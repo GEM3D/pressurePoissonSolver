@@ -150,7 +150,7 @@ int main (int argc, char *argv[])
         pj = myid - pi*Nx;
    }
 
-   printf("MyId: %d, np: %d, Nx: %d, Ny: %d, hx: %f, hy: %f, pj: %d, pi: %d\n",myid, num_procs, Nx, Ny, hx, hy, pj, pi);
+  // printf("MyId: %d, np: %d, Nx: %d, Ny: %d, hx: %f, hy: %f, pj: %d, pi: %d\n",myid, num_procs, Nx, Ny, hx, hy, pj, pi);
    /* Figure out the extents of each processor's piece of the grid. */
    ilower[0] = pi*nx;
    ilower[1] = pj*ny;
@@ -342,20 +342,6 @@ int main (int argc, char *argv[])
       HYPRE_StructVectorInitialize(analytical);
     
      //printf("My Id is %d. %d,%d Lowers are %d,  %d and uppers are %d, %d\n",myid, pi, pj, ilower[0], ilower[1] , iupper[0], iupper[1]);
-/*
-     Set the values 
-      for (j = ilower[1]; j <= iupper[1]; j++){
-          double y = (j+1.) * 1.0 * hy;
-          for (i = ilower[0]; i <= iupper[0]; i ++){
-              double x = (i+1.) * 1.0 * hx;
-              exact_solution[i + j * nx] = 1.0 * sin(2 * M_PI * x) * sin(2 * M_PI * y);
-              values[i + j * nx] = -8. * PI2 * sin(2. * M_PI * x) * sin(2. * M_PI * y);
-              //printf("my id is %d (x,y) %f, %f\n",myid, x, y);
-              xvalues[i + j * nx] = 0.0;
-              printf("At %f, %f the value is %f and exact solution is %f\n", x , y , values[i+j*nx], exact_solution[i+j*nx]);
-          }
-      }
-*/
 
    for (j = 0; j < ny; j++){
           double y = (j+1.) * 1.0 * hy + ilower[1] * hy;
@@ -387,7 +373,7 @@ int main (int argc, char *argv[])
       HYPRE_StructVectorPrint("try2varxy/try2varxy.vect.x", x, 0);
       HYPRE_StructMatrixPrint("try2varxy/try2varxy.matrix.A", A, 0);
    }
-   printf("vectors assembled\n");   
+   //printf("vectors assembled\n");   
 
    /* 6. Set up and use a struct solver
       (Solver options can be found in the Reference Manual.) */
