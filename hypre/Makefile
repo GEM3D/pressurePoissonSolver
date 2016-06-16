@@ -6,12 +6,13 @@ F77       = mpif77
 CXX       = mpicxx
 F90       = mpif90
 HYPRE_DIR = /cm/shared/apps/hypre/gcc/64/2.10.1/
+LAPACK_DIR = /cm/shared/apps/lapack/gcc/64/3.5.0/lib/cmaike/lapack-3.4.2/
 
 ########################################################################
 # Compiling and linking options
 ########################################################################
 COPTS     = -g -Wall
-CINCLUDES = -I$(HYPRE_DIR)/include
+CINCLUDES = -I$(HYPRE_DIR)/include -I$(LAPACK_DIR)/include
 CDEFS     = -DHAVE_CONFIG_H -DHYPRE_TIMING
 CFLAGS    = $(COPTS) $(CINCLUDES) $(CDEFS)
 FOPTS     = -g
@@ -27,10 +28,11 @@ F90FLAGS = $(FFLAGS) $(IF90FLAGS)
 
 
 LINKOPTS  = $(COPTS)
-LIBS      = -L$(HYPRE_DIR)/lib -lHYPRE -lm
+LIBS      = -L$(HYPRE_DIR)/lib -lHYPRE -lm -L$(LAPACK_DIR)/lib -llapack -lblas
 LFLAGS    = $(LINKOPTS) $(LIBS) -lstdc++
 LFLAGS_B =\
  -L${HYPRE_DIR}/lib\
+ -L${LAPACK_DIR}/lib\
  -lbHYPREClient-C\
  -lbHYPREClient-CX\
  -lbHYPREClient-F\
@@ -250,7 +252,10 @@ try2: try2.o
 try2_varxy: try2_varxy.o
 	$(CC) -o $@ $^ $(LFLAGS)
 
-ParCSR.: ParCSR.c
+ParCSR.: ParCSR.o
+	$(CC) -o $@ $^ $(LFLAGS)
+
+ExactIJ: ExactIJ.o
 	$(CC) -o $@ $^ $(LFLAGS)
 
 ########################################################################
