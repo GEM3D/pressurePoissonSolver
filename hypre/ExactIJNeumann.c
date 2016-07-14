@@ -206,14 +206,14 @@ int main(int argc, char *argv[]) {
     center_valuesx = calloc(nvaluesx, sizeof(double));
     for (j = 0; j < nvaluesx; j++){
       valuesx[j] = 0.0;
-      center_valuesx[j] = -hx2inv;
+      center_valuesx[j] = hx2inv;
     }
 
     valuesy = calloc(nvaluesy, sizeof(double));
     center_valuesy = calloc(nvaluesy, sizeof(double));
     for (j = 0; j < nvaluesy; j++){
       valuesy[j] = 0.0;
-      center_valuesy[j] = -hy2inv;
+      center_valuesy[j] = hy2inv;
      }
  
 
@@ -311,8 +311,8 @@ int main(int argc, char *argv[]) {
     for (i = 0; i < nx; i++) {
       double x = (ilower[0] + i + .5) * hx;
       rhs_values[i + j * nx] =
-          -8. * PI2 * sin(2. * M_PI * x) * sin(2. * M_PI * y);
-      exactsolution[i + j * nx] = 1.0 * sin(2. * M_PI * x) * sin(2. * M_PI * y);
+          -8. * PI2 * cos(2. * M_PI * x) * cos(2. * M_PI * y);
+      exactsolution[i + j * nx] = 1.0 * cos(2. * M_PI * x) * cos(2. * M_PI * y);
       x_values[i + j * nx] = 0.0;
     }
   }
@@ -404,25 +404,27 @@ int main(int argc, char *argv[]) {
       MPI_Finalize();
       exit(1);
     }
-
+    double mean = 0.0;
     // Reads the file to the array values 
     for (i = 0; i < nvalues + 1; i++) {
       fscanf(solution, "%lf", &values[i]);
+      if (i != 0){
+      mean += values[i];
+      }
     }
-
     // Close the file 
     fflush(solution);
     fclose(solution);
 
     MPI_Barrier(MPI_COMM_WORLD);
-
+mean /= nvalues; 
     // Calcluates the sum of the squared differences for the exact and numerical solutions on each processor   
   for (i = 1; i < nvalues + 1; i++) {
-      diff = values[i] - exactsolution[i-1];
+      diff = values[i] -mean - exactsolution[i-1];
       diff2 = diff * diff;
       if (diff2 > 10){
-       printf("%+6f       %+6f     %+6d\n", values[i], exactsolution[i-1],
-       i-1);
+       printf("%+6f       %+6f     %+6f\n", values[i], exactsolution[i-1],
+       diff);
       }
       sum += diff2;
       }
