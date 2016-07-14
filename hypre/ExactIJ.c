@@ -6,7 +6,7 @@
  * f = -2pi^2*sin(2*pi*x)*(2*pi*y) with dirchlet boundary conditions
  *
  * Compile with: make ExactIJ
- * Execute with: mpirun -np 4 ExactIJ -nx 101 -ny 101 -NX 2 -solver 0 -vis
+ * Execute with: mpirun -np 4 ExactIJ -nx 100 -ny 100 -NX 2 -solver 0 -vis
  *
  * Create by: Joseph McNeal
  */
@@ -29,6 +29,7 @@ int main(int argc, char *argv[]) {
   int i, j, pi, pj;
   int myid, num_procs;
   int Nx, Ny, nx, ny;
+  //nx and ny are number of mesh cells
   int solver_id;
   int vis;
   int ilower[2], iupper[2];
@@ -57,8 +58,8 @@ int main(int argc, char *argv[]) {
   // printf("mpi initialized\n");
    
   // Set default problem parameters
-  nx = 101;
-  ny = 101;
+  nx = 100;
+  ny = 100;
   Nx = 1;
   solver_id = 0;
   vis = 0;
@@ -99,8 +100,8 @@ int main(int argc, char *argv[]) {
    
   // Set up processors in grid 
   Ny = num_procs / Nx;
-  hx = 1.0 / (Nx * (nx - 1));
-  hy = 1.0 / (Ny * (ny - 1));
+  hx = 1.0 / (Nx * nx + 1);
+  hy = 1.0 / (Ny * ny + 1);
 
   if (Ny <= Nx) {
     pj = myid / Nx;
@@ -436,7 +437,7 @@ int main(int argc, char *argv[]) {
   // Calculates the L2 norm  
   if (myid == 0){
       //printf("%f\n" , recvbuffer[myid]);
-
+    //  nvalues = (nx-2)*(ny-2);      
       double totalvalues = nvalues * num_procs * 1.0; 
 
       L2 = sqrt(recvbuffer[0] / totalvalues);      
