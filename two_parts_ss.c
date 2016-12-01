@@ -10,6 +10,7 @@
  * Execute with: mpirun -np 1 two_parts_ss
  *
  * Created by: Joseph McNeal
+ * JUNK THING
  */
 
 #include <math.h>
