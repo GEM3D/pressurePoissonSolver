@@ -62,7 +62,7 @@ int main(int argc, char *argv[]){
   num_parts = 2;
   nx = 10;
   ny = 10;
-  solver_id = 0;
+  solver_id = 1;
   vis = 1;
 
   int plower[2*num_parts], pupper[2*num_parts];
@@ -92,8 +92,8 @@ int main(int argc, char *argv[]){
   //Determine the grid spacing of each part
   //Here Part 0 has the global grid spacing, and part 1 has half of that
   //Set the parts into a grid
-  int num_partsx = num_parts;
-  int num_partsy = 1;
+  //int num_partsx = num_parts;
+  //int num_partsy = 1;
   phx[0] = hx;
   phy[0] = hy;
   phx[1] = hx;
@@ -126,7 +126,7 @@ int main(int argc, char *argv[]){
 
   //Determine each part's piece of the processor's grid
   
-
+/*
   for(i = 0; i < num_parts; i++){
        plower[2 * i] = ilower[0] + i * nx/num_partsx;
        plower[1 + 2 * i] = ilower[1];
@@ -139,7 +139,7 @@ int main(int argc, char *argv[]){
 
        //HYPRE_SStructGridSetExtents(grid, part[i], plowerloc, pupperloc);
    }
-
+*/
    plower[0] = 1;
    plower[1] = 1; 
    pupper[0] = 10;
@@ -297,8 +297,8 @@ int main(int argc, char *argv[]){
        //Set the Neumann Boundary Conditions
        //Check for different numbers of parts
        nentries = 1;
-       nvaluesx = nentries / phx[i];
-       nvaluesy = nentries / phy[i];
+       nvaluesx = nentries / hx;
+       nvaluesy = nentries / hy;
        printf("nx: %d, ny: %d\n", nvaluesx, nvaluesy); 
        valuesx = calloc(nvaluesx, sizeof(double));
        valuesy = calloc(nvaluesy, sizeof(double));
@@ -307,27 +307,30 @@ int main(int argc, char *argv[]){
        for(j = 0; j < nvaluesx; j++){
               valuesx[j] = 0.0;
               center_valuesx[j] = phx2inv[i];
+              //printf("x2inv: %f\n", phx2inv[i]);
+              //printf("Vx: %f, CVx: %f\n", valuesx[j], center_valuesx[j]);
        }
  
        for(j = 0; j < nvaluesy; j++){
               valuesy[j] = 0.0;
               center_valuesy[j] = phy2inv[i];
+              //printf("Vy: %f, CVy: %f\n", valuesy[j], center_valuesy[j]);
        }
 
        //printf("center values set\n");
 
        if (pj == 0){
               //Bottom Row of grid points
-              b_ilower[0] = plower[2*i];
-              b_ilower[1] = plower[1+2*i];
-              b_iupper[0] = pupper[1+2*i];
+              b_ilower[0] = lower[0];
+              b_ilower[1] = lower[1];
+              b_iupper[0] = upper[0];
               b_iupper[1] = b_ilower[1];
               stencil_index[0] = 3;
               if (myid == 0 && i == 0 ){
                      center_valuesy[1] = -phy2inv[0];
               }
               HYPRE_SStructMatrixSetBoxValues(A, part[i], b_ilower, b_iupper, var, nentries, stencil_index, valuesy);
-              HYPRE_SStructMatrixAddToBoxValues(A, part[i], b_ilower, b_ilower, var, nentries, center_index, center_valuesy);
+              HYPRE_SStructMatrixAddToBoxValues(A, part[i], b_ilower, b_iupper, var, nentries, center_index, center_valuesy);
 
               center_valuesy[1] = phy2inv[i];
        }
@@ -335,16 +338,15 @@ int main(int argc, char *argv[]){
 
        if (pj == Ny - 1) {
               //Upper row of grid points
-              b_ilower[0] = plower[2*i];
-              b_ilower[1] = pupper[1+2*i];
+              b_ilower[0] = lower[0];
+              b_ilower[1] = upper[1];
 
-              b_iupper[0] = pupper[2*i];
+              b_iupper[0] = upper[0];
               b_iupper[1] = b_ilower[1];
 
               stencil_index[0] = 4;
-
-              HYPRE_SStructMatrixSetBoxValues(A, part[i], b_ilower, b_iupper, var,
-                                      nentries, stencil_index, valuesy);
+              printf("U:%d,%d    L:%d,%d\n", b_ilower[0],b_ilower[1],b_iupper[0], b_iupper[1]);
+              HYPRE_SStructMatrixSetBoxValues(A, part[i], b_ilower, b_iupper, var, nentries, stencil_index, valuesy);
               HYPRE_SStructMatrixAddToBoxValues(A, part[i], b_ilower, b_iupper, var, nentries, center_index, center_valuesy);
        }
 
@@ -365,11 +367,11 @@ int main(int argc, char *argv[]){
 
        if (i == 1) {
                //Right column of gridpoints
-                b_ilower[0] = pupper[2*i];
-                b_ilower[1] = plower[1+2*i];
+                b_ilower[0] = upper[0];
+                b_ilower[1] = lower[0];
 
                 b_iupper[0] = b_ilower[0];
-                b_iupper[1] = pupper[1+2*i];
+                b_iupper[1] = upper[1];
 
                 stencil_index[0] = 2;
 
@@ -457,7 +459,7 @@ int main(int argc, char *argv[]){
                x_values[i + j * nx] = 1.0;
                counter++;
                //printf("rhs: %f\n", rhs_values[i + j * nx]);
-               printf("p: %d, x: %f, y: %f, rhs: %+.6f  exact: %+.6f\n", p, x, y, rhs_values[i+j*nx], exactsolution[i+j*nx]);
+               //printf("p: %d, x: %f, y: %f, rhs: %+.6f  exact: %+.6f\n", p, x, y, rhs_values[i+j*nx], exactsolution[i+j*nx]);
          }
   
         //printf("total number of points:%d\n", counter);
