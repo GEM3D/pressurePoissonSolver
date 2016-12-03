@@ -5,7 +5,7 @@ CC        = mpicc
 F77       = mpif77
 CXX       = mpicxx
 F90       = mpif90
-HYPRE_DIR = /Users/calhoun/software/hypre/src/hypre
+HYPRE_DIR = ${GEM3D_HYPRE}/src/hypre
 
 ########################################################################
 # Compiling and linking options
@@ -71,45 +71,27 @@ all: $(ALLPROGS)
 
 default: all
 
+usage:
+	@echo 'ex1 : Dirichlet conditions (homogenous face-centered bc)'
+	@echo 'ex2 : Neumann conditions (homogenous face-centered bc)'
+
 ########################################################################
-# Example 1
+# Example 1 - Dirichlet (homogenous boundary conditions)
 ########################################################################
 ex1: ex1.o
 	$(CC) -o $@ $^ $(LFLAGS)
 
 ########################################################################
-# Example 2
+# Example 2 - Dirichlet (homogenous boundary conditions)
 ########################################################################
 ex2: ex2.o
 	$(CC) -o $@ $^ $(LFLAGS)
 
-##################a######################################################
-# Example 2a
-########################################################################
-ex2a: ex2a.o
-	$(CC) -o $@ $^ $(LFLAGS)
-
-
-##################a######################################################
-# Example 2b
-########################################################################
-ex2b: ex2b.o
-	$(CC) -o $@ $^ $(LFLAGS)
-
-
-
 
 ########################################################################
-# Example 3
+# Example 3 - Dirichlet (homogenous boundary conditions)
 ########################################################################
 ex3: ex3.o
-	$(CC) -o $@ $^ $(LFLAGS)
-
-
-########################################################################
-# Example 4
-########################################################################
-ex4: ex4.o
 	$(CC) -o $@ $^ $(LFLAGS)
 
 

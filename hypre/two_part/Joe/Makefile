@@ -5,9 +5,9 @@ CC        = mpicc
 F77       = mpif77
 CXX       = mpicxx
 F90       = mpif90
-# HYPRE_DIR = /cm/shared/apps/hypre/gcc/64/2.10.1/
-LAPACK_DIR = /Users/calhoun/lapack-3.5.0
-HYPRE_DIR = /Users/calhoun/software/hypre/src/hypre
+
+LAPACK_DIR = ${GEM3D_HYPRE}/src/lapack
+HYPRE_DIR = ${GEM3D_HYPRE}/src/hypre
 
 
 ########################################################################

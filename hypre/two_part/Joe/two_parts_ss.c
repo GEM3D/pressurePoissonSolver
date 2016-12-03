@@ -368,7 +368,7 @@ int main(int argc, char *argv[]){
        if (i == 1) {
                //Right column of gridpoints
                 b_ilower[0] = upper[0];
-                b_ilower[1] = lower[0];
+                b_ilower[1] = lower[1];
 
                 b_iupper[0] = b_ilower[0];
                 b_iupper[1] = upper[1];
