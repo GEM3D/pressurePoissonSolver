@@ -1,21 +1,10 @@
 /*
-   Example 8
+   Example 1
 
    Interface:    Semi-Structured interface (SStruct)
 
-   Compile with: make ex8
+   Compile with: make ex1
 
-   Sample run:   mpirun -np 2 ex8
-
-   Description:  This is a two processor example which solves a similar
-                 problem to the one in Example 2, and Example 6 (The grid
-                 boxes are exactly those in the example diagram in the
-                 struct interface chapter of the User's Manual.)
-
-                 The difference with the previous examples is that we use
-                 three parts, two with a 5-point and one with a 9-point
-                 discretization stencil. The solver is PCG with split-SMG
-                 preconditioner.
 */
 
 #include <stdio.h>

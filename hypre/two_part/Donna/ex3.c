@@ -1,21 +1,8 @@
 /*
-   Example 8
+   Example 3
 
-   Interface:    Semi-Structured interface (SStruct)
+   Interface:    Semi-Structured interface with two parts
 
-   Compile with: make ex8
-
-   Sample run:   mpirun -np 2 ex8
-
-   Description:  This is a two processor example which solves a similar
-                 problem to the one in Example 2, and Example 6 (The grid
-                 boxes are exactly those in the example diagram in the
-                 struct interface chapter of the User's Manual.)
-
-                 The difference with the previous examples is that we use
-                 three parts, two with a 5-point and one with a 9-point
-                 discretization stencil. The solver is PCG with split-SMG
-                 preconditioner.
 */
 
 #include <stdio.h>
@@ -27,6 +14,7 @@
 #include "HYPRE_parcsr_mv.h"
 
 #include "vis.c"
+#include "mpi.h"
 
 #define MAX(a,b) \
    ({ __typeof__ (a) _a = (a); \
@@ -48,26 +36,51 @@ int main (int argc, char *argv[])
     HYPRE_SStructSolver   solver;
     HYPRE_SStructSolver   precond;
 
-    int object_type;
-
     /* Initialize MPI */
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
 
-    /* Dimensions of each box */
-    int nx = 10;
+    /* ----------------------------------------------------
+       User defined parameters (mesh size and solver type)
+       ---------------------------------------------------- */
+
+    int nx = 10;  /* nx should equal ny */
     int ny = 10;
-    double h = 1.0/h;
+
+    int solver_id = 2;   /* 0 for PCG;  1 for PCG; 2 for BoomerAMR  */
+
+    /* -------------------------------------------------
+       Things the user shouldn't change
+       ------------------------------------------------- */
+
+    if (nx != ny)
+    {
+        printf("nx should equal ny for this problem\n");
+        MPI_Finalize();
+        return(0);
+    }
+
+    double h = 1.0/nx;   /* Assume that nx == ny */
     double h2 = h*h;
 
-    int ndim = 2;
-    int nparts = 2;
-    int var = 0;
-    int nvars = 1;
+    int ndim = 2;       /* Dimension of the problem */
+    int nparts = 2;     /* Number of parts (fixed)  */
+    int var = 0;        /* Variable index */
+    int nvars = 1;      /* Number of variables */
 
-    int i;
+    int object_type;
+    if (solver_id == 0)
+    {
+        object_type = HYPRE_SSTRUCT;
+    }
+    else if (solver_id == 1)
+    {
+        object_type = HYPRE_PARCSR;    /* Doesn't yet work */
+    }
 
+
+    /* Index space for each part */
     int ll[2], lr[2], ul[2], ur[2];
     ll[0] = 1;
     ll[1] = 1;
@@ -89,9 +102,18 @@ int main (int argc, char *argv[])
     ur_g[0] = ur[0] + 1;
     ur_g[1] = ur[1];
 
+    /* Miscellaneous variables */
+    int i, j, part;
+
+
+    /* -------------------------------------------------------------
+       For this code we assume that all parts are local to a single
+       processor.
+       ------------------------------------------------------------- */
+
     if (num_procs != 1)
     {
-        if (myid ==0) printf("Must run with 1 processor!\n");
+        printf("Must run with 1 processor!\n");
         MPI_Finalize();
 
         return(0);
@@ -140,14 +162,9 @@ int main (int argc, char *argv[])
 
     /* -------------------------------------------------------------
        1. Set up the 2D grid.
-
-       This gives the index space in each part. We have one variable
-       in each part.
        ------------------------------------------------------------- */
 
     {
-        int part;
-
         /* Create an empty 2D grid object */
         HYPRE_SStructGridCreate(MPI_COMM_WORLD, ndim, nparts, &grid);
 
@@ -163,22 +180,22 @@ int main (int argc, char *argv[])
         /* Set cell centered data */
         HYPRE_SStructVariable vartypes[1] = {HYPRE_SSTRUCT_VARIABLE_CELL};
 
-        for (i = 0; i < nparts; i++)
-            HYPRE_SStructGridSetVariables(grid, i, nvars, vartypes);
+        part = 0;
+        HYPRE_SStructGridSetVariables(grid, part, nvars, vartypes);
+
+        part = 1;
+        HYPRE_SStructGridSetVariables(grid, part, nvars, vartypes);
 
         /* Describe part connectivity */
         {
             int index_map[2] = {0,1};
             int index_dir[2] = {1,1};
-            int part;
             int nbor_part;
 
+            /* connectivity described in terms of both part and neighbor
+               coordinates */
             part = 0;
             nbor_part = 1;
-
-            /* Cells just outside of the boundary of part 0 in
-               its coordinates */
-
             HYPRE_SStructGridSetNeighborPart(grid, part, lr_g, ur_g,
                                              nbor_part, ll, ul,
                                              index_map, index_dir);
@@ -214,19 +231,12 @@ int main (int argc, char *argv[])
 
     /* -------------------------------------------------------------
        3. Set up the graph.
-
-       This determines the non-zero structure of the matrix and
-       allows non-stencil relationships between the parts
        ------------------------------------------------------------- */
-
     {
-        int part;
-
         /* Create the graph object */
         HYPRE_SStructGraphCreate(MPI_COMM_WORLD, grid, &graph);
 
         /* See MatrixSetObjectType below */
-        object_type = HYPRE_PARCSR;
         HYPRE_SStructGraphSetObjectType(graph, object_type);
 
         /* Use the 5-pt stencil on each part  */
@@ -244,9 +254,6 @@ int main (int argc, char *argv[])
        4. Set up a SStruct Matrix
        ------------------------------------------------------------- */
     {
-        int i,j;
-        int part;
-
         /* Create the empty matrix object */
         HYPRE_SStructMatrixCreate(MPI_COMM_WORLD, graph, &A);
 
@@ -256,7 +263,6 @@ int main (int argc, char *argv[])
            If the problem is purely structured (with one part), you may want to use
            HYPRE_STRUCT to access the structured solvers.  Since we have two parts
            with different stencils, we set the object type to HYPRE_SSTRUCT. */
-        object_type = HYPRE_SSTRUCT;
         HYPRE_SStructMatrixSetObjectType(A, object_type);
 
         /* Get ready to set values */
@@ -359,8 +365,8 @@ int main (int argc, char *argv[])
             free(values);
         }
 
+        /* Fix corner stencils */
         {
-            /* Fix corner stencils */
             int nentries = 3;                 /* Number of stencil weights to set */
             double values[3] = {2/h2,0,0};    /* setting only 1 stencil per call */
 
@@ -418,12 +424,9 @@ int main (int argc, char *argv[])
         }
 
 
-
-        /* This is a collective call finalizing the matrix assembly.
-           The matrix is now ``ready to be used'' */
         HYPRE_SStructMatrixAssemble(A);
-
         HYPRE_SStructMatrixPrint("matrix.ex3",A,0);
+
     }
 
 
@@ -431,16 +434,12 @@ int main (int argc, char *argv[])
        5. Set up SStruct Vectors for b and x
        ------------------------------------------------------------- */
     {
-        int i;
-        int part;
-
         /* Create an empty vector object */
         HYPRE_SStructVectorCreate(MPI_COMM_WORLD, grid, &b);
         HYPRE_SStructVectorCreate(MPI_COMM_WORLD, grid, &x);
 
         /* As with the matrix,  set the object type for the vectors
            to be the sstruct type */
-        object_type = HYPRE_PARCSR;
         HYPRE_SStructVectorSetObjectType(b, object_type);
         HYPRE_SStructVectorSetObjectType(x, object_type);
 
@@ -475,42 +474,133 @@ int main (int argc, char *argv[])
         }
         free(values);
 
-        /* This is a collective call finalizing the vector assembly.
-           The vectors are now ``ready to be used'' */
         HYPRE_SStructVectorAssemble(b);
         HYPRE_SStructVectorAssemble(x);
+
     }
 
 
-    /* 6. Set up and use a solver (See the Reference Manual for descriptions
-       of all of the options.) */
+    /* -------------------------------------------------------------
+       6. Set up the solver and solve problem
+       ------------------------------------------------------------- */
     {
+        if (solver_id == 0)
+        {
+            /* This seems to work */
+
+            /* Create an empty PCG Struct solver */
+            HYPRE_SStructPCGCreate(MPI_COMM_WORLD, &solver);
+
+            /* Set PCG parameters */
+            HYPRE_SStructPCGSetTol(solver, 1.0e-12 );
+            HYPRE_SStructPCGSetPrintLevel(solver, 2);
+            HYPRE_SStructPCGSetMaxIter(solver, 500);
+
+            /* Create a split SStruct solver for use as a preconditioner */
+            HYPRE_SStructSplitCreate(MPI_COMM_WORLD, &precond);
+            HYPRE_SStructSplitSetMaxIter(precond, 1);
+            HYPRE_SStructSplitSetTol(precond, 0.0);
+            HYPRE_SStructSplitSetZeroGuess(precond);
+
+            /* Set the preconditioner type to split-SMG */
+            HYPRE_SStructSplitSetStructSolver(precond, HYPRE_SMG);
+
+            /* Set preconditioner and solve */
+            HYPRE_SStructPCGSetPrecond(solver, HYPRE_SStructSplitSolve,
+                                       HYPRE_SStructSplitSetup, precond);
+
+            HYPRE_SStructPCGSetup(solver, A, b, x);
+            HYPRE_SStructPCGSolve(solver, A, b, x);
+
+            HYPRE_SStructPCGDestroy(solver);
+            HYPRE_SStructSplitDestroy(precond);
+        }
+        else if (solver_id == 1)
+        {
+
+            /* This doesn't work */
+
+            HYPRE_Solver solver;
+            HYPRE_Solver precond;
+
+            HYPRE_ParCSRMatrix parcsr_A;
+            HYPRE_ParVector par_b;
+            HYPRE_ParVector par_x;
+
+            //Set the PCG solvers parameters
+            HYPRE_ParCSRPCGCreate(MPI_COMM_WORLD, &solver);
+            HYPRE_ParCSRPCGSetTol(solver, 1.0e-12);
+            HYPRE_BoomerAMGSetPrintLevel(solver, 3);
+            HYPRE_ParCSRPCGSetMaxIter(solver, 500);
+
 #if 0
-        /* Create an empty PCG Struct solver */
-        HYPRE_SStructPCGCreate(MPI_COMM_WORLD, &solver);
-
-        /* Set PCG parameters */
-        HYPRE_SStructPCGSetTol(solver, 1.0e-12 );
-        HYPRE_SStructPCGSetPrintLevel(solver, 2);
-        HYPRE_SStructPCGSetMaxIter(solver, 500);
-
-        /* Create a split SStruct solver for use as a preconditioner */
-        HYPRE_SStructSplitCreate(MPI_COMM_WORLD, &precond);
-        HYPRE_SStructSplitSetMaxIter(precond, 1);
-        HYPRE_SStructSplitSetTol(precond, 0.0);
-        HYPRE_SStructSplitSetZeroGuess(precond);
-
-        /* Set the preconditioner type to split-SMG */
-        HYPRE_SStructSplitSetStructSolver(precond, HYPRE_SMG);
-
-        /* Set preconditioner and solve */
-        HYPRE_SStructPCGSetPrecond(solver, HYPRE_SStructSplitSolve,
-                                   HYPRE_SStructSplitSetup, precond);
-
-        HYPRE_SStructPCGSetup(solver, A, b, x);
-
-        HYPRE_SStructPCGSolve(solver, A, b, x);
+            HYPRE_ParCSRPCGSetTwoNorm(solver, 1);
+            HYPRE_ParCSRPCGSetLogging(solver, 3);
 #endif
+
+            //Set the AMG preconditioner parameters
+            HYPRE_BoomerAMGCreate(&precond);
+            HYPRE_BoomerAMGSetStrongThreshold(precond, .25);
+            HYPRE_BoomerAMGSetCoarsenType(precond, 6);
+            HYPRE_BoomerAMGSetTol(precond, 0.0);
+            HYPRE_BoomerAMGSetMaxIter(precond, 10);
+            HYPRE_BoomerAMGSetPrintLevel(precond, 0);
+
+            // Setup and Solve the system
+            HYPRE_ParCSRPCGSetPrecond(solver,
+                                      HYPRE_BoomerAMGSolve,
+                                      HYPRE_BoomerAMGSetup,
+                                      precond);
+
+            HYPRE_SStructMatrixGetObject(A, (void **) &parcsr_A);
+            HYPRE_SStructVectorGetObject(b, (void **) &par_b);
+            HYPRE_SStructVectorGetObject(x, (void **) &par_x);
+
+            HYPRE_ParCSRPCGSetup(solver, parcsr_A, par_b, par_x);
+            HYPRE_ParCSRPCGSolve(solver, parcsr_A, par_b, par_x);
+
+            HYPRE_BoomerAMGDestroy(precond);
+            HYPRE_ParCSRPCGDestroy(solver);
+        }
+        else if (solver_id == 2)
+        {
+            HYPRE_Solver solver;
+
+            HYPRE_ParCSRMatrix parcsr_A;
+            HYPRE_ParVector par_b;
+            HYPRE_ParVector par_x;
+
+            double final_res_norm;
+            int num_iterations;
+
+            HYPRE_BoomerAMGCreate(&solver);
+
+            //Set solver parameters
+            HYPRE_BoomerAMGSetPrintLevel(solver, 3);
+            HYPRE_BoomerAMGSetStrongThreshold(solver, .15);
+            HYPRE_BoomerAMGSetCoarsenType(solver, 6);
+            HYPRE_BoomerAMGSetRelaxType(solver, 6);
+            HYPRE_BoomerAMGSetNumSweeps(solver, 1);
+            HYPRE_BoomerAMGSetMaxLevels(solver, 20);
+            HYPRE_BoomerAMGSetTol(solver, 1e-12);
+            HYPRE_BoomerAMGSetInterpType(solver, 14);
+            HYPRE_BoomerAMGSetAggInterpType(solver, 2);
+            HYPRE_BoomerAMGSetMaxIter(solver, 100);
+
+            HYPRE_SStructMatrixGetObject(A, (void **) &parcsr_A);
+            HYPRE_SStructVectorGetObject(b, (void **) &par_b);
+            HYPRE_SStructVectorGetObject(x, (void **) &par_x);
+
+            HYPRE_BoomerAMGSetup(solver, parcsr_A, par_b, par_x);
+
+            HYPRE_BoomerAMGSolve(solver, parcsr_A, par_b, par_x);
+
+            //Get Run Information
+            HYPRE_BoomerAMGGetNumIterations(solver, &num_iterations);
+            HYPRE_BoomerAMGGetFinalRelativeResidualNorm(solver, &final_res_norm);
+
+            HYPRE_BoomerAMGDestroy(solver);
+        }
     }
 
     /* Save the solution for GLVis visualization, see vis/glvis-ex8.sh */
@@ -535,8 +625,12 @@ int main (int argc, char *argv[])
     HYPRE_SStructVectorDestroy(b);
     HYPRE_SStructVectorDestroy(x);
 
-    HYPRE_SStructPCGDestroy(solver);
-    HYPRE_SStructSplitDestroy(precond);
+    if (solver_id == -1)
+    {
+        HYPRE_SStructPCGDestroy(solver);
+        HYPRE_SStructSplitDestroy(precond);
+    }
+
 
     /* Finalize MPI */
     MPI_Finalize();
