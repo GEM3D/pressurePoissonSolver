@@ -1,2 +1,7 @@
 #include "Grid.h"
-void solve(Grid& d);
+/**
+ * @brief solve for the given grid
+ *
+ * @param grid the grid to solve over
+ */
+void solve(Grid& grid);
