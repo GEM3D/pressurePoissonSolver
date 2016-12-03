@@ -72,8 +72,7 @@ all: $(ALLPROGS)
 default: all
 
 usage:
-	@echo 'ex1 : Dirichlet conditions (homogenous face-centered bc)'
-	@echo 'ex2 : Neumann conditions (homogenous face-centered bc)'
+	@echo 'ex3 : Neumann conditions (homogenous face-centered bc)'
 
 ########################################################################
 # Example 1 - Dirichlet (homogenous boundary conditions)
