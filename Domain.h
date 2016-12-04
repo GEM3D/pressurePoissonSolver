@@ -11,12 +11,17 @@ class Domain
 	/**
 	 * @brief the values that we are integrating over
 	 */
-	std::vector<double> uxx;
+	std::vector<double> u_xx;
 
 	/**
 	 * @brief the solution on this domain
 	 */
-	std::vector<double> u;
+	std::vector<double>* u_curr_ptr;
+
+	/**
+	 * @brief the solution on this domain, from the previous iteration
+	 */
+	std::vector<double>* u_prev_ptr;
 
 	/**
 	 * @brief the beginning of this domain
@@ -60,6 +65,11 @@ class Domain
 	 */
 	Domain(double d_begin, double d_end, int m, double f(double x));
 
+    /**
+     * @brief destructor for domain object
+     */
+    ~Domain();
+
 	/**
 	 * @return the spacing between grid points
 	 */
@@ -95,31 +105,51 @@ class Domain
 	void setRightNbr(Domain &grid);
 
 	/**
-	 * @brief Return a grid that is associated with a string
+	 * @brief Return the uxx vector
 	 *
-	 * @param str the name of the grid to return
-	 *
-	 * @return a reference to the grid
+	 * @return a reference to the vector
 	 */
-	std::vector<double> &getGrid(std::string str);
+	std::vector<double> &uxx();
 
 	/**
-	 * @brief Return a grid from the left domain that is associated with a string
+	 * @brief Return the u_curr vector
 	 *
-	 * @param str the name of the grid to return
-	 *
-	 * @return a reference to the grid
+	 * @return a reference to the vector
 	 */
-	std::vector<double> &getLeftGrid(std::string str);
+	std::vector<double> &uCurr();
 
 	/**
-	 * @brief Return a grid from the right domain that is associated with a string
+	 * @brief Return the u_prev vector
 	 *
-	 * @param str the name of the grid to return
-	 *
-	 * @return a reference to the grid
+	 * @return a reference to the vector
 	 */
-	std::vector<double> &getRightGrid(std::string str);
+	std::vector<double> &uPrev();
+
+    /**
+     * @brief swap the pointer of to the u_curr vector and the u_prev vector
+     */
+	void swapCurrPrev();
+
+	/**
+	 * @brief Return the domain that is to the left of this one
+	 *
+	 * @return a reference to the Domain
+	 */
+	Domain &leftNbr();
+
+	/**
+	 * @brief Return the domain that is to the right of this one
+	 *
+	 * @return a reference to the domain
+	 */
+	Domain &rightNbr();
+
+    /**
+     * @brief Calculate the l2norm between u_curr and u_prev
+     *
+     * @return the l2norm
+     */
+    double l2norm();
 };
 
 #endif

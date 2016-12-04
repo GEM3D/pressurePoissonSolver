@@ -1,25 +1,31 @@
 #include <vector>
 using namespace std;
-#include "Domain.h"
+#include "TriDiagSolver.h"
 
-void solve(Domain &dom)
+TriDiagSolver::TriDiagSolver(double left_boundary, double right_boundary)
 {
-    vector<double>& uxx = dom.getGrid("u_xx");
-    vector<double>& u = dom.getGrid("u");
-	vector<double> d_prime(dom.size());
-	vector<double> c_prime(dom.size());
+	left_bnd  = left_boundary;
+	right_bnd = right_boundary;
+}
+
+void TriDiagSolver::solve(Domain &dom)
+{
+	vector<double> &uxx = dom.uxx();
+	vector<double> &u   = dom.uCurr();
+	vector<double>  d_prime(dom.size());
+	vector<double>  c_prime(dom.size());
 
 	// get some variables that are used for convenience
 	const int    last_i = dom.size() - 1;
 	const double h      = dom.spaceDelta();
 
-	double left_boundary = 0.0;
+	double left_boundary = left_bnd;
 	if (dom.hasLeftNbr()) {
-		left_boundary = (dom.getLeftGrid("u").back() + u.at(0)) / 2;
+		left_boundary = (dom.leftNbr().uCurr().back() + u.at(0)) / 2;
 	}
-	double right_boundary = 0.0;
+	double right_boundary = right_bnd;
 	if (dom.hasRightNbr()) {
-		right_boundary = (u.at(last_i) + dom.getRightGrid("u").front()) / 2;
+		right_boundary = (u.at(last_i) + dom.rightNbr().uPrev().front()) / 2;
 	}
 
 	// first value
