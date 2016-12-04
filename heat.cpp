@@ -16,21 +16,21 @@ int             main()
 	// set neighbors
 	left_dom.setRightNbr(right_dom);
 	right_dom.setLeftNbr(left_dom);
-	for (int i = 0; i < left_dom.size(); i++) {
-		cout << left_dom.uxx.at(i) << "  ";
+	for (double x : left_dom.getGrid("u_xx")) {
+		cout << x << "  ";
 	}
-	for (int i = 0; i < right_dom.size(); i++) {
-		cout << right_dom.uxx.at(i) << "  ";
+	for (double x : right_dom.getGrid("u_xx")) {
+		cout << x << "  ";
 	}
 	cout << '\n';
 	for (int i = 0; i < 100; i++) {
 		solve(left_dom);
 		solve(right_dom);
-		for (int i = 0; i < left_dom.size(); i++) {
-			cout << left_dom.u.at(i) << "  ";
+		for (double x : left_dom.getGrid("u")) {
+			cout << x << "  ";
 		}
-		for (int i = 0; i < right_dom.size(); i++) {
-			cout << right_dom.u.at(i) << "  ";
+		for (double x : right_dom.getGrid("u")) {
+			cout << x << "  ";
 		}
 		cout << '\n';
 	}
@@ -38,8 +38,8 @@ int             main()
 	cout << "The soluiton on a single dom:\n";
 	Domain single_dom(0.0, 1.0, m, f);
 	solve(single_dom);
-	for (int i = 0; i < single_dom.size(); i++) {
-		cout << single_dom.u.at(i) << "  ";
+	for (double x : single_dom.getGrid("u")) {
+		cout << x << "  ";
 	}
 	cout << '\n' << '\n';
 

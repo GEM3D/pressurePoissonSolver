@@ -4,7 +4,7 @@ using namespace std;
 Domain::Domain(double d_begin, double d_end, int m, double f(double x))
 {
 	this->m      = m;
-	u            = LinkedVector<double>(m);
+	u            = vector<double>(m);
 	uxx          = vector<double>(m);
 	domain_begin = d_begin;
 	domain_end   = d_end;
@@ -18,7 +18,18 @@ Domain::Domain(double d_begin, double d_end, int m, double f(double x))
 
 double Domain::spaceDelta() { return h; }
 int    Domain::size() { return m; }
-bool   Domain::hasLeftNbr() { return u.left_nbr_ptr != nullptr; }
-bool   Domain::hasRightNbr() { return u.right_nbr_ptr != nullptr; }
-void Domain::setLeftNbr(Domain &nbr) { u.left_nbr_ptr = &nbr.u; }
-void Domain::setRightNbr(Domain &nbr) { u.right_nbr_ptr = &nbr.u; }
+bool   Domain::hasLeftNbr() { return left_nbr_ptr != nullptr; }
+bool   Domain::hasRightNbr() { return right_nbr_ptr != nullptr; }
+void Domain::setLeftNbr(Domain &nbr) { left_nbr_ptr = &nbr; }
+void Domain::setRightNbr(Domain &nbr) { right_nbr_ptr = &nbr; }
+vector<double> &Domain::getGrid(string str)
+{
+	if (str == "u_xx") {
+		return uxx;
+	}
+	if (str == "u") {
+		return u;
+	}
+}
+vector<double> &Domain::getLeftGrid(string str) { return left_nbr_ptr->getGrid(str); }
+vector<double> &Domain::getRightGrid(string str) { return right_nbr_ptr->getGrid(str); }
