@@ -1,7 +1,7 @@
-#include "Grid.h"
+#include "Domain.h"
 /**
  * @brief solve for the given grid
  *
- * @param grid the grid to solve over
+ * @param dom the domain to solve over
  */
-void solve(Grid &grid);
+void solve(Domain &grid);

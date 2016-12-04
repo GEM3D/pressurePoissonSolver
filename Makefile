@@ -4,13 +4,13 @@ LDFLAGS = -lstdc++ -lm
 
 all: heat clean
 
-heat: heat.cpp TriDiagSolver.o Grid.o
+heat: heat.cpp TriDiagSolver.o Domain.o
 		$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 TriDiagSolver.o: TriDiagSolver.cpp
 		$(CC) -c $(CFLAGS) $<
 
-Grid.o: Grid.cpp
+Domain.o: Domain.cpp
 		$(CC) -c $(CFLAGS) $<
 clean:
 		rm *.o

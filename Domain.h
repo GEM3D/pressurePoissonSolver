@@ -1,11 +1,11 @@
-#ifndef GRID_H_SEEN
-#define GRID_H_SEEN
+#ifndef DOMAIN_H_SEEN
+#define DOMAIN_H_SEEN
 #include "LinkedVector.h"
 #include <vector>
 /**
- * @brief This class is an object that represents a grid.
+ * @brief This class is an object that represents a domain.
  */
-class Grid
+class Domain
 {
 	private:
 	/**
@@ -35,7 +35,7 @@ class Grid
 	 */
 	LinkedVector<double> u;
 	/**
-	 * @brief Create a new Grid object, and initialize the values
+	 * @brief Create a new Domain object, and initialize the values
 	 *
 	 * @param d_begin the beginning of the domain
 	 * @param d_end the end of the domain
@@ -43,7 +43,7 @@ class Grid
 	 * @param f is the function that is used to initialize the domain over x,
 	 * the function must have the form double f(double x)
 	 */
-	Grid(double d_begin, double d_end, int m, double f(double x));
+	Domain(double d_begin, double d_end, int m, double f(double x));
 	/**
 	 * @return the spacing between grid points
 	 */
@@ -65,13 +65,13 @@ class Grid
 	 *
 	 * @param grid the grid that is to the left of this one
 	 */
-	void setLeftNbr(Grid &grid);
+	void setLeftNbr(Domain &grid);
 	/**
 	 * @brief set the neighbor to this grid's right
 	 *
 	 * @param grid the grid that is to the right of this one
 	 */
-	void setRightNbr(Grid &grid);
+	void setRightNbr(Domain &grid);
 };
 
 #endif
