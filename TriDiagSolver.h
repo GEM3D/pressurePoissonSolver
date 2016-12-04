@@ -4,4 +4,4 @@
  *
  * @param grid the grid to solve over
  */
-void solve(Grid& grid);
+void solve(Grid &grid);
