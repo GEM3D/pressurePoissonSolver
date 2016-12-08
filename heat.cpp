@@ -1,6 +1,7 @@
 #include <cmath>
 #include <iostream>
 #include <vector>
+#include <limits>
 #define PI M_PI
 
 using namespace std;
@@ -11,7 +12,10 @@ double uxx_init(double x) { return -PI * PI * sin(PI * x); }
 double exact_solution(double x) { return sin(PI * x); }
 int main(int argc, char *argv[])
 {
-    // create a solver with 0 for the boundary conditions
+	// set cout to print full precision
+	cout.precision(numeric_limits<double>::max_digits10);
+
+	// create a solver with 0 for the boundary conditions
 	TriDiagSolver    tds(0.0, 0.0);
 	int              m           = stoi(argv[1]);
 	int              num_domains = stoi(argv[2]);
@@ -21,7 +25,6 @@ int main(int argc, char *argv[])
 	for (int i = 0; i < num_domains; i++) {
 		double x_start = (0.0 + i) / num_domains;
 		double x_end   = (1.0 + i) / num_domains;
-		cout << x_start << x_end << '\n';
 		dmns[i] = new Domain(x_start, x_end, m / num_domains, uxx_init);
 	}
 
@@ -59,7 +62,7 @@ int main(int argc, char *argv[])
 		// print out solution
 		for (Domain *d_ptr : dmns) {
 			for (double x : d_ptr->uCurr()) {
-				cout << x << "  ";
+				cout << x << "\t";
 			}
 		}
 		cout << '\n';
