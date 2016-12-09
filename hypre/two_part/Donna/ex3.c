@@ -51,15 +51,22 @@ int main (int argc, char *argv[])
        User defined parameters (mesh size and solver type)
        ---------------------------------------------------- */
 
-    int nx = 100;  /* nx should equal ny */
-    int ny = 100;
+    int nx = 200;  /* nx should equal ny */
+    int ny = 200;
 
     /*
       0 : PCG (no preconditioning)
       1 : PCG (BoomerAMG preconditioning);
       2 : BoomerAMG (no preconditioning)
     */
-    int solver_id = 2;
+    int solver_id = 0;
+
+    /*
+      Print levels for solvers.
+      0   : No printing
+      >0  : Print iterations (depends on solver)
+    */
+    int solver_print_level = 0;
 
     /* -------------------------------------------------
        Things the user shouldn't change
@@ -503,6 +510,8 @@ int main (int argc, char *argv[])
        6. Set up the solver and solve problem
        ------------------------------------------------------------- */
     {
+        double t0, t1;
+        t0 = MPI_Wtime();
         if (solver_id == 0)
         {
             /* This seems to work */
@@ -512,7 +521,7 @@ int main (int argc, char *argv[])
 
             /* Set PCG parameters */
             HYPRE_SStructPCGSetTol(solver, 1.0e-12 );
-            HYPRE_SStructPCGSetPrintLevel(solver, 2);
+            HYPRE_SStructPCGSetPrintLevel(solver, solver_print_level);
             HYPRE_SStructPCGSetMaxIter(solver, 2000);
 
             /* Create a split SStruct solver for use as a preconditioner */
@@ -522,7 +531,7 @@ int main (int argc, char *argv[])
             HYPRE_SStructSplitSetZeroGuess(precond);
 
             /* Set the preconditioner type to split-SMG */
- #if 0
+#if 1
             HYPRE_SStructSplitSetStructSolver(precond, HYPRE_SMG);
 
             /* Set preconditioner and solve */
@@ -544,7 +553,7 @@ int main (int argc, char *argv[])
             /* Set the PCG solvers parameters */
             HYPRE_ParCSRPCGCreate(MPI_COMM_WORLD, &solver);
             HYPRE_ParCSRPCGSetTol(solver, 1.0e-12);
-            HYPRE_ParCSRPCGSetPrintLevel(solver, 3);
+            HYPRE_ParCSRPCGSetPrintLevel(solver, solver_print_level);
             HYPRE_ParCSRPCGSetMaxIter(solver, 500);
 
 #if 0
@@ -591,7 +600,7 @@ int main (int argc, char *argv[])
             HYPRE_BoomerAMGSetCoarsenType(solver, 6);
             HYPRE_BoomerAMGSetTol(solver, 1e-12);
             HYPRE_BoomerAMGSetMaxIter(solver, 500);
-            HYPRE_BoomerAMGSetPrintLevel(solver, 1);
+            HYPRE_BoomerAMGSetPrintLevel(solver, solver_print_level);
 
             HYPRE_BoomerAMGSetRelaxType(solver, 6);
             HYPRE_BoomerAMGSetNumSweeps(solver, 1);
@@ -613,6 +622,9 @@ int main (int argc, char *argv[])
 
             HYPRE_BoomerAMGDestroy(solver);
         }
+        t1 = MPI_Wtime();
+        printf("Elapsed time : %12.4e\n",t1-t0);
+
     }
 
     /* Save the solution for GLVis visualization, see vis/glvis-ex8.sh */
@@ -651,10 +663,9 @@ int main (int argc, char *argv[])
 
             /* From vis.c */
             fprintf(file, "FiniteElementSpace\n");
-            fprintf(file, "FiniteElementCollection: Local_L2_2D_P0\n");
+            fprintf(file, "FiniteElementCollection: Local_L2_2D_P0\n");  /* cell-centered */
             fprintf(file, "VDim: 1\n");
             fprintf(file, "Ordering: 0\n\n");
-
 
             /* save solution */
             for (i = 0; i < nvalues; i++)
