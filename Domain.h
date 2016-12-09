@@ -65,7 +65,7 @@ class Domain
 	 */
 	Domain(double d_begin, double d_end, int m, double f(double x));
 
-    /**
+	/**
      * @brief destructor for domain object
      */
     ~Domain();
@@ -74,6 +74,16 @@ class Domain
 	 * @return the spacing between grid points
 	 */
 	double spaceDelta();
+
+	/**
+	 * @return begining of the domain
+	 */
+	double domainBegin();
+
+	/**
+	 * @return end of the domain
+	 */
+	double domainEnd();
 
 	/**
 	 * @return the number of grid points

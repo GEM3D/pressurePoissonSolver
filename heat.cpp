@@ -1,7 +1,7 @@
 #include <cmath>
 #include <iostream>
-#include <vector>
 #include <limits>
+#include <vector>
 #define PI M_PI
 
 using namespace std;
@@ -10,6 +10,22 @@ using namespace std;
 
 double uxx_init(double x) { return -PI * PI * sin(PI * x); }
 double exact_solution(double x) { return sin(PI * x); }
+double error(vector<Domain *> &dmns)
+{
+	double l2norm = 0;
+	for (Domain *d_ptr : dmns) {
+		int    m       = d_ptr->size();
+		double d_begin = d_ptr->domainBegin();
+		double d_end   = d_ptr->domainEnd();
+		for (int i = 0; i < m; i++) {
+			double x    = d_begin + (i + 0.5) / m * (d_end - d_begin);
+			double diff = exact_solution(x) - d_ptr->uPrev().at(i);
+			l2norm += diff * diff;
+		}
+	}
+	return sqrt(l2norm);
+}
+
 int main(int argc, char *argv[])
 {
 	// set cout to print full precision
@@ -25,7 +41,7 @@ int main(int argc, char *argv[])
 	for (int i = 0; i < num_domains; i++) {
 		double x_start = (0.0 + i) / num_domains;
 		double x_end   = (1.0 + i) / num_domains;
-		dmns[i] = new Domain(x_start, x_end, m / num_domains, uxx_init);
+		dmns[i]        = new Domain(x_start, x_end, m / num_domains, uxx_init);
 	}
 
 	// set neighbors
@@ -80,10 +96,12 @@ int main(int argc, char *argv[])
 		}
 	} while (l2norm > uxx_l2norm * 10e-10);
 
+	cerr << '\n';
+	cerr << "number of iterations: " << num_iter << "\n";
+	cerr << "error: " << error(dmns) << "\n";
+
 	// delete the domains
 	for (Domain *d_ptr : dmns) {
 		delete d_ptr;
 	}
-	cerr << '\n';
-	cerr << "number of iterations: " << num_iter << "\n";
 }

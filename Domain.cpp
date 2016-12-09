@@ -25,6 +25,8 @@ Domain::~Domain()
 }
 
 double Domain::spaceDelta() { return h; }
+double Domain::domainBegin() { return domain_begin; }
+double Domain::domainEnd() { return domain_end; }
 int    Domain::size() { return m; }
 bool   Domain::hasLeftNbr() { return left_nbr_ptr != nullptr; }
 bool   Domain::hasRightNbr() { return right_nbr_ptr != nullptr; }
