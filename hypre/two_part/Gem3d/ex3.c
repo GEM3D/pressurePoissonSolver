@@ -41,18 +41,16 @@ int main (int argc, char *argv[])
     HYPRE_ParVector par_x;
 
 
-
     /* Initialize MPI */
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
 
     /* ----------------------------------------------------
-       User defined parameters (mesh size and solver type)
+       Default values for input parameters
        ---------------------------------------------------- */
 
-    int nx = 200;  /* nx should equal ny */
-    int ny = 200;
+    int nx = 200;  /* ny set to nx */
 
     /*
       0 : PCG (no preconditioning)
@@ -61,12 +59,15 @@ int main (int argc, char *argv[])
     */
     int solver_id = 0;
 
+    int maxiter = 500;    /* Maximum number of iterations */
+    double tol = 1e-14;   /* Solver tolerance */
+
     /*
       Print levels for solvers.
       0   : No printing
       >0  : Print iterations (depends on solver)
     */
-    int solver_print_level = 0;
+    int print_level = 0;
 
     /* -------------------------------------------------------------
        For this code we assume that all parts are local to a single
@@ -112,12 +113,21 @@ int main (int argc, char *argv[])
             {
                 arg_index++;
                 nx = atoi(argv[arg_index++]);
-                ny = nx;
             }
-            else if (strcmp(argv[arg_index], "-solver_print_level") == 0)
+            else if (strcmp(argv[arg_index], "-maxiter") == 0)
             {
                 arg_index++;
-                solver_print_level = atoi(argv[arg_index++]);
+                maxiter = atoi(argv[arg_index++]);
+            }
+            else if (strcmp(argv[arg_index], "-tol") == 0)
+            {
+                arg_index++;
+                tol = atof(argv[arg_index++]);
+            }
+            else if (strcmp(argv[arg_index], "-print_level") == 0)
+            {
+                arg_index++;
+                print_level = atoi(argv[arg_index++]);
             }
             else
             {
@@ -131,9 +141,10 @@ int main (int argc, char *argv[])
             printf("Usage: %s [<options>]\n", argv[0]);
             printf("\n");
             printf("  -vis                  : save the solution for GLVis visualization\n");
-            printf("  -solver_id N          : Set solver_id to N(N=0,1,2)\n");
-            printf("  -nx N                 : Set nx to N (ny will be set to equal nx)\n");
-            printf("  -solver_print_level N : Set solver print level to N (N=0-3)\n");
+            printf("  -solver_id N          : Solver_id (N=0,1,2)\n");
+            printf("  -nx N                 : nx (ny will be set to equal nx)\n");
+            printf("  -maxiter N            : Maximum number of iterations\n");
+            printf("  -print_level N        : Solver print level to N (N=0-3)\n");
             printf("\n");
         }
 
@@ -151,13 +162,7 @@ int main (int argc, char *argv[])
         return(0);
     }
 
-    if (nx != ny)
-    {
-        printf("nx should equal ny for this problem\n");
-        MPI_Finalize();
-        return(0);
-    }
-
+    int ny = nx;
     double h = 1.0/nx;   /* Assume that nx == ny */
     double h2 = h*h;
 
@@ -526,6 +531,9 @@ int main (int argc, char *argv[])
        ------------------------------------------------------------- */
     {
         double t0, t1;
+        double final_res_norm;
+        int num_iterations;
+
         t0 = MPI_Wtime();
         if (solver_id == 0)
         {
@@ -535,9 +543,9 @@ int main (int argc, char *argv[])
             HYPRE_SStructPCGCreate(MPI_COMM_WORLD, &solver);
 
             /* Set PCG parameters */
-            HYPRE_SStructPCGSetTol(solver, 1.0e-12 );
-            HYPRE_SStructPCGSetPrintLevel(solver, solver_print_level);
-            HYPRE_SStructPCGSetMaxIter(solver, 2000);
+            HYPRE_SStructPCGSetTol(solver, tol );
+            HYPRE_SStructPCGSetPrintLevel(solver, print_level);
+            HYPRE_SStructPCGSetMaxIter(solver, maxiter);
 
             /* Create a split SStruct solver for use as a preconditioner */
             HYPRE_SStructSplitCreate(MPI_COMM_WORLD, &precond);
@@ -557,6 +565,9 @@ int main (int argc, char *argv[])
             HYPRE_SStructPCGSetup(solver, A, b, x);
             HYPRE_SStructPCGSolve(solver, A, b, x);
 
+            HYPRE_SStructPCGGetNumIterations(solver, &num_iterations);
+            HYPRE_SStructPCGGetFinalRelativeResidualNorm(solver, &final_res_norm);
+
             HYPRE_SStructPCGDestroy(solver);
             HYPRE_SStructSplitDestroy(precond);
         }
@@ -567,9 +578,9 @@ int main (int argc, char *argv[])
 
             /* Set the PCG solvers parameters */
             HYPRE_ParCSRPCGCreate(MPI_COMM_WORLD, &solver);
-            HYPRE_ParCSRPCGSetTol(solver, 1.0e-12);
-            HYPRE_ParCSRPCGSetPrintLevel(solver, solver_print_level);
-            HYPRE_ParCSRPCGSetMaxIter(solver, 500);
+            HYPRE_ParCSRPCGSetTol(solver,tol);
+            HYPRE_ParCSRPCGSetPrintLevel(solver, print_level);
+            HYPRE_ParCSRPCGSetMaxIter(solver, maxiter);
 
 #if 0
             /* Not sure what these do */
@@ -600,6 +611,10 @@ int main (int argc, char *argv[])
             HYPRE_ParCSRPCGSetup(solver, parcsr_A, par_b, par_x);
             HYPRE_ParCSRPCGSolve(solver, parcsr_A, par_b, par_x);
 
+            HYPRE_ParCSRPCGGetNumIterations(solver, &num_iterations);
+            HYPRE_ParCSRPCGGetFinalRelativeResidualNorm(solver, &final_res_norm);
+
+
             HYPRE_BoomerAMGDestroy(precond);
             HYPRE_ParCSRPCGDestroy(solver);
         }
@@ -607,15 +622,12 @@ int main (int argc, char *argv[])
         {
             HYPRE_Solver solver;
 
-            double final_res_norm;
-            int num_iterations;
-
             HYPRE_BoomerAMGCreate(&solver);
             HYPRE_BoomerAMGSetStrongThreshold(solver, .15);
             HYPRE_BoomerAMGSetCoarsenType(solver, 6);
-            HYPRE_BoomerAMGSetTol(solver, 1e-12);
-            HYPRE_BoomerAMGSetMaxIter(solver, 500);
-            HYPRE_BoomerAMGSetPrintLevel(solver, solver_print_level);
+            HYPRE_BoomerAMGSetTol(solver, tol);
+            HYPRE_BoomerAMGSetMaxIter(solver, maxiter);
+            HYPRE_BoomerAMGSetPrintLevel(solver, print_level);
 
             HYPRE_BoomerAMGSetRelaxType(solver, 6);
             HYPRE_BoomerAMGSetNumSweeps(solver, 1);
@@ -638,7 +650,17 @@ int main (int argc, char *argv[])
             HYPRE_BoomerAMGDestroy(solver);
         }
         t1 = MPI_Wtime();
-        printf("Elapsed time : %12.4e\n",t1-t0);
+        printf("%20s %12.4e\n","Elapsed time",t1-t0);
+        printf("%20s %12.4e\n","Residual norm",final_res_norm);
+        printf("%20s %12d ","Number of iterations",num_iterations);
+        if (num_iterations >= maxiter)
+        {
+            printf(" (Maximum number of iterations exceeded)\n");
+        }
+        else
+        {
+            printf("\n");
+        }
 
     }
 
