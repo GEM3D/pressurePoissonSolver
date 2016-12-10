@@ -16,6 +16,8 @@
 #include "vis.c"
 #include "mpi.h"
 
+#define  PI2 M_PI*M_PI
+
 #define MAX(a,b) \
    ({ __typeof__ (a) _a = (a); \
        __typeof__ (b) _b = (b); \
@@ -68,6 +70,14 @@ int main (int argc, char *argv[])
       >0  : Print iterations (depends on solver)
     */
     int print_level = 0;
+
+
+    /*
+      0  : Constant solution
+      1  : Variable solution
+    */
+    int solution_type = 1;
+
 
     /* -------------------------------------------------------------
        For this code we assume that all parts are local to a single
@@ -140,11 +150,12 @@ int main (int argc, char *argv[])
             printf("\n");
             printf("Usage: %s [<options>]\n", argv[0]);
             printf("\n");
-            printf("  -vis                  : save the solution for GLVis visualization\n");
-            printf("  -solver_id N          : Solver_id (N=0,1,2)\n");
-            printf("  -nx N                 : nx (ny will be set to equal nx)\n");
-            printf("  -maxiter N            : Maximum number of iterations\n");
-            printf("  -print_level N        : Solver print level to N (N=0-3)\n");
+            printf("  -vis                  : Save the solution for GLVis visualization\n");
+            printf("  -solver_id N          : Solver_id (N=0,1,2) [1]\n");
+            printf("  -nx N                 : nx (ny will be set to equal nx) [100]\n");
+            printf("  -maxiter N            : Maximum number of iterations [500]\n");
+            printf("  -tol t                : Solver tolerance [1e-10]\n");
+            printf("  -print_level N        : Solver print level to N (N=0-3) [0]\n");
             printf("\n");
         }
 
@@ -479,6 +490,8 @@ int main (int argc, char *argv[])
     /* -------------------------------------------------------------
        5. Set up SStruct Vectors for b and x
        ------------------------------------------------------------- */
+    double *solution[2];
+    double *error;
     {
         /* Create an empty vector object */
         HYPRE_SStructVectorCreate(MPI_COMM_WORLD, grid, &b);
@@ -495,30 +508,79 @@ int main (int argc, char *argv[])
 
         /* Set the vector coefficients over the gridpoints in my first box */
         int nvalues = nx*ny;  /* 6 grid points */
-        double *values = calloc(nvalues,sizeof(double));
+        double *values[2];  /* For each part */
+        int n;
+        for (n = 0; n < nparts; n++)
+        {
+            values[n] = calloc(nvalues,sizeof(double));
+            solution[n] = calloc(nvalues,sizeof(double));
+        }
 
         {
-            /* Set b (RHS) */
-            for (i = 0; i < nvalues; i++)
-                values[i] = 1.0;
+            if (solution_type == 0)
+            {
+                /* Set b (RHS) */
+                double c = 2;   /* Value of constant solution */
+                for (i = 0; i < nvalues; i++)
+                {
+                    values[0][i] = 0.0;
+                    values[1][i] = 0.0;
+                    solution[0][i] = c;
+                    solution[1][i] = c;
+                }
+                values[0][0] = c*4/h2;
+            }
+            else if (solution_type == 1)
+            {
+                double x,y;
+                int k = 0;
+                for (j = 0; j < ny; j++)
+                {
+                    y = (j+0.5)*h;
+                    for (i = 0; i < nx; i++)
+                    {
+                        /* Part 0 */
+                        x = (i+0.5)*h;
+                        values[0][k] = 8*M_PI*M_PI*cos(2*M_PI*x)*cos(2*M_PI*y);
+                        solution[0][k] = cos(2*M_PI*x)*cos(2*M_PI*y);
+
+                        /* Part 1 */
+                        x += 1.0;
+                        values[1][k] = 8*M_PI*M_PI*cos(2*M_PI*x)*cos(2*M_PI*y);
+                        solution[1][k] = cos(2*M_PI*x)*cos(2*M_PI*y);
+                        k++;
+                    }
+                }
+                /* Add Dirichlet condition at boundary edge */
+                double bx = cos(2*M_PI*h/2.0);  /* Solution at x-face of lower left corner cell */
+                double by = cos(2*M_PI*h/2.0);  /* Solution at y-face of lower left corner cell */
+                values[0][0] += (2*bx + 2*by)/h2;
+            }
 
             part = 0;
-            HYPRE_SStructVectorSetBoxValues(b, part, ll, ur, var, values);
+            HYPRE_SStructVectorSetBoxValues(b, part, ll, ur, var, values[0]);
 
             part = 1;
-            HYPRE_SStructVectorSetBoxValues(b, part, ll, ur, var, values);
+            HYPRE_SStructVectorSetBoxValues(b, part, ll, ur, var, values[1]);
+        }
+
+        {
 
             /* Set x (initial guess) */
             for (i = 0; i < nvalues; i++)
-                values[i] = 0.0;
+            {
+                values[0][i] = 0.0;
+                values[1][i] = 0.0;
+            }
 
             part = 0;
-            HYPRE_SStructVectorSetBoxValues(x, part, ll,ur, var, values);
+            HYPRE_SStructVectorSetBoxValues(x, part, ll,ur, var, values[0]);
 
             part = 1;
-            HYPRE_SStructVectorSetBoxValues(x, part, ll,ur, var, values);
+            HYPRE_SStructVectorSetBoxValues(x, part, ll,ur, var, values[1]);
         }
-        free(values);
+        free(values[0]);
+        free(values[1]);
 
         HYPRE_SStructVectorAssemble(b);
         HYPRE_SStructVectorAssemble(x);
@@ -554,13 +616,11 @@ int main (int argc, char *argv[])
             HYPRE_SStructSplitSetZeroGuess(precond);
 
             /* Set the preconditioner type to split-SMG */
-#if 1
             HYPRE_SStructSplitSetStructSolver(precond, HYPRE_SMG);
 
             /* Set preconditioner and solve */
             HYPRE_SStructPCGSetPrecond(solver, HYPRE_SStructSplitSolve,
                                        HYPRE_SStructSplitSetup, precond);
-#endif
 
             HYPRE_SStructPCGSetup(solver, A, b, x);
             HYPRE_SStructPCGSolve(solver, A, b, x);
@@ -649,10 +709,41 @@ int main (int argc, char *argv[])
 
             HYPRE_BoomerAMGDestroy(solver);
         }
+
+        double error_norm[3] = {0,0,0};
+        {
+            /* Compute error */
+            int nvalues = nx*ny;
+            int n,i;
+            double *xvalues;
+
+            /* get the local solution */
+            xvalues = hypre_VectorData(hypre_ParVectorLocalVector(par_x));
+            error = calloc(nparts*nvalues,sizeof(double));
+
+
+            for (i = 0; i < nvalues; i++)
+            {
+                for (n = 0; n < nparts; n++)
+                {
+                    double err;
+                    err = fabs(solution[n][i] - xvalues[nvalues*n + i]);
+                    error_norm[0] += err*h2;
+                    error_norm[1] += err*err*h2;
+                    error_norm[2] = MAX(err,error_norm[2]);
+                    error[nvalues*n + i] = err;
+                }
+            }
+            error_norm[0] = error_norm[0]/2.0;     /* Divide by area of domain */
+            error_norm[1] = sqrt(error_norm[1]/2.0);
+        }
+
         t1 = MPI_Wtime();
         printf("%20s %12.4e\n","Elapsed time",t1-t0);
         printf("%20s %12.4e\n","Residual norm",final_res_norm);
-        printf("%20s %12d ","Number of iterations",num_iterations);
+        printf("%20s %12d\n","Number of iterations",num_iterations);
+        printf("%20s %12.4e %12.4e %12.4e\n","Error",error_norm[0],
+               error_norm[1],error_norm[2]);
         if (num_iterations >= maxiter)
         {
             printf(" (Maximum number of iterations exceeded)\n");
@@ -689,6 +780,10 @@ int main (int argc, char *argv[])
 
             /* get the local solution */
             values = hypre_VectorData(hypre_ParVectorLocalVector(par_x));
+#if 0
+            /* To plot error */
+            values = error;
+#endif
 
             sprintf(filename, "%s.%06d", "vis/ex3.sol", myid);
             if ((file = fopen(filename, "w")) == NULL)
