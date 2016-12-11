@@ -21,7 +21,7 @@
 #define MAX(a,b) \
    ({ __typeof__ (a) _a = (a); \
        __typeof__ (b) _b = (b); \
-     _a > _b ? _a : _b; })
+       _a > _b ? _a : _b; })
 
 int main (int argc, char *argv[])
 {
@@ -193,7 +193,16 @@ int main (int argc, char *argv[])
     ur[0] = nx;
     ur[1] = ny;
 
-    /* Ghost indices, needed to set neighbor connectivity */
+    printf("\n");
+#ifdef USE_GRAPH_ENTRIES
+    printf("Using GraphAddEntries to define connectivity\n");
+#else
+    printf("Using SetNeighborPart to define connectivity\n");
+#endif
+    printf("\n");
+
+#ifndef USE_GRAPH_ENTRIES
+    /* Ghost indices, needed for SetNeighborPart */
     int ll_g[2], lr_g[2], ul_g[2], ur_g[2];
     ll_g[0] = ll[0] - 1;
     ll_g[1] = ll[1];
@@ -203,6 +212,7 @@ int main (int argc, char *argv[])
     ul_g[1] = ul[1];
     ur_g[0] = ur[0] + 1;
     ur_g[1] = ur[1];
+#endif
 
     int object_type;
     switch(solver_id)
@@ -243,6 +253,7 @@ int main (int argc, char *argv[])
         part = 1;
         HYPRE_SStructGridSetVariables(grid, part, nvars, vartypes);
 
+#ifndef USE_GRAPH_ENTRIES
         /* Describe part connectivity */
         {
             int index_map[2] = {0,1};
@@ -263,6 +274,7 @@ int main (int argc, char *argv[])
                                              nbor_part, lr, ur,
                                              index_map, index_dir);
         }
+#endif
 
         /* Now the grid is ready to use */
         HYPRE_SStructGridAssemble(grid);
@@ -302,6 +314,39 @@ int main (int argc, char *argv[])
 
         part = 1;
         HYPRE_SStructGraphSetStencil(graph, part, var, stencil_5pt);
+
+#ifdef USE_GRAPH_ENTRIES
+        /* Add additional graph entries to define connectivity */
+        {
+            int idx[2], to_idx[2];
+            int to_part;
+
+            for(j = lr[1]; j <= ur[1]; j++)
+            {
+
+                idx[1] = j;
+                to_idx[1] = j;
+
+                /* Connect part 0 to part 1 */
+                part = 0;
+                idx[0] = lr[0];
+
+                to_part = 1;
+                to_idx[0] = ll[0];
+
+                HYPRE_SStructGraphAddEntries(graph, part, idx, var, to_part, to_idx, var);
+
+                /* Connect part 1 to part 0 */
+                part = 1;
+                idx[0] = ll[0];
+
+                to_part = 0;
+                to_idx[0] = lr[0];
+                HYPRE_SStructGraphAddEntries(graph, part, idx, var, to_part, to_idx, var);
+            }
+        }
+#endif
+
 
         /* Assemble the graph */
         HYPRE_SStructGraphAssemble(graph);
@@ -422,6 +467,59 @@ int main (int argc, char *argv[])
             free(values);
         }
 
+#ifdef USE_GRAPH_ENTRIES
+        {
+            /* Zero out stencils set along center line */
+            int nentries = 1;
+            int maxnvalues = nentries*MAX(nx,ny);
+            double *values = calloc(maxnvalues,sizeof(double));
+            int stencil_indices[1];
+
+            for (i = 0; i < maxnvalues; i += nentries)
+            {
+                values[i] = 0;
+            }
+
+            /* Right edge of part 0 (replaced by graph entry) */
+            stencil_indices[0] = 2;
+            part = 0;
+            HYPRE_SStructMatrixSetBoxValues(A, part, lr, ur,
+                                            var, nentries,
+                                            stencil_indices, values);
+
+            /* Left edge of part 1 (replaced by graph entry) */
+            stencil_indices[0] = 1;
+            part = 1;
+            HYPRE_SStructMatrixSetBoxValues(A, part, ll, ul,
+                                            var, nentries,
+                                            stencil_indices, values);
+
+            /* Set the values of the stencil weights for graph entries, added above.
+               Each graph entry is the 6th entry in the stencil.
+            */
+            for (j = 0; j < maxnvalues; j++)
+            {
+                values[j] = -1.0/h2 ;
+            }
+
+            stencil_indices[0] = 5;  /* Graph entry was sixth entry added? */
+
+            part = 0;
+            HYPRE_SStructMatrixSetBoxValues(A, part, lr, ur,
+                                            var, nentries,
+                                            stencil_indices, values);
+
+            stencil_indices[0] = 5;  /* Graph entry was sixth entry added? */
+            part = 1;
+            HYPRE_SStructMatrixSetBoxValues(A, part, ll, ul,
+                                            var, nentries,
+                                            stencil_indices, values);
+            free(values);
+        }
+
+
+#endif
+
         /* Fix corner stencils */
         {
             int nentries = 3;                 /* Number of stencil weights to set */
@@ -487,6 +585,7 @@ int main (int argc, char *argv[])
     }
 
 
+
     /* -------------------------------------------------------------
        5. Set up SStruct Vectors for b and x
        ------------------------------------------------------------- */
@@ -533,6 +632,8 @@ int main (int argc, char *argv[])
             else if (solution_type == 1)
             {
                 double x,y;
+                double C = 2;  /* Coefficients used in exact solution */
+                double D = 1;
                 int k = 0;
                 for (j = 0; j < ny; j++)
                 {
@@ -541,19 +642,19 @@ int main (int argc, char *argv[])
                     {
                         /* Part 0 */
                         x = (i+0.5)*h;
-                        values[0][k] = 8*M_PI*M_PI*cos(2*M_PI*x)*cos(2*M_PI*y);
-                        solution[0][k] = cos(2*M_PI*x)*cos(2*M_PI*y);
+                        values[0][k] = (C*C + D*D)*M_PI*M_PI*cos(C*M_PI*x)*cos(D*M_PI*y);
+                        solution[0][k] = cos(C*M_PI*x)*cos(D*M_PI*y);
 
                         /* Part 1 */
                         x += 1.0;
-                        values[1][k] = 8*M_PI*M_PI*cos(2*M_PI*x)*cos(2*M_PI*y);
-                        solution[1][k] = cos(2*M_PI*x)*cos(2*M_PI*y);
+                        values[1][k] = (C*C + D*D)*M_PI*M_PI*cos(C*M_PI*x)*cos(D*M_PI*y);
+                        solution[1][k] = cos(C*M_PI*x)*cos(D*M_PI*y);
                         k++;
                     }
                 }
                 /* Add Dirichlet condition at boundary edge */
-                double bx = cos(2*M_PI*h/2.0);  /* Solution at x-face of lower left corner cell */
-                double by = cos(2*M_PI*h/2.0);  /* Solution at y-face of lower left corner cell */
+                double bx = cos(C*M_PI*h/2.0);    /* Solution at x-face of lower left corner cell */
+                double by = cos(D*M_PI*h/2.0);  /* Solution at y-face of lower left corner cell */
                 values[0][0] += (2*bx + 2*by)/h2;
             }
 
@@ -682,18 +783,26 @@ int main (int argc, char *argv[])
         {
             HYPRE_Solver solver;
 
-            HYPRE_BoomerAMGCreate(&solver);
-            HYPRE_BoomerAMGSetStrongThreshold(solver, .15);
-            HYPRE_BoomerAMGSetCoarsenType(solver, 6);
-            HYPRE_BoomerAMGSetTol(solver, tol);
-            HYPRE_BoomerAMGSetMaxIter(solver, maxiter);
-            HYPRE_BoomerAMGSetPrintLevel(solver, print_level);
+            printf("print_level %d\n",print_level);
+            printf("maxiter %d\n",maxiter);
+            printf("tol %12.4e\n",tol);
 
-            HYPRE_BoomerAMGSetRelaxType(solver, 6);
-            HYPRE_BoomerAMGSetNumSweeps(solver, 1);
+            HYPRE_BoomerAMGCreate(&solver);
+            HYPRE_BoomerAMGSetTol(solver, tol);
+            HYPRE_BoomerAMGSetPrintLevel(solver, print_level);
+            HYPRE_BoomerAMGSetMaxIter(solver, maxiter);
+
+
+#if 0
+            /* Stick with default values */
+            HYPRE_BoomerAMGSetStrongThreshold(solver, .15);
+            HYPRE_BoomerAMGSetNumSweeps(solver, 30);
             HYPRE_BoomerAMGSetMaxLevels(solver, 20);
+            HYPRE_BoomerAMGSetCoarsenType(solver, 6);
+            HYPRE_BoomerAMGSetRelaxType(solver, 6);
             HYPRE_BoomerAMGSetInterpType(solver, 14);
             HYPRE_BoomerAMGSetAggInterpType(solver, 2);
+#endif
 
             HYPRE_SStructMatrixGetObject(A, (void **) &parcsr_A);
             HYPRE_SStructVectorGetObject(b, (void **) &par_b);
@@ -718,7 +827,19 @@ int main (int argc, char *argv[])
             double *xvalues;
 
             /* get the local solution */
-            xvalues = hypre_VectorData(hypre_ParVectorLocalVector(par_x));
+            if (object_type == HYPRE_SSTRUCT)
+            {
+                xvalues = calloc(nparts*nvalues,sizeof(double));
+
+                part = 0;
+                HYPRE_SStructVectorGetBoxValues(x, part, ll, lr, var, xvalues);
+                part = 1;
+                HYPRE_SStructVectorGetBoxValues(x, part, ll, lr, var, &xvalues[nvalues]);
+            }
+            else if (object_type == HYPRE_PARCSR)
+            {
+                xvalues = hypre_VectorData(hypre_ParVectorLocalVector(par_x));
+            }
             error = calloc(nparts*nvalues,sizeof(double));
 
 
@@ -736,6 +857,11 @@ int main (int argc, char *argv[])
             }
             error_norm[0] = error_norm[0]/2.0;     /* Divide by area of domain */
             error_norm[1] = sqrt(error_norm[1]/2.0);
+            if (object_type == HYPRE_SSTRUCT)
+            {
+                free(xvalues);
+            }
+
         }
 
         t1 = MPI_Wtime();

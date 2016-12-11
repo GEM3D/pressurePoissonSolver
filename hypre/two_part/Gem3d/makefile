@@ -65,41 +65,39 @@ LFLAGS90 =
 ########################################################################
 # List of all programs to be compiled
 ########################################################################
-ALLPROGS = ex1
+ALLPROGS = ex3
 
 all: $(ALLPROGS)
 
 default: all
 
 usage:
-	@echo 'ex3 : Neumann conditions (homogenous face-centered bc)'
+	@echo 'ex3 : Neumann conditions (SetNeighborPart)'
+	@echo 'ex4 : Neumann conditions (GraphAddEntries)'
 
 ########################################################################
-# Example 1 - Dirichlet (homogenous boundary conditions)
-########################################################################
-ex1: ex1.o
-	$(CC) -o $@ $^ $(LFLAGS)
-
-########################################################################
-# Example 2 - Dirichlet (homogenous boundary conditions)
-########################################################################
-ex2: ex2.o
-	$(CC) -o $@ $^ $(LFLAGS)
-
-
-########################################################################
-# Example 3 - Dirichlet (homogenous boundary conditions)
+# Example 3 - Neumann (homogenous boundary conditions)
+#           - To try out GraphAddEntries option, compile as
+#
+#       %> gmake clean
+#       %> gmake ex3 "CDEFS=-D USE_GRAPH_ENTRIES"
+#
 ########################################################################
 ex3: ex3.o
 	$(CC) -o $@ $^ $(LFLAGS)
 
 
 ########################################################################
+# Example 4 - Neumann (homogenous boundary conditions)
+########################################################################
+ex4: ex4.o
+	$(CC) -o $@ $^ $(LFLAGS)
+
+########################################################################
 # Clean up
 ########################################################################
 clean:
 	rm -f $(ALLPROGS:=.o)
-	cd vis; make clean
 
 distclean: clean
 	rm -f $(ALLPROGS) $(ALLPROGS:=*~)
