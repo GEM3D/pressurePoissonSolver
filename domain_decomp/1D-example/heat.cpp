@@ -19,7 +19,7 @@ double error(vector<Domain *> &dmns)
 		double d_end   = d_ptr->domainEnd();
 		for (int i = 0; i < m; i++) {
 			double x    = d_begin + (i + 0.5) / m * (d_end - d_begin);
-			double diff = exact_solution(x) - d_ptr->uPrev().at(i);
+			double diff = exact_solution(x) - d_ptr->uCurr().at(i);
 			l2norm += diff * diff;
 		}
 	}
@@ -70,6 +70,11 @@ int main(int argc, char *argv[])
 	do {
 		num_iter++;
 
+		// go ahead and swap the vectors
+		for (Domain *d_ptr : dmns) {
+			d_ptr->swapCurrPrev();
+		}
+
 		// solve over each domain
 		for (Domain *d_ptr : dmns) {
 			tds.solve(*d_ptr);
@@ -89,8 +94,6 @@ int main(int argc, char *argv[])
 			for (Domain *d_ptr : dmns) {
 				double tmp = d_ptr->l2norm();
 				l2norm += tmp * tmp;
-				// go ahead and swap the vectors
-				d_ptr->swapCurrPrev();
 			}
 			l2norm = sqrt(l2norm);
 		}
@@ -98,7 +101,8 @@ int main(int argc, char *argv[])
 
 	cerr << '\n';
 	cerr << "number of iterations: " << num_iter << "\n";
-	cerr << "error: " << error(dmns) << "\n";
+	cerr.precision(3);
+	cerr << "error: " << scientific << error(dmns) << "\n";
 
 	// delete the domains
 	for (Domain *d_ptr : dmns) {
