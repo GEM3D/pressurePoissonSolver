@@ -1,6 +1,6 @@
 #ifndef DOMAIN_H_SEEN
 #define DOMAIN_H_SEEN
-#include <vector>
+#include <valarray>
 #include <string>
 /**
  * @brief This class is an object that represents a domain.
@@ -8,21 +8,6 @@
 class Domain
 {
 	private:
-	/**
-	 * @brief the values that we are integrating over
-	 */
-	std::vector<double> u_xx;
-
-	/**
-	 * @brief the solution on this domain
-	 */
-	std::vector<double>* u_curr_ptr;
-
-	/**
-	 * @brief the solution on this domain, from the previous iteration
-	 */
-	std::vector<double>* u_prev_ptr;
-
 	/**
 	 * @brief the beginning of this domain
 	 */
@@ -55,6 +40,21 @@ class Domain
 
 	public:
 	/**
+	 * @brief the values that we are integrating over
+	 */
+	std::valarray<double> u_xx;
+
+	/**
+	 * @brief the solution on this domain
+	 */
+	std::valarray<double> u_curr;
+
+	/**
+	 * @brief the solution on this domain, from the previous iteration
+	 */
+	std::valarray<double> u_prev;
+
+	/**
 	 * @brief Create a new Domain object, and initialize the values
 	 *
 	 * @param d_begin the beginning of the domain
@@ -64,11 +64,6 @@ class Domain
 	 * the function must have the form double f(double x)
 	 */
 	Domain(double d_begin, double d_end, int m, double f(double x));
-
-	/**
-     * @brief destructor for domain object
-     */
-    ~Domain();
 
 	/**
 	 * @return the spacing between grid points
@@ -115,29 +110,8 @@ class Domain
 	void setRightNbr(Domain &grid);
 
 	/**
-	 * @brief Return the uxx vector
-	 *
-	 * @return a reference to the vector
+	 * @brief swap the pointer of to the u_curr vector and the u_prev vector
 	 */
-	std::vector<double> &uxx();
-
-	/**
-	 * @brief Return the u_curr vector
-	 *
-	 * @return a reference to the vector
-	 */
-	std::vector<double> &uCurr();
-
-	/**
-	 * @brief Return the u_prev vector
-	 *
-	 * @return a reference to the vector
-	 */
-	std::vector<double> &uPrev();
-
-    /**
-     * @brief swap the pointer of to the u_curr vector and the u_prev vector
-     */
 	void swapCurrPrev();
 
 	/**
@@ -153,13 +127,6 @@ class Domain
 	 * @return a reference to the domain
 	 */
 	Domain &rightNbr();
-
-    /**
-     * @brief Calculate the l2norm between u_curr and u_prev
-     *
-     * @return the l2norm
-     */
-    double l2norm();
 };
 
 #endif

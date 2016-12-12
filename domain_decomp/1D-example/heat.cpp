@@ -1,6 +1,7 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <valarray>
 #include <vector>
 #define PI M_PI
 
@@ -19,7 +20,7 @@ double error(vector<Domain *> &dmns)
 		double d_end   = d_ptr->domainEnd();
 		for (int i = 0; i < m; i++) {
 			double x    = d_begin + (i + 0.5) / m * (d_end - d_begin);
-			double diff = exact_solution(x) - d_ptr->uPrev().at(i);
+			double diff = exact_solution(x) - d_ptr->u_curr[i];
 			l2norm += diff * diff;
 		}
 	}
@@ -58,9 +59,8 @@ int main(int argc, char *argv[])
 	// get l2norm of uxx
 	double uxx_l2norm = 0;
 	for (Domain *d_ptr : dmns) {
-		for (double x : d_ptr->uxx()) {
-			uxx_l2norm += x * x;
-		}
+		valarray<double> &u_xx = d_ptr->u_xx;
+		uxx_l2norm += (u_xx * u_xx).sum();
 	}
 	uxx_l2norm = sqrt(uxx_l2norm);
 
@@ -70,6 +70,11 @@ int main(int argc, char *argv[])
 	do {
 		num_iter++;
 
+		// go ahead and swap the vectors
+		for (Domain *d_ptr : dmns) {
+			d_ptr->swapCurrPrev();
+		}
+
 		// solve over each domain
 		for (Domain *d_ptr : dmns) {
 			tds.solve(*d_ptr);
@@ -77,7 +82,7 @@ int main(int argc, char *argv[])
 
 		// print out solution
 		for (Domain *d_ptr : dmns) {
-			for (double x : d_ptr->uCurr()) {
+			for (double x : d_ptr->u_curr) {
 				cout << x << "\t";
 			}
 		}
@@ -87,10 +92,7 @@ int main(int argc, char *argv[])
 		if (num_domains > 1) {
 			l2norm = 0;
 			for (Domain *d_ptr : dmns) {
-				double tmp = d_ptr->l2norm();
-				l2norm += tmp * tmp;
-				// go ahead and swap the vectors
-				d_ptr->swapCurrPrev();
+				l2norm += pow(d_ptr->u_curr - d_ptr->u_prev, 2).sum();
 			}
 			l2norm = sqrt(l2norm);
 		}
@@ -98,7 +100,8 @@ int main(int argc, char *argv[])
 
 	cerr << '\n';
 	cerr << "number of iterations: " << num_iter << "\n";
-	cerr << "error: " << error(dmns) << "\n";
+	cerr.precision(3);
+	cerr << "error: " << scientific << error(dmns) << "\n";
 
 	// delete the domains
 	for (Domain *d_ptr : dmns) {
