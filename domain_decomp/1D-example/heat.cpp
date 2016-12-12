@@ -13,18 +13,21 @@ double uxx_init(double x) { return -PI * PI * sin(PI * x); }
 double exact_solution(double x) { return sin(PI * x); }
 double error(vector<Domain *> &dmns)
 {
-	double l2norm = 0;
+	double l2norm     = 0;
+	double exact_norm = 0;
 	for (Domain *d_ptr : dmns) {
 		int    m       = d_ptr->size();
 		double d_begin = d_ptr->domainBegin();
 		double d_end   = d_ptr->domainEnd();
 		for (int i = 0; i < m; i++) {
-			double x    = d_begin + (i + 0.5) / m * (d_end - d_begin);
-			double diff = exact_solution(x) - d_ptr->u_curr[i];
+			double x     = d_begin + (i + 0.5) / m * (d_end - d_begin);
+			double exact = exact_solution(x);
+			double diff  = exact - d_ptr->u_curr[i];
 			l2norm += diff * diff;
+			exact_norm += exact * exact;
 		}
 	}
-	return sqrt(l2norm);
+	return sqrt(l2norm) / sqrt(exact_norm);
 }
 
 int main(int argc, char *argv[])
