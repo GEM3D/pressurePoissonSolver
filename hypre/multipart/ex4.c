@@ -9,6 +9,7 @@
 
 /* SStruct linear solvers headers */
 #include "HYPRE_sstruct_ls.h"
+#include "HYPRE_krylov.h"
 
 #include "HYPRE_parcsr_ls.h"
 #include "HYPRE_parcsr_mv.h"
@@ -166,9 +167,9 @@ int main (int argc, char *argv[])
         }
     }
 
-    if (solver_id < 0 || solver_id > 2)
+    if (solver_id < 0 || solver_id > 3)
     {
-        printf("Solver_id must be 0, 1, or 2\n");
+        printf("Solver_id must be in [0,3]\n");
         MPI_Finalize();
         return(0);
     }
@@ -908,7 +909,30 @@ int main (int argc, char *argv[])
 
             HYPRE_BoomerAMGDestroy(solver);
         }
+        else if (solver_id == 3)
+        {
+            HYPRE_SStructBiCGSTABCreate(MPI_COMM_WORLD, &solver);
+            HYPRE_BiCGSTABSetMaxIter((HYPRE_Solver) solver, maxiter );
+            HYPRE_BiCGSTABSetTol((HYPRE_Solver) solver, tol );
+            HYPRE_BiCGSTABSetPrintLevel((HYPRE_Solver) solver, print_level );
+#if 0
+            HYPRE_BiCGSTABSetLogging((HYPRE_Solver) solver, 1 );
+#endif
 
+#if 0
+            precond = NULL;
+            HYPRE_SStructBiCGSTABSetPrecond(solver,
+                                            HYPRE_SStructDiagScale,
+                                            HYPRE_SStructDiagScaleSetup,
+                                            precond);
+#endif
+
+            HYPRE_SStructBiCGSTABSetup(solver, A, b, x );
+            HYPRE_SStructBiCGSTABSolve(solver, A, b, x);
+
+            HYPRE_SStructBiCGSTABDestroy(solver);
+
+        }
         double error_norm[3] = {0,0,0};
         {
             /* Compute error */
