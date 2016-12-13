@@ -31,8 +31,8 @@ void TriDiagSolver::solve(Domain &dom)
 	if (dom.hasRightNbr()) {
 		right_boundary = dom.rightGamma();
 	}
-	cout << "On this domain using boundaries: " << left_boundary << ", " << right_boundary
-	     << "\n\n";
+	//cout << "On this domain using boundaries: " << left_boundary << ", " << right_boundary
+	//     << "\n\n";
 
 	// first value
 	c_prime[0] = 1.0 / -3.0;

@@ -104,56 +104,54 @@ int main(int argc, char *argv[])
 		dmns[last_i]->left_gamma_ptr = &gammas[last_i - 1];
 	}
 
-	/*
-	 * solve with gammas set to 0
-	 */
-	gammas             = 0;
-	valarray<double> b = solveOnAllDomains(tds, dmns, gammas);
+	gammas = 0;
+	if (num_domains > 1) {
+		/*
+		 * solve with gammas set to 0
+		 */
+		valarray<double> b = solveOnAllDomains(tds, dmns, gammas);
 
-	// print out solution
-	printSolution(dmns);
-	cout << '\n';
+		cout << "b value(s):\n";
+		for (double x : b) {
+			cout << x << ' ';
+		}
+		cout << "\n\n";
 
-	cout << "b value(s):\n";
-	for (double x : b) {
-		cout << x << ' ';
+		/*
+		 * solve with gammas set to 1
+		 */
+		gammas             = 1;
+		valarray<double> a = solveOnAllDomains(tds, dmns, gammas) - b;
+
+		cout << "a value(s):\n";
+		for (double x : a) {
+			cout << x << ' ';
+		}
+		cout << "\n\n";
+
+		/*
+		 * calculate the gamma value, and solve with that
+		 */
+		gammas = -b / a;
+		cout << "calculated gamma value(s):\n";
+		for (double x : gammas) {
+			cout << x << ' ';
+		}
+		cout << "\n\n";
 	}
-	cout << "\n\n";
 
-	/*
-	 * solve with gammas set to 1
-	 */
-	gammas             = 1;
-	valarray<double> a = solveOnAllDomains(tds, dmns, gammas) - b;
-
-	// print out solution
-	printSolution(dmns);
-	cout << '\n';
-
-	cout << "a value(s):\n";
-	for (double x : a) {
-		cout << x << ' ';
-	}
-	cout << "\n\n";
-
-	/*
-	 * calculate the gamma values, and solve with that
-	 */
-	gammas = -b / a;
+    /*
+     * get the final solution
+     */
 	solveOnAllDomains(tds, dmns, gammas);
 
-	cout << "calculated gamma value(s):\n";
-	for (double x : gammas) {
-		cout << x << ' ';
-	}
-	cout << "\n\n";
 
 	// print out solution
+	cout << "Final solution:\n";
 	printSolution(dmns);
 	cout << '\n';
 
 	cerr << '\n';
-	cerr.precision(3);
 	cerr << "error: " << scientific << error(dmns) << "\n";
 
 	// delete the domains
