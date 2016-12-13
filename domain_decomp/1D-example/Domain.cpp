@@ -22,10 +22,8 @@ double Domain::spaceDelta() { return h; }
 double Domain::domainBegin() { return domain_begin; }
 double Domain::domainEnd() { return domain_end; }
 int    Domain::size() { return m; }
-bool   Domain::hasLeftNbr() { return left_nbr_ptr != nullptr; }
-bool   Domain::hasRightNbr() { return right_nbr_ptr != nullptr; }
-void Domain::setLeftNbr(Domain &nbr) { left_nbr_ptr = &nbr; }
-void Domain::setRightNbr(Domain &nbr) { right_nbr_ptr = &nbr; }
-Domain &                         Domain::leftNbr() { return *left_nbr_ptr; }
-Domain &                         Domain::rightNbr() { return *right_nbr_ptr; }
-void                             Domain::swapCurrPrev() { u_curr.swap(u_prev); }
+bool   Domain::hasLeftNbr() { return left_gamma_ptr != nullptr; }
+bool   Domain::hasRightNbr() { return right_gamma_ptr != nullptr; }
+double Domain::rightGamma() { return *right_gamma_ptr; }
+double Domain::leftGamma() { return *left_gamma_ptr; }
+void   Domain::swapCurrPrev() { u_curr.swap(u_prev); }

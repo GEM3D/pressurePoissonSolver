@@ -13,24 +13,69 @@ double uxx_init(double x) { return -PI * PI * sin(PI * x); }
 double exact_solution(double x) { return sin(PI * x); }
 double error(vector<Domain *> &dmns)
 {
-	double l2norm = 0;
+	double l2norm     = 0;
+	double exact_norm = 0;
 	for (Domain *d_ptr : dmns) {
 		int    m       = d_ptr->size();
 		double d_begin = d_ptr->domainBegin();
 		double d_end   = d_ptr->domainEnd();
 		for (int i = 0; i < m; i++) {
-			double x    = d_begin + (i + 0.5) / m * (d_end - d_begin);
-			double diff = exact_solution(x) - d_ptr->u_curr[i];
+			double x     = d_begin + (i + 0.5) / m * (d_end - d_begin);
+			double exact = exact_solution(x);
+			double diff  = exact - d_ptr->u_curr[i];
 			l2norm += diff * diff;
+			exact_norm += exact * exact;
 		}
 	}
-	return sqrt(l2norm);
+	return sqrt(l2norm) / sqrt(exact_norm);
+}
+
+/**
+ * @brief solve over each of the domains
+ *
+ * @param tds the solver to use
+ * @param dmns the domains to over
+ * @param gammas the gamma values that are used
+ *
+ * @return 
+ */
+valarray<double> solveOnAllDomains(TriDiagSolver &tds, vector<Domain *> &dmns,
+                                   valarray<double> &gammas)
+{
+	// solve over the domains
+	for (Domain *d_ptr : dmns) {
+		tds.solve(*d_ptr);
+	}
+
+	// get the difference between the gamma value and computed solution at the interface
+	valarray<double> z(gammas.size());
+	for (size_t i = 0; i < gammas.size(); i++) {
+		Domain *left_dmn_ptr  = dmns[i];
+		Domain *right_dmn_ptr = dmns[i + 1];
+
+		double left_val  = left_dmn_ptr->u_curr[left_dmn_ptr->u_curr.size() - 1];
+		double right_val = right_dmn_ptr->u_curr[0];
+
+		z[i] = left_val + right_val - 2 * gammas[i];
+	}
+	return z;
+}
+
+void printSolution(vector<Domain *> &dmns)
+{
+	for (Domain *d_ptr : dmns) {
+		for (double x : d_ptr->u_curr) {
+			cout << x << "\t";
+		}
+	}
+	cout << '\n';
 }
 
 int main(int argc, char *argv[])
 {
 	// set cout to print full precision
-	cout.precision(numeric_limits<double>::max_digits10);
+	// cout.precision(numeric_limits<double>::max_digits10);
+	cout.precision(9);
 
 	// create a solver with 0 for the boundary conditions
 	TriDiagSolver    tds(0.0, 0.0);
@@ -45,62 +90,68 @@ int main(int argc, char *argv[])
 		dmns[i]        = new Domain(x_start, x_end, m / num_domains, uxx_init);
 	}
 
-	// set neighbors
+	// create an array to store the gamma values for each of the interfaces
+	valarray<double> gammas(num_domains - 1);
+
+	// set the gamma pointers
 	if (num_domains > 1) {
-		const int last_i = num_domains - 1;
-		dmns[0]->setRightNbr(*dmns[1]);
+		const int last_i         = num_domains - 1;
+		dmns[0]->right_gamma_ptr = &gammas[0];
 		for (int i = 1; i < last_i; i++) {
-			dmns[i]->setLeftNbr(*dmns[i - 1]);
-			dmns[i]->setRightNbr(*dmns[i + 1]);
+			dmns[i]->left_gamma_ptr  = &gammas[i - 1];
+			dmns[i]->right_gamma_ptr = &gammas[i];
 		}
-		dmns[last_i]->setLeftNbr(*dmns[last_i - 1]);
+		dmns[last_i]->left_gamma_ptr = &gammas[last_i - 1];
 	}
 
-	// get l2norm of uxx
-	double uxx_l2norm = 0;
-	for (Domain *d_ptr : dmns) {
-		valarray<double> &u_xx = d_ptr->u_xx;
-		uxx_l2norm += (u_xx * u_xx).sum();
+	gammas = 0;
+	if (num_domains > 1) {
+		/*
+		 * solve with gammas set to 0
+		 */
+		valarray<double> b = solveOnAllDomains(tds, dmns, gammas);
+
+		cout << "b value(s):\n";
+		for (double x : b) {
+			cout << x << ' ';
+		}
+		cout << "\n\n";
+
+		/*
+		 * solve with gammas set to 1
+		 */
+		gammas             = 1;
+		valarray<double> a = solveOnAllDomains(tds, dmns, gammas) - b;
+
+		cout << "a value(s):\n";
+		for (double x : a) {
+			cout << x << ' ';
+		}
+		cout << "\n\n";
+
+		/*
+		 * calculate the gamma value, and solve with that
+		 */
+		gammas = -b / a;
+		cout << "calculated gamma value(s):\n";
+		for (double x : gammas) {
+			cout << x << ' ';
+		}
+		cout << "\n\n";
 	}
-	uxx_l2norm = sqrt(uxx_l2norm);
 
-	// start solving
-	double l2norm   = 0;
-	int    num_iter = 0;
-	do {
-		num_iter++;
+    /*
+     * get the final solution
+     */
+	solveOnAllDomains(tds, dmns, gammas);
 
-		// go ahead and swap the vectors
-		for (Domain *d_ptr : dmns) {
-			d_ptr->swapCurrPrev();
-		}
 
-		// solve over each domain
-		for (Domain *d_ptr : dmns) {
-			tds.solve(*d_ptr);
-		}
-
-		// print out solution
-		for (Domain *d_ptr : dmns) {
-			for (double x : d_ptr->u_curr) {
-				cout << x << "\t";
-			}
-		}
-		cout << '\n';
-
-		// calculate l2norm
-		if (num_domains > 1) {
-			l2norm = 0;
-			for (Domain *d_ptr : dmns) {
-				l2norm += pow(d_ptr->u_curr - d_ptr->u_prev, 2).sum();
-			}
-			l2norm = sqrt(l2norm);
-		}
-	} while (l2norm > uxx_l2norm * 10e-10);
+	// print out solution
+	cout << "Final solution:\n";
+	printSolution(dmns);
+	cout << '\n';
 
 	cerr << '\n';
-	cerr << "number of iterations: " << num_iter << "\n";
-	cerr.precision(3);
 	cerr << "error: " << scientific << error(dmns) << "\n";
 
 	// delete the domains

@@ -1,3 +1,4 @@
+#include <iostream>
 #include <valarray>
 using namespace std;
 #include "TriDiagSolver.h"
@@ -19,36 +20,32 @@ void TriDiagSolver::solve(Domain &dom)
 	const int    last_i = dom.size() - 1;
 	const double h      = dom.spaceDelta();
 
-	// determine left boundary conditions
-	double left_boundary  = 2 * left_bnd;
-	double top_left_coeff = -3.0;
+	// determine left boundary condition
+	double left_boundary = left_bnd;
 	if (dom.hasLeftNbr()) {
-		top_left_coeff             = -2.0;
-		valarray<double> &left_sol = dom.leftNbr().u_curr;
-		left_boundary              = left_sol[left_sol.size() - 1];
+		left_boundary = dom.leftGamma();
 	}
 
-	// determine right boundary conditions
-	double right_boundary     = 2 * right_bnd;
-	double bottom_right_coeff = -3.0;
+	// determine right boundary condition
+	double right_boundary = right_bnd;
 	if (dom.hasRightNbr()) {
-		bottom_right_coeff          = -2.0;
-		valarray<double> &right_sol = dom.rightNbr().u_prev;
-		right_boundary              = right_sol[0];
+		right_boundary = dom.rightGamma();
 	}
+	//cout << "On this domain using boundaries: " << left_boundary << ", " << right_boundary
+	//     << "\n\n";
 
 	// first value
-	c_prime[0] = 1.0 / top_left_coeff;
-	d_prime[0] = (u_xx[0] * h * h - left_boundary) / top_left_coeff;
+	c_prime[0] = 1.0 / -3.0;
+	d_prime[0] = (u_xx[0] * h * h - 2 * left_boundary) / -3.0;
 	// in between values
 	for (int i = 1; i < last_i; i++) {
 		c_prime[i] = 1.0 / (-2.0 - c_prime[i - 1]);
 		d_prime[i] = (u_xx[i] * h * h - d_prime[i - 1]) / (-2.0 - c_prime[i - 1]);
 	}
 	// last value
-	c_prime[last_i] = 1.0 / (bottom_right_coeff - c_prime[last_i - 1]);
-	d_prime[last_i] = (u_xx[last_i] * h * h - right_boundary - d_prime[last_i - 1])
-	                  / (bottom_right_coeff - c_prime[last_i - 1]);
+	c_prime[last_i] = 1.0 / (-3.0 - c_prime[last_i - 1]);
+	d_prime[last_i] = (u_xx[last_i] * h * h - 2 * right_boundary - d_prime[last_i - 1])
+	                  / (-3.0 - c_prime[last_i - 1]);
 
 	// back substitute
 	u[last_i] = d_prime[last_i];
