@@ -36,8 +36,11 @@ int main (int argc, char *argv[])
     HYPRE_SStructMatrix   A;
     HYPRE_SStructVector   b;
     HYPRE_SStructVector   x;
+    HYPRE_SStructVector   error_vec;
     HYPRE_SStructSolver   solver;
     HYPRE_SStructSolver   precond;
+
+    double *error[5];
 
     HYPRE_ParCSRMatrix parcsr_A;
     HYPRE_ParVector par_b;
@@ -77,7 +80,7 @@ int main (int argc, char *argv[])
       0  : Constant solution
       1  : Variable solution
     */
-    int solution_type = 0;
+    int solution_type = 1;
 
 
     /* -------------------------------------------------------------
@@ -212,6 +215,7 @@ int main (int argc, char *argv[])
     switch(solver_id)
     {
     case 0:
+    case 3:
         object_type = HYPRE_SSTRUCT;
         break;
     case 1:
@@ -262,7 +266,7 @@ int main (int argc, char *argv[])
             HYPRE_SStructGridSetVariables(grid, part, nvars, vartypes);
         }
 
-#if 0
+#ifndef USE_GRAPH_ENTRIES
         /* Connectivity between four sibling grids (doesn't yet work)
 
            Vertical connections   : P1-P2, P3-P4
@@ -374,37 +378,146 @@ int main (int argc, char *argv[])
             HYPRE_SStructGraphSetStencil(graph, part, var, stencil_5pt);
         }
 
-#if 0
-        /* TODO :  Add graph entries to describe connection between
-           part 0 and parts 1 and 3.  (code below won't work) */
+#ifdef USE_GRAPH_ENTRIES
         {
+            /* Connect sibling grids */
             int idx[2], to_idx[2];
             int to_part;
 
-            for(j = lr[1]; j <= ur[1]; j++)
             {
+                /* Vertical connections (P1-P2, P3-P4) */
+                {
+                    int parts[2] = {1,3};
+                    int to_parts[2] = {2,4};
 
-                idx[1] = j;
-                to_idx[1] = j;
+                    for(j = lr[1]; j <= ur[1]; j++)
+                    {
+                        idx[1] = j;
+                        to_idx[1] = j;
+                        for(n = 0; n < 2; n++)
+                        {
+                            part = parts[n];
+                            idx[0] = lr[0];
 
-                /* Connect part 0 to part 1 */
-                part = 0;
-                idx[0] = lr[0];
+                            to_part = to_parts[n];
+                            to_idx[0] = ll[0];
 
-                to_part = 1;
-                to_idx[0] = ll[0];
+                            HYPRE_SStructGraphAddEntries(graph, part, idx,
+                                                         var, to_part, to_idx, var);
 
-                HYPRE_SStructGraphAddEntries(graph, part, idx, var, to_part, to_idx, var);
+                            part = to_parts[n];
+                            idx[0] = ll[0];
 
-                /* Connect part 1 to part 0 */
-                part = 1;
-                idx[0] = ll[0];
+                            to_part = parts[n];
+                            to_idx[0] = lr[0];
+                            HYPRE_SStructGraphAddEntries(graph, part, idx,
+                                                         var, to_part, to_idx, var);
+                        }
+                    }
+                }
 
-                to_part = 0;
-                to_idx[0] = lr[0];
-                HYPRE_SStructGraphAddEntries(graph, part, idx, var, to_part, to_idx, var);
+                /* Horizontal connections (P1-P2, P3-P4) */
+                {
+                    int parts[2] = {1,2};
+                    int to_parts[2] = {3,4};
 
-                /* etc */
+                    for(i = ul[0]; i <= ur[0]; i++)
+                    {
+                        idx[0] = i;
+                        to_idx[0] = i;
+                        for(n = 0; n < 2; n++)
+                        {
+                            part = parts[n];
+                            idx[1] = ul[1];
+
+                            to_part = to_parts[n];
+                            to_idx[1] = ll[1];
+
+                            HYPRE_SStructGraphAddEntries(graph, part, idx,
+                                                         var, to_part, to_idx, var);
+
+                            part = to_parts[n];
+                            idx[1] = ll[1];
+
+                            to_part = parts[n];
+                            to_idx[1] = ul[1];
+                            HYPRE_SStructGraphAddEntries(graph, part, idx,
+                                                         var, to_part, to_idx, var);
+                        }
+                    }
+                }
+
+                /* Vertical connections (P0-P1 and P0-P3) */
+                {
+                    /* Lower half */
+                    for(j = lr[1]; j <= ny/2; j++)
+                    {
+                        {
+                            /* Lower half */
+                            part = 0;
+                            idx[0] = lr[0];
+                            idx[1] = j;
+
+                            to_part = 1;
+                            to_idx[0] = ll[0];
+                            to_idx[1] = 2*j-1;  /* Simple connection - not accurate */
+
+                            HYPRE_SStructGraphAddEntries(graph, part, idx,
+                                                         var, to_part, to_idx, var);
+
+                            part = 1;
+                            idx[0] = ll[0];
+                            idx[1] = 2*j-1;  /* Simple connection - not accurate */
+
+                            to_part = 0;
+                            to_idx[0] = lr[0];
+                            to_idx[1] = j;
+                            HYPRE_SStructGraphAddEntries(graph, part, idx,
+                                                         var, to_part, to_idx, var);
+
+                            part = 1;
+                            idx[0] = ll[0];
+                            idx[1] = 2*j;  /* Simple connection - not accurate */
+                            HYPRE_SStructGraphAddEntries(graph, part, idx,
+                                                         var, to_part, to_idx, var);
+
+                        }
+                    }
+
+                    for(j = ny/2+1; j <= ur[1]; j++)
+                    {
+                        {
+                            /* upper half */
+                            part = 0;
+                            idx[0] = lr[0];
+                            idx[1] = j;
+
+                            to_part = 3;
+                            to_idx[0] = ll[0];
+                            to_idx[1] = 2*j-1 - ny;  /* Simple connection - not accurate */
+
+                            HYPRE_SStructGraphAddEntries(graph, part, idx,
+                                                         var, to_part, to_idx, var);
+
+                            part = 3;
+                            idx[0] = ll[0];
+                            idx[1] = 2*j - 1 - ny;  /* Simple connection - not accurate */
+
+                            to_part = 0;
+                            to_idx[0] = lr[0];
+                            to_idx[1] = j;
+                            HYPRE_SStructGraphAddEntries(graph, part, idx,
+                                                         var, to_part, to_idx, var);
+
+                            part = 3;
+                            idx[0] = ll[0];
+                            idx[1] = 2*j - ny;  /* Simple connection - not accurate */
+                            HYPRE_SStructGraphAddEntries(graph, part, idx,
+                                                         var, to_part, to_idx, var);
+
+                        }
+                    }
+                }
             }
         }
 #endif
@@ -459,7 +572,6 @@ int main (int argc, char *argv[])
             for(n = 1; n < nparts; n++)
             {
                 part = n;
-                printf("here ... part = %d \n", part);
                 HYPRE_SStructMatrixSetBoxValues(A, part, ll, ur,
                                                 var, nentries,
                                                 stencil_indices, valuesf);
@@ -551,13 +663,14 @@ int main (int argc, char *argv[])
         }
 
         {
-            /* Zero out stencils set along center line */
+            /* Zero out stencils set along all edges, since we are using graph entries */
             int nentries = 1;
             int maxnvalues = nentries*MAX(nx,ny);
             double *values = calloc(maxnvalues,sizeof(double));
+            double *valuesf = calloc(maxnvalues,sizeof(double));
             int stencil_indices[1];
 
-            for (i = 0; i < maxnvalues; i += nentries)
+            for (i = 0; i < maxnvalues; i++)
             {
                 values[i] = 0;
             }
@@ -569,12 +682,12 @@ int main (int argc, char *argv[])
                                             var, nentries,
                                             stencil_indices, values);
 
-            /* Left edge of P1 and P3 */
+            /* Left edges of sibling grids (P1,P2,P3,P4) */
             {
                 stencil_indices[0] = 1;
-                int parts[2] = {1,3};
+                int parts[4] = {1,2,3,4};
 
-                for(n = 0; n < 2; n++)
+                for(n = 0; n < 4; n++)
                 {
                     part = parts[n];
                     HYPRE_SStructMatrixSetBoxValues(A, part, ll, ul,
@@ -583,29 +696,161 @@ int main (int argc, char *argv[])
                 }
             }
 
-#if 0
+            /* Right edges of P1,P3*/
+            {
+                stencil_indices[0] = 2;
+                int parts[2] = {1,3};
+
+                for(n = 0; n < 2; n++)
+                {
+                    part = parts[n];
+                    HYPRE_SStructMatrixSetBoxValues(A, part, lr, ur,
+                                                    var, nentries,
+                                                    stencil_indices, values);
+                }
+            }
+
+            /* Top edges of P1, P2 */
+            {
+                stencil_indices[0] = 4;
+                int parts[2] = {1,2};
+
+                for(n = 0; n < 2; n++)
+                {
+                    part = parts[n];
+                    HYPRE_SStructMatrixSetBoxValues(A, part, ul, ur,
+                                                    var, nentries,
+                                                    stencil_indices, values);
+                }
+            }
+
+            /* Bottom edges of P3, P4*/
+            {
+                stencil_indices[0] = 3;
+                int parts[2] = {3,4};
+
+                for(n = 0; n < 2; n++)
+                {
+                    part = parts[n];
+                    HYPRE_SStructMatrixSetBoxValues(A, part, ll, lr,
+                                                    var, nentries,
+                                                    stencil_indices, values);
+                }
+            }
+
+
+#ifdef USE_GRAPH_ENTRIES
             /* Set the values of the stencil weights for graph entries, added above.
                Each graph entry is the 6th entry in the stencil.
             */
             for (j = 0; j < maxnvalues; j++)
             {
                 values[j] = -1.0/h2 ;
+                valuesf[j] = -1.0/hf2;
             }
 
-            stencil_indices[0] = 5;  /* Graph entry was sixth entry added? */
+            /* Each stencil has one non-stencil entry - added as 6th entry */
+            stencil_indices[0] = 5;
 
+            /* Right edge of P0 */
             part = 0;
             HYPRE_SStructMatrixSetBoxValues(A, part, lr, ur,
                                             var, nentries,
                                             stencil_indices, values);
 
-            stencil_indices[0] = 5;  /* Graph entry was sixth entry added? */
-            part = 1;
-            HYPRE_SStructMatrixSetBoxValues(A, part, ll, ul,
-                                            var, nentries,
-                                            stencil_indices, values);
+            /* Left edges of P1,P2,P3,P4 */
+            {
+                int parts[4] = {1,2,3,4};
+                for(n = 0; n < 4; n++)
+                {
+                    part = parts[n];
+                    HYPRE_SStructMatrixSetBoxValues(A, part, ll, ul,
+                                                    var, nentries,
+                                                    stencil_indices, valuesf);
+                }
+            }
+
+            /* Right edges of P1,P3 */
+            {
+                int parts[2] = {1,3};
+                for(n = 0; n < 2; n++)
+                {
+                    part = parts[n];
+                    HYPRE_SStructMatrixSetBoxValues(A, part, lr, ur,
+                                                    var, nentries,
+                                                    stencil_indices, valuesf);
+                }
+            }
+            /* Top edges of P1,P2 */
+            {
+                int parts[2] = {1,2};
+                for(n = 0; n < 2; n++)
+                {
+                    part = parts[n];
+                    HYPRE_SStructMatrixSetBoxValues(A, part, ul, ur,
+                                                    var, nentries,
+                                                    stencil_indices, valuesf);
+                }
+            }
+
+            /* Bottom edges of P3,P4 */
+            {
+                int parts[2] = {3,4};
+                for(n = 0; n < 2; n++)
+                {
+                    part = parts[n];
+                    HYPRE_SStructMatrixSetBoxValues(A, part, ll, lr,
+                                                    var, nentries,
+                                                    stencil_indices, valuesf);
+                }
+            }
+
+            /* Fix corner entries at common corner P1,P2,P3,P4 */
+            {
+                int nentries = 2;
+                int stencil_indices[2] = {5,6};
+                double valuesf[2] = {-1.0/hf2, -1.0/hf2};
+                {
+                    /* P1 (ur corner) */
+                    part = 1;
+                    HYPRE_SStructMatrixSetBoxValues(A, part, ur, ur,
+                                                    var, nentries,
+                                                    stencil_indices, valuesf);
+                    HYPRE_SStructMatrixSetBoxValues(A, part, ul, ul,
+                                                    var, nentries,
+                                                    stencil_indices, valuesf);
+
+                }
+                {
+                    /* P2 (ul corner) */
+                    part = 2;
+                    HYPRE_SStructMatrixSetBoxValues(A, part, ul, ul,
+                                                    var, nentries,
+                                                    stencil_indices, valuesf);
+                }
+                {
+                    /* P3 (lr corner) */
+                    part = 3;
+                    HYPRE_SStructMatrixSetBoxValues(A, part, lr,lr,
+                                                    var, nentries,
+                                                    stencil_indices, valuesf);
+                    HYPRE_SStructMatrixSetBoxValues(A, part, ll,ll,
+                                                    var, nentries,
+                                                    stencil_indices, valuesf);
+                }
+                {
+                    /* P4 (lr corner) */
+                    part = 4;
+                    HYPRE_SStructMatrixSetBoxValues(A, part, ll,ll,
+                                                    var, nentries,
+                                                    stencil_indices, valuesf);
+                }
+            }
+
+
 #endif
             free(values);
+            free(valuesf);
         }
 
 
@@ -679,7 +924,6 @@ int main (int argc, char *argv[])
        5. Set up SStruct Vectors for b and x
        ------------------------------------------------------------- */
     double *solution[2];
-    double *error;
     {
         /* Create an empty vector object */
         HYPRE_SStructVectorCreate(MPI_COMM_WORLD, grid, &b);
@@ -708,7 +952,7 @@ int main (int argc, char *argv[])
             if (solution_type == 0)
             {
                 /* Set b (RHS) */
-                double c = 2;   /* Value of constant solution */
+                double c = 1.3;   /* Value of constant solution */
                 for(n = 0; n < nparts; n++)
                 {
                     for (i = 0; i < nvalues; i++)
@@ -723,7 +967,7 @@ int main (int argc, char *argv[])
             {
                 double x,y;
                 double C = 2;  /* Coefficients used in exact solution */
-                double D = 1;
+                double D = 2;
 
                 double ax[5] = {0,1,1.5,1,1.5};  /* Lower left corners for each part */
                 double ay[5] = {0,0,0,0.5,0.5};  /* Lower left corners for each part */
@@ -911,15 +1155,14 @@ int main (int argc, char *argv[])
         }
         else if (solver_id == 3)
         {
+
             HYPRE_SStructBiCGSTABCreate(MPI_COMM_WORLD, &solver);
             HYPRE_BiCGSTABSetMaxIter((HYPRE_Solver) solver, maxiter );
             HYPRE_BiCGSTABSetTol((HYPRE_Solver) solver, tol );
             HYPRE_BiCGSTABSetPrintLevel((HYPRE_Solver) solver, print_level );
-#if 0
             HYPRE_BiCGSTABSetLogging((HYPRE_Solver) solver, 1 );
-#endif
 
-#if 0
+#if 1
             precond = NULL;
             HYPRE_SStructBiCGSTABSetPrecond(solver,
                                             HYPRE_SStructDiagScale,
@@ -927,8 +1170,42 @@ int main (int argc, char *argv[])
                                             precond);
 #endif
 
+#if 0
+            /* Create a split SStruct solver for use as a preconditioner */
+            HYPRE_SStructSplitCreate(MPI_COMM_WORLD, &precond);
+            HYPRE_SStructSplitSetMaxIter(precond, 1);
+            HYPRE_SStructSplitSetTol(precond, 0.0);
+            HYPRE_SStructSplitSetZeroGuess(precond);
+
+            /* Set the preconditioner type to split-SMG */
+            HYPRE_SStructSplitSetStructSolver(precond, HYPRE_Jacobi);
+
+            HYPRE_SStructBiCGSTABSetPrecond(solver, HYPRE_SStructSplitSolve,
+                                       HYPRE_SStructSplitSetup, precond);
+#endif
+#if 0
+            /* Set the AMG preconditioner parameters */
+            HYPRE_BoomerAMGCreate(&precond);
+            HYPRE_BoomerAMGSetStrongThreshold(precond, .25);
+            HYPRE_BoomerAMGSetCoarsenType(precond, 6);
+            HYPRE_BoomerAMGSetTol(precond, 0.0);
+            HYPRE_BoomerAMGSetMaxIter(precond, 1);
+            HYPRE_BoomerAMGSetPrintLevel(precond, 0);
+
+            /* Set the preconditioner */
+            HYPRE_SStructBiCGSTABSetPrecond(solver,
+                                            HYPRE_BoomerAMGSolve,
+                                            HYPRE_BoomerAMGSetup,
+                                            precond);
+
+#endif
+
             HYPRE_SStructBiCGSTABSetup(solver, A, b, x );
             HYPRE_SStructBiCGSTABSolve(solver, A, b, x);
+
+            HYPRE_SStructBiCGSTABGetNumIterations(solver, &num_iterations);
+            HYPRE_SStructBiCGSTABGetFinalRelativeResidualNorm(solver, &final_res_norm);
+
 
             HYPRE_SStructBiCGSTABDestroy(solver);
 
@@ -945,28 +1222,33 @@ int main (int argc, char *argv[])
             {
                 xvalues = calloc(nparts*nvalues,sizeof(double));
 
-                part = 0;
-                HYPRE_SStructVectorGetBoxValues(x, part, ll, lr, var, xvalues);
-                part = 1;
-                HYPRE_SStructVectorGetBoxValues(x, part, ll, lr, var, &xvalues[nvalues]);
+                for(n = 0; n < nparts; n++)
+                {
+                    part = n;
+                    HYPRE_SStructVectorGetBoxValues(x, part, ll, ur, var, &xvalues[n*nvalues]);
+                }
             }
             else if (object_type == HYPRE_PARCSR)
             {
                 xvalues = hypre_VectorData(hypre_ParVectorLocalVector(par_x));
             }
-            error = calloc(nparts*nvalues,sizeof(double));
 
+            for(n = 0; n < nparts; n++)
+            {
+                error[n] = calloc(nparts*nvalues,sizeof(double));
+            }
 
+            double hv[5] = {h2, hf2, hf2, hf2, hf2};
             for (i = 0; i < nvalues; i++)
             {
                 for (n = 0; n < nparts; n++)
                 {
                     double err;
                     err = fabs(solution[n][i] - xvalues[nvalues*n + i]);
-                    error_norm[0] += err*h2;
-                    error_norm[1] += err*err*h2;
+                    error_norm[0] += err*hv[n];
+                    error_norm[1] += err*err*hv[n];
                     error_norm[2] = MAX(err,error_norm[2]);
-                    error[nvalues*n + i] = err;
+                    error[n][i] = err;
                 }
             }
             error_norm[0] = error_norm[0]/2.0;     /* Divide by area of domain */
@@ -1029,7 +1311,17 @@ int main (int argc, char *argv[])
 
         if (object_type == HYPRE_SSTRUCT)
         {
-            GLVis_PrintSStructVector(x, 0, "vis/ex4.sol", myid);
+            HYPRE_SStructVectorCreate(MPI_COMM_WORLD, grid, &error_vec);
+            HYPRE_SStructVectorSetObjectType(error_vec, object_type);
+            HYPRE_SStructVectorInitialize(error_vec);
+            for(n = 0; n < nparts; n++)
+            {
+                part = n;
+                HYPRE_SStructVectorSetBoxValues(error_vec, part, ll, ur, var, error[n]);
+            }
+            HYPRE_SStructVectorAssemble(error_vec);
+
+            GLVis_PrintSStructVector(error_vec, 0, "vis/ex4.sol", myid);
         }
         else if (object_type == HYPRE_PARCSR)
         {
