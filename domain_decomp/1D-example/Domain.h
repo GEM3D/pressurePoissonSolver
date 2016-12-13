@@ -28,17 +28,17 @@ class Domain
 	 */
 	int m;
 
-	/**
-	 * @brief point to the Domain that is left of this one
-	 */
-	Domain *left_nbr_ptr = nullptr;
-
-	/**
-	 * @brief point to the Domain that is right of this one
-	 */
-	Domain *right_nbr_ptr = nullptr;
-
 	public:
+	/**
+	 * @brief pointer to the gamma value on the left end
+	 */
+	double *left_gamma_ptr = nullptr;
+
+	/**
+	 * @brief pointer to the gamma value on the right end
+	 */
+	double *right_gamma_ptr = nullptr;
+
 	/**
 	 * @brief the values that we are integrating over
 	 */
@@ -95,19 +95,15 @@ class Domain
 	 */
 	bool hasRightNbr();
 
-	/**
-	 * @brief set the neighbor to this grid's left
-	 *
-	 * @param grid the grid that is to the left of this one
-	 */
-	void setLeftNbr(Domain &grid);
+    /**
+     * @return the gamma value on the right end
+     */
+    double rightGamma();
 
-	/**
-	 * @brief set the neighbor to this grid's right
-	 *
-	 * @param grid the grid that is to the right of this one
-	 */
-	void setRightNbr(Domain &grid);
+    /**
+     * @return the gamma value on the left end
+     */
+    double leftGamma();
 
 	/**
 	 * @brief swap the pointer of to the u_curr vector and the u_prev vector
