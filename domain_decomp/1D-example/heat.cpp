@@ -56,7 +56,7 @@ valarray<double> solveOnAllDomains(TriDiagSolver &tds, vector<Domain *> &dmns,
 		double left_val  = left_dmn_ptr->u_curr[left_dmn_ptr->u_curr.size() - 1];
 		double right_val = right_dmn_ptr->u_curr[0];
 
-		z[i] = left_val + right_val + 2 * gammas[i];
+		z[i] = left_val + right_val - 2 * gammas[i];
 	}
 	return z;
 }
