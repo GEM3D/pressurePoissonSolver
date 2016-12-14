@@ -144,7 +144,9 @@ int main(int argc, char *argv[])
 		dgesv_(&n, &one, &A[0], &n, &ipiv[0], &b[0], &n, &info);
 
 		// the solution gets stored in the b array
-		gammas = -b;
+		for (int i = 0; i < n; i++) {
+			gammas[i] = -b[i];
+		}
 
 		cout << "calculated gamma value(s):\n";
 		for (double x : gammas) {
