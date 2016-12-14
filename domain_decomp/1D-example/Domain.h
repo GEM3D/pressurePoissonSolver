@@ -66,6 +66,10 @@ class Domain
 	Domain(double d_begin, double d_end, int m, double f(double x));
 
 	/**
+	 * @brief an empty constructor, does nothing
+	 */
+	Domain() {}
+	/**
 	 * @return the spacing between grid points
 	 */
 	double spaceDelta();
