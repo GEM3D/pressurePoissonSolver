@@ -1,3 +1,4 @@
+#include <cassert>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -9,9 +10,11 @@ using namespace std;
 #include "Domain.h"
 #include "TriDiagSolver.h"
 
-// lapack function declaration
-extern "C" void dgesv_(int *n, int *nrhs, double *a, int *lda, int *ipiv, double *b, int *ldb, int *info);
-
+// lapack function signatures
+extern "C" void dgesv_(int *n, int *nrhs, double *a, int *lda, int *ipiv, double *b, int *ldb,
+                       int *info);
+extern "C" void dgecon_(char *norm, int *n, double *A, int *lda, double *Anorm, double *rcond,
+                        double *work, int *iwork, int *info);
 
 double uxx_init(double x) { return -PI * PI * sin(PI * x); }
 double exact_solution(double x) { return sin(PI * x); }
@@ -108,6 +111,7 @@ int main(int argc, char *argv[])
 		dmns[last_i].left_gamma_ptr = &gammas[last_i - 1];
 	}
 
+	double condition_number;
 	if (num_domains > 1) {
 		// solve with gammas set to zero
 		gammas             = 0;
@@ -137,11 +141,35 @@ int main(int argc, char *argv[])
 		}
 		cout << "\n\n";
 
+		// get the condition number of A
+		double rcond;
+
+		{
+			// I'm putting these in their own scope so I don't clutter up the namespace with these
+			// variables
+			char             norm = '1';
+			valarray<double> col_sum(n);
+			for (int i = 0; i < n; i++) {
+				valarray<double> col = A[slice(i * n, n, 1)];
+				col_sum[i]           = abs(col).sum();
+			}
+			double           A_norm = col_sum.max();
+			valarray<double> work(4 * n);
+			valarray<int>    iwork(n);
+			int              info;
+			dgecon_(&norm, &n, &A[0], &n, &A_norm, &rcond, &work[0], &iwork[0], &info);
+			assert(info == 0);
+		}
+		condition_number = 1.0 / rcond;
+
 		// solve for the gamma values
-		int           one = 1;
-		valarray<int> ipiv(n);
-		int           info;
-		dgesv_(&n, &one, &A[0], &n, &ipiv[0], &b[0], &n, &info);
+		{
+			int           one = 1;
+			valarray<int> ipiv(n);
+			int           info;
+			dgesv_(&n, &one, &A[0], &n, &ipiv[0], &b[0], &n, &info);
+			assert(info == 0);
+		}
 
 		// the solution gets stored in the b array
 		for (int i = 0; i < n; i++) {
@@ -167,4 +195,7 @@ int main(int argc, char *argv[])
 
 	cerr << '\n';
 	cerr << "error: " << scientific << error(dmns) << "\n";
+	if (num_domains > 1) {
+		cout << "condition number of A: " << condition_number << "\n";
+	}
 }
