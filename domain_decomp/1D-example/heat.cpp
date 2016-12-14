@@ -9,6 +9,10 @@ using namespace std;
 #include "Domain.h"
 #include "TriDiagSolver.h"
 
+// lapack function declaration
+extern "C" void dgesv_(int *n, int *nrhs, double *a, int *lda, int *ipiv, double *b, int *ldb, int *info);
+
+
 double uxx_init(double x) { return -PI * PI * sin(PI * x); }
 double exact_solution(double x) { return sin(PI * x); }
 double error(vector<Domain> &dmns)
@@ -104,11 +108,9 @@ int main(int argc, char *argv[])
 		dmns[last_i].left_gamma_ptr = &gammas[last_i - 1];
 	}
 
-	gammas = 0;
 	if (num_domains > 1) {
-		/*
-		 * solve with gammas set to 0
-		 */
+		// solve with gammas set to zero
+		gammas             = 0;
 		valarray<double> b = solveOnAllDomains(tds, dmns, gammas);
 
 		cout << "b value(s):\n";
@@ -117,22 +119,33 @@ int main(int argc, char *argv[])
 		}
 		cout << "\n\n";
 
-		/*
-		 * solve with gammas set to 1
-		 */
-		gammas             = 1;
-		valarray<double> a = solveOnAllDomains(tds, dmns, gammas) - b;
+		// build the A matrix
+		int              n = gammas.size();
+		valarray<double> A(n * n);
+		for (int i = 0; i < n; i++) {
+			gammas[i] = 1.0;
+			A[slice(i * n, n, 1)] = solveOnAllDomains(tds, dmns, gammas) - b;
+			gammas[i] = 0.0;
+		}
 
-		cout << "a value(s):\n";
-		for (double x : a) {
-			cout << x << ' ';
+		cout << "A matrix:\n";
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				cout << A[n * i + j] << '\t';
+			}
+			cout << '\n';
 		}
 		cout << "\n\n";
 
-		/*
-		 * calculate the gamma value, and solve with that
-		 */
-		gammas = -b / a;
+		// solve for the gamma values
+		int           one = 1;
+		valarray<int> ipiv(n);
+		int           info;
+		dgesv_(&n, &one, &A[0], &n, &ipiv[0], &b[0], &n, &info);
+
+		// the solution gets stored in the b array
+		gammas = -b;
+
 		cout << "calculated gamma value(s):\n";
 		for (double x : gammas) {
 			cout << x << ' ';

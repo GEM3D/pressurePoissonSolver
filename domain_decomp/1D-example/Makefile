@@ -1,6 +1,6 @@
 C      = g++
 CFLAGS  = -Wall -pedantic -std=c++11 -O2
-LDFLAGS = -lstdc++ -lm
+LDFLAGS = -lstdc++ -lm -llapack
 
 all: heat clean
 
