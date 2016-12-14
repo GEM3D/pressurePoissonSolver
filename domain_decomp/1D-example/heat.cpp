@@ -42,12 +42,10 @@ double error(vector<Domain> &dmns)
  *
  * @param tds the solver to use
  * @param dmns the domains to over
- * @param gammas the gamma values that are used
  *
- * @return
+ * @return the difference between the gamma values and the computed value at the domain
  */
-valarray<double> solveOnAllDomains(TriDiagSolver &tds, vector<Domain> &dmns,
-                                   valarray<double> &gammas)
+valarray<double> solveOnAllDomains(TriDiagSolver &tds, vector<Domain> &dmns)
 {
 	// solve over the domains
 	for (Domain &d : dmns) {
@@ -55,15 +53,16 @@ valarray<double> solveOnAllDomains(TriDiagSolver &tds, vector<Domain> &dmns,
 	}
 
 	// get the difference between the gamma value and computed solution at the interface
-	valarray<double> z(gammas.size());
-	for (size_t i = 0; i < gammas.size(); i++) {
+	valarray<double> z(dmns.size() - 1);
+	for (size_t i = 0; i < z.size(); i++) {
 		Domain &left_dmn  = dmns[i];
 		Domain &right_dmn = dmns[i + 1];
+		double  gamma     = left_dmn.rightGamma();
 
 		double left_val  = left_dmn.u_curr[left_dmn.u_curr.size() - 1];
 		double right_val = right_dmn.u_curr[0];
 
-		z[i] = left_val + right_val - 2 * gammas[i];
+		z[i] = left_val + right_val - 2 * gamma;
 	}
 	return z;
 }
@@ -115,7 +114,7 @@ int main(int argc, char *argv[])
 	if (num_domains > 1) {
 		// solve with gammas set to zero
 		gammas             = 0;
-		valarray<double> b = solveOnAllDomains(tds, dmns, gammas);
+		valarray<double> b = solveOnAllDomains(tds, dmns);
 
 		cout << "b value(s):\n";
 		for (double x : b) {
@@ -128,7 +127,7 @@ int main(int argc, char *argv[])
 		valarray<double> A(n * n);
 		for (int i = 0; i < n; i++) {
 			gammas[i] = 1.0;
-			A[slice(i * n, n, 1)] = solveOnAllDomains(tds, dmns, gammas) - b;
+			A[slice(i * n, n, 1)] = solveOnAllDomains(tds, dmns) - b;
 			gammas[i] = 0.0;
 		}
 
@@ -186,7 +185,7 @@ int main(int argc, char *argv[])
 	/*
 	 * get the final solution
 	 */
-	solveOnAllDomains(tds, dmns, gammas);
+	solveOnAllDomains(tds, dmns);
 
 	// print out solution
 	cout << "Final solution:\n";
