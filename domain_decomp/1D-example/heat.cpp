@@ -193,8 +193,8 @@ int main(int argc, char *argv[])
 	printSolution(dmns);
 	cout << '\n';
 
-	cerr << '\n';
-	cerr << "error: " << scientific << error(dmns) << "\n";
+	cout << '\n';
+	cout << "error: " << scientific << error(dmns) << "\n" << defaultfloat;
 	if (num_domains > 1) {
 		cout << "condition number of A: " << condition_number << "\n";
 	}
