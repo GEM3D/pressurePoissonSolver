@@ -98,7 +98,7 @@ void printHelp()
 	cout << "Usage:\n";
 	cout << "./heat <num_cells> <numdomains> [options]\n\n";
 	cout << "Options can be:\n";
-	cout << "\t -s \t print solution\n";
+	cout << "\t -s <file> \t save solution to file\n";
 	cout << "\t -m \t print the matrix that was formed.\n";
 	cout << "\t -h \t print this help message\n";
 }
