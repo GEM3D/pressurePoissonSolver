@@ -18,8 +18,10 @@ extern "C" void dgesv_(int *n, int *nrhs, double *a, int *lda, int *ipiv, double
 extern "C" void dgecon_(char *norm, int *n, double *A, int *lda, double *Anorm, double *rcond,
                         double *work, int *iwork, int *info);
 
-double uxx_init(double x) { return -PI * PI * sin(PI * x); }
-double exact_solution(double x) { return sin(PI * x); }
+//double uxx_init(double x) { return -PI * PI * sin(PI * x); }
+//double exact_solution(double x) { return sin(PI * x); }
+double uxx_init(double x) { return -0.5 + abs(x-0.5); }
+double exact_solution(double x) { return 1.0/24.0 - (x-0.5)*(x-0.5)/4.0 + abs(x-0.5)*abs(x-0.5)*abs(x-0.5)/6.0; }
 double error(vector<Domain> &dmns)
 {
 	double l2norm     = 0;
