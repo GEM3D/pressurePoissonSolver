@@ -1,9 +1,11 @@
 #include <cassert>
 #include <cmath>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <valarray>
 #include <vector>
+
 #define PI M_PI
 
 using namespace std;
@@ -67,14 +69,23 @@ valarray<double> solveOnAllDomains(TriDiagSolver &tds, vector<Domain> &dmns)
 	return z;
 }
 
-void printSolution(vector<Domain> &dmns)
+void printSolution(vector<Domain> &dmns, ostream &os)
 {
 	for (Domain &d : dmns) {
 		for (double x : d.u_curr) {
-			cout << x << "\t";
+			os << x << "\t";
 		}
 	}
-	cout << '\n';
+	os << '\n';
+}
+
+char *getCmdOption(char **begin, char **end, const std::string &option)
+{
+	char **itr = std::find(begin, end, option);
+	if (itr != end && ++itr != end) {
+		return *itr;
+	}
+	return 0;
 }
 
 bool cmdOptionExists(char **begin, char **end, const string &option)
@@ -94,14 +105,14 @@ void printHelp()
 
 int main(int argc, char *argv[])
 {
-	bool print_solution = false;
-	bool print_matrix   = false;
+	string save_solution_file = "";
+	bool   print_matrix       = false;
 	if (argc < 2 || cmdOptionExists(argv, argv + argc, "-h")) {
 		printHelp();
 		return 1;
 	}
 	if (cmdOptionExists(argv, argv + argc, "-s")) {
-		print_solution = true;
+		save_solution_file = getCmdOption(argv, argv + argc, "-s");
 	}
 	if (cmdOptionExists(argv, argv + argc, "-m")) {
 		print_matrix = true;
@@ -221,11 +232,11 @@ int main(int argc, char *argv[])
 	 */
 	solveOnAllDomains(tds, dmns);
 
-	if (print_solution) {
+	if (save_solution_file != "") {
 		// print out solution
-		cout << "Final solution:\n";
-		printSolution(dmns);
-		cout << '\n';
+		ofstream out_file(save_solution_file);
+		printSolution(dmns, out_file);
+		out_file.close();
 	}
 
 	cout << "error: " << scientific << error(dmns) << "\n" << defaultfloat;
