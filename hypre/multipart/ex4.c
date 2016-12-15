@@ -1,9 +1,25 @@
 /*
-   Example 3
+   Example 4
 
-   Interface:    Semi-Structured interface with two parts
+   Interface:    Semi-Structured interface with five parts parts
+
+   Grid structure.
+       - Each grid is NxN
+       - Use SetNeighborParts for sibling grids (P1-P4)
+       - Use GraphAddEntries for connectivity between P0 and P1 and P3.
+
+
+         |---------|-----|-----|
+         |         |     |     |
+         |         | P3  | P4  |
+         |    P0   |-----|-----|
+         |         |     |     |
+         |         | P1  | P2  |
+         |---------|-----|-----|
 
 */
+
+
 
 #include <stdio.h>
 
@@ -24,6 +40,15 @@
        __typeof__ (b) _b = (b); \
        _a > _b ? _a : _b; })
 
+
+void qtrue_constant(double x, double y, double *q, double *qx, double *qy, double *qxx, double *qyy);
+void qtrue_plane(double x, double y, double *q, double *qx, double *qy, double *qxx, double *qyy);
+void qtrue_parabola(double x, double y, double *q, double *qx, double *qy, double *qxx, double *qyy);
+void qtrue_trig(double x, double y, double *q, double *qx, double *qy, double *qxx, double *qyy);
+
+typedef void (*solution_t)(double x, double y, double *q, double *qx, double *qy, double *qxx, double *qyy);
+
+
 int main (int argc, char *argv[])
 {
     int myid, num_procs;
@@ -40,8 +65,9 @@ int main (int argc, char *argv[])
     HYPRE_SStructSolver   solver;
     HYPRE_SStructSolver   precond;
 
-    double *error[5];
-
+    double **error;
+    double **solution;
+    solution_t qtrue;
     HYPRE_ParCSRMatrix parcsr_A;
     HYPRE_ParVector par_b;
     HYPRE_ParVector par_x;
@@ -78,10 +104,18 @@ int main (int argc, char *argv[])
 
     /*
       0  : Constant solution
-      1  : Variable solution
+      1  : Linear (a*x + b*y)
+      2  : Quadratic (a*x^2 + b*y^2)
+      3  : Trigonometric (cos(a*2*pi*x)*cos(b*2*pi*y)
+      .....
+      10 : Original problem
     */
     int solution_type = 1;
 
+
+    /* Lower Left corners for each part : [ax[n],bx[n]] x [ay[n],by[n]] */
+    double ax[5] = {0,1,1.5,1,1.5};
+    double ay[5] = {0,0,0,0.5,0.5};
 
     /* -------------------------------------------------------------
        For this code we assume that all parts are local to a single
@@ -143,6 +177,11 @@ int main (int argc, char *argv[])
                 arg_index++;
                 print_level = atoi(argv[arg_index++]);
             }
+            else if (strcmp(argv[arg_index], "-solution_type") == 0)
+            {
+                arg_index++;
+                solution_type = atoi(argv[arg_index++]);
+            }
             else
             {
                 arg_index++;
@@ -155,11 +194,12 @@ int main (int argc, char *argv[])
             printf("Usage: %s [<options>]\n", argv[0]);
             printf("\n");
             printf("  -vis                  : Save the solution for GLVis visualization\n");
-            printf("  -solver_id N          : Solver_id (N=0,1,2) [1]\n");
-            printf("  -nx N                 : nx (ny will be set to equal nx) [100]\n");
-            printf("  -maxiter N            : Maximum number of iterations [500]\n");
-            printf("  -tol t                : Solver tolerance [1e-10]\n");
-            printf("  -print_level N        : Solver print level to N (N=0-3) [0]\n");
+            printf("  -solver_id <N>        : Solver_id (N=0,1,2) [1]\n");
+            printf("  -nx <N>               : nx (ny will be set to equal nx) [100]\n");
+            printf("  -maxiter <N>          : Maximum number of iterations [500]\n");
+            printf("  -tol <t>              : Solver tolerance [1e-10]\n");
+            printf("  -print_level <N>      : Solver print level to N (N=0-3) [0]\n");
+            printf("  -solution_type <N>    : Solution type (0=constant; 1=linear; 2=quad. 3=trig. [1]\n");
             printf("\n");
         }
 
@@ -183,6 +223,7 @@ int main (int argc, char *argv[])
 
     double hf = h/2.0;   /* Fine grid mesh size */
     double hf2 = hf*hf;
+    double hv[5] = {h,hf,hf,hf,hf};  /* Mesh widths */
 
     int ndim = 2;       /* Dimension of the problem */
     int nparts = 5;     /* Number of parts (fixed)  */
@@ -200,6 +241,7 @@ int main (int argc, char *argv[])
     ur[0] = nx;
     ur[1] = ny;
 
+#ifndef USE_GRAPH_ENTRIES
     /* Ghost indices, needed for SetNeighborPart */
     int ll_g[2], lr_g[2], ul_g[2], ur_g[2];
     ll_g[0] = ll[0] - 1;
@@ -210,6 +252,7 @@ int main (int argc, char *argv[])
     ul_g[1] = ul[1];
     ur_g[0] = ur[0] + 1;
     ur_g[1] = ur[1];
+#endif
 
     int object_type;
     switch(solver_id)
@@ -223,28 +266,28 @@ int main (int argc, char *argv[])
         object_type = HYPRE_PARCSR;    /* Doesn't yet work */
     }
 
+    switch(solution_type)
+    {
+    case 0:
+        qtrue = &qtrue_constant;
+        break;
+    case 1:
+        qtrue = &qtrue_plane;
+        break;
+    case 2:
+        qtrue = &qtrue_parabola;
+        break;
+    case 3:
+        qtrue = &qtrue_trig;
+        break;
+    case 10:
+        /* Use original code */
+        break;
+    }
 
     /* -------------------------------------------------------------
        1. Set up the 2D grid.
        ------------------------------------------------------------- */
-
-    /* Grid structure.
-       - Each grid is NxN
-       - Use SetNeighborParts for sibling grids (P1-P4)
-       - Use GraphAddEntries for connectivity between P0 and P1 and P3.
-
-
-         |---------|-----|-----|
-         |         |     |     |
-         |         | P3  | P4  |
-         |    P0   |-----|-----|
-         |         |     |     |
-         |         | P1  | P2  |
-         |---------|-----|-----|
-
-    */
-
-
 
     {
         /* Create an empty 2D grid object */
@@ -460,14 +503,14 @@ int main (int argc, char *argv[])
 
                             to_part = 1;
                             to_idx[0] = ll[0];
-                            to_idx[1] = 2*j-1;  /* Simple connection - not accurate */
+                            to_idx[1] = 2*j;  /* Simple connection - not accurate */
 
                             HYPRE_SStructGraphAddEntries(graph, part, idx,
                                                          var, to_part, to_idx, var);
 
                             part = 1;
                             idx[0] = ll[0];
-                            idx[1] = 2*j-1;  /* Simple connection - not accurate */
+                            idx[1] = 2*j;  /* Simple connection - not accurate */
 
                             to_part = 0;
                             to_idx[0] = lr[0];
@@ -477,7 +520,9 @@ int main (int argc, char *argv[])
 
                             part = 1;
                             idx[0] = ll[0];
-                            idx[1] = 2*j;  /* Simple connection - not accurate */
+                            idx[1] = 2*j-1;  /* Simple connection - not accurate */
+                            to_idx[0] = lr[0];
+                            to_idx[1] = j;
                             HYPRE_SStructGraphAddEntries(graph, part, idx,
                                                          var, to_part, to_idx, var);
 
@@ -494,14 +539,14 @@ int main (int argc, char *argv[])
 
                             to_part = 3;
                             to_idx[0] = ll[0];
-                            to_idx[1] = 2*j-1 - ny;  /* Simple connection - not accurate */
+                            to_idx[1] = 2*j - ny;  /* Simple connection - not accurate */
 
                             HYPRE_SStructGraphAddEntries(graph, part, idx,
                                                          var, to_part, to_idx, var);
 
                             part = 3;
                             idx[0] = ll[0];
-                            idx[1] = 2*j - 1 - ny;  /* Simple connection - not accurate */
+                            idx[1] = 2*j - ny;  /* Simple connection - not accurate */
 
                             to_part = 0;
                             to_idx[0] = lr[0];
@@ -511,7 +556,9 @@ int main (int argc, char *argv[])
 
                             part = 3;
                             idx[0] = ll[0];
-                            idx[1] = 2*j - ny;  /* Simple connection - not accurate */
+                            idx[1] = 2*j - 1 - ny;  /* Simple connection - not accurate */
+                            to_idx[0] = lr[0];
+                            to_idx[1] = j;
                             HYPRE_SStructGraphAddEntries(graph, part, idx,
                                                          var, to_part, to_idx, var);
 
@@ -554,12 +601,12 @@ int main (int argc, char *argv[])
             /* Set stencil on coarse grid */
             for (i = 0; i < nvalues; i += nentries)
             {
-                values[i] = 4.0/h2;
-                valuesf[i] = 4.0/hf2;
+                values[i] = -4.0/h2;
+                valuesf[i] = -4.0/hf2;
                 for (j = 1; j < nentries; j++)
                 {
-                    values[i+j] = -1.0/h2;
-                    valuesf[i+j] = -1.0/hf2;
+                    values[i+j] = 1.0/h2;
+                    valuesf[i+j] = 1.0/hf2;
                 }
             }
 
@@ -595,9 +642,9 @@ int main (int argc, char *argv[])
 
             for (i = 0; i < maxnvalues; i += nentries)
             {
-                values[i] = 3.0/h2;
+                values[i] = -3.0/h2;
                 values[i+1] = 0;
-                valuesf[i] = 3.0/hf2;
+                valuesf[i] = -3.0/hf2;
                 valuesf[i+1] = 0;
             }
 
@@ -745,8 +792,8 @@ int main (int argc, char *argv[])
             */
             for (j = 0; j < maxnvalues; j++)
             {
-                values[j] = -1.0/h2 ;
-                valuesf[j] = -1.0/hf2;
+                values[j] = 1.0/h2 ;
+                valuesf[j] = 1.0/hf2;
             }
 
             /* Each stencil has one non-stencil entry - added as 6th entry */
@@ -809,7 +856,7 @@ int main (int argc, char *argv[])
             {
                 int nentries = 2;
                 int stencil_indices[2] = {5,6};
-                double valuesf[2] = {-1.0/hf2, -1.0/hf2};
+                double valuesf[2] = {1.0/hf2, 1.0/hf2};
                 {
                     /* P1 (ur corner) */
                     part = 1;
@@ -858,8 +905,8 @@ int main (int argc, char *argv[])
         /* Fix corner stencils */
         {
             int nentries = 3;                 /* Number of stencil weights to set */
-            double values[3] = {2.0/h2,0,0};    /* setting only 1 stencil per call */
-            double valuesf[3] = {2.0/hf2,0,0};    /* setting only 1 stencil per call */
+            double values[3] = {-2.0/h2,0,0};    /* setting only 1 stencil per call */
+            double valuesf[3] = {-2.0/hf2,0,0};    /* setting only 1 stencil per call */
 
             int stencil_indices[3];
             stencil_indices[0] = 0;
@@ -900,7 +947,7 @@ int main (int argc, char *argv[])
         /* Set one stencil to Dirichlet */
         {
             int nentries = 3;                 /* Number of stencil weights to set */
-            double values[3] = {6/h2,0,0};    /* setting only 1 stencil per call */
+            double values[3] = {-6/h2,0,0};    /* setting only 1 stencil per call */
 
             int stencil_indices[3];
             stencil_indices[0] = 0;
@@ -923,7 +970,6 @@ int main (int argc, char *argv[])
     /* -------------------------------------------------------------
        5. Set up SStruct Vectors for b and x
        ------------------------------------------------------------- */
-    double *solution[2];
     {
         /* Create an empty vector object */
         HYPRE_SStructVectorCreate(MPI_COMM_WORLD, grid, &b);
@@ -939,9 +985,12 @@ int main (int argc, char *argv[])
         HYPRE_SStructVectorInitialize(x);
 
         /* Set the vector coefficients over the gridpoints in my first box */
+
         int nvalues = nx*ny;  /* 6 grid points */
-        double *values[5];  /* For each part */
-        int n;
+        double **values;
+        values = calloc(nparts,sizeof(double*));  /* For each part */
+        solution = calloc(nparts,sizeof(double*));
+
         for (n = 0; n < nparts; n++)
         {
             values[n] = calloc(nvalues,sizeof(double));
@@ -949,29 +998,10 @@ int main (int argc, char *argv[])
         }
 
         {
-            if (solution_type == 0)
-            {
-                /* Set b (RHS) */
-                double c = 1.3;   /* Value of constant solution */
-                for(n = 0; n < nparts; n++)
-                {
-                    for (i = 0; i < nvalues; i++)
-                    {
-                        values[n][i] = 0;
-                        solution[n][i] = c;
-                    }
-                }
-                values[0][0] = c*4/h2;  /* Lower left corner - Dirichlet value */
-            }
-            else if (solution_type == 1)
+            if (solution_type < 10)
             {
                 double x,y;
-                double C = 2;  /* Coefficients used in exact solution */
-                double D = 2;
-
-                double ax[5] = {0,1,1.5,1,1.5};  /* Lower left corners for each part */
-                double ay[5] = {0,0,0,0.5,0.5};  /* Lower left corners for each part */
-                double hv[5] = {h,hf,hf,hf,hf};
+                double q,qx,qy,qxx,qyy;
 
                 for(n = 0; n < nparts; n++)
                 {
@@ -982,23 +1012,116 @@ int main (int argc, char *argv[])
                         for (i = 0; i < nx; i++)
                         {
                             x = ax[n] + (i+0.5)*hv[n];
-                            values[n][k] = (C*C + D*D)*M_PI*M_PI*cos(C*M_PI*x)*cos(D*M_PI*y);
+
+                            /* Set above */
+                            qtrue(x,y,&q,&qx,&qy,&qxx,&qyy);
+                            values[n][k] = qxx + qyy;
+                            solution[n][k] = q;
+                            if (n == 0)
+                            {
+                                /* Left edge of P0 */
+                                if (i == 0 && j > 0)
+                                {
+                                    values[n][k] += qx/hv[n];
+                                }
+                                else if (j == 0 && i > 0)
+                                {
+                                    values[n][k] += qy/hv[n];
+                                }
+                                if (j == ny-1)
+                                {
+                                    values[n][k] -= qy/hv[n];
+                                }
+                            }
+                            else if (n == 1)
+                            {
+                                if (j == 0)
+                                {
+                                    values[n][k] += qy/hv[n];
+                                }
+                            }
+                            else if (n == 2)
+                            {
+                                /* Right edge  of P2 */
+                                if (j == 0)
+                                {
+                                    values[n][k] += qy/hv[n];
+                                }
+                                if (i == nx-1)
+                                {
+                                    values[n][k] -= qx/hv[n];
+                                }
+                            }
+                            else if (n == 3)
+                            {
+                                /* Top edge */
+                                if (j == ny - 1)
+                                {
+                                    values[n][k] -= qy/hv[n];
+                                }
+                            }
+                            else if (n == 4)
+                            {
+                                if (j == ny-1)
+                                {
+                                    values[n][k] -= qy/hv[n];
+                                }
+                                if (i == nx-1)
+                                {
+                                    values[n][k] -= qx/hv[n];
+                                }
+                            }
+                            k++;
+                        }
+                    }
+                }
+                /* Add Dirichlet condition at lower left corner of P0 */
+                double q_xface, q_yface;
+
+                /* x-face solution */
+                x = ax[0];
+                y = ay[0] + hv[0]/2.0;
+                qtrue(x,y,&q_xface,&qx,&qy,&qxx,&qyy);
+
+                /* y-face solution */
+                x = ax[0] + hv[0]/2.0;
+                y = ay[0];
+                qtrue(x,y,&q_yface,&qx,&qy,&qxx,&qyy);
+                values[0][0] -= (2*q_xface + 2*q_yface)/h2;
+            }
+            else
+            {
+                double x,y;
+                double C = 2;  /* Coefficients used in exact solution */
+                double D = 2;
+
+                for(n = 0; n < nparts; n++)
+                {
+                    int k = 0;
+                    for (j = 0; j < ny; j++)
+                    {
+                        y = ay[n] + (j+0.5)*hv[n];
+                        for (i = 0; i < nx; i++)
+                        {
+                            x = ax[n] + (i+0.5)*hv[n];
                             solution[n][k] = cos(C*M_PI*x)*cos(D*M_PI*y);
+                            values[n][k] = -(C*C + D*D)*M_PI*M_PI*solution[n][k];
 
                             k++;
                         }
                     }
                 }
                 /* Add Dirichlet condition at boundary edge */
-                double bx = cos(C*M_PI*h/2.0);    /* Solution at x-face of lower left corner cell */
-                double by = cos(D*M_PI*h/2.0);  /* Solution at y-face of lower left corner cell */
-                values[0][0] += (2*bx + 2*by)/h2;
+                double bx = cos(D*M_PI*h/2.0);    /* xface */
+                double by = cos(C*M_PI*h/2.0);    /* yface */
+                values[0][0] -= (2*bx + 2*by)/h2;
             }
 
             for(n = 0; n < nparts; n++)
             {
                 part = n;
                 HYPRE_SStructVectorSetBoxValues(b, part, ll, ur, var, values[n]);
+                HYPRE_SStructVectorSetBoxValues(x, part, ll, ur, var, solution[n]);
             }
         }
 
@@ -1017,6 +1140,7 @@ int main (int argc, char *argv[])
         {
             free(values[n]);
         }
+        free(values);
 
         HYPRE_SStructVectorAssemble(b);
         HYPRE_SStructVectorAssemble(x);
@@ -1158,11 +1282,11 @@ int main (int argc, char *argv[])
 
             HYPRE_SStructBiCGSTABCreate(MPI_COMM_WORLD, &solver);
             HYPRE_BiCGSTABSetMaxIter((HYPRE_Solver) solver, maxiter );
-            HYPRE_BiCGSTABSetTol((HYPRE_Solver) solver, tol );
+            HYPRE_BiCGSTABSetAbsoluteTol((HYPRE_Solver) solver, tol );
             HYPRE_BiCGSTABSetPrintLevel((HYPRE_Solver) solver, print_level );
             HYPRE_BiCGSTABSetLogging((HYPRE_Solver) solver, 1 );
 
-#if 1
+#if 0
             precond = NULL;
             HYPRE_SStructBiCGSTABSetPrecond(solver,
                                             HYPRE_SStructDiagScale,
@@ -1216,6 +1340,8 @@ int main (int argc, char *argv[])
             int nvalues = nx*ny;
             int n,i;
             double *xvalues;
+
+            error = calloc(nparts,sizeof(double*));
 
             /* get the local solution */
             if (object_type == HYPRE_SSTRUCT)
@@ -1280,32 +1406,21 @@ int main (int argc, char *argv[])
     /* Save the solution for GLVis visualization, see vis/glvis-ex8.sh */
     if (vis)
     {
-        /* Scale indices by h or hf */
-        double Tc[4] = {h,0,0,h};
-        double Tf[4] = {hf,0,0,hf};
+        /* Each part is transformed using T*[x;y] + O */
+        double *O = calloc(2*nparts,sizeof(double));
         double *T = calloc(4*nparts,sizeof(double));
-        for(i = 0; i < 4; i++)
+        for(n = 0; n < nparts; n++)
         {
-            T[i] = Tc[i];
-        }
-        for(n = 1; n < nparts; n++)
-        {
-            for(i = 0; i < 4; i++)
-            {
-                T[4*n + i] = Tf[i];
-            }
-        }
+            /* Transformation */
+            T[4*n + 0] = hv[n];
+            T[4*n + 1] = 0;
+            T[4*n + 2] = 0;
+            T[4*n + 3] = hv[n];
 
-        /* Shift parts by specifing lower left corners.  Has to be shifted by h
-         since box index space is [1,nx]x[1,ny] (Not [0,nx-1]x[0,ny-1]) */
-        double O[10] = {0.0,0.0, nx*h,0.0, nx*(h+hf),0.0, nx*h,ny*hf, nx*(h+hf),ny*hf};
-        O[0] -= h;
-        O[1] -= h;
-        for(i = 2; i < 2*nparts; i++)
-        {
-            O[i] -= hf;
+            /* Lower left corners; shifted by h (vis assumes index space is [0,n-1] */
+            O[2*n + 0] = ax[n] - hv[n];
+            O[2*n + 1] = ay[n] - hv[n];
         }
-
 
         GLVis_PrintSStructGrid(grid, "vis/ex4.mesh", myid, T, O);
 
@@ -1317,11 +1432,11 @@ int main (int argc, char *argv[])
             for(n = 0; n < nparts; n++)
             {
                 part = n;
-                HYPRE_SStructVectorSetBoxValues(error_vec, part, ll, ur, var, error[n]);
+                HYPRE_SStructVectorSetBoxValues(error_vec, part, ll, ur, var, solution[n]);
             }
             HYPRE_SStructVectorAssemble(error_vec);
 
-            GLVis_PrintSStructVector(error_vec, 0, "vis/ex4.sol", myid);
+            GLVis_PrintSStructVector(x, 0, "vis/ex4.sol", myid);
         }
         else if (object_type == HYPRE_PARCSR)
         {
@@ -1361,6 +1476,7 @@ int main (int argc, char *argv[])
             fclose(file);
         }
         free(T);
+        free(O);
 
 
         GLVis_PrintData("vis/ex4.data", myid, num_procs);
@@ -1374,8 +1490,64 @@ int main (int argc, char *argv[])
     HYPRE_SStructVectorDestroy(b);
     HYPRE_SStructVectorDestroy(x);
 
+    for(n = 0; n < nparts; n++)
+    {
+        free(error[n]);
+        free(solution[n]);
+    }
+    free(error);
+    free(solution);
+
+
     /* Finalize MPI */
     MPI_Finalize();
 
     return (0);
+}
+
+
+void qtrue_constant(double x, double y, double *q, double *qx, double *qy, double *qxx, double *qyy)
+{
+    double c = 2;
+    *q = c;
+    *qx = 0;
+    *qy = 0;
+    *qxx = 0;
+    *qyy = 0;
+}
+
+void qtrue_plane(double x, double y, double *q, double *qx, double *qy, double *qxx, double *qyy)
+{
+    double a = 0;
+    double b = 1;
+    *q = a*x + b*y;
+    *qx = a;
+    *qy = b;
+    *qxx = 0;
+    *qyy = 0;
+}
+
+void qtrue_parabola(double x, double y, double *q, double *qx, double *qy, double *qxx, double *qyy)
+{
+    double a = 1;
+    double b = 0;
+    *q = a*x*x + b*y*y;
+    *qx = 2*a*x;
+    *qy = 2*b*y;
+    *qxx = 2*a;
+    *qyy = 2*b;
+}
+
+
+void qtrue_trig(double x, double y, double *q, double *qx, double *qy, double *qxx, double *qyy)
+{
+    double C = 2;
+    double D = 2;
+    double Cpi = C*M_PI;
+    double Dpi = D*M_PI;
+    *q = cos(Cpi*x)*cos(Dpi*y);
+    *qx = -Cpi*sin(Cpi*x)*cos(Dpi*y);
+    *qy = -Dpi*cos(Cpi*x)*sin(Dpi*y);
+    *qxx = -Cpi*Cpi*(*q);
+    *qyy = -Dpi*Dpi*(*q);
 }
