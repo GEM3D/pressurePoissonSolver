@@ -77,8 +77,36 @@ void printSolution(vector<Domain> &dmns)
 	cout << '\n';
 }
 
+bool cmdOptionExists(char **begin, char **end, const string &option)
+{
+	return find(begin, end, option) != end;
+}
+
+void printHelp()
+{
+	cout << "Usage:\n";
+	cout << "./heat <num_cells> <numdomains> [options]\n\n";
+	cout << "Options can be:\n";
+	cout << "\t -s \t print solution\n";
+	cout << "\t -m \t print the matrix that was formed.\n";
+	cout << "\t -h \t print this help message\n";
+}
+
 int main(int argc, char *argv[])
 {
+	bool print_solution = false;
+	bool print_matrix   = false;
+	if (argc < 2 || cmdOptionExists(argv, argv + argc, "-h")) {
+		printHelp();
+		return 1;
+	}
+	if (cmdOptionExists(argv, argv + argc, "-s")) {
+		print_solution = true;
+	}
+	if (cmdOptionExists(argv, argv + argc, "-m")) {
+		print_matrix = true;
+	}
+
 	// set cout to print full precision
 	// cout.precision(numeric_limits<double>::max_digits10);
 	cout.precision(9);
@@ -116,11 +144,13 @@ int main(int argc, char *argv[])
 		gammas             = 0;
 		valarray<double> b = solveOnAllDomains(tds, dmns);
 
-		cout << "b value(s):\n";
-		for (double x : b) {
-			cout << x << ' ';
+		if (print_matrix) {
+			cout << "b value(s):\n";
+			for (double x : b) {
+				cout << x << ' ';
+			}
+			cout << "\n\n";
 		}
-		cout << "\n\n";
 
 		// build the A matrix
 		int              n = gammas.size();
@@ -131,14 +161,16 @@ int main(int argc, char *argv[])
 			gammas[i] = 0.0;
 		}
 
-		cout << "A matrix:\n";
-		for (int i = 0; i < n; i++) {
-			for (int j = 0; j < n; j++) {
-				cout << A[n * i + j] << '\t';
+		if (print_matrix) {
+			cout << "A matrix:\n";
+			for (int i = 0; i < n; i++) {
+				for (int j = 0; j < n; j++) {
+					cout << A[n * i + j] << '\t';
+				}
+				cout << '\n';
 			}
-			cout << '\n';
+			cout << "\n\n";
 		}
-		cout << "\n\n";
 
 		// get the condition number of A
 		double rcond;
@@ -175,11 +207,13 @@ int main(int argc, char *argv[])
 			gammas[i] = -b[i];
 		}
 
-		cout << "calculated gamma value(s):\n";
-		for (double x : gammas) {
-			cout << x << ' ';
+		if (print_matrix) {
+			cout << "calculated gamma value(s):\n";
+			for (double x : gammas) {
+				cout << x << ' ';
+			}
+			cout << "\n\n";
 		}
-		cout << "\n\n";
 	}
 
 	/*
@@ -187,12 +221,13 @@ int main(int argc, char *argv[])
 	 */
 	solveOnAllDomains(tds, dmns);
 
-	// print out solution
-	cout << "Final solution:\n";
-	printSolution(dmns);
-	cout << '\n';
+	if (print_solution) {
+		// print out solution
+		cout << "Final solution:\n";
+		printSolution(dmns);
+		cout << '\n';
+	}
 
-	cout << '\n';
 	cout << "error: " << scientific << error(dmns) << "\n" << defaultfloat;
 	if (num_domains > 1) {
 		cout << "condition number of A: " << condition_number << "\n";
