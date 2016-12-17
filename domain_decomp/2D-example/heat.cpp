@@ -12,25 +12,25 @@ int main(int argc, char *argv[])
 	int    m       = stoi(argv[1]);
 	double x_start = 0.0;
 	double x_end   = 1.0;
-	double h       = (x_end - x_start) / (m + 1);
+	double h       = (x_end - x_start) / m;
 
-	ArrayXf  x = ArrayXf::LinSpaced(m + 2, x_start, x_end);
-	ArrayXf  y = ArrayXf::LinSpaced(m + 2, x_start, x_end);
+	ArrayXf  x = ArrayXf::LinSpaced(m, x_start + h / 2.0, x_end - h / 2.0);
+	ArrayXf  y = ArrayXf::LinSpaced(m, x_start + h / 2.0, x_end - h / 2.0);
 	MatrixXd G(m, m);
 	MatrixXd Exact(m, m);
 	for (int i = 0; i < m; i++) {
 		for (int j = 0; j < m; j++) {
-			G(i, j)     = ffun(x(i + 1), y(j + 1));
-			Exact(i, j) = gfun(x(i + 1), y(j + 1));
+			G(i, j)     = ffun(x(i), y(j));
+			Exact(i, j) = gfun(x(i), y(j));
 		}
 	}
 	for (int i = 0; i < m; i++) {
-		G(i, 0)     = G(i, 0) - gfun(x(i + 1), y(0)) / (h * h);
-		G(i, m - 1) = G(i, m - 1) - gfun(x(i + 1), y(m + 1)) / (h * h);
+		G(i, 0)     = G(i, 0) - 2 * gfun(x(i), x_start) / (h * h);
+		G(i, m - 1) = G(i, m - 1) - 2 * gfun(x(i), x_end) / (h * h);
 	}
 	for (int j = 0; j < m; j++) {
-		G(0, j)     = G(0, j) - gfun(x(0), y(j + 1)) / (h * h);
-		G(m - 1, j) = G(m - 1, j) - gfun(x(m + 1), y(j + 1)) / (h * h);
+		G(0, j)     = G(0, j) - 2 * gfun(x_start, y(j)) / (h * h);
+		G(m - 1, j) = G(m - 1, j) - 2 * gfun(x_end, y(j)) / (h * h);
 	}
 
 	Map<VectorXd> f(G.data(), G.size());
@@ -40,9 +40,15 @@ int main(int argc, char *argv[])
 	eye.setIdentity();
 
 	SparseMatrix<double> D2(m, m);
-	D2.insert(0, 0) = -2 / (h * h);
-	for (int i = 1; i < m; i++) {
+	D2.insert(0, 0) = -3 / (h * h);
+	for (int i = 1; i < m - 1; i++) {
 		D2.insert(i, i)     = -2 / (h * h);
+		D2.insert(i - 1, i) = 1 / (h * h);
+		D2.insert(i, i - 1) = 1 / (h * h);
+	}
+	if (m > 1) {
+		int i = m - 1;
+		D2.insert(i, i)     = -3 / (h * h);
 		D2.insert(i - 1, i) = 1 / (h * h);
 		D2.insert(i, i - 1) = 1 / (h * h);
 	}
