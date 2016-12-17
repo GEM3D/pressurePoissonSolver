@@ -1,5 +1,5 @@
 #include <Eigen/Dense>
-#include <Eigen/KroneckerProduct>
+#include <unsupported/Eigen/KroneckerProduct>
 #include <Eigen/Sparse>
 #include <cmath>
 #include <iostream>
