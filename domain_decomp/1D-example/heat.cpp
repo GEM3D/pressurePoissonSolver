@@ -161,6 +161,7 @@ int main(int argc, char *argv[])
 	double condition_number;
 	if (num_domains > 1) {
 		// solve with gammas set to zero
+        gammas = VectorXd::Zero(gammas.size());
 		VectorXd b = solveOnAllDomains(tds, dmns);
 
 		if (print_matrix) {
