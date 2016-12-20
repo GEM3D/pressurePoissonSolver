@@ -5,11 +5,11 @@ Eigen is a header-only library, so you only have to tell the compiler
 where the headers are.
 
 Once you download the Eigen library and extract it, you have to update
-the `EigenDir` variable in the `EigenDir.mk` file.
+the `EIGEN_DIR` variable in the `EigenDir.mk` file.
 
 In my case, the `EigenDir.mk` file ended up looking like:
 ```
-EigenDir = /home/nvgba/Downloads/eigen-eigen-f562a193118d/
+EIGEN_DIR = /home/nvgba/Downloads/eigen-eigen-f562a193118d/
 ```
 
 After that is completed, it should compile with:
