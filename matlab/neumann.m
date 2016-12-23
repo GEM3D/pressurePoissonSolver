@@ -18,13 +18,23 @@ end
 
 plot_eig = false;    % Plot eigenvalues and return
 
+% In the two step version, we can impose either mean on the boundary or the
+% interior.  Choices : 
+% 
+%  enforce_mean_bc       : Enforce zero mean on the boundary
+%  enforce_mean_domain   : Enforce zero mean in the domain.
+% 
+
+twostep_choice = 'enforce_mean_domain';   
+
+
 solver_choice = sc;
 tol = 1e-8;
 
 % --------------------------------
 % Physical parameters
 % --------------------------------
-u_true = @(x) cos(2*pi*x) - 1;
+u_true = @(x) cos(2*pi*x);
 ux_true = @(x) -(2*pi)*sin(2*pi*x);
 uxx_true = @(x) -(2*pi)^2*cos(2*pi*x);
 
@@ -46,6 +56,7 @@ h = (bx-ax)/N;
 xe = linspace(0,1,N+1)';
 xc = xe(1:end-1) + h/2;
 
+uc = u_true(xc);
 ul = u_true(xe(1));
 ur = u_true(xe(end));
 uxl = ux_true(xe(1));
@@ -56,13 +67,25 @@ s = sum(uxx_true(xc));   % FTC!
 tol_input = 1e-8;
 if abs(s - (uxr-uxl)) > tol_input
     warning('Compatibility condition not satisfied');
-elseif abs(ul + ur) > tol_input
-    warning('The true solution does not satisfy u(ax) + u(bx) = 0')
+end
+if abs(ul + ur) > tol_input
+    warning('The true solution on the boundary does not have zero mean')
+end
+if (abs(sum(uc)*h) > tol_input)
+    warning('The true solution does not have zero mean');
 end
 
 switch method
     case 1
-        % Two step procedure
+        % Two step procedure;  Enforce zero mean either on the boundary or 
+        % in the domain.
+        
+        switch twostep_choice
+            case 'enforce_mean_bc'
+                enforce = @F;
+            case 'enforce_mean_domain'
+                enforce = @G;
+        end
         
         % Set up matrix with Dirichlet condition at left edge; Neumann at
         % right.
@@ -93,14 +116,14 @@ switch method
         %
         
         tic;
-        b = F(f,0,uxl,uxr);      % set g=0
-        a = F(f,1,uxl,uxr) - b;  % set g=1
+        b = enforce(f,0,uxl,uxr);      % set g=0
+        a = enforce(f,1,uxl,uxr) - b;  % set g=1
         g = -b/a;
         
         % Final solution
-        [c,u,flag,relres,iter,resvec] = F(f,g,uxl,uxr);   % c should be 0 here
+        [c,u,flag,relres,iter,resvec] = enforce(f,g,uxl,uxr);   % c should be 0 here
         t1 = toc;
-        
+
     case 2
         % Neumann conditions at both ends with identity stencil at one
         % point
@@ -118,7 +141,9 @@ switch method
             fprintf('Minimum eigenvalue : %12.4e\n',min(abs(eig(full(A)))));
         end
         
-        % Set one point to identity stencil
+        % Set one point to identity stencil.  By setting to -2, 
+        % we get a positive definite matrix (although PCG still doesn't
+        % really work (???)
         A(N/2,(N/2-1):(N/2+1)) = [0 -2 0];
         
         if (plot_eig)
@@ -286,6 +311,61 @@ c = (u(1) - ul_ghost)/h - uxl;
 
 end
 
+% Enforce zero mean in the domain
+function [c,u,flag,relres,iter,resvec] = G(f,g,uxl,uxr)
+
+global A h solver_choice tol
+
+N = length(A);
+
+bc = zeros(N,1);
+bc(1) = -2*g;       % Dirichlet condition at left end
+bc(end) = -h*uxr;   % Neumann condition at the right end
+
+% Solve problem with u=g at left end point; u_x = uxl at right end point
+b = f + bc;
+
+switch solver_choice
+    case 'direct'
+        u = A\b;
+        flag = 0;
+        relres = norm(A*u-b)/norm(b);
+        iter = 1;
+        resvec = relres;
+        
+    case 'bicgstab'
+        [u,flag,relres,iter,resvec] = bicgstab(-A,-b,tol,2*N);
+    case 'pcg'
+        [u,flag,relres,iter,resvec] = pcg(-A,-b,tol,2*N);
+    case 'gmres'
+        restart = 20;
+        maxit = 5*N;
+        [u,flag,relres,iter,resvec] = gmres(-A,-b,restart,tol,maxit);
+end
+
+% Use Neumann condition at right end to get value at right end point
+ur_ghost = u(end) + h*uxr;
+ur = (u(end) + ur_ghost)/2;
+
+% Impose Neumann condition at left edge as constraint :
+%
+%          (u(1) - ul_ghost)/h = uxl
+%
+% Use sum(u) = 0 to get sum(u) = u(1) + (sum(u) - u(1)).  We want sum(u) = 0, 
+% so we get u1 = -sum(u) + u(1).  Use this to enforce Neumann constraint
+%
+%             (u1 + ul_ghost)/2 = g
+% to get
+
+ul_ghost = 2*(-sum(u) + u(1)) - u(1);   % ul_ghost = 2*g - u(1)
+
+% Final constraint condition.
+c = (u(1) - ul_ghost)/h - uxl;
+
+
+end
+
+
 function coeffs = dct2(x,dim)
 %  DCT2   Discrete Cosine Transform Type II computed using the fast Fourier Transform.
 %     X = dct2(x) computes the Discrete Cosine Transform Type II (DCT-II) of the columns of X.
@@ -399,6 +479,7 @@ coeffs = fft(tmp,[],dim);
 
 % Truncate, flip the order, and scale:
 % coeffs = (2/scale)*coeffs(j,k);
+% Does fftshift work here? 
 coeffs = (2/scale)*coeffs(1:m,1:n);
 
 % Post-process:
