@@ -15,5 +15,6 @@ class Domain
 	Eigen::SparseMatrix<double>                         A;
 	Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> *solver;
 	Domain(Eigen::SparseMatrix<double> A, Eigen::MatrixXd grid,double h_x,double h_y);
+	Domain() {}
 	void solve();
 };
