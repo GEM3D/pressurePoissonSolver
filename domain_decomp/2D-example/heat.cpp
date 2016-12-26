@@ -3,6 +3,7 @@
 #include <Eigen/Sparse>
 #include <cmath>
 #include <iostream>
+#include <fstream>
 using namespace Eigen;
 using namespace std;
 #include "Domain.h"
@@ -235,4 +236,11 @@ int main(int argc, char *argv[])
 	cout << "Error: " << error << '\n';
 	cout << defaultfloat;
 	cout << "Condition Number: " << condition_number << '\n';
+
+	if (save_solution_file != "") {
+		// print out solution
+		ofstream out_file(save_solution_file);
+		out_file << SOL << "\n";
+		out_file.close();
+	}
 }
