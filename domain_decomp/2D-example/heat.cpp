@@ -219,6 +219,8 @@ int main(int argc, char *argv[])
 		if (save_solution_file != "") {
 			// print out solution
 			ofstream out_file(save_solution_file+".matrix");
+			out_file.precision(20);
+			out_file << scientific;
 			out_file << A << "\n";
 			out_file.close();
 		}
