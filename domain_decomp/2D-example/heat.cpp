@@ -216,6 +216,12 @@ int main(int argc, char *argv[])
 			cout << A;
 			cout << "\n\n";
 		}
+		if (save_solution_file != "") {
+			// print out solution
+			ofstream out_file(save_solution_file+".matrix");
+			out_file << A << "\n";
+			out_file.close();
+		}
 	}
 
 	// do one last solve
