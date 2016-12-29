@@ -1,37 +1,15 @@
 #include <Eigen/Dense>
-#include <unsupported/Eigen/KroneckerProduct>
 #include <Eigen/Sparse>
 #include <cmath>
-#include <iostream>
 #include <fstream>
+#include <iostream>
+#include <unsupported/Eigen/KroneckerProduct>
 using namespace Eigen;
 using namespace std;
 #include "Domain.h"
+#include "args.h"
 
-typedef Matrix<Domain,-1,-1> DomainMatrix;
-char *getCmdOption(char **begin, char **end, const std::string &option)
-{
-	char **itr = std::find(begin, end, option);
-	if (itr != end && ++itr != end) {
-		return *itr;
-	}
-	return 0;
-}
-
-bool cmdOptionExists(char **begin, char **end, const string &option)
-{
-	return find(begin, end, option) != end;
-}
-
-void printHelp()
-{
-	cout << "Usage:\n";
-	cout << "./heat <num_cells> <numdomains> [options]\n\n";
-	cout << "Options can be:\n";
-	cout << "\t -s <file> \t save solution to file\n";
-	cout << "\t -m \t print the matrix that was formed.\n";
-	cout << "\t -h \t print this help message\n";
-}
+typedef Matrix<Domain, -1, -1> DomainMatrix;
 
 /**
  * @brief solve over all of the domains
@@ -41,9 +19,10 @@ void printHelp()
  *
  * @return the difference between the interface values and gamma values.
  */
-VectorXd solveWithInterfaceValues(DomainMatrix &dmns, VectorXd &gamma){
-    //set the interface values on east and west
-    int interface_size_ew = dmns(0,0).grid.rows();
+VectorXd solveWithInterfaceValues(DomainMatrix &dmns, VectorXd &gamma)
+{
+	// set the interface values on east and west
+	int interface_size_ew = dmns(0, 0).grid.rows();
 	for (int j = 0; j < dmns.cols() - 1; j++) {
 		for (int i = 0; i < dmns.rows(); i++) {
 			int start_i = (j * dmns.rows() + i) * interface_size_ew;
@@ -51,10 +30,10 @@ VectorXd solveWithInterfaceValues(DomainMatrix &dmns, VectorXd &gamma){
 			dmns(i, j + 1).boundary_west = gamma.block(start_i, 0, interface_size_ew, 1);
 		}
 	}
-    //set the interface values on north and south
-    int interface_size_ns = dmns(0,0).grid.cols();
-    int ns_start_i = dmns.rows()*(dmns.cols()-1)*interface_size_ew;
-	for (int i = 0; i < dmns.rows()-1; i++) {
+	// set the interface values on north and south
+	int interface_size_ns = dmns(0, 0).grid.cols();
+	int ns_start_i        = dmns.rows() * (dmns.cols() - 1) * interface_size_ew;
+	for (int i = 0; i < dmns.rows() - 1; i++) {
 		for (int j = 0; j < dmns.cols(); j++) {
 			int start_i = (i * dmns.cols() + j) * interface_size_ns + ns_start_i;
 			dmns(i, j).boundary_south = gamma.block(start_i, 0, interface_size_ns, 1).transpose();
@@ -63,15 +42,15 @@ VectorXd solveWithInterfaceValues(DomainMatrix &dmns, VectorXd &gamma){
 		}
 	}
 
-	//solve
+	// solve
 	for (int i = 0; i < dmns.rows(); i++) {
 		for (int j = 0; j < dmns.cols(); j++) {
 			dmns(i, j).solve();
 		}
 	}
 
-    VectorXd diff(gamma.size());
-	//get the difference on east-west interfaces
+	VectorXd diff(gamma.size());
+	// get the difference on east-west interfaces
 	for (int j = 0; j < dmns.cols() - 1; j++) {
 		for (int i = 0; i < dmns.rows(); i++) {
 			int start_i            = (j * dmns.rows() + i) * interface_size_ew;
@@ -81,20 +60,21 @@ VectorXd solveWithInterfaceValues(DomainMatrix &dmns, VectorXd &gamma){
 			  - 2 * gamma.block(start_i, 0, interface_size_ew, 1);
 		}
 	}
-	//get the difference on north-south interfaces
-	for (int i = 0; i < dmns.rows()-1; i++) {
+	// get the difference on north-south interfaces
+	for (int i = 0; i < dmns.rows() - 1; i++) {
 		for (int j = 0; j < dmns.cols(); j++) {
 			int start_i           = (i * dmns.cols() + j) * interface_size_ns + ns_start_i;
 			int top_dmns_last_row = dmns(i, j).grid.rows() - 1;
 			diff.block(start_i, 0, interface_size_ns, 1)
-			= dmns(i, j).u.row(top_dmns_last_row).transpose() + dmns(i+1, j).u.row(0).transpose()
+			= dmns(i, j).u.row(top_dmns_last_row).transpose() + dmns(i + 1, j).u.row(0).transpose()
 			  - 2 * gamma.block(start_i, 0, interface_size_ns, 1);
 		}
 	}
 	return diff;
 }
 
-SparseMatrix<double> generateMatrix(int m_x, int m_y, double h_x, double h_y){
+SparseMatrix<double> generateMatrix(int m_x, int m_y, double h_x, double h_y)
+{
 	// crate an identity matricies
 	SparseMatrix<double> eye_x(m_x, m_x);
 	eye_x.setIdentity();
@@ -132,37 +112,61 @@ SparseMatrix<double> generateMatrix(int m_x, int m_y, double h_x, double h_y){
 	}
 	// form the matrix
 	SparseMatrix<double> A = kroneckerProduct(Diag_x, eye_y) + kroneckerProduct(eye_x, Diag_y);
-    return A;
+	return A;
 }
 
 // the functions that we are using
 double ffun(double x, double y) { return -5 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y); }
 double gfun(double x, double y) { return sin(M_PI * x) * cos(2 * M_PI * y); }
-
 int main(int argc, char *argv[])
 {
-    // parse input
-    string save_solution_file = "";
-	bool   print_matrix       = false;
-	if (argc < 2 || cmdOptionExists(argv, argv + argc, "-h")) {
-		printHelp();
+	// parse input
+	args::ArgumentParser  parser("");
+	args::HelpFlag        help(parser, "help", "Display this help menu", {'h', "help"});
+	args::Positional<int> d_x(parser, "d_x", "number of domains in the x direction");
+	args::Positional<int> d_y(parser, "d_y", "number of domains in the y direction");
+	args::Positional<int> n_x(parser, "n_x", "number of cells in the x direction, in each domain");
+	args::Positional<int> n_y(parser, "n_y", "number of cells in the y direction, in each domain");
+	args::ValueFlag<string> f_m(parser, "matrix filename", "the file to write the matrix to",
+	                            {'m'});
+	args::ValueFlag<string> f_s(parser, "solution filename", "the file to write the solution to",
+	                            {'s'});
+
+	try {
+		parser.ParseCLI(argc, argv);
+	} catch (args::Help) {
+		std::cout << parser;
+		return 0;
+	} catch (args::ParseError e) {
+		std::cerr << e.what() << std::endl;
+		std::cerr << parser;
+		return 1;
+	} catch (args::ValidationError e) {
+		std::cerr << e.what() << std::endl;
+		std::cerr << parser;
 		return 1;
 	}
-	if (cmdOptionExists(argv, argv + argc, "-s")) {
-		save_solution_file = getCmdOption(argv, argv + argc, "-s");
-	}
-	if (cmdOptionExists(argv, argv + argc, "-m")) {
-		print_matrix = true;
+
+	int    num_domains_x  = args::get(d_x);
+	int    num_domains_y  = args::get(d_y);
+	int    domain_width_x = args::get(n_x);
+	int    domain_width_y = args::get(n_y);
+	int    m_x            = domain_width_x * num_domains_x;
+	int    m_y            = domain_width_y * num_domains_y;
+	double x_start        = 0.0;
+	double x_end          = 1.0;
+	double h_x            = (x_end - x_start) / m_x;
+	double h_y            = (x_end - x_start) / m_y;
+
+	string save_solution_file = "";
+	if (f_s) {
+		save_solution_file = args::get(f_s);
 	}
 
-	int    m_x           = stoi(argv[1]);
-	int    m_y           = m_x;
-	int    num_domains_x = stoi(argv[2]);
-	int    num_domains_y = num_domains_x;
-	double x_start       = 0.0;
-	double x_end         = 1.0;
-	double h_x           = (x_end - x_start) / m_x;
-	double h_y           = (x_end - x_start) / m_y;
+	string save_matrix_file = "";
+	if (f_m) {
+		save_matrix_file = args::get(f_m);
+	}
 
 	double error;
 
@@ -194,14 +198,13 @@ int main(int argc, char *argv[])
 	}
 
 	// Generate Domains
-	DomainMatrix dmns(num_domains_y,num_domains_x);
-	int            domain_width = m_x / num_domains_x;
+	DomainMatrix dmns(num_domains_y, num_domains_x);
 	for (int i = 0; i < num_domains_y; i++) {
 		for (int j = 0; j < num_domains_x; j++) {
-			SparseMatrix<double> A        = generateMatrix(domain_width, domain_width, h_x, h_y);
-			int                  start_i  = i * domain_width;
-			int                  start_j  = j * domain_width;
-			MatrixXd             sub_grid = G.block(start_i, start_j, domain_width, domain_width);
+			SparseMatrix<double> A       = generateMatrix(domain_width_x, domain_width_y, h_x, h_y);
+			int                  start_i = i * domain_width_y;
+			int                  start_j = j * domain_width_x;
+			MatrixXd sub_grid = G.block(start_i, start_j, domain_width_y, domain_width_x);
 			dmns(i, j) = Domain(A, sub_grid, h_x, h_y);
 		}
 	}
@@ -218,14 +221,14 @@ int main(int argc, char *argv[])
 	for (int i = 0; i < num_domains_y; i++) {
 		int start_i = i * m_y / num_domains_y;
 		int length  = m_y / num_domains_y;
-		dmns(i, 0).boundary_west                 = boundary_west.block(start_i,0, length, 1);
-		dmns(i, num_domains_x - 1).boundary_east = boundary_east.block(start_i,0, length, 1);
+		dmns(i, 0).boundary_west                 = boundary_west.block(start_i, 0, length, 1);
+		dmns(i, num_domains_x - 1).boundary_east = boundary_east.block(start_i, 0, length, 1);
 	}
 
 	// create gamma array
-	VectorXd gamma            = VectorXd::Zero(m_y * (num_domains_x - 1)+m_x*(num_domains_y-1));
+	VectorXd gamma = VectorXd::Zero(m_y * (num_domains_x - 1) + m_x * (num_domains_y - 1));
 	double   condition_number = 0.0;
-	if (num_domains_x > 1) {
+	if (num_domains_x > 1 || num_domains_y > 1) {
 		// get the b vector
 		VectorXd b = solveWithInterfaceValues(dmns, gamma);
 
@@ -245,14 +248,9 @@ int main(int argc, char *argv[])
 		gamma                   = -tmp;
 		condition_number        = 1.0 / lu.rcond();
 
-		if (print_matrix) {
-			cout << "The matrix that was formed:\n";
-			cout << A;
-			cout << "\n\n";
-		}
-		if (save_solution_file != "") {
+		if (save_matrix_file != "") {
 			// print out solution
-			ofstream out_file(save_solution_file+".matrix");
+			ofstream out_file(save_matrix_file);
 			out_file.precision(20);
 			out_file << scientific;
 			out_file << A << "\n";
@@ -267,9 +265,9 @@ int main(int argc, char *argv[])
 	MatrixXd SOL(m_y, m_x);
 	for (int i = 0; i < num_domains_y; i++) {
 		for (int j = 0; j < num_domains_x; j++) {
-			int start_i = i * domain_width;
-			int start_j = j * domain_width;
-			SOL.block(start_i, start_j, domain_width, domain_width) = dmns(i, j).u;
+			int start_i = i * domain_width_y;
+			int start_j = j * domain_width_x;
+			SOL.block(start_i, start_j, domain_width_y, domain_width_x) = dmns(i, j).u;
 		}
 	}
 
@@ -285,8 +283,8 @@ int main(int argc, char *argv[])
 	if (save_solution_file != "") {
 		// print out solution
 		ofstream out_file(save_solution_file);
-	    out_file.precision(20);
-        out_file << scientific;
+		out_file.precision(20);
+		out_file << scientific;
 		out_file << SOL << "\n";
 		out_file.close();
 	}
