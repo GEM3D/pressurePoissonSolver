@@ -8,6 +8,7 @@ using namespace Eigen;
 using namespace std;
 #include "Domain.h"
 
+typedef Matrix<Domain,-1,-1> DomainMatrix;
 char *getCmdOption(char **begin, char **end, const std::string &option)
 {
 	char **itr = std::find(begin, end, option);
@@ -40,30 +41,57 @@ void printHelp()
  *
  * @return the difference between the interface values and gamma values.
  */
-VectorXd solveWithInterfaceValues(vector<Domain> &dmns, VectorXd &gamma){
-    //set the interface values
-    int interface_size = dmns[0].grid.rows();
-	for (size_t i = 0; i < dmns.size()-1; i++) {
-        int start_i = i*interface_size;
-        dmns[i].boundary_east = gamma.block(start_i,0,interface_size,1);
-        dmns[i+1].boundary_west = gamma.block(start_i,0,interface_size,1);
-    }
-    
-    //solve
-    for(Domain& d: dmns){
-        d.solve();
-    }
-
-    //get the difference
-    VectorXd diff(gamma.size());
-	for (size_t i = 0; i < dmns.size()-1; i++) {
-        int start_i = i*interface_size;
-        int left_dmns_last_col = dmns[i].grid.cols()-1;
-		diff.block(start_i, 0, interface_size, 1)
-		= dmns[i].u.col(left_dmns_last_col) + dmns[i + 1].u.col(0)
-		  - 2 * gamma.block(start_i, 0, interface_size, 1);
+VectorXd solveWithInterfaceValues(DomainMatrix &dmns, VectorXd &gamma){
+    //set the interface values on east and west
+    int interface_size_ew = dmns(0,0).grid.rows();
+	for (int j = 0; j < dmns.cols() - 1; j++) {
+		for (int i = 0; i < dmns.rows(); i++) {
+			int start_i = (j * dmns.rows() + i) * interface_size_ew;
+			dmns(i, j).boundary_east     = gamma.block(start_i, 0, interface_size_ew, 1);
+			dmns(i, j + 1).boundary_west = gamma.block(start_i, 0, interface_size_ew, 1);
+		}
 	}
-    return diff;
+    //set the interface values on north and south
+    int interface_size_ns = dmns(0,0).grid.cols();
+    int ns_start_i = dmns.rows()*(dmns.cols()-1)*interface_size_ew;
+	for (int i = 0; i < dmns.rows()-1; i++) {
+		for (int j = 0; j < dmns.cols(); j++) {
+			int start_i = (i * dmns.cols() + j) * interface_size_ns + ns_start_i;
+			dmns(i, j).boundary_south = gamma.block(start_i, 0, interface_size_ns, 1).transpose();
+			dmns(i + 1, j).boundary_north
+			= gamma.block(start_i, 0, interface_size_ns, 1).transpose();
+		}
+	}
+
+	//solve
+	for (int i = 0; i < dmns.rows(); i++) {
+		for (int j = 0; j < dmns.cols(); j++) {
+			dmns(i, j).solve();
+		}
+	}
+
+    VectorXd diff(gamma.size());
+	//get the difference on east-west interfaces
+	for (int j = 0; j < dmns.cols() - 1; j++) {
+		for (int i = 0; i < dmns.rows(); i++) {
+			int start_i            = (j * dmns.rows() + i) * interface_size_ew;
+			int left_dmns_last_col = dmns(i, j).grid.cols() - 1;
+			diff.block(start_i, 0, interface_size_ew, 1)
+			= dmns(i, j).u.col(left_dmns_last_col) + dmns(i, j + 1).u.col(0)
+			  - 2 * gamma.block(start_i, 0, interface_size_ew, 1);
+		}
+	}
+	//get the difference on north-south interfaces
+	for (int i = 0; i < dmns.rows()-1; i++) {
+		for (int j = 0; j < dmns.cols(); j++) {
+			int start_i           = (i * dmns.cols() + j) * interface_size_ns + ns_start_i;
+			int top_dmns_last_row = dmns(i, j).grid.rows() - 1;
+			diff.block(start_i, 0, interface_size_ns, 1)
+			= dmns(i, j).u.row(top_dmns_last_row).transpose() + dmns(i+1, j).u.row(0).transpose()
+			  - 2 * gamma.block(start_i, 0, interface_size_ns, 1);
+		}
+	}
+	return diff;
 }
 
 SparseMatrix<double> generateMatrix(int m_x, int m_y, double h_x, double h_y){
@@ -127,13 +155,14 @@ int main(int argc, char *argv[])
 		print_matrix = true;
 	}
 
-	int    m_x         = stoi(argv[1]);
-	int    m_y         = m_x;
-	int    num_domains = stoi(argv[2]);
-	double x_start     = 0.0;
-	double x_end       = 1.0;
-	double h_x         = (x_end - x_start) / m_x;
-	double h_y         = (x_end - x_start) / m_y;
+	int    m_x           = stoi(argv[1]);
+	int    m_y           = m_x;
+	int    num_domains_x = stoi(argv[2]);
+	int    num_domains_y = num_domains_x;
+	double x_start       = 0.0;
+	double x_end         = 1.0;
+	double h_x           = (x_end - x_start) / m_x;
+	double h_y           = (x_end - x_start) / m_y;
 
 	double error;
 
@@ -165,33 +194,38 @@ int main(int argc, char *argv[])
 	}
 
 	// Generate Domains
-	vector<Domain> dmns(num_domains);
-	int            domain_width = m_x / num_domains;
-	for (int i = 0; i < num_domains; i++) {
-		SparseMatrix<double> A        = generateMatrix(domain_width, m_y, h_x, h_y);
-		int                  start_j  = i * m_x / num_domains;
-		MatrixXd             sub_grid = G.block(0, start_j, m_y, domain_width);
-		dmns[i]                       = Domain(A, sub_grid, h_x, h_y);
+	DomainMatrix dmns(num_domains_y,num_domains_x);
+	int            domain_width = m_x / num_domains_x;
+	for (int i = 0; i < num_domains_y; i++) {
+		for (int j = 0; j < num_domains_x; j++) {
+			SparseMatrix<double> A        = generateMatrix(domain_width, domain_width, h_x, h_y);
+			int                  start_i  = i * domain_width;
+			int                  start_j  = j * domain_width;
+			MatrixXd             sub_grid = G.block(start_i, start_j, domain_width, domain_width);
+			dmns(i, j) = Domain(A, sub_grid, h_x, h_y);
+		}
 	}
 
-	// set the outer boundary vectors
-	for (int i = 0; i < num_domains; i++) {
-		if (i == 0) {
-			dmns[0].boundary_west = boundary_west;
-		}
-		if (i == num_domains - 1) {
-			dmns[num_domains - 1].boundary_east = boundary_east;
-		}
-		int start_j            = i * m_x / num_domains;
-		int length             = m_x / num_domains;
-		dmns[i].boundary_north = boundary_north.block(0, start_j, 1, length);
-		dmns[i].boundary_south = boundary_south.block(0, start_j, 1, length);
+	// set the outer boundary vectors on north and south
+	for (int i = 0; i < num_domains_x; i++) {
+		int start_j = i * m_x / num_domains_x;
+		int length  = m_x / num_domains_x;
+		dmns(0, i).boundary_north                 = boundary_north.block(0, start_j, 1, length);
+		dmns(num_domains_y - 1, i).boundary_south = boundary_south.block(0, start_j, 1, length);
+	}
+
+	// set the outer boundary vectors on east and west
+	for (int i = 0; i < num_domains_y; i++) {
+		int start_i = i * m_y / num_domains_y;
+		int length  = m_y / num_domains_y;
+		dmns(i, 0).boundary_west                 = boundary_west.block(start_i,0, length, 1);
+		dmns(i, num_domains_x - 1).boundary_east = boundary_east.block(start_i,0, length, 1);
 	}
 
 	// create gamma array
-	VectorXd gamma            = VectorXd::Zero(m_y * (num_domains - 1));
+	VectorXd gamma            = VectorXd::Zero(m_y * (num_domains_x - 1)+m_x*(num_domains_y-1));
 	double   condition_number = 0.0;
-	if (num_domains > 1) {
+	if (num_domains_x > 1) {
 		// get the b vector
 		VectorXd b = solveWithInterfaceValues(dmns, gamma);
 
@@ -231,9 +265,12 @@ int main(int argc, char *argv[])
 
 	// form the complete grid
 	MatrixXd SOL(m_y, m_x);
-	for (int i = 0; i < num_domains; i++) {
-		int start_j = i * m_x / num_domains;
-		SOL.block(0, start_j, m_y, domain_width) = dmns[i].u;
+	for (int i = 0; i < num_domains_y; i++) {
+		for (int j = 0; j < num_domains_x; j++) {
+			int start_i = i * domain_width;
+			int start_j = j * domain_width;
+			SOL.block(start_i, start_j, domain_width, domain_width) = dmns(i, j).u;
+		}
 	}
 
 	// calculate error
