@@ -3,6 +3,7 @@
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <unsupported/Eigen/IterativeSolvers>
 #include <unsupported/Eigen/KroneckerProduct>
 using namespace Eigen;
 using namespace std;
@@ -10,6 +11,86 @@ using namespace std;
 #include "args.h"
 
 typedef Matrix<Domain, -1, -1> DomainMatrix;
+
+class FunctionWrapper;
+using Eigen::SparseMatrix;
+namespace Eigen
+{
+namespace internal
+{
+// FunctionWrapper looks-like a SparseMatrix, so let's inherits its traits:
+template <>
+struct traits<FunctionWrapper> : public Eigen::internal::traits<Eigen::SparseMatrix<double> > {
+};
+}
+}
+// Example of a matrix-free wrapper from a user type to Eigen's compatible type
+// For the sake of simplicity, this example simply wrap a Eigen::SparseMatrix.
+class FunctionWrapper : public Eigen::EigenBase<FunctionWrapper>
+{
+	private:
+	const SparseMatrix<double> *mp_mat;
+	Index                       my_rows;
+
+	public:
+	DomainMatrix *dmns;
+	VectorXd      b;
+	// Required typedefs, constants, and method:
+	typedef double Scalar;
+	typedef double RealScalar;
+	typedef int    StorageIndex;
+	enum {
+		ColsAtCompileTime    = Eigen::Dynamic,
+		MaxColsAtCompileTime = Eigen::Dynamic,
+		IsRowMajor           = false
+	};
+	Index rows() const { return my_rows; }
+	Index cols() const { return my_rows; }
+	template <typename Rhs>
+	Eigen::Product<FunctionWrapper, Rhs, Eigen::AliasFreeProduct>
+	operator*(const Eigen::MatrixBase<Rhs> &x) const
+	{
+		return Eigen::Product<FunctionWrapper, Rhs, Eigen::AliasFreeProduct>(*this, x.derived());
+	}
+	// Custom API:
+	FunctionWrapper(DomainMatrix *dmns, int size, VectorXd b)
+	{
+		this->dmns = dmns;
+		this->b    = b;
+		my_rows    = size;
+	}
+
+	void attachMyMatrix(const SparseMatrix<double> &mat) { mp_mat = &mat; }
+	const SparseMatrix<double>                      my_matrix() const { return *mp_mat; }
+};
+VectorXd solveWithInterfaceValues(DomainMatrix &dmns, VectorXd &gamma);
+// Implementation of FunctionWrapper * Eigen::DenseVector though a specialization of
+// internal::generic_product_impl:
+namespace Eigen
+{
+namespace internal
+{
+template <typename Rhs>
+struct generic_product_impl<FunctionWrapper, Rhs, SparseShape, DenseShape,
+                            GemvProduct> // GEMV stands for matrix-vector
+: generic_product_impl_base<FunctionWrapper, Rhs, generic_product_impl<FunctionWrapper, Rhs> > {
+	typedef typename Product<FunctionWrapper, Rhs>::Scalar Scalar;
+	template <typename Dest>
+	static void scaleAndAddTo(Dest &dst, const FunctionWrapper &lhs, const Rhs &rhs,
+	                          const Scalar &alpha)
+	{
+		// This method should implement "dst += alpha * lhs * rhs" inplace,
+		// however, for iterative solvers, alpha is always equal to 1, so let's not bother about it.
+		assert(alpha == Scalar(1) && "scaling is not implemented");
+		// Here we could simply call dst.noalias() += lhs.my_matrix() * rhs,
+		// but let's do something fancier (and less efficient):
+		VectorXd rhscopy = rhs;
+		VectorXd result  = solveWithInterfaceValues(*lhs.dmns, rhscopy) - lhs.b;
+		dst += alpha * result;
+	}
+};
+}
+}
 
 /**
  * @brief solve over all of the domains
@@ -131,7 +212,12 @@ int main(int argc, char *argv[])
 	                            {'m'});
 	args::ValueFlag<string> f_s(parser, "solution filename", "the file to write the solution to",
 	                            {'s'});
+	args::Flag f_cg(parser, "cg", "use conjugate gradient for solving gamma values", {"cg"});
 
+	if (argc < 5) {
+		std::cout << parser;
+		return 0;
+	}
 	try {
 		parser.ParseCLI(argc, argv);
 	} catch (args::Help) {
@@ -232,29 +318,38 @@ int main(int argc, char *argv[])
 		// get the b vector
 		VectorXd b = solveWithInterfaceValues(dmns, gamma);
 
-		// create a matrix
-		MatrixXd A(gamma.size(), gamma.size());
+		if (f_cg) {
+			FunctionWrapper F(&dmns, gamma.size(), b);
+			Eigen::ConjugateGradient<FunctionWrapper, Eigen::Lower | Eigen::Upper,
+			                         Eigen::IdentityPreconditioner>
+			cg(F);
+			// cg.compute(F);
+			gamma = -1 * cg.solve(b);
+			std::cout << "CG: Number of iterations: " << cg.iterations() << "\n";
+		} else {
+			// create a matrix
+			MatrixXd A(gamma.size(), gamma.size());
+			// get the columns of the matrix
+			for (int i = 0; i < gamma.size(); i++) {
+				gamma(i) = 1;
+				A.col(i) = solveWithInterfaceValues(dmns, gamma) - b;
+				gamma(i) = 0;
+			}
 
-		// get the columns of the matrix
-		for (int i = 0; i < gamma.size(); i++) {
-			gamma(i) = 1;
-			A.col(i) = solveWithInterfaceValues(dmns, gamma) - b;
-			gamma(i) = 0;
-		}
+			// solve for gamme values
+			FullPivLU<MatrixXd> lu(A);
+			VectorXd            tmp = lu.solve(b);
+			gamma                   = -tmp;
+			condition_number        = 1.0 / lu.rcond();
 
-		// solve for gamme values
-		FullPivLU<MatrixXd> lu(A);
-		VectorXd            tmp = lu.solve(b);
-		gamma                   = -tmp;
-		condition_number        = 1.0 / lu.rcond();
-
-		if (save_matrix_file != "") {
-			// print out solution
-			ofstream out_file(save_matrix_file);
-			out_file.precision(20);
-			out_file << scientific;
-			out_file << A << "\n";
-			out_file.close();
+			if (save_matrix_file != "") {
+				// print out solution
+				ofstream out_file(save_matrix_file);
+				out_file.precision(20);
+				out_file << scientific;
+				out_file << A << "\n";
+				out_file.close();
+			}
 		}
 	}
 
@@ -289,3 +384,4 @@ int main(int argc, char *argv[])
 		out_file.close();
 	}
 }
+
