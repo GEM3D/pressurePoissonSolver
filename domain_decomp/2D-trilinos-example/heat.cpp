@@ -1,21 +1,17 @@
-#include <Galeri_CrsMatrices.h>
-#include <Galeri_Maps.h>
-#include <Galeri_Utils.h>
-#include <Epetra_MpiComm.h>
-#include <mpi.h>
-#include <Epetra_CrsMatrix.h>
-#include <Epetra_Map.h>
-#include <Epetra_MultiVector.h>
-#include <Teuchos_ParameterList.hpp>
-#include <Teuchos_RCP.hpp>
-#include <Teuchos_GlobalMPISession.hpp>
-#include <Teuchos_oblackholestream.hpp>
-#include <Teuchos_Tuple.hpp>
-#include <Teuchos_VerboseObject.hpp>
 #include <Amesos2.hpp>
 #include <Amesos2_Version.hpp>
-
-using namespace Galeri;
+#include <Epetra_CrsMatrix.h>
+#include <Epetra_Map.h>
+#include <Epetra_MpiComm.h>
+#include <Epetra_MultiVector.h>
+#include <Teuchos_GlobalMPISession.hpp>
+#include <Teuchos_ParameterList.hpp>
+#include <Teuchos_RCP.hpp>
+#include <Teuchos_Tuple.hpp>
+#include <Teuchos_VerboseObject.hpp>
+#include <Teuchos_oblackholestream.hpp>
+#include <iostream>
+#include <mpi.h>
 
 Epetra_CrsMatrix *generate2DLaplacian(const Teuchos::RCP<Epetra_Map> Map, const int nx,
                                       const int ny, const double h_x, const double h_y);
@@ -35,18 +31,11 @@ int main(int argv, char *argc[])
 	MPI_Init(&argv, &argc);
 	Epetra_MpiComm Comm(MPI_COMM_WORLD);
 
-	// Create a parameter list
-	Teuchos::ParameterList GaleriList;
-
 	// Set the number of discretization points in the x and y direction.
 	int    nx  = 256;
 	int    ny  = 256;
 	double h_x = 1.0 / nx;
 	double h_y = 1.0 / ny;
-	GaleriList.set("nx", nx);
-	GaleriList.set("ny", ny);
-	GaleriList.set("lx", 1.0);
-	GaleriList.set("ly", 1.0);
 
 	// Create the map and matrix using the parameter list for a 2D Laplacian.
 	RCP<Epetra_Map> Map = rcp(new Epetra_Map(nx * ny, 0, Comm));
@@ -63,7 +52,6 @@ int main(int argv, char *argc[])
 		int       NumMyElements    = Map->NumMyElements();
 		int *     MyGlobalElements = 0;
 		Map->MyGlobalElementsPtr(MyGlobalElements);
-		cout << MyGlobalElements << "\n";
 		for (int i = 0; i < NumMyElements; i++) {
 			int    global_i = MyGlobalElements[i];
 			int    index_x  = global_i % nx;
@@ -114,7 +102,6 @@ int main(int argv, char *argc[])
 		int       NumMyElements    = Map->NumMyElements();
 		int *     MyGlobalElements = 0;
 		Map->MyGlobalElementsPtr(MyGlobalElements);
-		cout << MyGlobalElements << "\n";
 		for (int i = 0; i < NumMyElements; i++) {
 			(*exact)[0][i] -= (*u)[0][i];
 		}
@@ -122,7 +109,7 @@ int main(int argv, char *argc[])
 	// u->Print(std::cout);
 	double diff_norm;
 	exact->Norm2(&diff_norm);
-	cout << diff_norm / exact_norm << "\n";
+	std::cout << diff_norm / exact_norm << "\n";
 
 	MPI_Finalize();
 	return 0;
