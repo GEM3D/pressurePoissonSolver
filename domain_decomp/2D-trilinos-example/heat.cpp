@@ -5,6 +5,7 @@
 #include <mpi.h>
 #include <Epetra_CrsMatrix.h>
 #include <Epetra_Map.h>
+#include <Epetra_Vector.h>
 #include <Teuchos_ParameterList.hpp>
 #include <Teuchos_RCP.hpp>
 
@@ -12,6 +13,10 @@ using namespace Galeri;
 using Teuchos::RCP;
 
 Epetra_CrsMatrix *generate2DLaplacian(const RCP<Epetra_Map> Map, const int nx, const int ny, const double h_x, const double h_y);
+
+// the functions that we are using
+double ffun(double x, double y) { return -5 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y); }
+double gfun(double x, double y) { return sin(M_PI * x) * cos(2 * M_PI * y); }
 // =========== //
 // main driver //
 // =========== //
@@ -30,6 +35,8 @@ int main(int argv, char *argc[])
 	// Set the number of discretization points in the x and y direction.
     int nx = 5;
     int ny = 10;
+	double h_x = 1.0 / nx;
+	double h_y = 1.0 / ny;
 	GaleriList.set("nx", nx);
 	GaleriList.set("ny", ny);
 	GaleriList.set("lx", 1.0);
@@ -37,13 +44,32 @@ int main(int argv, char *argc[])
 
 	// Create the map and matrix using the parameter list for a 2D Laplacian.
 	RCP<Epetra_Map>       Map    = rcp(CreateMap("Cartesian2D", Comm, GaleriList));
-	RCP<Epetra_CrsMatrix> Matrix = rcp(generate2DLaplacian(Map,nx,ny,0.5,2.0));
 
-    // Create grid for rhs
-    
+	RCP<Epetra_CrsMatrix> Matrix = rcp(generate2DLaplacian(Map,nx,ny,h_x,h_y));
+
+    // Generate RHS vector
+	Epetra_Vector f(*Map,nx*ny);
+	{
+		// Use local indices to access the entries of f_data.
+		const int localLength      = f.MyLength();
+		int       NumMyElements    = Map->NumMyElements();
+		int *     MyGlobalElements = 0;
+		Map->MyGlobalElementsPtr(MyGlobalElements);
+		cout << MyGlobalElements << "\n";
+		for (int i = 0; i < NumMyElements; i++) {
+			int    global_i = MyGlobalElements[i];
+			int    index_x  = i % nx;
+			int    index_y  = (i - index_x) / nx;
+			double x        = h_x / 2.0 + 1.0 * index_x / nx;
+			double y        = h_y / 2.0 + 1.0 * index_y / ny;
+			f[i]            = ffun(x, y);
+		}
+	}
+
 	// Print out the map and matrices
 	Map->Print(std::cout);
 	Matrix->Print(std::cout);
+	f.Print(std::cout);
 
 	MPI_Finalize();
 	return 0;
