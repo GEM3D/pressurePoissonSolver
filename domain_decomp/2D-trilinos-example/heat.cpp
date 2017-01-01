@@ -9,10 +9,9 @@
 #include <Teuchos_RCP.hpp>
 
 using namespace Galeri;
-	using Teuchos::RCP;
+using Teuchos::RCP;
 
-Epetra_CrsMatrix *Cross2D(const RCP<Epetra_Map> Map, const int nx, const int ny, const double a,
-                          const double b, const double c, const double d, const double e);
+Epetra_CrsMatrix *generate2DLaplacian(const RCP<Epetra_Map> Map, const int nx, const int ny, const double h_x, const double h_y);
 // =========== //
 // main driver //
 // =========== //
@@ -38,7 +37,7 @@ int main(int argv, char *argc[])
 
 	// Create the map and matrix using the parameter list for a 2D Laplacian.
 	RCP<Epetra_Map>       Map    = rcp(CreateMap("Cartesian2D", Comm, GaleriList));
-	RCP<Epetra_CrsMatrix> Matrix = rcp(Cross2D(Map,nx,ny,4.0,-1.0,-1.0,-1.0,-1.0));
+	RCP<Epetra_CrsMatrix> Matrix = rcp(generate2DLaplacian(Map,nx,ny,0.5,2.0));
 
     // Create grid for rhs
     
@@ -50,51 +49,7 @@ int main(int argv, char *argc[])
 	return 0;
 }
 
-void GetNeighboursCartesian2d(const int i, const int nx, const int ny, int &left, int &right,
-                              int &lower, int &upper, int &left2, int &right2, int &lower2,
-                              int &upper2)
-{
-	int ix, iy;
-	ix = i % nx;
-	iy = (i - ix) / nx;
-
-	if (ix == 0)
-		left = -1;
-	else
-		left = i - 1;
-	if (ix == nx - 1)
-		right = -1;
-	else
-		right = i + 1;
-	if (iy == 0)
-		lower = -1;
-	else
-		lower = i - nx;
-	if (iy == ny - 1)
-		upper = -1;
-	else
-		upper = i + nx;
-
-	if (ix <= 1)
-		left2 = -1;
-	else
-		left2 = i - 2;
-	if (ix >= nx - 2)
-		right2 = -1;
-	else
-		right2 = i + 2;
-	if (iy <= 1)
-		lower2 = -1;
-	else
-		lower2 = i - 2 * nx;
-	if (iy >= ny - 2)
-		upper2 = -1;
-	else
-		upper2 = i + 2 * nx;
-}
-
-Epetra_CrsMatrix *Cross2D(const RCP<Epetra_Map> Map, const int nx, const int ny, const double a,
-                          const double b, const double c, const double d, const double e)
+Epetra_CrsMatrix *generate2DLaplacian(const RCP<Epetra_Map> Map, const int nx, const int ny, const double h_x, const double h_y)
 {
 	Epetra_CrsMatrix *Matrix = new Epetra_CrsMatrix(Copy, *Map, 5);
 
@@ -111,37 +66,58 @@ Epetra_CrsMatrix *Cross2D(const RCP<Epetra_Map> Map, const int nx, const int ny,
 	//    d
 	for (int i = 0; i < NumMyElements; ++i) {
 		int NumEntries = 0;
-		GetNeighboursCartesian2d(MyGlobalElements[i], nx, ny, left, right, lower, upper);
+		// determine index of of neighbors in row
+		int ix, iy;
+		ix = i % nx;
+		iy = (i - ix) / nx;
 
-		double diag = a;
+		if (ix == 0)
+			left = -1;
+		else
+			left = i - 1;
+		if (ix == nx - 1)
+			right = -1;
+		else
+			right = i + 1;
+		if (iy == 0)
+			lower = -1;
+		else
+			lower = i - nx;
+		if (iy == ny - 1)
+			upper = -1;
+		else
+			upper = i + nx;
+
+
+		double diag = -2.0/(h_y*h_y)-2.0/(h_x*h_x);
 
 		if (left != -1) {
 			Indices[NumEntries] = left;
-			Values[NumEntries]  = b;
+			Values[NumEntries]  = 1.0/(h_y*h_y);
 			++NumEntries;
 		} else {
-			diag += 1.0;
+			diag -= 1.0/(h_y*h_y);
 		}
 		if (right != -1) {
 			Indices[NumEntries] = right;
-			Values[NumEntries]  = c;
+			Values[NumEntries]  = 1.0/(h_y*h_y);
 			++NumEntries;
 		} else {
-			diag += 1.0;
+			diag -= 1.0/(h_y*h_y);
 		}
 		if (lower != -1) {
 			Indices[NumEntries] = lower;
-			Values[NumEntries]  = d;
+			Values[NumEntries]  = 1.0/(h_x*h_x);
 			++NumEntries;
 		} else {
-			diag += 1.0;
+			diag -= 1.0/(h_x*h_x);
 		}
 		if (upper != -1) {
 			Indices[NumEntries] = upper;
-			Values[NumEntries]  = e;
+			Values[NumEntries]  = 1.0/(h_x*h_x);
 			++NumEntries;
 		} else {
-			diag += 1.0;
+			diag -= 1.0/(h_x*h_x);
 		}
 		// put the off-diagonal entries
 		Matrix->InsertGlobalValues(MyGlobalElements[i], NumEntries, &Values[0], &Indices[0]);
