@@ -5,14 +5,19 @@
 #include <mpi.h>
 #include <Epetra_CrsMatrix.h>
 #include <Epetra_Map.h>
-#include <Epetra_Vector.h>
+#include <Epetra_MultiVector.h>
 #include <Teuchos_ParameterList.hpp>
 #include <Teuchos_RCP.hpp>
+#include <Teuchos_GlobalMPISession.hpp>
+#include <Teuchos_oblackholestream.hpp>
+#include <Teuchos_Tuple.hpp>
+#include <Teuchos_VerboseObject.hpp>
+#include <Amesos2.hpp>
+#include <Amesos2_Version.hpp>
 
 using namespace Galeri;
-using Teuchos::RCP;
 
-Epetra_CrsMatrix *generate2DLaplacian(const RCP<Epetra_Map> Map, const int nx, const int ny, const double h_x, const double h_y);
+Epetra_CrsMatrix *generate2DLaplacian(const Teuchos::RCP<Epetra_Map> Map, const int nx, const int ny, const double h_x, const double h_y);
 
 // the functions that we are using
 double ffun(double x, double y) { return -5 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y); }
@@ -45,13 +50,15 @@ int main(int argv, char *argc[])
 	// Create the map and matrix using the parameter list for a 2D Laplacian.
 	RCP<Epetra_Map>       Map    = rcp(CreateMap("Cartesian2D", Comm, GaleriList));
 
-	RCP<Epetra_CrsMatrix> Matrix = rcp(generate2DLaplacian(Map,nx,ny,h_x,h_y));
+	RCP<Epetra_CrsMatrix> A = rcp(generate2DLaplacian(Map,nx,ny,h_x,h_y));
 
     // Generate RHS vector
-	Epetra_Vector f(*Map,nx*ny);
+	RCP<Epetra_MultiVector> f = rcp(new Epetra_MultiVector(*Map,1));
+	RCP<Epetra_MultiVector> u = rcp(new Epetra_MultiVector(*Map,1));
+	RCP<Epetra_MultiVector> exact = rcp(new Epetra_MultiVector(*Map,1));
 	{
 		// Use local indices to access the entries of f_data.
-		const int localLength      = f.MyLength();
+		const int localLength      = f->MyLength();
 		int       NumMyElements    = Map->NumMyElements();
 		int *     MyGlobalElements = 0;
 		Map->MyGlobalElementsPtr(MyGlobalElements);
@@ -62,21 +69,31 @@ int main(int argv, char *argc[])
 			int    index_y  = (i - index_x) / nx;
 			double x        = h_x / 2.0 + 1.0 * index_x / nx;
 			double y        = h_y / 2.0 + 1.0 * index_y / ny;
-			f[i]            = ffun(x, y);
+			(*f)[0][i]            = ffun(x, y);
+			(*exact)[0][i]        = gfun(x, y);
 		}
 	}
 
 	// Print out the map and matrices
 	Map->Print(std::cout);
-	Matrix->Print(std::cout);
-	f.Print(std::cout);
+	A->Print(std::cout);
+	f->Print(std::cout);
+	exact->Print(std::cout);
+
+	// Create solver interface to Superlu with Amesos2 factory method
+	RCP<Amesos2::Solver<Epetra_CrsMatrix, Epetra_MultiVector> > solver
+	= Amesos2::create<Epetra_CrsMatrix, Epetra_MultiVector>("KLU2", A, u, f);
+    solver->solve();
+
+    u->Print(std::cout);
 
 	MPI_Finalize();
 	return 0;
 }
 
-Epetra_CrsMatrix *generate2DLaplacian(const RCP<Epetra_Map> Map, const int nx, const int ny, const double h_x, const double h_y)
+Epetra_CrsMatrix *generate2DLaplacian(const Teuchos::RCP<Epetra_Map> Map, const int nx, const int ny, const double h_x, const double h_y)
 {
+	using Teuchos::RCP;
 	Epetra_CrsMatrix *Matrix = new Epetra_CrsMatrix(Copy, *Map, 5);
 
 	int  NumMyElements    = Map->NumMyElements();
