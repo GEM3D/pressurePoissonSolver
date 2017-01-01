@@ -51,7 +51,7 @@ test: MyApp.exe input.xml
 	./MyApp.exe
 
 # build the 
-heat:
+heat: heat.cpp
 	$(CXX) $(CXX_FLAGS) heat.cpp -o heat $(LINK_FLAGS) $(INCLUDE_DIRS) $(DEFINES) $(LIBRARY_DIRS) $(LIBRARIES)
 
 : src_file.o
