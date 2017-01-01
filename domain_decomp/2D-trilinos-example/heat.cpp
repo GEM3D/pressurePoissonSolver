@@ -39,8 +39,8 @@ int main(int argv, char *argc[])
 	Teuchos::ParameterList GaleriList;
 
 	// Set the number of discretization points in the x and y direction.
-	int    nx  = 100;
-	int    ny  = 100;
+	int    nx  = 256;
+	int    ny  = 256;
 	double h_x = 1.0 / nx;
 	double h_y = 1.0 / ny;
 	GaleriList.set("nx", nx);
@@ -49,7 +49,7 @@ int main(int argv, char *argc[])
 	GaleriList.set("ly", 1.0);
 
 	// Create the map and matrix using the parameter list for a 2D Laplacian.
-	RCP<Epetra_Map> Map = rcp(CreateMap("Cartesian2D", Comm, GaleriList));
+	RCP<Epetra_Map> Map = rcp(new Epetra_Map(nx * ny, 0, Comm));
 
 	RCP<Epetra_CrsMatrix> A = rcp(generate2DLaplacian(Map, nx, ny, h_x, h_y));
 
@@ -99,7 +99,7 @@ int main(int argv, char *argc[])
 	// Map->Print(std::cout);
 	// A->Print(std::cout);
 	// f->Print(std::cout);
-	exact->Print(std::cout);
+	// exact->Print(std::cout);
 
 	// Create solver interface with Amesos2 factory method
 	RCP<Amesos2::Solver<Epetra_CrsMatrix, Epetra_MultiVector> > solver
@@ -119,7 +119,7 @@ int main(int argv, char *argc[])
 			(*exact)[0][i] -= (*u)[0][i];
 		}
 	}
-	u->Print(std::cout);
+	// u->Print(std::cout);
 	double diff_norm;
 	exact->Norm2(&diff_norm);
 	cout << diff_norm / exact_norm << "\n";
