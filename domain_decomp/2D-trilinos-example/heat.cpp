@@ -30,20 +30,50 @@ class Domain
 	RCP<vector_type> f;
 	RCP<vector_type> u;
 	RCP<solver_type> solver;
+	int              nx;
+	int              ny;
+	double           h_x;
+	double           h_y;
+	double *         north_boundary = nullptr;
+	double *         south_boundary = nullptr;
+	double *         east_boundary  = nullptr;
+	double *         west_boundary  = nullptr;
 
-	Domain(RCP<matrix_type> A, RCP<vector_type> f)
+	Domain(RCP<matrix_type> A, RCP<vector_type> f, int nx, int ny, double h_x, double h_y)
 	{
 		solver = Amesos2::create<matrix_type, vector_type>("KLU2", A);
 		solver->symbolicFactorization().numericFactorization();
-		this->A = A;
-		this->f = f;
-		u       = rcp(new vector_type(f->Map(), 1, false));
+		this->A   = A;
+		this->f   = f;
+		this->nx  = nx;
+		this->ny  = ny;
+		this->h_x = h_x;
+		this->h_y = h_y;
+		u         = rcp(new vector_type(f->Map(), 1, false));
 	}
 
 	void solve()
 	{
+		RCP<vector_type> f_copy = rcp(new vector_type(f->Map(), 1, false));
+		for (int i = 0; i < nx; i++) {
+			for (int j = 0; j < ny; j++) {
+				(*f_copy)[0][j * nx + i] = (*f)[0][j * nx + i];
+				if (j == 0 && north_boundary != nullptr) {
+					(*f_copy)[0][j * nx + i] += -2.0 / (h_y * h_y) * north_boundary[i];
+				}
+				if (j == ny - 1 && south_boundary != nullptr) {
+					(*f_copy)[0][j * nx + i] += -2.0 / (h_y * h_y) * south_boundary[i];
+				}
+				if (i == 0 && east_boundary != nullptr) {
+					(*f_copy)[0][j * nx + i] += -2.0 / (h_x * h_x) * east_boundary[j];
+				}
+				if (i == nx - 1 && west_boundary != nullptr) {
+					(*f_copy)[0][j * nx + i] += -2.0 / (h_x * h_x) * west_boundary[j];
+				}
+			}
+		}
 		solver->setX(u);
-		solver->setB(f);
+		solver->setB(f_copy);
 		solver->solve();
 	}
 };
@@ -162,11 +192,10 @@ int main(int argc, char *argv[])
 		}
 	}
 
-    // create a domain
-    Domain d(A,f);
-    d.solve();
+	// create a domain
+	Domain d(A, f, nx, ny, h_x, h_y);
+	d.solve();
 	RCP<vector_type> u = d.u;
-
 
 	double exact_norm;
 	if (my_global_rank == 0) {
