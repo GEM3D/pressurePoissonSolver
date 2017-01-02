@@ -1,3 +1,4 @@
+#include "args.h"
 #include <Amesos2.hpp>
 #include <Amesos2_Version.hpp>
 #include <Epetra_CrsMatrix.h>
@@ -12,6 +13,7 @@
 #include <Teuchos_oblackholestream.hpp>
 #include <iostream>
 #include <mpi.h>
+#include <string>
 
 Epetra_CrsMatrix *generate2DLaplacian(const Teuchos::RCP<Epetra_Map> Map, const int nx,
                                       const int ny, const double h_x, const double h_y);
@@ -23,17 +25,47 @@ double gfun(double x, double y) { return sin(M_PI * x) * cos(2 * M_PI * y); }
 // main driver //
 // =========== //
 
-int main(int argv, char *argc[])
+int main(int argc, char *argv[])
 {
 	using Teuchos::RCP;
 	using Teuchos::rcp;
 
-	MPI_Init(&argv, &argc);
+	MPI_Init(&argc, &argv);
 	Epetra_MpiComm Comm(MPI_COMM_WORLD);
+	// parse input
+	args::ArgumentParser  parser("");
+	args::HelpFlag        help(parser, "help", "Display this help menu", {'h', "help"});
+	args::Positional<int> d_x(parser, "d_x", "number of domains in the x direction");
+	args::Positional<int> d_y(parser, "d_y", "number of domains in the y direction");
+	args::Positional<int> n_x(parser, "n_x", "number of cells in the x direction, in each domain");
+	args::Positional<int> n_y(parser, "n_y", "number of cells in the y direction, in each domain");
+	args::ValueFlag<std::string> f_m(parser, "matrix filename", "the file to write the matrix to",
+	                                 {'m'});
+	args::ValueFlag<std::string> f_s(parser, "solution filename",
+	                                 "the file to write the solution to", {'s'});
+	args::Flag f_cg(parser, "cg", "use conjugate gradient for solving gamma values", {"cg"});
 
+	if (argc < 5) {
+		std::cout << parser;
+		return 0;
+	}
+	try {
+		parser.ParseCLI(argc, argv);
+	} catch (args::Help) {
+		std::cout << parser;
+		return 0;
+	} catch (args::ParseError e) {
+		std::cerr << e.what() << std::endl;
+		std::cerr << parser;
+		return 1;
+	} catch (args::ValidationError e) {
+		std::cerr << e.what() << std::endl;
+		std::cerr << parser;
+		return 1;
+	}
 	// Set the number of discretization points in the x and y direction.
-	int    nx  = 256;
-	int    ny  = 256;
+	int    nx  = args::get(n_x);
+	int    ny  = args::get(n_y);
 	double h_x = 1.0 / nx;
 	double h_y = 1.0 / ny;
 
