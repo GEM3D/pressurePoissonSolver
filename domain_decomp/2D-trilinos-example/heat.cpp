@@ -4,7 +4,9 @@
 #include <Epetra_CrsMatrix.h>
 #include <Epetra_Map.h>
 #include <Epetra_MpiComm.h>
+#include <Epetra_SerialComm.h>
 #include <Epetra_MultiVector.h>
+#include <Epetra_Vector.h>
 #include <Teuchos_GlobalMPISession.hpp>
 #include <Teuchos_ParameterList.hpp>
 #include <Teuchos_RCP.hpp>
@@ -15,7 +17,37 @@
 #include <mpi.h>
 #include <string>
 
-Epetra_CrsMatrix *generate2DLaplacian(const Teuchos::RCP<Epetra_Map> Map, const int nx,
+using Teuchos::RCP;
+using Teuchos::rcp;
+typedef Epetra_CrsMatrix   matrix_type;
+typedef Epetra_MultiVector vector_type;
+typedef Amesos2::Solver<matrix_type, vector_type> solver_type;
+typedef Epetra_Map map_type;
+class Domain
+{
+	public:
+	RCP<matrix_type> A;
+	RCP<vector_type> f;
+	RCP<vector_type> u;
+	RCP<solver_type> solver;
+
+	Domain(RCP<matrix_type> A, RCP<vector_type> f)
+	{
+		solver = Amesos2::create<matrix_type, vector_type>("KLU2", A);
+		solver->symbolicFactorization().numericFactorization();
+		this->A = A;
+		this->f = f;
+		u       = rcp(new vector_type(f->Map(), 1, false));
+	}
+
+	void solve()
+	{
+		solver->setX(u);
+		solver->setB(f);
+		solver->solve();
+	}
+};
+matrix_type *generate2DLaplacian(const Teuchos::RCP<map_type> Map, const int nx,
                                       const int ny, const double h_x, const double h_y);
 
 // the functions that we are using
@@ -32,6 +64,19 @@ int main(int argc, char *argv[])
 
 	MPI_Init(&argc, &argv);
 	Epetra_MpiComm Comm(MPI_COMM_WORLD);
+
+    int num_procs;
+	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+
+    int my_global_rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &my_global_rank);
+    // comunicator for subdomain
+    // for now, subdomains are going to be single threaded
+	MPI_Comm subdomain_comm_raw;
+	MPI_Comm_split(MPI_COMM_WORLD, my_global_rank, 0, &subdomain_comm_raw);
+	Epetra_MpiComm subdomain_comm(subdomain_comm_raw);
+
+
 	// parse input
 	args::ArgumentParser  parser("");
 	args::HelpFlag        help(parser, "help", "Display this help menu", {'h', "help"});
@@ -46,44 +91,54 @@ int main(int argc, char *argv[])
 	args::Flag f_cg(parser, "cg", "use conjugate gradient for solving gamma values", {"cg"});
 
 	if (argc < 5) {
-		std::cout << parser;
+		if (my_global_rank == 0) std::cout << parser;
 		return 0;
 	}
 	try {
 		parser.ParseCLI(argc, argv);
 	} catch (args::Help) {
-		std::cout << parser;
+		if (my_global_rank == 0) std::cout << parser;
 		return 0;
 	} catch (args::ParseError e) {
-		std::cerr << e.what() << std::endl;
-		std::cerr << parser;
+		if (my_global_rank == 0) {
+			std::cerr << e.what() << std::endl;
+			std::cerr << parser;
+		}
 		return 1;
 	} catch (args::ValidationError e) {
-		std::cerr << e.what() << std::endl;
-		std::cerr << parser;
+		if (my_global_rank == 0) {
+			std::cerr << e.what() << std::endl;
+			std::cerr << parser;
+		}
 		return 1;
 	}
 	// Set the number of discretization points in the x and y direction.
-	int    nx  = args::get(n_x);
-	int    ny  = args::get(n_y);
-	double h_x = 1.0 / nx;
-	double h_y = 1.0 / ny;
+	int    num_domains_x = args::get(d_x);
+	int    num_domains_y = args::get(d_y);
+	int    nx            = args::get(n_x);
+	int    ny            = args::get(n_y);
+	double h_x           = 1.0 / nx;
+	double h_y           = 1.0 / ny;
 
-	// Create the map and matrix using the parameter list for a 2D Laplacian.
-	RCP<Epetra_Map> Map = rcp(new Epetra_Map(nx * ny, 0, Comm));
+    if(num_domains_x*num_domains_y!=num_procs){
+        std::cerr << "number of domains must be equal to the number of processes\n";
+        return 1;
+    }
 
-	RCP<Epetra_CrsMatrix> A = rcp(generate2DLaplacian(Map, nx, ny, h_x, h_y));
+	// create a map and matrix
+	RCP<map_type>    Map = rcp(new map_type(nx * ny, 0, subdomain_comm));
+	RCP<matrix_type> A   = rcp(generate2DLaplacian(Map, nx, ny, h_x, h_y));
 
 	// Generate RHS vector
-	RCP<Epetra_MultiVector> f     = rcp(new Epetra_MultiVector(*Map, 1));
-	RCP<Epetra_MultiVector> u     = rcp(new Epetra_MultiVector(*Map, 1));
-	RCP<Epetra_MultiVector> exact = rcp(new Epetra_MultiVector(*Map, 1));
+	RCP<vector_type> f     = rcp(new vector_type(*Map, 1, false));
+	RCP<vector_type> exact = rcp(new vector_type(*Map, 1, false));
 	{
 		// Use local indices to access the entries of f_data.
 		const int localLength      = f->MyLength();
 		int       NumMyElements    = Map->NumMyElements();
 		int *     MyGlobalElements = 0;
 		Map->MyGlobalElementsPtr(MyGlobalElements);
+		// generate rhs
 		for (int i = 0; i < NumMyElements; i++) {
 			int    global_i = MyGlobalElements[i];
 			int    index_x  = global_i % nx;
@@ -92,14 +147,6 @@ int main(int argc, char *argv[])
 			double y        = h_y / 2.0 + 1.0 * index_y / ny;
 			(*f)[0][i]      = ffun(x, y);
 			(*exact)[0][i]  = gfun(x, y);
-		}
-		// add boundaries to rhs
-		for (int i = 0; i < NumMyElements; i++) {
-			int    global_i = MyGlobalElements[i];
-			int    index_x  = global_i % nx;
-			int    index_y  = (global_i - index_x) / nx;
-			double x        = h_x / 2.0 + 1.0 * index_x / nx;
-			double y        = h_y / 2.0 + 1.0 * index_y / ny;
 			if (index_x == 0) {
 				(*f)[0][i] += -2.0 / (h_x * h_x) * gfun(0.0, y);
 			}
@@ -115,19 +162,16 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	// Print out the map and matrices
-	// Map->Print(std::cout);
-	// A->Print(std::cout);
-	// f->Print(std::cout);
-	// exact->Print(std::cout);
+    // create a domain
+    Domain d(A,f);
+    d.solve();
+	RCP<vector_type> u = d.u;
 
-	// Create solver interface with Amesos2 factory method
-	RCP<Amesos2::Solver<Epetra_CrsMatrix, Epetra_MultiVector> > solver
-	= Amesos2::create<Epetra_CrsMatrix, Epetra_MultiVector>("KLU2", A, u, f);
-	solver->solve();
 
 	double exact_norm;
-	exact->Norm2(&exact_norm);
+	if (my_global_rank == 0) {
+		exact->Norm2(&exact_norm);
+	}
 	{
 		// Use local indices to access the entries of f_data.
 		const int localLength      = f->MyLength();
@@ -140,18 +184,20 @@ int main(int argc, char *argv[])
 	}
 	// u->Print(std::cout);
 	double diff_norm;
-	exact->Norm2(&diff_norm);
-	std::cout << diff_norm / exact_norm << "\n";
+	if (my_global_rank == 0) {
+		exact->Norm2(&diff_norm);
+		std::cout << diff_norm / exact_norm << "\n";
+	}
 
 	MPI_Finalize();
 	return 0;
 }
 
-Epetra_CrsMatrix *generate2DLaplacian(const Teuchos::RCP<Epetra_Map> Map, const int nx,
+matrix_type *generate2DLaplacian(const Teuchos::RCP<map_type> Map, const int nx,
                                       const int ny, const double h_x, const double h_y)
 {
 	using Teuchos::RCP;
-	Epetra_CrsMatrix *Matrix = new Epetra_CrsMatrix(Copy, *Map, 5);
+	matrix_type *Matrix = new matrix_type(Copy, *Map, 5);
 
 	int  NumMyElements    = Map->NumMyElements();
 	int *MyGlobalElements = 0;
