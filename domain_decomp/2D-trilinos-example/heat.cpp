@@ -194,8 +194,68 @@ int main(int argc, char *argv[])
 
 	// create a domain
 	Domain d(A, f, nx, ny, h_x, h_y);
+    // generate indices for gamma vector
+	int domain_i = my_global_rank % num_domains_x;
+	int domain_j = my_global_rank / num_domains_y;
+	int num_interface_points = 0;
+	if (domain_i != num_domains_x - 1) {
+		num_interface_points += nx;
+	}
+	if (domain_j != num_domains_y - 1) {
+		num_interface_points += ny;
+	}
+	if (domain_i != 0) {
+		num_interface_points += nx;
+	}
+	if (domain_j != 0) {
+		num_interface_points += ny;
+	}
+	std::vector<int> global_i(num_interface_points);
 	d.solve();
-	RCP<vector_type> u = d.u;
+	RCP<vector_type> u          = d.u;
+	int              ns_start_i = num_domains_y * (num_domains_x - 1) * ny;
+	int              curr_i     = 0;
+	// north
+	if (domain_i != num_domains_x - 1) {
+		int curr_global_i = (domain_i * num_domains_x + domain_j) * nx + ns_start_i;
+		for (int i = 0; i < nx; i++) {
+			global_i[curr_i] = curr_global_i;
+			curr_global_i++;
+			curr_i++;
+		}
+	}
+	// east
+	if (domain_j != num_domains_y - 1) {
+		int curr_global_i = (domain_j * num_domains_y + domain_i) * ny;
+		for (int i = 0; i < ny; i++) {
+			global_i[curr_i] = curr_global_i;
+			curr_global_i++;
+			curr_i++;
+		}
+	}
+	// south
+	if (domain_i != 0) {
+		int curr_global_i = ((domain_i - 1) * num_domains_x + domain_j) * nx + ns_start_i;
+		for (int i = 0; i < nx; i++) {
+			global_i[curr_i] = curr_global_i;
+			curr_global_i++;
+			curr_i++;
+		}
+	}
+	// west
+	if (domain_j != 0) {
+		int curr_global_i = ((domain_j - 1) * num_domains_y + domain_i) * ny;
+		for (int i = 0; i < ny; i++) {
+			global_i[curr_i] = curr_global_i;
+			curr_global_i++;
+			curr_i++;
+		}
+	}
+	// create the map
+	int num_global_elements
+	= nx * num_domains_x * (num_domains_y - 1) + ny * num_domains_y * (num_domains_x - 1);
+	RCP<map_type> gamma_map
+	= rcp(new map_type(num_global_elements, num_interface_points, &global_i[0], 0, Comm));
 
 	double exact_norm;
 	if (my_global_rank == 0) {
