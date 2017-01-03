@@ -7,6 +7,9 @@
 #include <Epetra_SerialComm.h>
 #include <Epetra_MultiVector.h>
 #include <Epetra_Vector.h>
+#include <Epetra_Export.h>
+#include <Epetra_Import.h>
+#include <Epetra_CombineMode.h>
 #include <Teuchos_GlobalMPISession.hpp>
 #include <Teuchos_ParameterList.hpp>
 #include <Teuchos_RCP.hpp>
@@ -34,10 +37,15 @@ class Domain
 	int              ny;
 	double           h_x;
 	double           h_y;
-	double *         north_boundary = nullptr;
-	double *         south_boundary = nullptr;
-	double *         east_boundary  = nullptr;
-	double *         west_boundary  = nullptr;
+	double *         boundary_north = nullptr;
+	double *         boundary_south = nullptr;
+	double *         boundary_east  = nullptr;
+	double *         boundary_west  = nullptr;
+	bool             has_north      = false;
+	bool             has_south      = false;
+	bool             has_east       = false;
+	bool             has_west       = false;
+	RCP<map_type>    domain_map;
 
 	Domain(RCP<matrix_type> A, RCP<vector_type> f, int nx, int ny, double h_x, double h_y)
 	{
@@ -58,23 +66,87 @@ class Domain
 		for (int i = 0; i < nx; i++) {
 			for (int j = 0; j < ny; j++) {
 				(*f_copy)[0][j * nx + i] = (*f)[0][j * nx + i];
-				if (j == 0 && north_boundary != nullptr) {
-					(*f_copy)[0][j * nx + i] += -2.0 / (h_y * h_y) * north_boundary[i];
+				if (j == 0 && has_north) {
+					(*f_copy)[0][j * nx + i] += -2.0 / (h_y * h_y) * boundary_north[i];
 				}
-				if (j == ny - 1 && south_boundary != nullptr) {
-					(*f_copy)[0][j * nx + i] += -2.0 / (h_y * h_y) * south_boundary[i];
+				if (j == ny - 1 && has_south) {
+					(*f_copy)[0][j * nx + i] += -2.0 / (h_y * h_y) * boundary_south[i];
 				}
-				if (i == 0 && east_boundary != nullptr) {
-					(*f_copy)[0][j * nx + i] += -2.0 / (h_x * h_x) * east_boundary[j];
+				if (i == 0 && has_east) {
+					(*f_copy)[0][j * nx + i] += -2.0 / (h_x * h_x) * boundary_east[j];
 				}
-				if (i == nx - 1 && west_boundary != nullptr) {
-					(*f_copy)[0][j * nx + i] += -2.0 / (h_x * h_x) * west_boundary[j];
+				if (i == nx - 1 && has_west) {
+					(*f_copy)[0][j * nx + i] += -2.0 / (h_x * h_x) * boundary_west[j];
 				}
 			}
 		}
 		solver->setX(u);
 		solver->setB(f_copy);
 		solver->solve();
+	}
+
+	void solveWithInterface(vector_type &gamma, vector_type &diff)
+	{
+		Epetra_Import importer(*domain_map, gamma.Map());
+		vector_type local_vector(*domain_map,1);
+		local_vector.Import(gamma, importer, Insert);
+		local_vector.Print(std::cout);
+		int curr_i = 0;
+		if (has_north) {
+			boundary_north = &local_vector[0][curr_i];
+			curr_i += nx;
+		}
+		if (has_east) {
+			boundary_east = &local_vector[0][curr_i];
+			curr_i += ny;
+		}
+		if (has_south) {
+			boundary_south = &local_vector[0][curr_i];
+			curr_i += nx;
+		}
+		if (has_west) {
+			boundary_west = &local_vector[0][curr_i];
+		}
+
+        // solve
+        solve();
+
+        diff.Update(-2,gamma,0);
+		local_vector.PutScalar(0.0);
+		curr_i = 0;
+		if (has_north) {
+            for(int i = 0; i < nx; i++){
+                local_vector[0][curr_i] = (*u)[0][i];
+				curr_i++;
+			}
+        }
+		if (has_east) {
+            for(int i = 0; i < ny; i++){
+                local_vector[0][curr_i] = (*u)[0][(i+1)*nx-1];
+				curr_i++;
+			}
+		}
+		if (has_south) {
+            for(int i = 0; i < nx; i++){
+                local_vector[0][curr_i] = (*u)[0][nx*(ny-1)+i];
+				curr_i++;
+			}
+		}
+		if (has_west) {
+            for(int i = 0; i < ny; i++){
+                local_vector[0][curr_i] = (*u)[0][i*nx];
+				curr_i++;
+			}
+		}
+        local_vector.Comm().Barrier();
+        local_vector.Print(std::cout);
+        local_vector.Comm().Barrier();
+		Epetra_Export exporter(local_vector.Map(),diff.Map());
+        diff.Export(local_vector,exporter,Add);
+        diff.Export(local_vector,exporter,Add);
+        diff.Comm().Barrier();
+        diff.Print(std::cout);
+        diff.Comm().Barrier();
 	}
 };
 matrix_type *generate2DLaplacian(const Teuchos::RCP<map_type> Map, const int nx,
@@ -147,11 +219,15 @@ int main(int argc, char *argv[])
 	int    num_domains_y = args::get(d_y);
 	int    nx            = args::get(n_x);
 	int    ny            = args::get(n_y);
-	double h_x           = 1.0 / nx;
-	double h_y           = 1.0 / ny;
+	double h_x           = 1.0 / (nx * num_domains_x);
+	double h_y           = 1.0 / (ny * num_domains_y);
+	int    domain_x      = my_global_rank % num_domains_x;
+	int    domain_y      = my_global_rank / num_domains_x;
+    std::cout << domain_x << "  " << domain_y << "\n";
+    std::cout << num_domains_x << "  " << num_domains_y << "\n";
 
-    if(num_domains_x*num_domains_y!=num_procs){
-        std::cerr << "number of domains must be equal to the number of processes\n";
+	if (num_domains_x * num_domains_y != num_procs) {
+		std::cerr << "number of domains must be equal to the number of processes\n";
         return 1;
     }
 
@@ -171,53 +247,57 @@ int main(int argc, char *argv[])
 		// generate rhs
 		for (int i = 0; i < NumMyElements; i++) {
 			int    global_i = MyGlobalElements[i];
-			int    index_x  = global_i % nx;
-			int    index_y  = (global_i - index_x) / nx;
-			double x        = h_x / 2.0 + 1.0 * index_x / nx;
-			double y        = h_y / 2.0 + 1.0 * index_y / ny;
+			int    index_x  = domain_x * nx + global_i % nx;
+			int    index_y  = domain_y * ny + (global_i - index_x) / nx;
+			double x        = h_x / 2.0 + 1.0 * index_x / (nx * num_domains_x);
+			double y        = h_y / 2.0 + 1.0 * index_y / (ny * num_domains_y);
 			(*f)[0][i]      = ffun(x, y);
 			(*exact)[0][i]  = gfun(x, y);
 			if (index_x == 0) {
 				(*f)[0][i] += -2.0 / (h_x * h_x) * gfun(0.0, y);
 			}
-			if (index_x == nx - 1) {
+			if (index_x == num_domains_x * nx - 1) {
 				(*f)[0][i] += -2.0 / (h_x * h_x) * gfun(1.0, y);
 			}
 			if (index_y == 0) {
 				(*f)[0][i] += -2.0 / (h_y * h_y) * gfun(x, 0.0);
 			}
-			if (index_y == ny - 1) {
+			if (index_y == num_domains_y * ny - 1) {
 				(*f)[0][i] += -2.0 / (h_y * h_y) * gfun(x, 1.0);
 			}
 		}
 	}
 
+    std::cout << "Creating domain\n";
 	// create a domain
 	Domain d(A, f, nx, ny, h_x, h_y);
     // generate indices for gamma vector
-	int domain_i = my_global_rank % num_domains_x;
-	int domain_j = my_global_rank / num_domains_y;
 	int num_interface_points = 0;
-	if (domain_i != num_domains_x - 1) {
+	if (domain_y != num_domains_y - 1) {
 		num_interface_points += nx;
+		d.has_north = true;
 	}
-	if (domain_j != num_domains_y - 1) {
+	if (domain_x != num_domains_x - 1) {
 		num_interface_points += ny;
+		d.has_east = true;
 	}
-	if (domain_i != 0) {
+	if (domain_y != 0) {
 		num_interface_points += nx;
+		d.has_south = true;
 	}
-	if (domain_j != 0) {
+	if (domain_x != 0) {
 		num_interface_points += ny;
+		d.has_west = true;
 	}
 	std::vector<int> global_i(num_interface_points);
-	d.solve();
 	RCP<vector_type> u          = d.u;
 	int              ns_start_i = num_domains_y * (num_domains_x - 1) * ny;
-	int              curr_i     = 0;
+    std::cout << ns_start_i << "\n";
+	std::cout << "Going to create the gamma map\n";
+	int curr_i = 0;
 	// north
-	if (domain_i != num_domains_x - 1) {
-		int curr_global_i = (domain_i * num_domains_x + domain_j) * nx + ns_start_i;
+	if (d.has_north) {
+		int curr_global_i = (domain_y * num_domains_x + domain_x) * nx + ns_start_i;
 		for (int i = 0; i < nx; i++) {
 			global_i[curr_i] = curr_global_i;
 			curr_global_i++;
@@ -225,8 +305,8 @@ int main(int argc, char *argv[])
 		}
 	}
 	// east
-	if (domain_j != num_domains_y - 1) {
-		int curr_global_i = (domain_j * num_domains_y + domain_i) * ny;
+	if (d.has_east) {
+		int curr_global_i = (domain_x * num_domains_y + domain_y) * ny;
 		for (int i = 0; i < ny; i++) {
 			global_i[curr_i] = curr_global_i;
 			curr_global_i++;
@@ -234,8 +314,8 @@ int main(int argc, char *argv[])
 		}
 	}
 	// south
-	if (domain_i != 0) {
-		int curr_global_i = ((domain_i - 1) * num_domains_x + domain_j) * nx + ns_start_i;
+	if (d.has_south) {
+		int curr_global_i = ((domain_y - 1) * num_domains_x + domain_x) * nx + ns_start_i;
 		for (int i = 0; i < nx; i++) {
 			global_i[curr_i] = curr_global_i;
 			curr_global_i++;
@@ -243,20 +323,35 @@ int main(int argc, char *argv[])
 		}
 	}
 	// west
-	if (domain_j != 0) {
-		int curr_global_i = ((domain_j - 1) * num_domains_y + domain_i) * ny;
+	if (d.has_west) {
+		int curr_global_i = ((domain_x - 1) * num_domains_y + domain_y) * ny;
 		for (int i = 0; i < ny; i++) {
 			global_i[curr_i] = curr_global_i;
 			curr_global_i++;
 			curr_i++;
 		}
 	}
+    std::cout << "Going to create the gamma map\n";
 	// create the map
 	int num_global_elements
 	= nx * num_domains_x * (num_domains_y - 1) + ny * num_domains_y * (num_domains_x - 1);
-	RCP<map_type> gamma_map
+	RCP<map_type> diff_map;
+		diff_map = rcp(new map_type(num_global_elements, 0, Comm));
+	d.domain_map
 	= rcp(new map_type(num_global_elements, num_interface_points, &global_i[0], 0, Comm));
 
+	RCP<vector_type> gamma    = rcp(new vector_type(*diff_map, 1));
+	RCP<vector_type> diff     = rcp(new vector_type(*diff_map, 1));
+	if (my_global_rank == 0) {
+		(*gamma)[0][0] = 1;
+	}
+
+	//d.domain_map->Print(std::cout);
+    //diff_map->Print(std::cout);
+	std::cout << "Solving...\n";
+	d.solveWithInterface(*gamma,*diff);
+    Comm.Barrier();
+    diff->Print(std::cout);
 	double exact_norm;
 	if (my_global_rank == 0) {
 		exact->Norm2(&exact_norm);
@@ -271,13 +366,14 @@ int main(int argc, char *argv[])
 			(*exact)[0][i] -= (*u)[0][i];
 		}
 	}
-	// u->Print(std::cout);
 	double diff_norm;
 	if (my_global_rank == 0) {
 		exact->Norm2(&diff_norm);
 		std::cout << diff_norm / exact_norm << "\n";
 	}
 
+    d.domain_map->Print(std::cout);
+    diff_map->Print(std::cout);
 	MPI_Finalize();
 	return 0;
 }
