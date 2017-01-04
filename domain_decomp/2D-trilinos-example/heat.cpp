@@ -111,7 +111,6 @@ class Domain
         // solve
         solve();
 
-        diff.Update(-2,gamma,0);
 		local_vector.PutScalar(0.0);
 		curr_i = 0;
 		if (has_north) {
@@ -142,8 +141,9 @@ class Domain
         local_vector.Print(std::cout);
         local_vector.Comm().Barrier();
 		Epetra_Export exporter(local_vector.Map(),diff.Map());
-        diff.Export(local_vector,exporter,Add);
-        diff.Export(local_vector,exporter,Add);
+        diff.Export(local_vector,importer,Add);
+        diff.Export(local_vector,importer,Add);
+        diff.Update(-2,gamma,1);
         diff.Comm().Barrier();
         diff.Print(std::cout);
         diff.Comm().Barrier();
@@ -351,7 +351,6 @@ int main(int argc, char *argv[])
 	std::cout << "Solving...\n";
 	d.solveWithInterface(*gamma,*diff);
     Comm.Barrier();
-    diff->Print(std::cout);
 	double exact_norm;
 	if (my_global_rank == 0) {
 		exact->Norm2(&exact_norm);
