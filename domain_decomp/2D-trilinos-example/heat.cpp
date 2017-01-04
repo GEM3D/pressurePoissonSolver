@@ -151,8 +151,6 @@ class Domain
 	}
 };
 
-namespace Belos
-{
 class FuncWrap// : virtual Belos::Operator
 {
     public:
@@ -162,40 +160,24 @@ class FuncWrap// : virtual Belos::Operator
         this->b = b;
         this->d = d;
     }
-    void Apply(const vector_type& x, vector_type& y){
-        d->solveWithInterface(x,y);
-        y.Update(-1,*b,1);
-    }
-    static bool HasApplyTranspose(const FuncWrap& wrapper){
-        return false;
-    }
-    //static bool this_type_is_missing_a_specialization(){
-    //    return false;
-    //}
-	static void Apply(const FuncWrap &wrapper, const vector_type &x, vector_type &y,
-	                  Belos::ETrans trans = Belos::ETrans::NOTRANS)
+	void Apply(const vector_type &x, vector_type &y) const
 	{
-        Domain* d_ptr = wrapper.d;
-        RCP<vector_type> b_ptr = wrapper.b;
-        d_ptr->solveWithInterface(x,y);
-        y.Update(-1,*b_ptr,1);
-		//wrapper.Apply(x, y);
-	}
+		d->solveWithInterface(x,y);
+        y.Update(1,*b,-1);
+    }
 };
-template<>
+namespace Belos
+{
+template <>
 void OperatorTraits<double, vector_type, FuncWrap>::Apply(const FuncWrap &wrapper,
                                                           const vector_type &x, vector_type &y,
                                                           Belos::ETrans trans)
 {
-	Domain *         d_ptr = wrapper.d;
-	RCP<vector_type> b_ptr = wrapper.b;
-	d_ptr->solveWithInterface(x, y);
-	y.Update(-1, *b_ptr, 1);
-	// wrapper.Apply(x, y);
+	wrapper.Apply(x, y);
 };
 }
 matrix_type *generate2DLaplacian(const Teuchos::RCP<map_type> Map, const int nx, const int ny,
-                                   const double h_x, const double h_y);
+                                 const double h_x, const double h_y);
 
 // the functions that we are using
 double ffun(double x, double y) { return -5 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y); }
@@ -206,7 +188,7 @@ double gfun(double x, double y) { return sin(M_PI * x) * cos(2 * M_PI * y); }
 
 int main(int argc, char *argv[])
 {
-    using Belos::FuncWrap;
+//    using Belos::FuncWrap;
 	using Teuchos::RCP;
 	using Teuchos::rcp;
 
@@ -410,7 +392,6 @@ int main(int argc, char *argv[])
 		= rcp(new Belos::BlockCGSolMgr<double, vector_type, FuncWrap>(rcp(&problem, false),
 		                                                              rcp(&belosList, false)));
         solver->solve();
-        gamma->Scale(-1);    
 	}
 
 	//d.domain_map->Print(std::cout);
