@@ -19,6 +19,7 @@
 #include <iostream>
 #include <mpi.h>
 #include <unistd.h>
+#include <cmath>
 #include <string>
 #include <BelosConfigDefs.hpp>
 #include <BelosLinearProblem.hpp>
@@ -93,6 +94,7 @@ class Domain
 
 	void solveWithInterface(const vector_type &gamma, vector_type &diff)
 	{
+        diff.PutScalar(0);
 		int my_global_rank;
 		MPI_Comm_rank(MPI_COMM_WORLD, &my_global_rank);
 		if (my_global_rank == 0) {
@@ -125,7 +127,7 @@ class Domain
 		curr_i = 0;
 		if (has_north) {
             for(int i = 0; i < nx; i++){
-                local_vector[0][curr_i] = (*u)[0][i];
+                local_vector[0][curr_i] = (*u)[0][nx*(ny-1)+i];
 				curr_i++;
 			}
         }
@@ -137,7 +139,7 @@ class Domain
 		}
 		if (has_south) {
             for(int i = 0; i < nx; i++){
-                local_vector[0][curr_i] = (*u)[0][nx*(ny-1)+i];
+                local_vector[0][curr_i] = (*u)[0][i];
 				curr_i++;
 			}
 		}
@@ -149,6 +151,8 @@ class Domain
 		}
         diff.Export(local_vector,importer,Add);
         diff.Update(-2,gamma,1);
+        diff.Print(std::cout);
+        sleep(1);
 	}
 };
 
@@ -293,7 +297,7 @@ int main(int argc, char *argv[])
 		for (int i = 0; i < NumMyElements; i++) {
 			int    global_i = MyGlobalElements[i];
 			int    index_x  = domain_x * nx + global_i % nx;
-			int    index_y  = domain_y * ny + (global_i - index_x) / nx;
+			int    index_y  = domain_y * ny + global_i / nx;
 			double x        = h_x / 2.0 + 1.0 * index_x / (nx * num_domains_x);
 			double y        = h_y / 2.0 + 1.0 * index_y / (ny * num_domains_y);
 			(*f)[0][i]      = ffun(x, y);
@@ -491,31 +495,31 @@ matrix_type *generate2DLaplacian(const Teuchos::RCP<map_type> Map, const int nx,
 
 		if (left != -1) {
 			Indices[NumEntries] = left;
-			Values[NumEntries]  = 1.0 / (h_y * h_y);
+			Values[NumEntries]  = 1.0 / (h_x * h_x);
 			++NumEntries;
 		} else {
-			diag -= 1.0 / (h_y * h_y);
+			diag -= 1.0 / (h_x * h_x);
 		}
 		if (right != -1) {
 			Indices[NumEntries] = right;
+			Values[NumEntries]  = 1.0 / (h_x * h_x);
+			++NumEntries;
+		} else {
+			diag -= 1.0 / (h_x * h_x);
+		}
+		if (lower != -1) {
+			Indices[NumEntries] = lower;
 			Values[NumEntries]  = 1.0 / (h_y * h_y);
 			++NumEntries;
 		} else {
 			diag -= 1.0 / (h_y * h_y);
 		}
-		if (lower != -1) {
-			Indices[NumEntries] = lower;
-			Values[NumEntries]  = 1.0 / (h_x * h_x);
-			++NumEntries;
-		} else {
-			diag -= 1.0 / (h_x * h_x);
-		}
 		if (upper != -1) {
 			Indices[NumEntries] = upper;
-			Values[NumEntries]  = 1.0 / (h_x * h_x);
+			Values[NumEntries]  = 1.0 / (h_y * h_y);
 			++NumEntries;
 		} else {
-			diag -= 1.0 / (h_x * h_x);
+			diag -= 1.0 / (h_y * h_y);
 		}
 		// put the off-diagonal entries
 		Matrix->InsertGlobalValues(MyGlobalElements[i], NumEntries, &Values[0], &Indices[0]);
