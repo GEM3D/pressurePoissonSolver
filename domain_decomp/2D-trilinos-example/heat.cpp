@@ -18,7 +18,13 @@
 #include <Teuchos_oblackholestream.hpp>
 #include <iostream>
 #include <mpi.h>
+#include <unistd.h>
 #include <string>
+#include <BelosConfigDefs.hpp>
+#include <BelosLinearProblem.hpp>
+#include <BelosEpetraAdapter.hpp>
+#include <BelosBlockCGSolMgr.hpp>
+
 
 using Teuchos::RCP;
 using Teuchos::rcp;
@@ -85,10 +91,15 @@ class Domain
 		solver->solve();
 	}
 
-	void solveWithInterface(vector_type &gamma, vector_type &diff)
+	void solveWithInterface(const vector_type &gamma, vector_type &diff)
 	{
+		int my_global_rank;
+		MPI_Comm_rank(MPI_COMM_WORLD, &my_global_rank);
+		if (my_global_rank == 0) {
+			std::cerr << "i have been called!\n";
+		}
 		Epetra_Import importer(*domain_map, gamma.Map());
-		vector_type local_vector(*domain_map,1);
+		vector_type   local_vector(*domain_map, 1);
 		local_vector.Import(gamma, importer, Insert);
 		int curr_i = 0;
 		if (has_north) {
@@ -140,8 +151,52 @@ class Domain
         diff.Update(-2,gamma,1);
 	}
 };
-matrix_type *generate2DLaplacian(const Teuchos::RCP<map_type> Map, const int nx,
-                                      const int ny, const double h_x, const double h_y);
+
+namespace Belos
+{
+class FuncWrap// : virtual Belos::Operator
+{
+    public:
+	RCP<vector_type> b;
+    Domain* d;
+    FuncWrap(RCP<vector_type> b,Domain* d){
+        this->b = b;
+        this->d = d;
+    }
+    void Apply(const vector_type& x, vector_type& y){
+        d->solveWithInterface(x,y);
+        y.Update(-1,*b,1);
+    }
+    static bool HasApplyTranspose(const FuncWrap& wrapper){
+        return false;
+    }
+    //static bool this_type_is_missing_a_specialization(){
+    //    return false;
+    //}
+	static void Apply(const FuncWrap &wrapper, const vector_type &x, vector_type &y,
+	                  Belos::ETrans trans = Belos::ETrans::NOTRANS)
+	{
+        Domain* d_ptr = wrapper.d;
+        RCP<vector_type> b_ptr = wrapper.b;
+        d_ptr->solveWithInterface(x,y);
+        y.Update(-1,*b_ptr,1);
+		//wrapper.Apply(x, y);
+	}
+};
+template<>
+void OperatorTraits<double, vector_type, FuncWrap>::Apply(const FuncWrap &wrapper,
+                                                          const vector_type &x, vector_type &y,
+                                                          Belos::ETrans trans)
+{
+	Domain *         d_ptr = wrapper.d;
+	RCP<vector_type> b_ptr = wrapper.b;
+	d_ptr->solveWithInterface(x, y);
+	y.Update(-1, *b_ptr, 1);
+	// wrapper.Apply(x, y);
+};
+}
+matrix_type *generate2DLaplacian(const Teuchos::RCP<map_type> Map, const int nx, const int ny,
+                                   const double h_x, const double h_y);
 
 // the functions that we are using
 double ffun(double x, double y) { return -5 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y); }
@@ -152,6 +207,7 @@ double gfun(double x, double y) { return sin(M_PI * x) * cos(2 * M_PI * y); }
 
 int main(int argc, char *argv[])
 {
+    using Belos::FuncWrap;
 	using Teuchos::RCP;
 	using Teuchos::rcp;
 
@@ -335,8 +391,28 @@ int main(int argc, char *argv[])
 
 	RCP<vector_type> gamma    = rcp(new vector_type(*diff_map, 1));
 	RCP<vector_type> diff     = rcp(new vector_type(*diff_map, 1));
-	if (my_global_rank == 0 && num_domains_x * num_domains_y != 1) {
-		(*gamma)[0][0] = 1;
+	if (num_domains_x * num_domains_y != 1) {
+        //do iterative solve
+		RCP<vector_type> b = rcp(new vector_type(*diff_map, 1));
+		d.solveWithInterface(*gamma, *b);
+        b->Print(std::cout);
+        sleep(1);
+		RCP<FuncWrap> wrapper = rcp(new FuncWrap(b, &d));
+		Belos::LinearProblem<double, vector_type, FuncWrap> problem(wrapper, gamma, b);
+        std::cout<< problem.setProblem()<<"\n";
+        Teuchos::ParameterList belosList;
+        belosList.set("Block Size",1);
+        belosList.set("Maximum Iterations",1000);
+        belosList.set("Convergence Tolerance",10e-7);
+		int verbosity = Belos::Errors + Belos::StatusTestDetails + Belos::Warnings
+		                + Belos::TimingDetails + Belos::Debug;
+        belosList.set("Verbosity",verbosity);
+        Belos::OutputManager<double> my_om();
+		RCP < Belos::SolverManager<double, vector_type, FuncWrap>> solver
+		= rcp(new Belos::BlockCGSolMgr<double, vector_type, FuncWrap>(rcp(&problem, false),
+		                                                              rcp(&belosList, false)));
+        solver->solve();
+        
 	}
 
 	//d.domain_map->Print(std::cout);
