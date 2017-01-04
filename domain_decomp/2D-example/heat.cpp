@@ -323,6 +323,7 @@ int main(int argc, char *argv[])
 			Eigen::ConjugateGradient<FunctionWrapper, Eigen::Lower | Eigen::Upper,
 			                         Eigen::IdentityPreconditioner>
 			cg(F);
+            cg.setTolerance(10e-10);
 			// cg.compute(F);
 			gamma = -1 * cg.solve(b);
 			std::cout << "CG: Number of iterations: " << cg.iterations() << "\n";
