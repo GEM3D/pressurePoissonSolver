@@ -85,7 +85,7 @@ struct generic_product_impl<FunctionWrapper, Rhs, SparseShape, DenseShape,
 		// Here we could simply call dst.noalias() += lhs.my_matrix() * rhs,
 		// but let's do something fancier (and less efficient):
 		VectorXd rhscopy = rhs;
-		VectorXd result  = solveWithInterfaceValues(*lhs.dmns, rhscopy) - lhs.b;
+		VectorXd result  = lhs.b - solveWithInterfaceValues(*lhs.dmns, rhscopy);
 		dst += alpha * result;
 	}
 };
@@ -323,9 +323,9 @@ int main(int argc, char *argv[])
 			Eigen::ConjugateGradient<FunctionWrapper, Eigen::Lower | Eigen::Upper,
 			                         Eigen::IdentityPreconditioner>
 			cg(F);
-            cg.setTolerance(10e-10);
+			cg.setTolerance(10e-10);
 			// cg.compute(F);
-			gamma = -1 * cg.solve(b);
+			gamma = cg.solve(b);
 			std::cout << "CG: Number of iterations: " << cg.iterations() << "\n";
 		} else {
 			// create a matrix
@@ -333,15 +333,14 @@ int main(int argc, char *argv[])
 			// get the columns of the matrix
 			for (int i = 0; i < gamma.size(); i++) {
 				gamma(i) = 1;
-				A.col(i) = solveWithInterfaceValues(dmns, gamma) - b;
+				A.col(i) = b - solveWithInterfaceValues(dmns, gamma);
 				gamma(i) = 0;
 			}
 
 			// solve for gamme values
 			FullPivLU<MatrixXd> lu(A);
-			VectorXd            tmp = lu.solve(b);
-			gamma                   = -tmp;
-			condition_number        = 1.0 / lu.rcond();
+			gamma            = lu.solve(b);
+			condition_number = 1.0 / lu.rcond();
 
 			if (save_matrix_file != "") {
 				// print out solution
