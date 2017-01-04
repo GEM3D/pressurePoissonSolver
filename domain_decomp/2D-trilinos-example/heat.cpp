@@ -1,34 +1,33 @@
-#include "args.h"
-#include "MyTypeDefs.h"
 #include "FunctionWrapper.h"
 #include "GenerateLaplacian.h"
+#include "MyTypeDefs.h"
+#include "args.h"
 #include <Amesos2.hpp>
 #include <Amesos2_Version.hpp>
+#include <BelosBlockCGSolMgr.hpp>
+#include <BelosConfigDefs.hpp>
+#include <BelosEpetraAdapter.hpp>
+#include <BelosLinearProblem.hpp>
+#include <Epetra_CombineMode.h>
 #include <Epetra_CrsMatrix.h>
-#include <Epetra_Map.h>
-#include <Epetra_MpiComm.h>
-#include <Epetra_SerialComm.h>
-#include <Epetra_MultiVector.h>
-#include <Epetra_Vector.h>
 #include <Epetra_Export.h>
 #include <Epetra_Import.h>
-#include <Epetra_CombineMode.h>
+#include <Epetra_Map.h>
+#include <Epetra_MpiComm.h>
+#include <Epetra_MultiVector.h>
+#include <Epetra_SerialComm.h>
+#include <Epetra_Vector.h>
 #include <Teuchos_GlobalMPISession.hpp>
 #include <Teuchos_ParameterList.hpp>
 #include <Teuchos_RCP.hpp>
 #include <Teuchos_Tuple.hpp>
 #include <Teuchos_VerboseObject.hpp>
 #include <Teuchos_oblackholestream.hpp>
+#include <cmath>
 #include <iostream>
 #include <mpi.h>
-#include <unistd.h>
-#include <cmath>
 #include <string>
-#include <BelosConfigDefs.hpp>
-#include <BelosLinearProblem.hpp>
-#include <BelosEpetraAdapter.hpp>
-#include <BelosBlockCGSolMgr.hpp>
-
+#include <unistd.h>
 
 using Teuchos::RCP;
 using Teuchos::rcp;
@@ -42,24 +41,23 @@ double gfun(double x, double y) { return sin(M_PI * x) * cos(2 * M_PI * y); }
 
 int main(int argc, char *argv[])
 {
-//    using Belos::FuncWrap;
+	//    using Belos::FuncWrap;
 	using Teuchos::RCP;
 	using Teuchos::rcp;
 
 	MPI_Init(&argc, &argv);
 	Epetra_MpiComm Comm(MPI_COMM_WORLD);
 
-    int num_procs;
+	int num_procs;
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
 
-    int my_global_rank;
+	int my_global_rank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &my_global_rank);
-    // comunicator for subdomain
-    // for now, subdomains are going to be single threaded
+	// comunicator for subdomain
+	// for now, subdomains are going to be single threaded
 	MPI_Comm subdomain_comm_raw;
 	MPI_Comm_split(MPI_COMM_WORLD, my_global_rank, 0, &subdomain_comm_raw);
 	Epetra_MpiComm subdomain_comm(subdomain_comm_raw);
-
 
 	// parse input
 	args::ArgumentParser  parser("");
@@ -108,8 +106,8 @@ int main(int argc, char *argv[])
 
 	if (num_domains_x * num_domains_y != num_procs) {
 		std::cerr << "number of domains must be equal to the number of processes\n";
-        return 1;
-    }
+		return 1;
+	}
 
 	// create a map and matrix
 	RCP<map_type>    Map = rcp(new map_type(nx * ny, 0, subdomain_comm));
@@ -150,34 +148,36 @@ int main(int argc, char *argv[])
 
 	// create a domain
 	Domain d(A, f, nx, ny, h_x, h_y);
-    // generate indices for gamma vector
+
+	// Detertime on which sides this domain has a neighboring domain
+	// and calculate how many interface points this domain is going to have
 	int num_interface_points = 0;
-    // north
+	// north
 	if (domain_y != num_domains_y - 1) {
 		num_interface_points += nx;
 		d.has_north = true;
 	}
-    // east
+	// east
 	if (domain_x != num_domains_x - 1) {
 		num_interface_points += ny;
 		d.has_east = true;
 	}
-    // south
+	// south
 	if (domain_y != 0) {
 		num_interface_points += nx;
 		d.has_south = true;
 	}
-    // west
+	// west
 	if (domain_x != 0) {
 		num_interface_points += ny;
 		d.has_west = true;
 	}
-	std::vector<int> global_i(num_interface_points);
 
+	// Now Calculate the global indicies for thos interface points
+	std::vector<int> global_i(num_interface_points);
 	RCP<vector_type> u          = d.u;
 	int              ns_start_i = num_domains_y * (num_domains_x - 1) * ny;
 	int              curr_i     = 0;
-	// north
 	if (d.has_north) {
 		int curr_global_i = (domain_y * num_domains_x + domain_x) * nx + ns_start_i;
 		for (int i = 0; i < nx; i++) {
@@ -186,7 +186,6 @@ int main(int argc, char *argv[])
 			curr_i++;
 		}
 	}
-	// east
 	if (d.has_east) {
 		int curr_global_i = (domain_x * num_domains_y + domain_y) * ny;
 		for (int i = 0; i < ny; i++) {
@@ -195,7 +194,6 @@ int main(int argc, char *argv[])
 			curr_i++;
 		}
 	}
-	// south
 	if (d.has_south) {
 		int curr_global_i = ((domain_y - 1) * num_domains_x + domain_x) * nx + ns_start_i;
 		for (int i = 0; i < nx; i++) {
@@ -204,7 +202,6 @@ int main(int argc, char *argv[])
 			curr_i++;
 		}
 	}
-	// west
 	if (d.has_west) {
 		int curr_global_i = ((domain_x - 1) * num_domains_y + domain_y) * ny;
 		for (int i = 0; i < ny; i++) {
@@ -213,46 +210,62 @@ int main(int argc, char *argv[])
 			curr_i++;
 		}
 	}
-	// create the map
-	int num_global_elements = nx * num_domains_x * (num_domains_y - 1) + ny * num_domains_y * (num_domains_x - 1);
 
-	RCP<map_type> diff_map = rcp(new map_type(num_global_elements, 0, Comm));
-
+	// Now that the global indices have been calculated, we can create a map for the interface
+	// points
+	int num_global_elements
+	= nx * num_domains_x * (num_domains_y - 1) + ny * num_domains_y * (num_domains_x - 1);
 	if (num_domains_x * num_domains_y == 1) {
+		// this is a special case for when there is only one domain
 		d.domain_map = rcp(new map_type(1, 0, Comm));
 	} else {
 		d.domain_map = rcp(new map_type(-1, num_interface_points, &global_i[0], 0, Comm));
 	}
 
-	RCP<vector_type> gamma    = rcp(new vector_type(*diff_map, 1));
-	RCP<vector_type> diff     = rcp(new vector_type(*diff_map, 1));
+	// Create a map that will be used in the iterative solver
+	RCP<map_type> diff_map = rcp(new map_type(num_global_elements, 0, Comm));
+
+	// Create the gamma and diff vectors
+	RCP<vector_type> gamma = rcp(new vector_type(*diff_map, 1));
+	RCP<vector_type> diff  = rcp(new vector_type(*diff_map, 1));
+
 	if (num_domains_x * num_domains_y != 1) {
-        //do iterative solve
+		// do iterative solve
+
+		// Get the b vector
 		RCP<vector_type> b = rcp(new vector_type(*diff_map, 1));
 		d.solveWithInterface(*gamma, *b);
-        sleep(1);
+
+		// Create a function wrapper
 		RCP<FuncWrap> wrapper = rcp(new FuncWrap(b, &d));
+
+		// Create linear problem for the Belos solver
 		Belos::LinearProblem<double, vector_type, FuncWrap> problem(wrapper, gamma, b);
-        problem.setProblem();
-        Teuchos::ParameterList belosList;
-        belosList.set("Block Size",1);
-        belosList.set("Maximum Iterations",1000);
-        belosList.set("Convergence Tolerance",10e-10);
+		problem.setProblem();
+
+		// Set the parameters
+		Teuchos::ParameterList belosList;
+		belosList.set("Block Size", 1);
+		belosList.set("Maximum Iterations", 1000);
+		belosList.set("Convergence Tolerance", 10e-10);
 		int verbosity = Belos::Errors + Belos::StatusTestDetails + Belos::Warnings
 		                + Belos::TimingDetails + Belos::Debug;
-        belosList.set("Verbosity",verbosity);
-        Belos::OutputManager<double> my_om();
-		RCP < Belos::SolverManager<double, vector_type, FuncWrap>> solver
+		belosList.set("Verbosity", verbosity);
+		Belos::OutputManager<double> my_om();
+
+		// Create solver and solve
+		RCP<Belos::SolverManager<double, vector_type, FuncWrap>> solver
 		= rcp(new Belos::BlockCGSolMgr<double, vector_type, FuncWrap>(rcp(&problem, false),
 		                                                              rcp(&belosList, false)));
-        solver->solve();
+		solver->solve();
 	}
 
-	//d.domain_map->Print(std::cout);
-    //diff_map->Print(std::cout);
-	d.solveWithInterface(*gamma,*diff);
-    map_type err_map(-1,1,0,Comm);
-    Epetra_Vector exact_norm(err_map);
+	// Do one last solve
+	d.solveWithInterface(*gamma, *diff);
+
+	// Calcuate error
+	map_type      err_map(-1, 1, 0, Comm);
+	Epetra_Vector exact_norm(err_map);
 	Epetra_Vector diff_norm(err_map);
 	exact->Norm2(&exact_norm[0]);
 	{
@@ -271,7 +284,9 @@ int main(int argc, char *argv[])
 	diff_norm.Norm2(&global_diff_norm);
 	exact_norm.Norm2(&global_exact_norm);
 	if (my_global_rank == 0) {
-		std::cout << global_diff_norm / global_exact_norm << "\n";
+		cout << scientific;
+		cout.precision(13);
+		std::cout << "Error: " << global_diff_norm / global_exact_norm << "\n";
 	}
 
 	MPI_Finalize();
