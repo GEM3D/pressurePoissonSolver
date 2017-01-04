@@ -90,7 +90,6 @@ class Domain
 		Epetra_Import importer(*domain_map, gamma.Map());
 		vector_type local_vector(*domain_map,1);
 		local_vector.Import(gamma, importer, Insert);
-		local_vector.Print(std::cout);
 		int curr_i = 0;
 		if (has_north) {
 			boundary_north = &local_vector[0][curr_i];
@@ -137,16 +136,8 @@ class Domain
 				curr_i++;
 			}
 		}
-        local_vector.Comm().Barrier();
-        local_vector.Print(std::cout);
-        local_vector.Comm().Barrier();
-		Epetra_Export exporter(local_vector.Map(),diff.Map());
-        diff.Export(local_vector,importer,Add);
         diff.Export(local_vector,importer,Add);
         diff.Update(-2,gamma,1);
-        diff.Comm().Barrier();
-        diff.Print(std::cout);
-        diff.Comm().Barrier();
 	}
 };
 matrix_type *generate2DLaplacian(const Teuchos::RCP<map_type> Map, const int nx,
@@ -223,8 +214,6 @@ int main(int argc, char *argv[])
 	double h_y           = 1.0 / (ny * num_domains_y);
 	int    domain_x      = my_global_rank % num_domains_x;
 	int    domain_y      = my_global_rank / num_domains_x;
-    std::cout << domain_x << "  " << domain_y << "\n";
-    std::cout << num_domains_x << "  " << num_domains_y << "\n";
 
 	if (num_domains_x * num_domains_y != num_procs) {
 		std::cerr << "number of domains must be equal to the number of processes\n";
@@ -293,10 +282,10 @@ int main(int argc, char *argv[])
 		d.has_west = true;
 	}
 	std::vector<int> global_i(num_interface_points);
+
 	RCP<vector_type> u          = d.u;
 	int              ns_start_i = num_domains_y * (num_domains_x - 1) * ny;
-    std::cout << ns_start_i << "\n";
-	int curr_i = 0;
+	int              curr_i     = 0;
 	// north
 	if (d.has_north) {
 		int curr_global_i = (domain_y * num_domains_x + domain_x) * nx + ns_start_i;
