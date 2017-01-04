@@ -327,24 +327,25 @@ int main(int argc, char *argv[])
 
 	RCP<map_type> diff_map = rcp(new map_type(num_global_elements, 0, Comm));
 
-
-	d.domain_map
-	= rcp(new map_type(-1, num_interface_points, &global_i[0], 0, Comm));
+	if (num_domains_x * num_domains_y == 1) {
+		d.domain_map = rcp(new map_type(1, 0, Comm));
+	} else {
+		d.domain_map = rcp(new map_type(-1, num_interface_points, &global_i[0], 0, Comm));
+	}
 
 	RCP<vector_type> gamma    = rcp(new vector_type(*diff_map, 1));
 	RCP<vector_type> diff     = rcp(new vector_type(*diff_map, 1));
-	if (my_global_rank == 0) {
+	if (my_global_rank == 0 && num_domains_x * num_domains_y != 1) {
 		(*gamma)[0][0] = 1;
 	}
 
 	//d.domain_map->Print(std::cout);
     //diff_map->Print(std::cout);
 	d.solveWithInterface(*gamma,*diff);
-    Comm.Barrier();
-	double exact_norm;
-	if (my_global_rank == 0) {
-		exact->Norm2(&exact_norm);
-	}
+    map_type err_map(-1,1,0,Comm);
+    Epetra_Vector exact_norm(err_map);
+	Epetra_Vector diff_norm(err_map);
+	exact->Norm2(&exact_norm[0]);
 	{
 		// Use local indices to access the entries of f_data.
 		const int localLength      = f->MyLength();
@@ -355,10 +356,13 @@ int main(int argc, char *argv[])
 			(*exact)[0][i] -= (*u)[0][i];
 		}
 	}
-	double diff_norm;
+	exact->Norm2(&diff_norm[0]);
+	double global_diff_norm;
+	double global_exact_norm;
+	diff_norm.Norm2(&global_diff_norm);
+	exact_norm.Norm2(&global_exact_norm);
 	if (my_global_rank == 0) {
-		exact->Norm2(&diff_norm);
-		std::cout << diff_norm / exact_norm << "\n";
+		std::cout << global_diff_norm / global_exact_norm << "\n";
 	}
 
 	MPI_Finalize();
