@@ -63,20 +63,20 @@ class Domain
 	void solve()
 	{
 		RCP<vector_type> f_copy = rcp(new vector_type(f->Map(), 1, false));
-		for (int i = 0; i < nx; i++) {
-			for (int j = 0; j < ny; j++) {
-				(*f_copy)[0][j * nx + i] = (*f)[0][j * nx + i];
-				if (j == 0 && has_north) {
-					(*f_copy)[0][j * nx + i] += -2.0 / (h_y * h_y) * boundary_north[i];
+		for (int x_i = 0; x_i < nx; x_i++) {
+			for (int y_i = 0; y_i < ny; y_i++) {
+				(*f_copy)[0][y_i * nx + x_i] = (*f)[0][y_i * nx + x_i];
+				if (y_i == ny - 1 && has_north) {
+					(*f_copy)[0][y_i * nx + x_i] += -2.0 / (h_y * h_y) * boundary_north[x_i];
 				}
-				if (j == ny - 1 && has_south) {
-					(*f_copy)[0][j * nx + i] += -2.0 / (h_y * h_y) * boundary_south[i];
+				if (x_i == nx-1 && has_east) {
+					(*f_copy)[0][y_i * nx + x_i] += -2.0 / (h_x * h_x) * boundary_east[y_i];
 				}
-				if (i == 0 && has_east) {
-					(*f_copy)[0][j * nx + i] += -2.0 / (h_x * h_x) * boundary_east[j];
+				if (y_i == 0 && has_south) {
+					(*f_copy)[0][y_i * nx + x_i] += -2.0 / (h_y * h_y) * boundary_south[x_i];
 				}
-				if (i == nx - 1 && has_west) {
-					(*f_copy)[0][j * nx + i] += -2.0 / (h_x * h_x) * boundary_west[j];
+				if (x_i == 0 && has_west) {
+					(*f_copy)[0][y_i * nx + x_i] += -2.0 / (h_x * h_x) * boundary_west[y_i];
 				}
 			}
 		}
@@ -268,23 +268,26 @@ int main(int argc, char *argv[])
 		}
 	}
 
-    std::cout << "Creating domain\n";
 	// create a domain
 	Domain d(A, f, nx, ny, h_x, h_y);
     // generate indices for gamma vector
 	int num_interface_points = 0;
+    // north
 	if (domain_y != num_domains_y - 1) {
 		num_interface_points += nx;
 		d.has_north = true;
 	}
+    // east
 	if (domain_x != num_domains_x - 1) {
 		num_interface_points += ny;
 		d.has_east = true;
 	}
+    // south
 	if (domain_y != 0) {
 		num_interface_points += nx;
 		d.has_south = true;
 	}
+    // west
 	if (domain_x != 0) {
 		num_interface_points += ny;
 		d.has_west = true;
@@ -293,7 +296,6 @@ int main(int argc, char *argv[])
 	RCP<vector_type> u          = d.u;
 	int              ns_start_i = num_domains_y * (num_domains_x - 1) * ny;
     std::cout << ns_start_i << "\n";
-	std::cout << "Going to create the gamma map\n";
 	int curr_i = 0;
 	// north
 	if (d.has_north) {
@@ -331,14 +333,14 @@ int main(int argc, char *argv[])
 			curr_i++;
 		}
 	}
-    std::cout << "Going to create the gamma map\n";
 	// create the map
-	int num_global_elements
-	= nx * num_domains_x * (num_domains_y - 1) + ny * num_domains_y * (num_domains_x - 1);
-	RCP<map_type> diff_map;
-		diff_map = rcp(new map_type(num_global_elements, 0, Comm));
+	int num_global_elements = nx * num_domains_x * (num_domains_y - 1) + ny * num_domains_y * (num_domains_x - 1);
+
+	RCP<map_type> diff_map = rcp(new map_type(num_global_elements, 0, Comm));
+
+
 	d.domain_map
-	= rcp(new map_type(num_global_elements, num_interface_points, &global_i[0], 0, Comm));
+	= rcp(new map_type(-1, num_interface_points, &global_i[0], 0, Comm));
 
 	RCP<vector_type> gamma    = rcp(new vector_type(*diff_map, 1));
 	RCP<vector_type> diff     = rcp(new vector_type(*diff_map, 1));
@@ -348,7 +350,6 @@ int main(int argc, char *argv[])
 
 	//d.domain_map->Print(std::cout);
     //diff_map->Print(std::cout);
-	std::cout << "Solving...\n";
 	d.solveWithInterface(*gamma,*diff);
     Comm.Barrier();
 	double exact_norm;
@@ -371,8 +372,6 @@ int main(int argc, char *argv[])
 		std::cout << diff_norm / exact_norm << "\n";
 	}
 
-    d.domain_map->Print(std::cout);
-    diff_map->Print(std::cout);
 	MPI_Finalize();
 	return 0;
 }
