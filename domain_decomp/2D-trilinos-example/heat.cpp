@@ -95,11 +95,6 @@ class Domain
 	void solveWithInterface(const vector_type &gamma, vector_type &diff)
 	{
         diff.PutScalar(0);
-		int my_global_rank;
-		MPI_Comm_rank(MPI_COMM_WORLD, &my_global_rank);
-		if (my_global_rank == 0) {
-			std::cerr << "i have been called!\n";
-		}
 		Epetra_Import importer(*domain_map, gamma.Map());
 		vector_type   local_vector(*domain_map, 1);
 		local_vector.Import(gamma, importer, Insert);
@@ -151,8 +146,8 @@ class Domain
 		}
         diff.Export(local_vector,importer,Add);
         diff.Update(-2,gamma,1);
-        diff.Print(std::cout);
-        sleep(1);
+        //diff.Print(std::cout);
+        //sleep(1);
 	}
 };
 
@@ -399,15 +394,14 @@ int main(int argc, char *argv[])
         //do iterative solve
 		RCP<vector_type> b = rcp(new vector_type(*diff_map, 1));
 		d.solveWithInterface(*gamma, *b);
-        b->Print(std::cout);
         sleep(1);
 		RCP<FuncWrap> wrapper = rcp(new FuncWrap(b, &d));
 		Belos::LinearProblem<double, vector_type, FuncWrap> problem(wrapper, gamma, b);
-        std::cout<< problem.setProblem()<<"\n";
+        problem.setProblem();
         Teuchos::ParameterList belosList;
         belosList.set("Block Size",1);
         belosList.set("Maximum Iterations",1000);
-        belosList.set("Convergence Tolerance",10e-7);
+        belosList.set("Convergence Tolerance",10e-10);
 		int verbosity = Belos::Errors + Belos::StatusTestDetails + Belos::Warnings
 		                + Belos::TimingDetails + Belos::Debug;
         belosList.set("Verbosity",verbosity);
@@ -416,7 +410,7 @@ int main(int argc, char *argv[])
 		= rcp(new Belos::BlockCGSolMgr<double, vector_type, FuncWrap>(rcp(&problem, false),
 		                                                              rcp(&belosList, false)));
         solver->solve();
-        
+        gamma->Scale(-1);    
 	}
 
 	//d.domain_map->Print(std::cout);
