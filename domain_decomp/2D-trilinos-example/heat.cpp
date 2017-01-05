@@ -25,6 +25,7 @@
 #include <Teuchos_oblackholestream.hpp>
 #include <cmath>
 #include <iostream>
+#include <iostream>
 #include <mpi.h>
 #include <string>
 #include <unistd.h>
@@ -66,11 +67,6 @@ int main(int argc, char *argv[])
 	args::Positional<int> d_y(parser, "d_y", "number of domains in the y direction");
 	args::Positional<int> n_x(parser, "n_x", "number of cells in the x direction, in each domain");
 	args::Positional<int> n_y(parser, "n_y", "number of cells in the y direction, in each domain");
-	args::ValueFlag<std::string> f_m(parser, "matrix filename", "the file to write the matrix to",
-	                                 {'m'});
-	args::ValueFlag<std::string> f_s(parser, "solution filename",
-	                                 "the file to write the solution to", {'s'});
-	args::Flag f_cg(parser, "cg", "use conjugate gradient for solving gamma values", {"cg"});
 
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;
@@ -284,8 +280,8 @@ int main(int argc, char *argv[])
 	diff_norm.Norm2(&global_diff_norm);
 	exact_norm.Norm2(&global_exact_norm);
 	if (my_global_rank == 0) {
-		cout << scientific;
-		cout.precision(13);
+        std::cout << std::scientific;
+        std::cout.precision(13);
 		std::cout << "Error: " << global_diff_norm / global_exact_norm << "\n";
 	}
 
