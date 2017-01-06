@@ -1,6 +1,6 @@
 ## Compiling and Running
 
-This program uses the [Trilinos Library](http://.tuxfamily.org/).
+This program uses the [Trilinos Library](https://trilinos.org/).
 
 Once you have the Trilinos library install, you just have to set the 
 `TRILINOS_DIR` variable in the bash shell to point to where Trilinos
