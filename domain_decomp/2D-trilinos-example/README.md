@@ -1,8 +1,6 @@
 ## Compiling and Running
 
 This program uses the [Trilinos Library](http://.tuxfamily.org/).
-Eigen is a header-only library, so you only have to tell the compiler
-where the headers are.
 
 Once you have the Trilinos library install, you just have to set the 
 `TRILINOS_DIR` variable in the bash shell to point to where Trilinos
