@@ -14,25 +14,18 @@ Domain::Domain(MyArray grid, double h_x, double h_y)
 	this->h_y  = h_y;
 
 	MyArray jx = RowVectorXd::LinSpaced(nx, 1, nx);
-	std::cout << jx << "\n\n";
 	jx = jx * (M_PI / (2 * nx));
-	std::cout << jx << "\n\n";
 	jx = jx.sin().square();
 	jx = jx * (-4 / (h_x * h_x));
-	std::cout << jx << "\n\n";
 
 	MyArray jy = VectorXd::LinSpaced(ny, 1, ny);
-	std::cout << jy << "\n\n";
 	jy = jy * (M_PI / (2 * ny));
-	std::cout << jy << "\n\n";
 	jy = jy.sin().square();
 	jy = jy * (-4 / (h_y * h_y));
-	std::cout << jy << "\n\n";
 
 	RowVectorXd x = jx;
 	VectorXd    y = jy;
 	denom         = VectorXd::Ones(ny) * x + y * RowVectorXd::Ones(nx);
-	std::cout << denom << "\n\n";
 }
 void Domain::solve()
 {
