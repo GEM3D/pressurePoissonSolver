@@ -1,20 +1,20 @@
-#include<Eigen/Dense>
-#include<Eigen/Sparse>
-#include<Eigen/SparseCholesky>
+#include <Eigen/Dense>
+typedef Eigen::Array<double, -1, -1> MyArray;
 class Domain
 {
 	public:
-	Eigen::RowVectorXd                                  boundary_north;
-	Eigen::RowVectorXd                                  boundary_south;
-	Eigen::VectorXd                                     boundary_east;
-	Eigen::VectorXd                                     boundary_west;
-	Eigen::MatrixXd                                     grid;
-	Eigen::MatrixXd                                     u;
-	double                                              h_x;
-	double                                              h_y;
-	Eigen::SparseMatrix<double>                         A;
-	Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> *solver;
-	Domain(Eigen::SparseMatrix<double> A, Eigen::MatrixXd grid,double h_x,double h_y);
+	MyArray boundary_north;
+	MyArray boundary_south;
+	MyArray boundary_east;
+	MyArray boundary_west;
+	MyArray grid;
+	MyArray denom;
+	MyArray u;
+	double  h_x;
+	double  h_y;
+	int     nx;
+	int     ny;
+	Domain(MyArray grid, double h_x, double h_y);
 	Domain() {}
 	void solve();
 };

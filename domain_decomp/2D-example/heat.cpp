@@ -134,66 +134,25 @@ VectorXd solveWithInterfaceValues(DomainMatrix &dmns, VectorXd &gamma)
 	// get the difference on east-west interfaces
 	for (int j = 0; j < dmns.cols() - 1; j++) {
 		for (int i = 0; i < dmns.rows(); i++) {
-			int start_i            = (j * dmns.rows() + i) * interface_size_ew;
-			int left_dmns_last_col = dmns(i, j).grid.cols() - 1;
+			int     start_i            = (j * dmns.rows() + i) * interface_size_ew;
+			int     left_dmns_last_col = dmns(i, j).grid.cols() - 1;
+			ArrayXd curr_block         = gamma.block(start_i, 0, interface_size_ew, 1);
 			diff.block(start_i, 0, interface_size_ew, 1)
-			= dmns(i, j).u.col(left_dmns_last_col) + dmns(i, j + 1).u.col(0)
-			  - 2 * gamma.block(start_i, 0, interface_size_ew, 1);
+			= dmns(i, j).u.col(left_dmns_last_col) + dmns(i, j + 1).u.col(0) - 2 * curr_block;
 		}
 	}
 	// get the difference on north-south interfaces
 	for (int i = 0; i < dmns.rows() - 1; i++) {
 		for (int j = 0; j < dmns.cols(); j++) {
-			int start_i           = (i * dmns.cols() + j) * interface_size_ns + ns_start_i;
-			int top_dmns_last_row = dmns(i, j).grid.rows() - 1;
+			int     start_i           = (i * dmns.cols() + j) * interface_size_ns + ns_start_i;
+			int     top_dmns_last_row = dmns(i, j).grid.rows() - 1;
+			ArrayXd curr_block        = gamma.block(start_i, 0, interface_size_ns, 1);
 			diff.block(start_i, 0, interface_size_ns, 1)
 			= dmns(i, j).u.row(top_dmns_last_row).transpose() + dmns(i + 1, j).u.row(0).transpose()
-			  - 2 * gamma.block(start_i, 0, interface_size_ns, 1);
+			  - 2 * curr_block;
 		}
 	}
 	return diff;
-}
-
-SparseMatrix<double> generateMatrix(int m_x, int m_y, double h_x, double h_y)
-{
-	// crate an identity matricies
-	SparseMatrix<double> eye_x(m_x, m_x);
-	eye_x.setIdentity();
-	SparseMatrix<double> eye_y(m_y, m_y);
-	eye_y.setIdentity();
-
-	// create diagonal for x values
-	SparseMatrix<double> Diag_x(m_x, m_x);
-	Diag_x.insert(0, 0) = -3 / (h_x * h_x);
-	for (int i = 1; i < m_x - 1; i++) {
-		Diag_x.insert(i, i)     = -2 / (h_x * h_x);
-		Diag_x.insert(i - 1, i) = 1 / (h_x * h_x);
-		Diag_x.insert(i, i - 1) = 1 / (h_x * h_x);
-	}
-	if (m_x > 1) {
-		int i = m_x - 1;
-		Diag_x.insert(i, i)     = -3 / (h_x * h_x);
-		Diag_x.insert(i - 1, i) = 1 / (h_x * h_x);
-		Diag_x.insert(i, i - 1) = 1 / (h_x * h_x);
-	}
-
-	// create diagonal for y values
-	SparseMatrix<double> Diag_y(m_y, m_y);
-	Diag_y.insert(0, 0) = -3 / (h_y * h_y);
-	for (int i = 1; i < m_y - 1; i++) {
-		Diag_y.insert(i, i)     = -2 / (h_y * h_y);
-		Diag_y.insert(i - 1, i) = 1 / (h_y * h_y);
-		Diag_y.insert(i, i - 1) = 1 / (h_y * h_y);
-	}
-	if (m_y > 1) {
-		int i = m_y - 1;
-		Diag_y.insert(i, i)     = -3 / (h_y * h_y);
-		Diag_y.insert(i - 1, i) = 1 / (h_y * h_y);
-		Diag_y.insert(i, i - 1) = 1 / (h_y * h_y);
-	}
-	// form the matrix
-	SparseMatrix<double> A = kroneckerProduct(Diag_x, eye_y) + kroneckerProduct(eye_x, Diag_y);
-	return A;
 }
 
 // the functions that we are using
@@ -287,11 +246,10 @@ int main(int argc, char *argv[])
 	DomainMatrix dmns(num_domains_y, num_domains_x);
 	for (int i = 0; i < num_domains_y; i++) {
 		for (int j = 0; j < num_domains_x; j++) {
-			SparseMatrix<double> A       = generateMatrix(domain_width_x, domain_width_y, h_x, h_y);
-			int                  start_i = i * domain_width_y;
-			int                  start_j = j * domain_width_x;
+			int      start_i  = i * domain_width_y;
+			int      start_j  = j * domain_width_x;
 			MatrixXd sub_grid = G.block(start_i, start_j, domain_width_y, domain_width_x);
-			dmns(i, j) = Domain(A, sub_grid, h_x, h_y);
+			dmns(i, j) = Domain(sub_grid, h_x, h_y);
 		}
 	}
 
