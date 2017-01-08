@@ -1,5 +1,4 @@
 #include "FunctionWrapper.h"
-#include "GenerateLaplacian.h"
 #include "MyTypeDefs.h"
 #include "args.h"
 #include <Amesos2.hpp>
@@ -107,7 +106,6 @@ int main(int argc, char *argv[])
 
 	// create a map and matrix
 	RCP<map_type>    Map = rcp(new map_type(nx * ny, 0, subdomain_comm));
-	RCP<matrix_type> A   = rcp(generate2DLaplacian(Map, nx, ny, h_x, h_y));
 
 	// Generate RHS vector
 	RCP<vector_type> f     = rcp(new vector_type(*Map, 1, false));
@@ -143,7 +141,7 @@ int main(int argc, char *argv[])
 	}
 
 	// create a domain
-	Domain d(A, f, nx, ny, h_x, h_y);
+	Domain d(f, nx, ny, h_x, h_y);
 
 	// Detertime on which sides this domain has a neighboring domain
 	// and calculate how many interface points this domain is going to have

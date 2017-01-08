@@ -3,13 +3,16 @@
 #include "MyTypeDefs.h"
 #include <Epetra_Import.h>
 #include <Teuchos_RCP.hpp>
+#include <valarray>
+#include <cmath>
+#include <fftw3.h>
 class Domain
 {
 	public:
-	Teuchos::RCP<matrix_type> A;
 	Teuchos::RCP<vector_type> f;
 	Teuchos::RCP<vector_type> u;
-	Teuchos::RCP<solver_type> solver;
+    std::valarray<double>          tmp;
+    std::valarray<double>          denom;
 	int                       nx;
 	int                       ny;
 	double                    h_x;
@@ -24,25 +27,32 @@ class Domain
 	bool                      has_west       = false;
 	Teuchos::RCP<map_type>    domain_map;
 
-	Domain(Teuchos::RCP<matrix_type> A, Teuchos::RCP<vector_type> f, int nx, int ny, double h_x,
+	Domain(Teuchos::RCP<vector_type> f, int nx, int ny, double h_x,
 	       double h_y)
 	{
-		solver = Amesos2::create<matrix_type, vector_type>("KLU2", A);
-		solver->symbolicFactorization().numericFactorization();
-		this->A   = A;
 		this->f   = f;
 		this->nx  = nx;
 		this->ny  = ny;
 		this->h_x = h_x;
 		this->h_y = h_y;
-		u         = Teuchos::rcp(new vector_type(f->Map(), 1, false));
+
+		u     = Teuchos::rcp(new vector_type(f->Map(), 1, false));
+		tmp   = std::valarray<double>(nx * ny);
+		denom = std::valarray<double>(nx * ny);
+		for (int yi = 1; yi <= ny; yi++) {
+			for (int xi = 1; xi <= nx; xi++) {
+				denom[ny * (yi - 1) + xi - 1]
+				= -4 / (h_x * h_x) * std::pow(std::sin(xi * M_PI / (2 * nx)), 2)
+				  - 4 / (h_y * h_y) * std::pow(std::sin(yi * M_PI / (2 * ny)), 2);
+			}
+		}
 	}
 
 	void solve()
 	{
 		Teuchos::RCP<vector_type> f_copy = Teuchos::rcp(new vector_type(f->Map(), 1, false));
-		for (int x_i = 0; x_i < nx; x_i++) {
-			for (int y_i = 0; y_i < ny; y_i++) {
+		for (int y_i = 0; y_i < ny; y_i++) {
+			for (int x_i = 0; x_i < nx; x_i++) {
 				(*f_copy)[0][y_i * nx + x_i] = (*f)[0][y_i * nx + x_i];
 				if (y_i == ny - 1 && has_north) {
 					(*f_copy)[0][y_i * nx + x_i] += -2.0 / (h_y * h_y) * boundary_north[x_i];
@@ -58,9 +68,18 @@ class Domain
 				}
 			}
 		}
-		solver->setX(u);
-		solver->setB(f_copy);
-		solver->solve();
+		fftw_plan plan1 = fftw_plan_r2r_2d(ny, nx, &(*f_copy)[0][0], &tmp[0], FFTW_RODFT10,
+		                                   FFTW_RODFT10, FFTW_MEASURE);
+
+		fftw_plan plan2
+		= fftw_plan_r2r_2d(ny, nx, &tmp[0], &(*u)[0][0], FFTW_RODFT01, FFTW_RODFT01, FFTW_MEASURE);
+
+		fftw_execute(plan1);
+		tmp /= denom;
+		fftw_execute(plan2);
+		u->Scale(1.0/(4 * nx * ny));
+		fftw_destroy_plan(plan1);
+		fftw_destroy_plan(plan2);
 	}
 
 	void solveWithInterface(const vector_type &gamma, vector_type &diff)
