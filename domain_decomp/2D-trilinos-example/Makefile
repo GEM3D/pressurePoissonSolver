@@ -23,7 +23,7 @@ INCLUDE_DIRS=$(Trilinos_INCLUDE_DIRS) $(Trilinos_TPL_INCLUDE_DIRS)
 LIBRARY_DIRS=$(Trilinos_LIBRARY_DIRS) $(Trilinos_TPL_LIBRARY_DIRS)
 LIBRARIES=$(Trilinos_LIBRARIES) $(Trilinos_TPL_LIBRARIES)
 
-LINK_FLAGS=$(Trilinos_EXTRA_LD_FLAGS)
+LINK_FLAGS=$(Trilinos_EXTRA_LD_FLAGS) -lfftw3
 
 #just assuming that epetra is turned on.
 DEFINES=-DMYAPP_EPETRA
@@ -51,7 +51,7 @@ test: MyApp.exe input.xml
 	./MyApp.exe
 
 # build the 
-heat: heat.cpp
+heat: heat.cpp Domain.h FunctionWrapper.h
 	$(CXX) $(CXX_FLAGS) heat.cpp -o heat $(LINK_FLAGS) $(INCLUDE_DIRS) $(DEFINES) $(LIBRARY_DIRS) $(LIBRARIES)
 
 : src_file.o

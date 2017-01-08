@@ -105,37 +105,32 @@ int main(int argc, char *argv[])
 	}
 
 	// create a map and matrix
-	RCP<map_type>    Map = rcp(new map_type(nx * ny, 0, subdomain_comm));
+	RCP<map_type> Map = rcp(new map_type(nx * ny, 0, subdomain_comm));
 
 	// Generate RHS vector
 	RCP<vector_type> f     = rcp(new vector_type(*Map, 1, false));
 	RCP<vector_type> exact = rcp(new vector_type(*Map, 1, false));
-	{
-		// Use local indices to access the entries of f_data.
-		const int localLength      = f->MyLength();
-		int       NumMyElements    = Map->NumMyElements();
-		int *     MyGlobalElements = 0;
-		Map->MyGlobalElementsPtr(MyGlobalElements);
-		// generate rhs
-		for (int i = 0; i < NumMyElements; i++) {
-			int    global_i = MyGlobalElements[i];
-			int    index_x  = domain_x * nx + global_i % nx;
-			int    index_y  = domain_y * ny + global_i / nx;
-			double x        = h_x / 2.0 + 1.0 * index_x / (nx * num_domains_x);
-			double y        = h_y / 2.0 + 1.0 * index_y / (ny * num_domains_y);
-			(*f)[0][i]      = ffun(x, y);
-			(*exact)[0][i]  = gfun(x, y);
+
+	// Use local indices to access the entries of f_data.
+	for (int yi = 0; yi < ny; yi++) {
+		for (int xi = 0; xi < nx; xi++) {
+			int    index_x            = domain_x * nx + xi;
+			int    index_y            = domain_y * ny + yi;
+			double x                  = h_x / 2.0 + 1.0 * index_x / (nx * num_domains_x);
+			double y                  = h_y / 2.0 + 1.0 * index_y / (ny * num_domains_y);
+			(*f)[0][yi * nx + xi]     = ffun(x, y);
+			(*exact)[0][yi * nx + xi] = gfun(x, y);
 			if (index_x == 0) {
-				(*f)[0][i] += -2.0 / (h_x * h_x) * gfun(0.0, y);
+				(*f)[0][yi * nx + xi] += -2.0 / (h_x * h_x) * gfun(0.0, y);
 			}
 			if (index_x == num_domains_x * nx - 1) {
-				(*f)[0][i] += -2.0 / (h_x * h_x) * gfun(1.0, y);
+				(*f)[0][yi * nx + xi] += -2.0 / (h_x * h_x) * gfun(1.0, y);
 			}
 			if (index_y == 0) {
-				(*f)[0][i] += -2.0 / (h_y * h_y) * gfun(x, 0.0);
+				(*f)[0][yi * nx + xi] += -2.0 / (h_y * h_y) * gfun(x, 0.0);
 			}
 			if (index_y == num_domains_y * ny - 1) {
-				(*f)[0][i] += -2.0 / (h_y * h_y) * gfun(x, 1.0);
+				(*f)[0][yi * nx + xi] += -2.0 / (h_y * h_y) * gfun(x, 1.0);
 			}
 		}
 	}

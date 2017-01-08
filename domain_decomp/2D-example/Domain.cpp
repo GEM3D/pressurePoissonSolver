@@ -42,10 +42,10 @@ void Domain::solve()
 	MyArray tmp = MyArray(ny, nx);
 
 	fftw_plan plan1
-	= fftw_plan_r2r_2d(ny, nx, &grid_copy(0), &tmp(0), FFTW_RODFT10, FFTW_RODFT10, FFTW_MEASURE);
+	= fftw_plan_r2r_2d(nx, ny, &grid_copy(0), &tmp(0), FFTW_RODFT10, FFTW_RODFT10, FFTW_MEASURE);
 
 	fftw_plan plan2
-	= fftw_plan_r2r_2d(ny, nx, &tmp(0), &u(0), FFTW_RODFT01, FFTW_RODFT01, FFTW_MEASURE);
+	= fftw_plan_r2r_2d(nx, ny, &tmp(0), &u(0), FFTW_RODFT01, FFTW_RODFT01, FFTW_MEASURE);
 
 	fftw_execute(plan1);
 	tmp /= denom;
