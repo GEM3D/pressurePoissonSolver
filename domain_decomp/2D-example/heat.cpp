@@ -33,8 +33,9 @@ class FunctionWrapper : public Eigen::EigenBase<FunctionWrapper>
 	Index                       my_rows;
 
 	public:
-	DomainMatrix *dmns;
-	VectorXd      b;
+	DomainMatrix *     dmns;
+	vector<Interface> *interfaces;
+	VectorXd           b;
 	// Required typedefs, constants, and method:
 	typedef double Scalar;
 	typedef double RealScalar;
@@ -53,17 +54,19 @@ class FunctionWrapper : public Eigen::EigenBase<FunctionWrapper>
 		return Eigen::Product<FunctionWrapper, Rhs, Eigen::AliasFreeProduct>(*this, x.derived());
 	}
 	// Custom API:
-	FunctionWrapper(DomainMatrix *dmns, int size, VectorXd b)
+	FunctionWrapper(DomainMatrix *dmns, vector<Interface> *interfaces, int size, VectorXd b)
 	{
-		this->dmns = dmns;
-		this->b    = b;
-		my_rows    = size;
+		this->dmns       = dmns;
+		this->interfaces = interfaces;
+		this->b          = b;
+		my_rows          = size;
 	}
 
 	void attachMyMatrix(const SparseMatrix<double> &mat) { mp_mat = &mat; }
 	const SparseMatrix<double>                      my_matrix() const { return *mp_mat; }
 };
-VectorXd solveWithInterfaceValues(DomainMatrix &dmns, VectorXd &gamma);
+VectorXd solveWithInterfaceValues(DomainMatrix &dmns, vector<Interface> &interfaces,
+                                  VectorXd &gamma);
 // Implementation of FunctionWrapper * Eigen::DenseVector though a specialization of
 // internal::generic_product_impl:
 namespace Eigen
@@ -85,7 +88,7 @@ struct generic_product_impl<FunctionWrapper, Rhs, SparseShape, DenseShape,
 		// Here we could simply call dst.noalias() += lhs.my_matrix() * rhs,
 		// but let's do something fancier (and less efficient):
 		VectorXd rhscopy = rhs;
-		VectorXd result  = lhs.b - solveWithInterfaceValues(*lhs.dmns, rhscopy);
+		VectorXd result  = lhs.b - solveWithInterfaceValues(*lhs.dmns, *lhs.interfaces, rhscopy);
 		dst += alpha * result;
 	}
 };
@@ -100,26 +103,14 @@ struct generic_product_impl<FunctionWrapper, Rhs, SparseShape, DenseShape,
  *
  * @return the difference between the interface values and gamma values.
  */
-VectorXd solveWithInterfaceValues(DomainMatrix &dmns, VectorXd &gamma)
+VectorXd solveWithInterfaceValues(DomainMatrix &dmns, vector<Interface> &interfaces,
+                                  VectorXd &gamma)
 {
-	// set the interface values on east and west
-	int interface_size_ew = dmns(0, 0).grid.rows();
-	for (int j = 0; j < dmns.cols() - 1; j++) {
-		for (int i = 0; i < dmns.rows(); i++) {
-			int start_i = (j * dmns.rows() + i) * interface_size_ew;
-			dmns(i, j).boundary_east     = gamma.block(start_i, 0, interface_size_ew, 1);
-			dmns(i, j + 1).boundary_west = gamma.block(start_i, 0, interface_size_ew, 1);
-		}
-	}
-	// set the interface values on north and south
-	int interface_size_ns = dmns(0, 0).grid.cols();
-	int ns_start_i        = dmns.rows() * (dmns.cols() - 1) * interface_size_ew;
-	for (int i = 0; i < dmns.rows() - 1; i++) {
-		for (int j = 0; j < dmns.cols(); j++) {
-			int start_i = (i * dmns.cols() + j) * interface_size_ns + ns_start_i;
-			dmns(i, j).boundary_south = gamma.block(start_i, 0, interface_size_ns, 1).transpose();
-			dmns(i + 1, j).boundary_north
-			= gamma.block(start_i, 0, interface_size_ns, 1).transpose();
+	for (Interface &i : interfaces) {
+		if (i.dir == Interface::axis::y) {
+			i.gamma = gamma.block(i.start_index, 0, i.size, 1);
+		} else {
+			i.gamma = gamma.block(i.start_index, 0, i.size, 1).transpose();
 		}
 	}
 
@@ -131,30 +122,55 @@ VectorXd solveWithInterfaceValues(DomainMatrix &dmns, VectorXd &gamma)
 	}
 
 	VectorXd diff(gamma.size());
-	// get the difference on east-west interfaces
-	for (int j = 0; j < dmns.cols() - 1; j++) {
-		for (int i = 0; i < dmns.rows(); i++) {
-			int     start_i            = (j * dmns.rows() + i) * interface_size_ew;
-			int     left_dmns_last_col = dmns(i, j).grid.cols() - 1;
-			ArrayXd curr_block         = gamma.block(start_i, 0, interface_size_ew, 1);
-			diff.block(start_i, 0, interface_size_ew, 1)
-			= dmns(i, j).u.col(left_dmns_last_col) + dmns(i, j + 1).u.col(0) - 2 * curr_block;
-		}
-	}
-	// get the difference on north-south interfaces
-	for (int i = 0; i < dmns.rows() - 1; i++) {
-		for (int j = 0; j < dmns.cols(); j++) {
-			int     start_i           = (i * dmns.cols() + j) * interface_size_ns + ns_start_i;
-			int     top_dmns_last_row = dmns(i, j).grid.rows() - 1;
-			ArrayXd curr_block        = gamma.block(start_i, 0, interface_size_ns, 1);
-			diff.block(start_i, 0, interface_size_ns, 1)
-			= dmns(i, j).u.row(top_dmns_last_row).transpose() + dmns(i + 1, j).u.row(0).transpose()
-			  - 2 * curr_block;
-		}
+	for (Interface &i : interfaces) {
+		diff.block(i.start_index, 0, i.size, 1) = i.getDiff();
 	}
 	return diff;
 }
 
+vector<Interface> createAndLinkInterfaces(DomainMatrix &dmns)
+{
+	int               num_interfaces_ns = dmns.cols() * (dmns.rows() - 1);
+	int               num_interfaces_ew = (dmns.cols() - 1) * dmns.rows();
+	int               num_interfaces    = num_interfaces_ns + num_interfaces_ew;
+	int               ns_interface_size = dmns(0, 0).u.cols();
+	int               ew_interface_size = dmns(0, 0).u.rows();
+	vector<Interface> interfaces(num_interfaces);
+	// fill the array of interfaces
+	int curr_i = 0;
+	for (int j = 0; j < dmns.cols() - 1; j++) {
+		for (int i = 0; i < dmns.rows(); i++) {
+			int start_i = (j * dmns.rows() + i) * ew_interface_size;
+			interfaces[curr_i]        = Interface(start_i, ew_interface_size, Interface::axis::y);
+			Interface &curr_interface = interfaces[curr_i];
+			// link to domain on left
+			curr_interface.left = &dmns(i, j);
+			dmns(i, j).east = &curr_interface;
+			// link to domain on right
+			curr_interface.right = &dmns(i, j + 1);
+			dmns(i, j+1).west = &curr_interface;
+			curr_i++;
+		}
+	}
+
+	int ns_start_i = dmns.rows() * (dmns.cols() - 1) * ew_interface_size;
+	for (int i = 0; i < dmns.rows() - 1; i++) {
+		for (int j = 0; j < dmns.cols(); j++) {
+			int start_i = (i * dmns.cols() + j) * ns_interface_size + ns_start_i;
+			interfaces[curr_i]        = Interface(start_i, ns_interface_size, Interface::axis::x);
+			Interface &curr_interface = interfaces[curr_i];
+			// link to domain on left
+			curr_interface.left = &dmns(i, j);
+			dmns(i, j).north = &curr_interface;
+			// link to domain on right
+			curr_interface.right = &dmns(i + 1, j);
+			dmns(i+1, j).south = &curr_interface;
+			curr_i++;
+		}
+	}
+	return interfaces;
+}
+void graphAssistedMatrixFormation(DomainMatrix &dmns, MatrixXd &A, VectorXd &b) {}
 // the functions that we are using
 double ffun(double x, double y) { return -5 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y); }
 double gfun(double x, double y) { return sin(M_PI * x) * cos(2 * M_PI * y); }
@@ -172,6 +188,7 @@ int main(int argc, char *argv[])
 	args::ValueFlag<string> f_s(parser, "solution filename", "the file to write the solution to",
 	                            {'s'});
 	args::Flag f_cg(parser, "cg", "use conjugate gradient for solving gamma values", {"cg"});
+	args::Flag f_gp(parser, "graph", "use a graph when forming the matrix", {"graph"});
 
 	if (argc < 5) {
 		std::cout << parser;
@@ -231,16 +248,26 @@ int main(int argc, char *argv[])
 	VectorXd boundary_east(m_y);
 	VectorXd boundary_west(m_y);
 	for (int i = 0; i < m_y; i++) {
-		boundary_east(i) = gfun(x_start, y(i));
-		boundary_west(i) = gfun(x_end, y(i));
+		boundary_east(i) = gfun(x_end, y(i));
+		boundary_west(i) = gfun(x_start, y(i));
 	}
 
 	RowVectorXd boundary_north(m_x);
 	RowVectorXd boundary_south(m_x);
 	for (int j = 0; j < m_x; j++) {
-		boundary_north(j) = gfun(x(j), x_start);
-		boundary_south(j) = gfun(x(j), x_end);
+		boundary_north(j) = gfun(x(j), x_end);
+		boundary_south(j) = gfun(x(j), x_start);
 	}
+
+	// set outer boundaries
+	// north
+	G.row(G.rows() - 1) -= 2 / ((h_y) * (h_y)) * boundary_north;
+	// east
+	G.col(G.cols() - 1) -= 2 / ((h_x) * (h_x)) * boundary_east;
+	// south
+	G.row(0) -= 2 / ((h_y) * (h_y)) * boundary_south;
+	// west
+	G.col(0) -= 2 / ((h_x) * (h_x)) * boundary_west;
 
 	// Generate Domains
 	DomainMatrix dmns(num_domains_y, num_domains_x);
@@ -253,35 +280,21 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	// set the outer boundary vectors on north and south
-	for (int i = 0; i < num_domains_x; i++) {
-		int start_j = i * m_x / num_domains_x;
-		int length  = m_x / num_domains_x;
-		dmns(0, i).boundary_north                 = boundary_north.block(0, start_j, 1, length);
-		dmns(num_domains_y - 1, i).boundary_south = boundary_south.block(0, start_j, 1, length);
-	}
-
-	// set the outer boundary vectors on east and west
-	for (int i = 0; i < num_domains_y; i++) {
-		int start_i = i * m_y / num_domains_y;
-		int length  = m_y / num_domains_y;
-		dmns(i, 0).boundary_west                 = boundary_west.block(start_i, 0, length, 1);
-		dmns(i, num_domains_x - 1).boundary_east = boundary_east.block(start_i, 0, length, 1);
-	}
-
+	// Generate Interfaces
+	vector<Interface> interfaces = createAndLinkInterfaces(dmns);
 	// create gamma array
 	VectorXd gamma = VectorXd::Zero(m_y * (num_domains_x - 1) + m_x * (num_domains_y - 1));
 	double   condition_number = 0.0;
 	if (num_domains_x > 1 || num_domains_y > 1) {
 		// get the b vector
-		VectorXd b = solveWithInterfaceValues(dmns, gamma);
+		VectorXd b = solveWithInterfaceValues(dmns, interfaces, gamma);
 
 		if (f_cg) {
-			FunctionWrapper F(&dmns, gamma.size(), b);
+			FunctionWrapper F(&dmns, &interfaces, gamma.size(), b);
 			Eigen::ConjugateGradient<FunctionWrapper, Eigen::Lower | Eigen::Upper,
 			                         Eigen::IdentityPreconditioner>
 			cg(F);
-			cg.setTolerance(10e-10);
+			cg.setTolerance(1e-10);
 			// cg.compute(F);
 			gamma = cg.solve(b);
 			std::cout << "CG: Number of iterations: " << cg.iterations() << "\n";
@@ -291,9 +304,12 @@ int main(int argc, char *argv[])
 			// get the columns of the matrix
 			for (int i = 0; i < gamma.size(); i++) {
 				gamma(i) = 1;
-				A.col(i) = b - solveWithInterfaceValues(dmns, gamma);
+				A.col(i) = b - solveWithInterfaceValues(dmns, interfaces, gamma);
 				gamma(i) = 0;
 			}
+
+			cout << "Number of solves to form " << gamma.size() << "x" << gamma.size()
+			     << " Matrix: " << gamma.size() << "\n";
 
 			// solve for gamme values
 			FullPivLU<MatrixXd> lu(A);
@@ -312,7 +328,7 @@ int main(int argc, char *argv[])
 	}
 
 	// do one last solve
-	solveWithInterfaceValues(dmns, gamma);
+	solveWithInterfaceValues(dmns, interfaces, gamma);
 
 	// form the complete grid
 	MatrixXd SOL(m_y, m_x);
