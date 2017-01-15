@@ -11,6 +11,7 @@ class Interface
 	enum class axis { x, y };
 	int             start_index;
 	int             size;
+    int my_id;
 	axis            dir;
 	Domain *        left  = nullptr;
 	Domain *        right = nullptr;
@@ -18,11 +19,12 @@ class Interface
 	Eigen::VectorXd right_zero;
 	MyArray         gamma;
 	Interface() {}
-	Interface(int start_index, int size, axis dir)
+	Interface(int id,int start_index, int size, axis dir)
 	{
 		this->start_index = start_index;
 		this->size        = size;
 		this->dir         = dir;
+        my_id = id;
 		if (dir == axis::x) {
 			gamma = Eigen::RowVectorXd(size);
 		} else {

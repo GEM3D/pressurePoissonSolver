@@ -1,10 +1,17 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <algorithm>
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/dijkstra_shortest_paths.hpp>
+#include <boost/graph/graph_traits.hpp>
+#include <boost/graph/sequential_vertex_coloring.hpp>
 #include <cmath>
 #include <fstream>
 #include <iostream>
 #include <unsupported/Eigen/IterativeSolvers>
 #include <unsupported/Eigen/KroneckerProduct>
+#include <utility>
+
 using namespace Eigen;
 using namespace std;
 #include "Domain.h"
@@ -141,7 +148,7 @@ vector<Interface> createAndLinkInterfaces(DomainMatrix &dmns)
 	for (int j = 0; j < dmns.cols() - 1; j++) {
 		for (int i = 0; i < dmns.rows(); i++) {
 			int start_i = (j * dmns.rows() + i) * ew_interface_size;
-			interfaces[curr_i]        = Interface(start_i, ew_interface_size, Interface::axis::y);
+			interfaces[curr_i]        = Interface(curr_i,start_i, ew_interface_size, Interface::axis::y);
 			Interface &curr_interface = interfaces[curr_i];
 			// link to domain on left
 			curr_interface.left = &dmns(i, j);
@@ -157,7 +164,7 @@ vector<Interface> createAndLinkInterfaces(DomainMatrix &dmns)
 	for (int i = 0; i < dmns.rows() - 1; i++) {
 		for (int j = 0; j < dmns.cols(); j++) {
 			int start_i = (i * dmns.cols() + j) * ns_interface_size + ns_start_i;
-			interfaces[curr_i]        = Interface(start_i, ns_interface_size, Interface::axis::x);
+			interfaces[curr_i]        = Interface(curr_i,start_i, ns_interface_size, Interface::axis::x);
 			Interface &curr_interface = interfaces[curr_i];
 			// link to domain on left
 			curr_interface.left = &dmns(i, j);
@@ -170,7 +177,74 @@ vector<Interface> createAndLinkInterfaces(DomainMatrix &dmns)
 	}
 	return interfaces;
 }
-void graphAssistedMatrixFormation(DomainMatrix &dmns, MatrixXd &A, VectorXd &b) {}
+
+void graphAssistedMatrixFormation(DomainMatrix &dmns, vector<Interface> &interfaces, MatrixXd &A,
+                                  VectorXd &b)
+{
+	using namespace boost;
+	typedef adjacency_list<vecS, vecS, bidirectionalS> Graph;
+	//typedef std::pair<int, int> Edge;
+	//typedef graph_traits<Graph>::vertex_descriptor  vertex_descriptor;
+	typedef graph_traits<Graph>::vertices_size_type vertices_size_type;
+	typedef property_map<Graph, vertex_index_t>::const_type vertex_index_map;
+
+	const int num_vertices = interfaces.size();
+	Graph     graph(num_vertices);
+	for (Interface &i : interfaces) {
+		const int u = i.my_id;
+		// add verticies in left domain
+		{
+			Domain &left = *i.left;
+			if (left.north != nullptr && left.north != &i) {
+				int v = left.north->my_id;
+				add_edge(u, v, graph);
+			}
+			if (left.east != nullptr && left.east != &i) {
+				int v = left.east->my_id;
+				add_edge(u, v, graph);
+			}
+			if (left.south != nullptr && left.south != &i) {
+				int v = left.south->my_id;
+				add_edge(u, v, graph);
+			}
+			if (left.west != nullptr && left.west != &i) {
+				int v = left.west->my_id;
+				add_edge(u, v, graph);
+			}
+		}
+		// add verticies in right domain
+		{
+			Domain &right = *i.right;
+			if (right.north != nullptr && right.north != &i) {
+				int v = right.north->my_id;
+				add_edge(u, v, graph);
+			}
+			if (right.east != nullptr && right.east != &i) {
+				int v = right.east->my_id;
+				add_edge(u, v, graph);
+			}
+			if (right.south != nullptr && right.south != &i) {
+				int v = right.south->my_id;
+				add_edge(u, v, graph);
+			}
+			if (right.west != nullptr && right.west != &i) {
+				int v = right.west->my_id;
+				add_edge(u, v, graph);
+			}
+		}
+	}
+    std::vector<vertices_size_type> color_vec(num_vertices);
+      iterator_property_map<vertices_size_type*, vertex_index_map>
+              color(&color_vec.front(), get(vertex_index, graph));
+        vertices_size_type num_colors = sequential_vertex_coloring(graph, color);
+    cout << "Number of colors: " << num_colors << "\n";
+    cout << "Colors: \n";
+   for (auto c:color_vec){
+      cout  << c << " ";
+   }
+   cout<< "\n";
+}
+
 // the functions that we are using
 double ffun(double x, double y) { return -5 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y); }
 double gfun(double x, double y) { return sin(M_PI * x) * cos(2 * M_PI * y); }
@@ -286,10 +360,10 @@ int main(int argc, char *argv[])
 	VectorXd gamma = VectorXd::Zero(m_y * (num_domains_x - 1) + m_x * (num_domains_y - 1));
 	double   condition_number = 0.0;
 	if (num_domains_x > 1 || num_domains_y > 1) {
-		// get the b vector
-		VectorXd b = solveWithInterfaceValues(dmns, interfaces, gamma);
 
 		if (f_cg) {
+		// get the b vector
+		VectorXd b = solveWithInterfaceValues(dmns, interfaces, gamma);
 			FunctionWrapper F(&dmns, &interfaces, gamma.size(), b);
 			Eigen::ConjugateGradient<FunctionWrapper, Eigen::Lower | Eigen::Upper,
 			                         Eigen::IdentityPreconditioner>
@@ -299,6 +373,11 @@ int main(int argc, char *argv[])
 			gamma = cg.solve(b);
 			std::cout << "CG: Number of iterations: " << cg.iterations() << "\n";
 		} else {
+            MatrixXd X;
+            VectorXd v;
+            graphAssistedMatrixFormation(dmns,interfaces,X,v);
+		// get the b vector
+		VectorXd b = solveWithInterfaceValues(dmns, interfaces, gamma);
 			// create a matrix
 			MatrixXd A(gamma.size(), gamma.size());
 			// get the columns of the matrix
