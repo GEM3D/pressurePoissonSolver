@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8)
 
 # Project's Name and Lanuages
 project(2D_Example CXX C)
-set (CMAKE_CXX_FLAGS "--std=c++11 -O2 ${CMAKE_CXX_FLAGS}")
+set (CMAKE_CXX_FLAGS "--std=c++11 -Wall --pedantic -O2 ${CMAKE_CXX_FLAGS}")
 
 # Set the output folder where your program will be created
 set(CMAKE_BINARY_DIR ${CMAKE_SOURCE_DIR})
