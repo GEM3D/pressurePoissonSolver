@@ -15,8 +15,8 @@ class Interface
 	axis            dir;
 	Domain *        left  = nullptr;
 	Domain *        right = nullptr;
-	Eigen::VectorXd left_zero;
-	Eigen::VectorXd right_zero;
+	MyArray left_zero;
+	MyArray right_zero;
 	MyArray         gamma;
 	Interface() {}
 	Interface(int id,int start_index, int size, axis dir)
@@ -27,11 +27,18 @@ class Interface
         my_id = id;
 		if (dir == axis::x) {
 			gamma = Eigen::RowVectorXd(size);
+		left_zero  = Eigen::RowVectorXd(size);
+		right_zero = Eigen::RowVectorXd(size);
 		} else {
 			gamma = Eigen::VectorXd(size);
+		left_zero  = Eigen::VectorXd(size);
+		right_zero = Eigen::VectorXd(size);
 		}
 	}
 	MyArray getDiff();
+	MyArray getZeroDiffFromLeft();
+	MyArray getZeroDiffFromRight();
+	void setZero();
 };
 class Domain
 {

@@ -73,3 +73,32 @@ MyArray Interface::getDiff()
 		return left->u.col(left->u.cols() - 1) + right->u.col(0) - 2 * gamma;
 	}
 }
+
+MyArray Interface::getZeroDiffFromLeft()
+{
+	if (dir == axis::x) {
+		return (left->u.row(left->u.rows() - 1) + right_zero - 2 * gamma).transpose();
+	} else {
+		return left->u.col(left->u.cols() - 1) + right_zero - 2 * gamma;
+	}
+}
+
+MyArray Interface::getZeroDiffFromRight()
+{
+	if (dir == axis::x) {
+		return (left_zero + right->u.row(0) - 2 * gamma).transpose();
+	} else {
+		return left_zero + right->u.col(0) - 2 * gamma;
+	}
+}
+
+void Interface::setZero()
+{
+	if (dir == axis::x) {
+		left_zero  = left->u.row(left->u.rows() - 1);
+		right_zero = right->u.row(0);
+	} else {
+		left_zero  = left->u.col(left->u.cols() - 1);
+		right_zero = right->u.col(0);
+	}
+}

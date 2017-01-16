@@ -1,5 +1,6 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <unsupported/Eigen/SparseExtra>
 #include <algorithm>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/dijkstra_shortest_paths.hpp>
@@ -178,13 +179,13 @@ vector<Interface> createAndLinkInterfaces(DomainMatrix &dmns)
 	return interfaces;
 }
 
-void graphAssistedMatrixFormation(DomainMatrix &dmns, vector<Interface> &interfaces, MatrixXd &A,
+void graphAssistedMatrixFormation(DomainMatrix &dmns, vector<Interface> &interfaces, SparseMatrix<double> &A,
                                   VectorXd &b)
 {
 	using namespace boost;
 	typedef adjacency_list<vecS, vecS, bidirectionalS> Graph;
-	//typedef std::pair<int, int> Edge;
-	//typedef graph_traits<Graph>::vertex_descriptor  vertex_descriptor;
+	// typedef std::pair<int, int> Edge;
+	// typedef graph_traits<Graph>::vertex_descriptor  vertex_descriptor;
 	typedef graph_traits<Graph>::vertices_size_type vertices_size_type;
 	typedef property_map<Graph, vertex_index_t>::const_type vertex_index_map;
 
@@ -233,16 +234,181 @@ void graphAssistedMatrixFormation(DomainMatrix &dmns, vector<Interface> &interfa
 			}
 		}
 	}
-    std::vector<vertices_size_type> color_vec(num_vertices);
-      iterator_property_map<vertices_size_type*, vertex_index_map>
-              color(&color_vec.front(), get(vertex_index, graph));
-        vertices_size_type num_colors = sequential_vertex_coloring(graph, color);
-    cout << "Number of colors: " << num_colors << "\n";
-    cout << "Colors: \n";
-   for (auto c:color_vec){
-      cout  << c << " ";
-   }
-   cout<< "\n";
+	std::vector<size_t> color_vec(num_vertices);
+	iterator_property_map<size_t *, vertex_index_map> color(&color_vec.front(),
+	                                                                    get(vertex_index, graph));
+	vertices_size_type num_colors = sequential_vertex_coloring(graph, color);
+	cout << "Number of colors: " << num_colors << "\n";
+	//cout << "Colors: \n";
+	//for (size_t c : color_vec) {
+	//	cout << c << " ";
+	//}
+	//cout << "\n";
+	// get b vector
+	VectorXd gamma = VectorXd::Zero(b.size());
+	b              = solveWithInterfaceValues(dmns, interfaces, gamma);
+	// save the edge results for zero, and get max interface size
+	int max_size = 0;
+	for (Interface &i : interfaces) {
+		i.setZero();
+		if (i.size > max_size) {
+			max_size = i.size;
+		}
+	}
+
+	typedef Eigen::Triplet<double> Trip;
+	std::deque<Trip>               tripletList;
+	// start forming matrix
+	int num_solves = 0;
+	for (size_t c = 0; c < num_colors; c++) {
+		// get list of vertices with color c
+		list<Interface *> vertices;
+		for (size_t i = 0; i < color_vec.size(); i++) {
+			if (color_vec[i] == c) {
+				vertices.push_back(&interfaces[i]);
+			}
+		}
+		// set each value to one and solve
+		for (int index = 0; index < max_size; index++) {
+			num_solves++;
+			// set value to one
+			for (Interface *i : vertices) {
+				if (index < max_size) {
+					i->gamma(index) = 1;
+				}
+			}
+
+			// solve
+			for (int i = 0; i < dmns.rows(); i++) {
+				for (int j = 0; j < dmns.cols(); j++) {
+					dmns(i, j).solve();
+				}
+			}
+			for (Interface *i : vertices) {
+				if (index < max_size) {
+					// set diagonal
+					{
+						int      vertex_i = i->start_index;
+						int      j        = vertex_i + index;
+						VectorXd diff
+						= b.block(i->start_index, 0, i->size, 1) - (VectorXd) i->getDiff();
+						for (int curr_i = 0; curr_i < i->size; curr_i++) {
+							int ind = curr_i + vertex_i;
+							tripletList.push_back(Trip(ind, j, diff(curr_i)));
+						}
+					}
+					// add off diagonals from left domain
+					{
+						Domain &left = *i->left;
+						if (left.north != nullptr && left.north != i) {
+							Interface &nbr_i = *left.north;
+							VectorXd   diff  = b.block(nbr_i.start_index, 0, nbr_i.size, 1)
+							                - (VectorXd) nbr_i.getZeroDiffFromLeft();
+							int vertex_i = nbr_i.start_index;
+							int j        = i->start_index + index;
+							for (int curr_i = 0; curr_i < i->size; curr_i++) {
+								int ind = curr_i + vertex_i;
+								tripletList.push_back(Trip(ind, j, diff(curr_i)));
+							}
+						}
+						if (left.east != nullptr && left.east != i) {
+							Interface &nbr_i = *left.east;
+							VectorXd   diff  = b.block(nbr_i.start_index, 0, nbr_i.size, 1)
+							                - (VectorXd) nbr_i.getZeroDiffFromLeft();
+							int vertex_i = nbr_i.start_index;
+							int j        = i->start_index + index;
+							for (int curr_i = 0; curr_i < i->size; curr_i++) {
+								int ind = curr_i + vertex_i;
+								tripletList.push_back(Trip(ind, j, diff(curr_i)));
+							}
+						}
+						if (left.south != nullptr && left.south != i) {
+							Interface &nbr_i = *left.south;
+							VectorXd   diff  = b.block(nbr_i.start_index, 0, nbr_i.size, 1)
+							                - (VectorXd) nbr_i.getZeroDiffFromRight();
+							int vertex_i = nbr_i.start_index;
+							int j        = i->start_index + index;
+							for (int curr_i = 0; curr_i < i->size; curr_i++) {
+								int ind = curr_i + vertex_i;
+								tripletList.push_back(Trip(ind, j, diff(curr_i)));
+							}
+						}
+						if (left.west != nullptr && left.west != i) {
+							Interface &nbr_i = *left.west;
+							VectorXd   diff  = b.block(nbr_i.start_index, 0, nbr_i.size, 1)
+							                - (VectorXd) nbr_i.getZeroDiffFromRight();
+							int vertex_i = nbr_i.start_index;
+							int j        = i->start_index + index;
+							for (int curr_i = 0; curr_i < i->size; curr_i++) {
+								int ind = curr_i + vertex_i;
+								tripletList.push_back(Trip(ind, j, diff(curr_i)));
+							}
+						}
+					}
+					// add off diagonals from right domain
+					{
+						Domain &right = *i->right;
+						if (right.north != nullptr && right.north != i) {
+							Interface &nbr_i = *right.north;
+							VectorXd   diff  = b.block(nbr_i.start_index, 0, nbr_i.size, 1)
+							                - (VectorXd) nbr_i.getZeroDiffFromLeft();
+							int vertex_i = nbr_i.start_index;
+							int j        = i->start_index + index;
+							for (int curr_i = 0; curr_i < i->size; curr_i++) {
+								int ind = curr_i + vertex_i;
+								tripletList.push_back(Trip(ind, j, diff(curr_i)));
+							}
+						}
+						if (right.east != nullptr && right.east != i) {
+							Interface &nbr_i = *right.east;
+							VectorXd   diff  = b.block(nbr_i.start_index, 0, nbr_i.size, 1)
+							                - (VectorXd) nbr_i.getZeroDiffFromLeft();
+							int vertex_i = nbr_i.start_index;
+							int j        = i->start_index + index;
+							for (int curr_i = 0; curr_i < i->size; curr_i++) {
+								int ind = curr_i + vertex_i;
+								tripletList.push_back(Trip(ind, j, diff(curr_i)));
+							}
+						}
+						if (right.south != nullptr && right.south != i) {
+							Interface &nbr_i = *right.south;
+							VectorXd   diff  = b.block(nbr_i.start_index, 0, nbr_i.size, 1)
+							                - (VectorXd) nbr_i.getZeroDiffFromRight();
+							int vertex_i = nbr_i.start_index;
+							int j        = i->start_index + index;
+							for (int curr_i = 0; curr_i < i->size; curr_i++) {
+								int ind = curr_i + vertex_i;
+								tripletList.push_back(Trip(ind, j, diff(curr_i)));
+							}
+						}
+						if (right.west != nullptr && right.west != i) {
+							Interface &nbr_i = *right.west;
+							VectorXd   diff  = b.block(nbr_i.start_index, 0, nbr_i.size, 1)
+							                - (VectorXd) nbr_i.getZeroDiffFromRight();
+							int vertex_i = nbr_i.start_index;
+							int j        = i->start_index + index;
+							for (int curr_i = 0; curr_i < i->size; curr_i++) {
+								int ind = curr_i + vertex_i;
+								tripletList.push_back(Trip(ind, j, diff(curr_i)));
+							}
+						}
+
+					}
+				}
+			}
+
+			// set value back to zero
+			for (Interface *i : vertices) {
+				if (index < max_size) {
+					i->gamma(index) = 0;
+				}
+			}
+		}
+	}
+	// form a from the list of triplets
+	A.setFromTriplets(tripletList.begin(), tripletList.end());
+	cout << "Number of solves to form " << A.rows() << "x" << A.cols() << " Matrix: " << num_solves
+	     << "\n";
 }
 
 // the functions that we are using
@@ -360,10 +526,9 @@ int main(int argc, char *argv[])
 	VectorXd gamma = VectorXd::Zero(m_y * (num_domains_x - 1) + m_x * (num_domains_y - 1));
 	double   condition_number = 0.0;
 	if (num_domains_x > 1 || num_domains_y > 1) {
-
 		if (f_cg) {
-		// get the b vector
-		VectorXd b = solveWithInterfaceValues(dmns, interfaces, gamma);
+			// get the b vector
+			VectorXd        b = solveWithInterfaceValues(dmns, interfaces, gamma);
 			FunctionWrapper F(&dmns, &interfaces, gamma.size(), b);
 			Eigen::ConjugateGradient<FunctionWrapper, Eigen::Lower | Eigen::Upper,
 			                         Eigen::IdentityPreconditioner>
@@ -372,12 +537,22 @@ int main(int argc, char *argv[])
 			// cg.compute(F);
 			gamma = cg.solve(b);
 			std::cout << "CG: Number of iterations: " << cg.iterations() << "\n";
+		} else if (f_gp) {
+			SparseMatrix<double> A(gamma.size(), gamma.size());
+			VectorXd             b(gamma.size());
+			graphAssistedMatrixFormation(dmns, interfaces, A, b);
+			Eigen::ConjugateGradient<SparseMatrix<double>, Eigen::Lower | Eigen::Upper,
+			                         Eigen::IdentityPreconditioner>
+			cg(A);
+			cg.setTolerance(1e-10);
+			gamma = cg.solve(b);
+			std::cout << "CG: Number of iterations: " << cg.iterations() << "\n";
+			if (save_matrix_file != "") {
+				saveMarket(A, save_matrix_file);
+			}
 		} else {
-            MatrixXd X;
-            VectorXd v;
-            graphAssistedMatrixFormation(dmns,interfaces,X,v);
-		// get the b vector
-		VectorXd b = solveWithInterfaceValues(dmns, interfaces, gamma);
+			// get the b vector
+			VectorXd b = solveWithInterfaceValues(dmns, interfaces, gamma);
 			// create a matrix
 			MatrixXd A(gamma.size(), gamma.size());
 			// get the columns of the matrix
