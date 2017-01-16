@@ -1,9 +1,8 @@
 #include <Eigen/Dense>
+#include <Eigen/IterativeLinearSolvers>
 #include <Eigen/Sparse>
-#include <unsupported/Eigen/SparseExtra>
 #include <algorithm>
 #include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/dijkstra_shortest_paths.hpp>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/sequential_vertex_coloring.hpp>
 #include <cmath>
@@ -11,6 +10,7 @@
 #include <iostream>
 #include <unsupported/Eigen/IterativeSolvers>
 #include <unsupported/Eigen/KroneckerProduct>
+#include <unsupported/Eigen/SparseExtra>
 #include <utility>
 
 using namespace Eigen;
@@ -136,6 +136,13 @@ VectorXd solveWithInterfaceValues(DomainMatrix &dmns, vector<Interface> &interfa
 	return diff;
 }
 
+/**
+ * @brief Create interfaces, and set them up so that they are linked in a pre-defined order
+ *
+ * @param dmns the domains to use
+ *
+ * @return a vector of interface objects
+ */
 vector<Interface> createAndLinkInterfaces(DomainMatrix &dmns)
 {
 	int               num_interfaces_ns = dmns.cols() * (dmns.rows() - 1);
@@ -178,7 +185,92 @@ vector<Interface> createAndLinkInterfaces(DomainMatrix &dmns)
 	}
 	return interfaces;
 }
-
+/**
+ * @brief Create interfaces, and set them up using a Breadth-First Search
+ *
+ * @param dmns the domains to use
+ *
+ * @return a vector of interface objects
+ */
+vector<Interface> createAndLinkInterfacesBFS(DomainMatrix &dmns)
+{
+	int               num_interfaces_ns = dmns.cols() * (dmns.rows() - 1);
+	int               num_interfaces_ew = (dmns.cols() - 1) * dmns.rows();
+	int               num_interfaces    = num_interfaces_ns + num_interfaces_ew;
+	vector<Interface> interfaces(num_interfaces);
+	// fill the array of interfaces
+	deque<Domain *> queue;
+	queue.push_back(&dmns(0, 0));
+	set<Domain *> visited;
+	int           curr_i       = 0;
+	int           curr_gamma_i = 0;
+	while (!queue.empty()) {
+		Domain &curr_domain = *queue.front();
+		queue.pop_front();
+		visited.insert(&curr_domain);
+		if (curr_domain.north_domain != nullptr && visited.count(curr_domain.north_domain) == 0) {
+			Domain &nbr            = *curr_domain.north_domain;
+			int     interface_size = curr_domain.u.cols();
+			interfaces[curr_i]
+			= Interface(curr_i, curr_gamma_i, interface_size, Interface::axis::x);
+            interfaces[curr_i].left = &curr_domain;
+            curr_domain.north = &interfaces[curr_i];
+            interfaces[curr_i].right = &nbr;
+            nbr.south = &interfaces[curr_i];
+            curr_i++;
+            curr_gamma_i+=interface_size;
+			if (std::find(queue.begin(), queue.end(), &nbr) == queue.end()) {
+				queue.push_back(&nbr);
+			}
+		}
+		if (curr_domain.east_domain != nullptr && visited.count(curr_domain.east_domain) == 0) {
+			Domain &nbr            = *curr_domain.east_domain;
+			int     interface_size = curr_domain.u.rows();
+			interfaces[curr_i]
+			= Interface(curr_i, curr_gamma_i, interface_size, Interface::axis::y);
+            interfaces[curr_i].left = &curr_domain;
+            curr_domain.east = &interfaces[curr_i];
+            interfaces[curr_i].right = &nbr;
+            nbr.west = &interfaces[curr_i];
+            curr_i++;
+            curr_gamma_i+=interface_size;
+			if (std::find(queue.begin(), queue.end(), &nbr) == queue.end()) {
+				queue.push_back(&nbr);
+			}
+		}
+		if (curr_domain.south_domain != nullptr && visited.count(curr_domain.south_domain) == 0) {
+			Domain &nbr            = *curr_domain.south_domain;
+			int     interface_size = curr_domain.u.cols();
+			interfaces[curr_i]
+			= Interface(curr_i, curr_gamma_i, interface_size, Interface::axis::x);
+            interfaces[curr_i].left = &nbr;
+            nbr.north = &interfaces[curr_i];
+            interfaces[curr_i].right = &curr_domain;
+            curr_domain.south = &interfaces[curr_i];
+            curr_i++;
+            curr_gamma_i+=interface_size;
+			if (std::find(queue.begin(), queue.end(), &nbr) == queue.end()) {
+				queue.push_back(&nbr);
+			}
+		}
+		if (curr_domain.west_domain != nullptr && visited.count(curr_domain.west_domain) == 0) {
+			Domain &nbr            = *curr_domain.west_domain;
+			int     interface_size = curr_domain.u.rows();
+			interfaces[curr_i]
+			= Interface(curr_i, curr_gamma_i, interface_size, Interface::axis::y);
+            interfaces[curr_i].left = &nbr;
+            nbr.east = &interfaces[curr_i];
+            interfaces[curr_i].right = &curr_domain;
+            curr_domain.west = &interfaces[curr_i];
+            curr_i++;
+            curr_gamma_i+=interface_size;
+			if (std::find(queue.begin(), queue.end(), &nbr) == queue.end()) {
+				queue.push_back(&nbr);
+			}
+		}
+	}
+	return interfaces;
+}
 void graphAssistedMatrixFormation(DomainMatrix &dmns, vector<Interface> &interfaces, SparseMatrix<double> &A,
                                   VectorXd &b)
 {
@@ -284,6 +376,8 @@ void graphAssistedMatrixFormation(DomainMatrix &dmns, vector<Interface> &interfa
 					dmns(i, j).solve();
 				}
 			}
+
+            // fill matrix values
 			for (Interface *i : vertices) {
 				if (index < max_size) {
 					// set diagonal
@@ -411,6 +505,25 @@ void graphAssistedMatrixFormation(DomainMatrix &dmns, vector<Interface> &interfa
 	     << "\n";
 }
 
+void linkDomains(DomainMatrix &dmns)
+{
+	for (int i = 0; i < dmns.rows(); i++) {
+		for (int j = 0; j < dmns.cols(); j++) {
+            if(i!=dmns.rows()-1){
+                dmns(i,j).north_domain = &dmns(i+1,j);
+            }
+            if(j!=dmns.cols()-1){
+                dmns(i,j).east_domain = &dmns(i,j+1);
+            }
+            if(i!=0){
+                dmns(i,j).south_domain = &dmns(i-1,j);
+            }
+            if(j!=0){
+                dmns(i,j).west_domain = &dmns(i,j-1);
+            }
+		}
+	}
+}
 // the functions that we are using
 double ffun(double x, double y) { return -5 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y); }
 double gfun(double x, double y) { return sin(M_PI * x) * cos(2 * M_PI * y); }
@@ -429,6 +542,9 @@ int main(int argc, char *argv[])
 	                            {'s'});
 	args::Flag f_cg(parser, "cg", "use conjugate gradient for solving gamma values", {"cg"});
 	args::Flag f_gp(parser, "graph", "use a graph when forming the matrix", {"graph"});
+	args::Flag f_bfs(
+	parser, "bfs",
+	"use a breadth-first search when determining mapping of interfaces to gamma vectors", {"bfs"});
 
 	if (argc < 5) {
 		std::cout << parser;
@@ -519,9 +635,15 @@ int main(int argc, char *argv[])
 			dmns(i, j) = Domain(sub_grid, h_x, h_y);
 		}
 	}
+    linkDomains(dmns);
 
 	// Generate Interfaces
-	vector<Interface> interfaces = createAndLinkInterfaces(dmns);
+	vector<Interface> interfaces;
+    if(f_bfs){
+	interfaces = createAndLinkInterfacesBFS(dmns);
+    }else{
+	interfaces = createAndLinkInterfaces(dmns);
+    }
 	// create gamma array
 	VectorXd gamma = VectorXd::Zero(m_y * (num_domains_x - 1) + m_x * (num_domains_y - 1));
 	double   condition_number = 0.0;
