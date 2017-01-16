@@ -1,18 +1,29 @@
 ## Compiling and Running
 
-This program uses the [Eigen library](http://eigen.tuxfamily.org/).
-Eigen is a header-only library, so you only have to tell the compiler
-where the headers are.
+This program uses the following third party libraries:
 
-Once you download the Eigen library and extract it, you have to update
-the `EIGEN_DIR` variable in the `EigenDir.mk` file.
++ fftw3
++ Eigen3
++ boost
 
-In my case, the `EigenDir.mk` file ended up looking like:
+**Note on Eigen:**
+
+If you downloaded eigen, you will have to tell `cmake` where to look
+for it. You can do this by setting the `EIGEN3_ROOT` environment variable,
+in my case it was:
+
 ```
-EIGEN_DIR = /home/nvgba/Downloads/eigen-eigen-f562a193118d/
+$ export EIGEN3_ROOT = /home/nvgba/Downloads/eigen-eigen-f562a193118d/
 ```
 
-After that is completed, it should compile with:
+First, you will have to have use `cmake` to generate a makefile.
+I added a convient script in order to do this:
+
+```
+$ ./configure.sh
+```
+
+After the makefile is generated, it should compile with:
 
 ```
 $ make all
@@ -21,8 +32,23 @@ $ make all
 This will create an executable named `heat`.
 It is used in the following way:
 
-```
-$ ./heat <num_cells>
-```
-
-Where `num_cells` is the number of cells in each direction.
+    ./heat {OPTIONS} [d_x] [d_y] [n_x] [n_y]
+    
+    
+      OPTIONS:
+    
+          -h, --help                        Display this help menu
+          d_x                               number of domains in the x direction
+          d_y                               number of domains in the y direction
+          n_x                               number of cells in the x direction, in
+                                            each domain
+          n_y                               number of cells in the y direction, in
+                                            each domain
+          -m[matrix filename]               the file to write the matrix to
+          -s[solution filename]             the file to write the solution to
+          --cg                              use conjugate gradient for solving gamma
+                                            values
+          --graph                           use a graph when forming the matrix
+          "--" can be used to terminate flag options and force all following
+          arguments to be treated as positional options
+    
