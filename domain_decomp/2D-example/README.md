@@ -6,6 +6,14 @@ This program uses the following third party libraries:
 + Eigen3
 + boost
 
+### Configuring
+First, you will have to have use `cmake` to generate a makefile.
+I added a convient script in order to do this:
+
+```
+$ ./configure.sh
+```
+
 **Note on Eigen:**
 
 If you downloaded eigen, you will have to tell `cmake` where to look
@@ -16,20 +24,15 @@ in my case it was:
 $ export EIGEN3_ROOT = /home/nvgba/Downloads/eigen-eigen-f562a193118d/
 ```
 
-First, you will have to have use `cmake` to generate a makefile.
-I added a convient script in order to do this:
-
-```
-$ ./configure.sh
-```
-
+### Compiling
 After the makefile is generated, it should compile with:
 
 ```
 $ make all
 ```
 
-This will create an executable named `heat`.
+### Running
+The executable is named `heat`.
 It is used in the following way:
 
     ./heat {OPTIONS} [d_x] [d_y] [n_x] [n_y]
