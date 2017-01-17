@@ -1,5 +1,6 @@
 C      = g++
-CFLAGS  = -Wall -pedantic -std=c++11 -O2
+include EigenDir.mk
+CFLAGS  = -I $(EIGEN_DIR) -Wall -pedantic -std=c++11 -O2
 LDFLAGS = -lstdc++ -lm -llapack
 
 all: heat clean
