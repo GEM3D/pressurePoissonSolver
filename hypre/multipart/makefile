@@ -65,30 +65,22 @@ LFLAGS90 =
 ########################################################################
 # List of all programs to be compiled
 ########################################################################
-ALLPROGS = ex3
+ALLPROGS = ex4
 
 all: $(ALLPROGS)
 
 default: all
 
 usage:
-	@echo 'ex3 : Neumann conditions (SetNeighborPart)'
 	@echo 'ex4 : Neumann conditions (GraphAddEntries)'
 
 ########################################################################
-# Example 3 - Neumann (homogenous boundary conditions)
+# Example 4 - Neumann (homogenous boundary conditions)
 #           - To try out GraphAddEntries option, compile as
 #
 #       %> gmake clean
-#       %> gmake ex3 "CDEFS=-D USE_GRAPH_ENTRIES"
-#
-########################################################################
-ex3: ex3.o
-	$(CC) -o $@ $^ $(LFLAGS)
+#       %> gmake ex4 "CDEFS=-D USE_GRAPH_ENTRIES"
 
-
-########################################################################
-# Example 4 - Neumann (homogenous boundary conditions)
 ########################################################################
 ex4: ex4.o
 	$(CC) -o $@ $^ $(LFLAGS)

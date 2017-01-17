@@ -36,6 +36,12 @@ int main (int argc, char *argv[])
     HYPRE_SStructSolver   solver;
     HYPRE_SStructSolver   precond;
 
+    HYPRE_ParCSRMatrix parcsr_A;
+    HYPRE_ParVector par_b;
+    HYPRE_ParVector par_x;
+
+
+
     /* Initialize MPI */
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
@@ -45,10 +51,22 @@ int main (int argc, char *argv[])
        User defined parameters (mesh size and solver type)
        ---------------------------------------------------- */
 
-    int nx = 10;  /* nx should equal ny */
-    int ny = 10;
+    int nx = 200;  /* nx should equal ny */
+    int ny = 200;
 
-    int solver_id = 2;   /* 0 for PCG;  1 for PCG; 2 for BoomerAMR  */
+    /*
+      0 : PCG (no preconditioning)
+      1 : PCG (BoomerAMG preconditioning);
+      2 : BoomerAMG (no preconditioning)
+    */
+    int solver_id = 0;
+
+    /*
+      Print levels for solvers.
+      0   : No printing
+      >0  : Print iterations (depends on solver)
+    */
+    int solver_print_level = 0;
 
     /* -------------------------------------------------
        Things the user shouldn't change
@@ -57,6 +75,13 @@ int main (int argc, char *argv[])
     if (nx != ny)
     {
         printf("nx should equal ny for this problem\n");
+        MPI_Finalize();
+        return(0);
+    }
+
+    if (solver_id < 0 || solver_id > 2)
+    {
+        printf("Solver_id must be 0, 1, or 2\n");
         MPI_Finalize();
         return(0);
     }
@@ -70,12 +95,13 @@ int main (int argc, char *argv[])
     int nvars = 1;      /* Number of variables */
 
     int object_type;
-    if (solver_id == 0)
+    switch(solver_id)
     {
+    case 0:
         object_type = HYPRE_SSTRUCT;
-    }
-    else if (solver_id == 1)
-    {
+        break;
+    case 1:
+    case 2:
         object_type = HYPRE_PARCSR;    /* Doesn't yet work */
     }
 
@@ -484,6 +510,8 @@ int main (int argc, char *argv[])
        6. Set up the solver and solve problem
        ------------------------------------------------------------- */
     {
+        double t0, t1;
+        t0 = MPI_Wtime();
         if (solver_id == 0)
         {
             /* This seems to work */
@@ -493,8 +521,8 @@ int main (int argc, char *argv[])
 
             /* Set PCG parameters */
             HYPRE_SStructPCGSetTol(solver, 1.0e-12 );
-            HYPRE_SStructPCGSetPrintLevel(solver, 2);
-            HYPRE_SStructPCGSetMaxIter(solver, 500);
+            HYPRE_SStructPCGSetPrintLevel(solver, solver_print_level);
+            HYPRE_SStructPCGSetMaxIter(solver, 2000);
 
             /* Create a split SStruct solver for use as a preconditioner */
             HYPRE_SStructSplitCreate(MPI_COMM_WORLD, &precond);
@@ -503,11 +531,13 @@ int main (int argc, char *argv[])
             HYPRE_SStructSplitSetZeroGuess(precond);
 
             /* Set the preconditioner type to split-SMG */
+#if 1
             HYPRE_SStructSplitSetStructSolver(precond, HYPRE_SMG);
 
             /* Set preconditioner and solve */
             HYPRE_SStructPCGSetPrecond(solver, HYPRE_SStructSplitSolve,
                                        HYPRE_SStructSplitSetup, precond);
+#endif
 
             HYPRE_SStructPCGSetup(solver, A, b, x);
             HYPRE_SStructPCGSolve(solver, A, b, x);
@@ -517,45 +547,41 @@ int main (int argc, char *argv[])
         }
         else if (solver_id == 1)
         {
-
-            /* This doesn't work */
-
             HYPRE_Solver solver;
             HYPRE_Solver precond;
 
-            HYPRE_ParCSRMatrix parcsr_A;
-            HYPRE_ParVector par_b;
-            HYPRE_ParVector par_x;
-
-            //Set the PCG solvers parameters
+            /* Set the PCG solvers parameters */
             HYPRE_ParCSRPCGCreate(MPI_COMM_WORLD, &solver);
             HYPRE_ParCSRPCGSetTol(solver, 1.0e-12);
-            HYPRE_BoomerAMGSetPrintLevel(solver, 3);
+            HYPRE_ParCSRPCGSetPrintLevel(solver, solver_print_level);
             HYPRE_ParCSRPCGSetMaxIter(solver, 500);
 
 #if 0
+            /* Not sure what these do */
             HYPRE_ParCSRPCGSetTwoNorm(solver, 1);
             HYPRE_ParCSRPCGSetLogging(solver, 3);
 #endif
 
-            //Set the AMG preconditioner parameters
+            /* Set the AMG preconditioner parameters */
             HYPRE_BoomerAMGCreate(&precond);
             HYPRE_BoomerAMGSetStrongThreshold(precond, .25);
             HYPRE_BoomerAMGSetCoarsenType(precond, 6);
             HYPRE_BoomerAMGSetTol(precond, 0.0);
-            HYPRE_BoomerAMGSetMaxIter(precond, 10);
+            HYPRE_BoomerAMGSetMaxIter(precond, 1);
             HYPRE_BoomerAMGSetPrintLevel(precond, 0);
 
-            // Setup and Solve the system
+            /* Set the preconditioner */
             HYPRE_ParCSRPCGSetPrecond(solver,
                                       HYPRE_BoomerAMGSolve,
                                       HYPRE_BoomerAMGSetup,
                                       precond);
 
+            /* Get matrix and vectors in the sparse matrix format */
             HYPRE_SStructMatrixGetObject(A, (void **) &parcsr_A);
             HYPRE_SStructVectorGetObject(b, (void **) &par_b);
             HYPRE_SStructVectorGetObject(x, (void **) &par_x);
 
+            /* Solve the system */
             HYPRE_ParCSRPCGSetup(solver, parcsr_A, par_b, par_x);
             HYPRE_ParCSRPCGSolve(solver, parcsr_A, par_b, par_x);
 
@@ -566,33 +592,28 @@ int main (int argc, char *argv[])
         {
             HYPRE_Solver solver;
 
-            HYPRE_ParCSRMatrix parcsr_A;
-            HYPRE_ParVector par_b;
-            HYPRE_ParVector par_x;
-
             double final_res_norm;
             int num_iterations;
 
             HYPRE_BoomerAMGCreate(&solver);
-
-            //Set solver parameters
-            HYPRE_BoomerAMGSetPrintLevel(solver, 3);
             HYPRE_BoomerAMGSetStrongThreshold(solver, .15);
             HYPRE_BoomerAMGSetCoarsenType(solver, 6);
+            HYPRE_BoomerAMGSetTol(solver, 1e-12);
+            HYPRE_BoomerAMGSetMaxIter(solver, 500);
+            HYPRE_BoomerAMGSetPrintLevel(solver, solver_print_level);
+
             HYPRE_BoomerAMGSetRelaxType(solver, 6);
             HYPRE_BoomerAMGSetNumSweeps(solver, 1);
             HYPRE_BoomerAMGSetMaxLevels(solver, 20);
-            HYPRE_BoomerAMGSetTol(solver, 1e-12);
             HYPRE_BoomerAMGSetInterpType(solver, 14);
             HYPRE_BoomerAMGSetAggInterpType(solver, 2);
-            HYPRE_BoomerAMGSetMaxIter(solver, 100);
 
             HYPRE_SStructMatrixGetObject(A, (void **) &parcsr_A);
             HYPRE_SStructVectorGetObject(b, (void **) &par_b);
             HYPRE_SStructVectorGetObject(x, (void **) &par_x);
 
-            HYPRE_BoomerAMGSetup(solver, parcsr_A, par_b, par_x);
 
+            HYPRE_BoomerAMGSetup(solver, parcsr_A, par_b, par_x);
             HYPRE_BoomerAMGSolve(solver, parcsr_A, par_b, par_x);
 
             //Get Run Information
@@ -601,6 +622,9 @@ int main (int argc, char *argv[])
 
             HYPRE_BoomerAMGDestroy(solver);
         }
+        t1 = MPI_Wtime();
+        printf("Elapsed time : %12.4e\n",t1-t0);
+
     }
 
     /* Save the solution for GLVis visualization, see vis/glvis-ex8.sh */
@@ -613,7 +637,45 @@ int main (int argc, char *argv[])
         double O[4] = {0,0,nx*h,0};
 
         GLVis_PrintSStructGrid(grid, "vis/ex3.mesh", myid, T, O);
-        GLVis_PrintSStructVector(x, 0, "vis/ex3.sol", myid);
+        if (solver_id == 0)
+        {
+            GLVis_PrintSStructVector(x, 0, "vis/ex3.sol", myid);
+        }
+        else
+        {
+            /* Needed if solution is a ParVector */
+            FILE *file;
+            char filename[255];
+
+            int nvalues = nparts*nx*ny;
+            double *values;
+
+            /* get the local solution */
+            values = hypre_VectorData(hypre_ParVectorLocalVector(par_x));
+
+            sprintf(filename, "%s.%06d", "vis/ex3.sol", myid);
+            if ((file = fopen(filename, "w")) == NULL)
+            {
+                printf("Error: can't open output file %s\n", filename);
+                MPI_Finalize();
+                exit(1);
+            }
+
+            /* From vis.c */
+            fprintf(file, "FiniteElementSpace\n");
+            fprintf(file, "FiniteElementCollection: Local_L2_2D_P0\n");  /* cell-centered */
+            fprintf(file, "VDim: 1\n");
+            fprintf(file, "Ordering: 0\n\n");
+
+            /* save solution */
+            for (i = 0; i < nvalues; i++)
+                fprintf(file, "%.14e\n", values[i]);
+
+            fflush(file);
+            fclose(file);
+        }
+
+
         GLVis_PrintData("vis/ex3.data", myid, num_procs);
     }
 
@@ -624,13 +686,6 @@ int main (int argc, char *argv[])
     HYPRE_SStructMatrixDestroy(A);
     HYPRE_SStructVectorDestroy(b);
     HYPRE_SStructVectorDestroy(x);
-
-    if (solver_id == -1)
-    {
-        HYPRE_SStructPCGDestroy(solver);
-        HYPRE_SStructSplitDestroy(precond);
-    }
-
 
     /* Finalize MPI */
     MPI_Finalize();
