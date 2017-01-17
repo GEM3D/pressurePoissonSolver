@@ -5,8 +5,8 @@
  *sin(pi*x)*sin(pi*y)
  * f = -2pi^2*sin(2*pi*x)*(2*pi*y) with dirchlet boundary conditions
  *
- * Compile with: make ExactIJ
- * Execute with: mpirun -np 4 ExactIJ -nx 100 -ny 100 -NX 2 -solver 0 -vis
+ * Compile with: make ExactIJNeumann
+ * Execute with: mpirun -np 4 ExactIJNeumann -nx 100 -ny 100 -NX 2 -solver 0 -vis
  *
  * Create by: Joseph McNeal
  */
@@ -189,7 +189,7 @@ int main(int argc, char *argv[]) {
   HYPRE_SStructMatrixSetBoxValues(A, part, ilower, iupper, var, nentries,
                                   stencil_indices, values);
 
-  // Set the dirchelet boundary condition
+  // Set the Neumann boundary condition
   {
     int bc_ilower[2];
     int bc_iupper[2];
@@ -228,9 +228,15 @@ int main(int argc, char *argv[]) {
 
       stencil_indices[0] = 3;
 
+      //Sets one of the boundary conditions to the dirichlet condition
+      if (myid == 0){
+	center_valuesy[1] = -hy2inv;
+      }
+      
       HYPRE_SStructMatrixSetBoxValues(A, part, bc_ilower, bc_iupper, var,
                                       nentries, stencil_indices, valuesy);
       HYPRE_SStructMatrixAddToBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesy);
+      center_valuesy[1] = hy2inv;
       // printf("Bottom row zeroed\n");
     }
 
@@ -307,9 +313,9 @@ int main(int argc, char *argv[]) {
   exactsolution = calloc(nvalues, sizeof(double));
   // printf("RHS calculation begin\n");
     for (j = 0; j < ny; j++) {
-    double y =  (ilower[1] + j + .5) * hy;
+         double y =  (ilower[1] + j + .5) * hy;
     for (i = 0; i < nx; i++) {
-      double x = (ilower[0] + i + .5) * hx;
+         double x = (ilower[0] + i + .5) * hx;
       rhs_values[i + j * nx] =
           -8. * PI2 * cos(2. * M_PI * x) * cos(2. * M_PI * y);
       exactsolution[i + j * nx] = 1.0 * cos(2. * M_PI * x) * cos(2. * M_PI * y);
@@ -334,14 +340,17 @@ int main(int argc, char *argv[]) {
   HYPRE_SStructVectorGetObject(x, (void **)&par_x);
 
   // Print out initial vectors 
-  HYPRE_SStructMatrixPrint("SStructExact/ss.initial.A", A, 0);
-  HYPRE_SStructVectorPrint("SStructExact/ss.initial.b", b, 0);
+  HYPRE_SStructMatrixPrint("SStructExact_data/ss.initial.A", A, 0);
+  HYPRE_SStructVectorPrint("SStructExact_data/ss.initial.b", b, 0);
   // printf("About to solve\n");
 
+  int num_iterations;
+  double final_res_norm, t1, t2;
+
+
   // Select a solver 
+  // BoomerAMG
   if (solver_id == 0) {
-    int num_iterations;
-    double final_res_norm;
 
     // Create AMG solver 
     HYPRE_BoomerAMGCreate(&solver);
@@ -352,16 +361,237 @@ int main(int argc, char *argv[]) {
     HYPRE_BoomerAMGSetRelaxType(solver, 3);
     HYPRE_BoomerAMGSetNumSweeps(solver, 1);
     HYPRE_BoomerAMGSetMaxLevels(solver, 20);
-    HYPRE_BoomerAMGSetTol(solver, 1e-12);
-    HYPRE_BoomerAMGSetMaxIter(solver, 100);
+    HYPRE_BoomerAMGSetTol(solver, 1.0e-12);
+
+    //HYPRE_BoomerAMGSetMaxIter(solver, 100);
     // Set up and solve 
     HYPRE_BoomerAMGSetup(solver, parcsr_A, par_b, par_x);
+    t1 = MPI_Wtime();
     HYPRE_BoomerAMGSolve(solver, parcsr_A, par_b, par_x);
+    t2 = MPI_Wtime();
     //printf("solution obtained\n");
+    
+    
+    //Destroy solver
+    HYPRE_BoomerAMGDestroy(solver);
   
     // Run information 
     HYPRE_BoomerAMGGetNumIterations(solver, &num_iterations);
     HYPRE_BoomerAMGGetFinalRelativeResidualNorm(solver, &final_res_norm);
+  }  
+  
+  //BoomerAMG preconditioned PCG
+  if (solver_id == 1) {
+	//Create PCG solver
+	HYPRE_Solver pcgsolver;
+
+	//Set PCG solver parameters
+	HYPRE_ParCSRPCGCreate(MPI_COMM_WORLD, &pcgsolver);
+	HYPRE_ParCSRPCGSetTol(pcgsolver, 1.0e-12);
+	HYPRE_ParCSRPCGSetMaxIter(pcgsolver, 500);
+	HYPRE_ParCSRPCGSetTwoNorm(pcgsolver, 1);
+	HYPRE_ParCSRPCGSetLogging(pcgsolver, 3);
+
+	//Create AMG preconditioner
+	HYPRE_Solver precond;
+	
+	//Set AMG preconditioner parameters
+	HYPRE_BoomerAMGCreate(&precond);
+	HYPRE_BoomerAMGSetStrongThreshold(precond, .25);
+	HYPRE_BoomerAMGSetCoarsenType(precond, 6);
+	HYPRE_BoomerAMGSetTol(precond, 1.0e-12);
+	HYPRE_BoomerAMGSetPrintLevel(precond, 1);
+        HYPRE_BoomerAMGSetPrintLevel(precond, 0);
+        HYPRE_BoomerAMGSetMaxIter(precond, 5);
+        HYPRE_BoomerAMGSetNumSweeps(precond, 2);
+        HYPRE_BoomerAMGSetRelaxType(precond, 0);
+        //HYPRE_BoomerAMGSetRelaxWeight(precond, .3);
+        HYPRE_BoomerAMGSetRelaxWt(precond, .3);
+                
+
+	
+  	//Setup and solve the system
+  	HYPRE_ParCSRPCGSetPrecond(pcgsolver, HYPRE_BoomerAMGSolve, HYPRE_BoomerAMGSetup, precond);
+	HYPRE_ParCSRPCGSetup(pcgsolver, parcsr_A, par_b, par_x);
+	t1 = MPI_Wtime();
+	HYPRE_ParCSRPCGSolve(pcgsolver, parcsr_A, par_b, par_x);
+	t2 = MPI_Wtime();
+
+	//Get run info
+	HYPRE_ParCSRPCGGetNumIterations(pcgsolver, &num_iterations);
+	HYPRE_ParCSRPCGGetFinalRelativeResidualNorm(pcgsolver, &final_res_norm);
+
+	//Cleanup
+	HYPRE_BoomerAMGDestroy(precond);
+	HYPRE_ParCSRPCGDestroy(pcgsolver);
+  }
+
+  //Boomer AMG Preconditioned GMRES
+  if (solver_id == 2){
+	//Create GMRES solver
+	HYPRE_Solver gmres_solver;
+
+	//Set GMRES solver parameters
+	HYPRE_ParCSRGMRESCreate(MPI_COMM_WORLD, &gmres_solver);
+	HYPRE_GMRESSetMaxIter(gmres_solver, 1000);
+	//HYPRE_GMRESSetAbsoluteTol(gmres_solver, 1.0e-12);
+	HYPRE_GMRESSetTol(gmres_solver, 1e-12);
+	HYPRE_GMRESSetPrintLevel(gmres_solver, 0);
+	HYPRE_GMRESSetLogging(gmres_solver, 0);
+
+        //Create AMG preconditioner
+        HYPRE_Solver precond;
+ 
+        //Set AMG preconditioner parameters
+        HYPRE_BoomerAMGCreate(&precond);
+        HYPRE_BoomerAMGSetStrongThreshold(precond, .25);
+        HYPRE_BoomerAMGSetCoarsenType(precond, 6);
+        HYPRE_BoomerAMGSetTol(precond, 1.0e-3);
+        HYPRE_BoomerAMGSetPrintLevel(precond, 0);
+        HYPRE_BoomerAMGSetMaxIter(precond, 1);
+	HYPRE_BoomerAMGSetNumSweeps(precond, 2);
+	HYPRE_BoomerAMGSetRelaxType(precond, 0);
+	//HYPRE_BoomerAMGSetRelaxWeight(precond, .3);
+	HYPRE_BoomerAMGSetRelaxWt(precond, .3);
+                                                                 
+	//Setup and solve the system
+	HYPRE_ParCSRGMRESSetPrecond(gmres_solver, HYPRE_BoomerAMGSolve, HYPRE_BoomerAMGSetup, precond);
+	HYPRE_ParCSRGMRESSetup(gmres_solver, parcsr_A, par_b, par_x);
+	t1 = MPI_Wtime();
+	HYPRE_ParCSRGMRESSolve(gmres_solver, parcsr_A, par_b, par_x);
+	t2 = MPI_Wtime();
+
+	//Get run info
+	HYPRE_ParCSRGMRESGetNumIterations(gmres_solver, &num_iterations);
+	HYPRE_ParCSRGMRESGetFinalRelativeResidualNorm(gmres_solver, &final_res_norm);
+
+	//Cleanup
+	HYPRE_ParCSRGMRESDestroy(gmres_solver);
+	HYPRE_BoomerAMGDestroy(precond);
+  }
+
+  //Euclid (ILU) preconditioned GMRES
+  if (solver_id == 3){
+	//Create GMRES solver
+	HYPRE_Solver gmres_solver;
+	HYPRE_ParCSRGMRESCreate(MPI_COMM_WORLD, &gmres_solver);
+
+	//Set the GMRES solver parameters
+	HYPRE_GMRESSetMaxIter(gmres_solver,100);
+	HYPRE_GMRESSetTol(gmres_solver, 1e-12);
+	HYPRE_GMRESSetPrintLevel(gmres_solver, 3);
+	HYPRE_GMRESSetLogging(gmres_solver, 0);	
+	HYPRE_GMRESSetKDim(gmres_solver, 1);
+
+	//Create Euclid precondtioner
+	HYPRE_Solver euclid_precond;
+	HYPRE_EuclidCreate(MPI_COMM_WORLD, &euclid_precond);
+	//HYPRE_ParaSailsCreate(MPI_COMM_WORLD, &euclid_precond);
+
+	//Set the euclid precondioner parameters
+	HYPRE_EuclidSetLevel(euclid_precond, 1);
+	//HYPRE_EuclidSetBJ(euclid_precond, 0);
+	HYPRE_ParaSailsSetParams(euclid_precond, .01, 2);
+	//HYPRE_ParaSailsSetSym(euclid_precond, 2);
+
+
+	//Setup and solve the system
+	HYPRE_ParCSRGMRESSetPrecond(gmres_solver, HYPRE_EuclidSolve, HYPRE_EuclidSetup, euclid_precond);
+	//HYPRE_ParCSRGMRESSetPrecond(gmres_solver, HYPRE_ParaSailsSolve, HYPRE_ParaSailsSetup, euclid_precond);
+	HYPRE_ParCSRGMRESSetup(gmres_solver, parcsr_A, par_b, par_x);
+	t1 = MPI_Wtime();
+	HYPRE_ParCSRGMRESSolve(gmres_solver, parcsr_A, par_b, par_x);
+	t2 = MPI_Wtime();
+
+	//Get run info
+	HYPRE_ParCSRGMRESGetNumIterations(gmres_solver, &num_iterations);
+	HYPRE_ParCSRGMRESGetFinalRelativeResidualNorm(gmres_solver, &final_res_norm);
+
+	//Cleanup
+	HYPRE_ParCSRGMRESDestroy(gmres_solver);
+	HYPRE_EuclidDestroy(euclid_precond);
+  }
+
+
+
+  //Doesn't work because the ParCSR solvers want Par CSR preconditioners
+  //SMG (GMG) preconditioned PCG
+  /*
+  if (solver_id == 4){
+	//Set PCG parameters
+	HYPRE_Solver pcg_solver;
+	HYPRE_ParCSRPCGCreate(MPI_COMM_WORLD, &pcg_solver);
+        HYPRE_ParCSRPCGSetTol(pcg_solver, 1.0e-12);
+        HYPRE_ParCSRPCGSetMaxIter(pcg_solver, 500);
+        HYPRE_ParCSRPCGSetTwoNorm(pcg_solver, 1);
+        HYPRE_ParCSRPCGSetLogging(pcg_solver, 3);
+	
+	//Set SMG parameters
+        HYPRE_Solver smg_precond;
+	HYPRE_StructSMGCreate(MPI_COMM_WORLD, &smg_precond);
+	HYPRE_StructSMGSetMaxIter(smg_precond, 1);
+	HYPRE_StructSMGSetTol(smg_precond, 1.0e-12);	
+	//Setup and solve the system
+	HYPRE_ParCSRPCGSetPrecond(pcg_solver, HYPRE_StructSMGSolve, HYPRE_StructSMGSetup, smg_precond);
+        HYPRE_ParCSRPCGSetup(pcg_solver, parcsr_A, par_b, par_x);
+        t1 = MPI_Wtime();
+        HYPRE_ParCSRPCGSolve(pcg_solver, parcsr_A, par_b, par_x);
+        t2 = MPI_Wtime();
+
+	//Get run info
+	HYPRE_ParCSRPCGGetNumIterations(pcg_solver, &num_iterations);
+	HYPRE_ParCSRPCGGetFinalRelativeResidualNorm(pcg_solver, &final_res_norm);
+	
+	//cleanup
+	HYPRE_ParCSRPCGDestroy(pcg_solver);
+	}
+     */
+
+  //AMG preconditioned BiCGSTAB
+  if (solver_id == 5){
+
+	//Set BiCGSTAB parameters
+	HYPRE_Solver bicg_solver;
+	HYPRE_ParCSRBiCGSTABCreate(MPI_COMM_WORLD, &bicg_solver);
+	HYPRE_ParCSRBiCGSTABSetTol(bicg_solver, 1.0e-12);
+	HYPRE_ParCSRBiCGSTABSetPrintLevel(bicg_solver, 3);
+	HYPRE_ParCSRBiCGSTABSetLogging(bicg_solver, 0);
+	HYPRE_ParCSRBiCGSTABSetMaxIter(bicg_solver, 100);
+
+	//Set AMG parameters
+	HYPRE_Solver amg_precond;
+	HYPRE_BoomerAMGCreate(&amg_precond);
+        HYPRE_BoomerAMGSetStrongThreshold(amg_precond, .25);
+        HYPRE_BoomerAMGSetCoarsenType(amg_precond, 6);
+        HYPRE_BoomerAMGSetTol(amg_precond, 1.0e-12);
+        HYPRE_BoomerAMGSetPrintLevel(amg_precond, 1);
+        HYPRE_BoomerAMGSetPrintLevel(amg_precond, 0);
+        HYPRE_BoomerAMGSetMaxIter(amg_precond, 5);
+        HYPRE_BoomerAMGSetNumSweeps(amg_precond, 2);
+        HYPRE_BoomerAMGSetRelaxType(amg_precond, 0);
+        //HYPRE_BoomerAMGSetRelaxWeight(amg_precond, .3);
+        HYPRE_BoomerAMGSetRelaxWt(amg_precond, .3);
+	
+	//Setup and solve the system
+	HYPRE_ParCSRBiCGSTABSetPrecond(bicg_solver, HYPRE_BoomerAMGSolve, HYPRE_BoomerAMGSetup, amg_precond);
+	HYPRE_ParCSRBiCGSTABSetup(bicg_solver, parcsr_A, par_b, par_x);
+	t1 = MPI_Wtime();
+	HYPRE_ParCSRBiCGSTABSolve(bicg_solver, parcsr_A, par_b, par_x);
+	t2 = MPI_Wtime();
+	//Get run info
+	HYPRE_ParCSRBiCGSTABGetNumIterations(bicg_solver, &num_iterations);
+	HYPRE_ParCSRBiCGSTABGetFinalRelativeResidualNorm(bicg_solver, &final_res_norm);
+	//Cleanup
+	HYPRE_ParCSRBiCGSTABDestroy(bicg_solver);
+	HYPRE_BoomerAMGDestroy(amg_precond);
+	}
+
+
+  //Euclid precondtioned BiCGSTAB
+  if (solver_id == 6){
+	}
+
+
     if (myid == 0) {
       printf("\n");
       printf("Iterations = %d\n", num_iterations);
@@ -369,13 +599,26 @@ int main(int argc, char *argv[]) {
       printf("\n");
     }
 
-    // Destroy solver 
-    HYPRE_BoomerAMGDestroy(solver);
-    // HYPRE_ParVectorPrint(par_x, "SStructExact/ss.final.x");
+    // HYPRE_ParVectorPrint(par_x, "SStructExact_data/ss.final.x");
     char solutionfile[255];
     sprintf(solutionfile, "%s.%06d", "ss.final.x", myid);
     HYPRE_ParVectorPrint(par_x, solutionfile);
+    
+  MPI_Barrier(MPI_COMM_WORLD);
+
+  double *time, *timemax;
+  time = calloc(1, sizeof(double));
+  time[0] = t2-t1;
+  timemax = calloc(1, sizeof(double));
+  int root = 0;
+  int count = 1;
+  MPI_Reduce(time, timemax, count, MPI_DOUBLE, MPI_MAX, root, MPI_COMM_WORLD);
+
+  if (myid == 0) {
+	printf("\n");
+	printf("Elapsed Wall Time %f\n", timemax[0]);
   }
+
 
   // Save the solution for visualization and L2 norm calculation  
   if (vis) {
@@ -418,7 +661,7 @@ int main(int argc, char *argv[]) {
 
     MPI_Barrier(MPI_COMM_WORLD);
 mean /= nvalues; 
-    // Calcluates the sum of the squared differences for the exact and numerical solutions on each processor   
+    // Calculates the sum of the squared differences for the exact and numerical solutions on each processor   
   for (i = 1; i < nvalues + 1; i++) {
       diff = values[i] -mean - exactsolution[i-1];
       diff2 = diff * diff;
@@ -487,7 +730,7 @@ mean /= nvalues;
   HYPRE_SStructVectorDestroy(b);
   HYPRE_SStructVectorDestroy(x);
 
-  // Finalize MPI*/
+  // Finalize MPI
   
   MPI_Finalize();
 
