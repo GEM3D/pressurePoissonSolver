@@ -16,8 +16,7 @@
 using namespace Eigen;
 using namespace std;
 #include "Domain.h"
-#include "args.h"
-
+#include "args.h" 
 typedef Matrix<Domain, -1, -1> DomainMatrix;
 
 class FunctionWrapper;
@@ -155,15 +154,15 @@ vector<Interface> createAndLinkInterfaces(DomainMatrix &dmns)
 	int curr_i = 0;
 	for (int j = 0; j < dmns.cols() - 1; j++) {
 		for (int i = 0; i < dmns.rows(); i++) {
-			int start_i = (j * dmns.rows() + i) * ew_interface_size;
-			interfaces[curr_i]        = Interface(curr_i,start_i, ew_interface_size, Interface::axis::y);
+			int start_i        = (j * dmns.rows() + i) * ew_interface_size;
+			interfaces[curr_i] = Interface(curr_i, start_i, ew_interface_size, Interface::axis::y);
 			Interface &curr_interface = interfaces[curr_i];
 			// link to domain on left
 			curr_interface.left = &dmns(i, j);
 			dmns(i, j).east = &curr_interface;
 			// link to domain on right
 			curr_interface.right = &dmns(i, j + 1);
-			dmns(i, j+1).west = &curr_interface;
+			dmns(i, j + 1).west = &curr_interface;
 			curr_i++;
 		}
 	}
@@ -171,15 +170,15 @@ vector<Interface> createAndLinkInterfaces(DomainMatrix &dmns)
 	int ns_start_i = dmns.rows() * (dmns.cols() - 1) * ew_interface_size;
 	for (int i = 0; i < dmns.rows() - 1; i++) {
 		for (int j = 0; j < dmns.cols(); j++) {
-			int start_i = (i * dmns.cols() + j) * ns_interface_size + ns_start_i;
-			interfaces[curr_i]        = Interface(curr_i,start_i, ns_interface_size, Interface::axis::x);
+			int start_i        = (i * dmns.cols() + j) * ns_interface_size + ns_start_i;
+			interfaces[curr_i] = Interface(curr_i, start_i, ns_interface_size, Interface::axis::x);
 			Interface &curr_interface = interfaces[curr_i];
 			// link to domain on left
 			curr_interface.left = &dmns(i, j);
 			dmns(i, j).north = &curr_interface;
 			// link to domain on right
 			curr_interface.right = &dmns(i + 1, j);
-			dmns(i+1, j).south = &curr_interface;
+			dmns(i + 1, j).south = &curr_interface;
 			curr_i++;
 		}
 	}
@@ -213,12 +212,12 @@ vector<Interface> createAndLinkInterfacesBFS(DomainMatrix &dmns)
 			int     interface_size = curr_domain.u.cols();
 			interfaces[curr_i]
 			= Interface(curr_i, curr_gamma_i, interface_size, Interface::axis::x);
-            interfaces[curr_i].left = &curr_domain;
-            curr_domain.north = &interfaces[curr_i];
-            interfaces[curr_i].right = &nbr;
-            nbr.south = &interfaces[curr_i];
-            curr_i++;
-            curr_gamma_i+=interface_size;
+			interfaces[curr_i].left  = &curr_domain;
+			curr_domain.north        = &interfaces[curr_i];
+			interfaces[curr_i].right = &nbr;
+			nbr.south                = &interfaces[curr_i];
+			curr_i++;
+			curr_gamma_i += interface_size;
 			if (std::find(queue.begin(), queue.end(), &nbr) == queue.end()) {
 				queue.push_back(&nbr);
 			}
@@ -228,12 +227,12 @@ vector<Interface> createAndLinkInterfacesBFS(DomainMatrix &dmns)
 			int     interface_size = curr_domain.u.rows();
 			interfaces[curr_i]
 			= Interface(curr_i, curr_gamma_i, interface_size, Interface::axis::y);
-            interfaces[curr_i].left = &curr_domain;
-            curr_domain.east = &interfaces[curr_i];
-            interfaces[curr_i].right = &nbr;
-            nbr.west = &interfaces[curr_i];
-            curr_i++;
-            curr_gamma_i+=interface_size;
+			interfaces[curr_i].left  = &curr_domain;
+			curr_domain.east         = &interfaces[curr_i];
+			interfaces[curr_i].right = &nbr;
+			nbr.west                 = &interfaces[curr_i];
+			curr_i++;
+			curr_gamma_i += interface_size;
 			if (std::find(queue.begin(), queue.end(), &nbr) == queue.end()) {
 				queue.push_back(&nbr);
 			}
@@ -243,12 +242,12 @@ vector<Interface> createAndLinkInterfacesBFS(DomainMatrix &dmns)
 			int     interface_size = curr_domain.u.cols();
 			interfaces[curr_i]
 			= Interface(curr_i, curr_gamma_i, interface_size, Interface::axis::x);
-            interfaces[curr_i].left = &nbr;
-            nbr.north = &interfaces[curr_i];
-            interfaces[curr_i].right = &curr_domain;
-            curr_domain.south = &interfaces[curr_i];
-            curr_i++;
-            curr_gamma_i+=interface_size;
+			interfaces[curr_i].left  = &nbr;
+			nbr.north                = &interfaces[curr_i];
+			interfaces[curr_i].right = &curr_domain;
+			curr_domain.south        = &interfaces[curr_i];
+			curr_i++;
+			curr_gamma_i += interface_size;
 			if (std::find(queue.begin(), queue.end(), &nbr) == queue.end()) {
 				queue.push_back(&nbr);
 			}
@@ -258,12 +257,12 @@ vector<Interface> createAndLinkInterfacesBFS(DomainMatrix &dmns)
 			int     interface_size = curr_domain.u.rows();
 			interfaces[curr_i]
 			= Interface(curr_i, curr_gamma_i, interface_size, Interface::axis::y);
-            interfaces[curr_i].left = &nbr;
-            nbr.east = &interfaces[curr_i];
-            interfaces[curr_i].right = &curr_domain;
-            curr_domain.west = &interfaces[curr_i];
-            curr_i++;
-            curr_gamma_i+=interface_size;
+			interfaces[curr_i].left  = &nbr;
+			nbr.east                 = &interfaces[curr_i];
+			interfaces[curr_i].right = &curr_domain;
+			curr_domain.west         = &interfaces[curr_i];
+			curr_i++;
+			curr_gamma_i += interface_size;
 			if (std::find(queue.begin(), queue.end(), &nbr) == queue.end()) {
 				queue.push_back(&nbr);
 			}
@@ -271,8 +270,8 @@ vector<Interface> createAndLinkInterfacesBFS(DomainMatrix &dmns)
 	}
 	return interfaces;
 }
-void graphAssistedMatrixFormation(DomainMatrix &dmns, vector<Interface> &interfaces, SparseMatrix<double> &A,
-                                  VectorXd &b)
+void graphAssistedMatrixFormation(DomainMatrix &dmns, vector<Interface> &interfaces,
+                                  SparseMatrix<double> &A, VectorXd &b)
 {
 	using namespace boost;
 	typedef adjacency_list<vecS, vecS, bidirectionalS> Graph;
@@ -333,11 +332,11 @@ void graphAssistedMatrixFormation(DomainMatrix &dmns, vector<Interface> &interfa
 	                                                        get(vertex_index, graph));
 	vertices_size_type num_colors = sequential_vertex_coloring(graph, color);
 	cout << "Number of colors: " << num_colors << "\n";
-	cout << "Colors: \n";
-	for (size_t c : color_vec) {
-		cout << c << " ";
-	}
-	cout << "\n";
+	// cout << "Colors: \n";
+	// for (size_t c : color_vec) {
+	//		cout << c << " ";
+	//	}
+	//	cout << "\n";
 	// get b vector
 	VectorXd gamma = VectorXd::Zero(b.size());
 	b              = solveWithInterfaceValues(dmns, interfaces, gamma);
@@ -494,6 +493,8 @@ int main(int argc, char *argv[])
 	args::Positional<int> n_y(parser, "n_y", "number of cells in the y direction, in each domain");
 	args::ValueFlag<string> f_m(parser, "matrix filename", "the file to write the matrix to",
 	                            {'m'});
+	args::ValueFlag<string> f_r(parser, "rhs filename", "the file to write the rhs vector to",
+	                            {'r'});
 	args::ValueFlag<string> f_s(parser, "solution filename", "the file to write the solution to",
 	                            {'s'});
 	args::Flag f_cg(parser, "cg", "use conjugate gradient for solving gamma values", {"cg"});
@@ -540,6 +541,11 @@ int main(int argc, char *argv[])
 	string save_matrix_file = "";
 	if (f_m) {
 		save_matrix_file = args::get(f_m);
+	}
+
+	string save_rhs_file = "";
+	if (f_r) {
+		save_rhs_file = args::get(f_r);
 	}
 
 	double error;
@@ -605,10 +611,11 @@ int main(int argc, char *argv[])
 	VectorXd gamma = VectorXd::Zero(m_y * (num_domains_x - 1) + m_x * (num_domains_y - 1));
 	double   condition_number = 0.0;
 	if (num_domains_x > 1 || num_domains_y > 1) {
+		VectorXd b = VectorXd::Zero(gamma.size());
 		if (f_cg) {
 			// Solve with a function wrapper
 			// get the b vector
-			VectorXd        b = solveWithInterfaceValues(dmns, interfaces, gamma);
+			b = solveWithInterfaceValues(dmns, interfaces, gamma);
 			FunctionWrapper F(&dmns, &interfaces, gamma.size(), b);
 			Eigen::ConjugateGradient<FunctionWrapper, Eigen::Lower | Eigen::Upper,
 			                         Eigen::IdentityPreconditioner>
@@ -620,7 +627,6 @@ int main(int argc, char *argv[])
 		} else if (f_gp) {
 			// quickly form the matrix and then use CG to solve
 			SparseMatrix<double> A(gamma.size(), gamma.size());
-			VectorXd             b(gamma.size());
 
 			// form the matrix
 			graphAssistedMatrixFormation(dmns, interfaces, A, b);
@@ -638,7 +644,7 @@ int main(int argc, char *argv[])
 		} else {
 			// slowly form the matrix and then solve with LU decomposition
 			// get the b vector
-			VectorXd b = solveWithInterfaceValues(dmns, interfaces, gamma);
+			b = solveWithInterfaceValues(dmns, interfaces, gamma);
 			// create a matrix
 			MatrixXd A(gamma.size(), gamma.size());
 			// get the columns of the matrix
@@ -657,13 +663,22 @@ int main(int argc, char *argv[])
 			condition_number = 1.0 / lu.rcond();
 
 			if (save_matrix_file != "") {
-				// print out solution
+				// print out matrix
 				ofstream out_file(save_matrix_file);
 				out_file.precision(20);
 				out_file << scientific;
 				out_file << A << "\n";
 				out_file.close();
 			}
+		}
+
+		if (save_rhs_file != "") {
+			// print out rhs
+			ofstream out_file(save_rhs_file);
+			out_file.precision(20);
+			out_file << scientific;
+			out_file << b << "\n";
+			out_file.close();
 		}
 	}
 
