@@ -281,61 +281,63 @@ void graphAssistedMatrixFormation(DomainMatrix &dmns, vector<Interface> &interfa
 	typedef graph_traits<Graph>::vertices_size_type vertices_size_type;
 	typedef property_map<Graph, vertex_index_t>::const_type vertex_index_map;
 
+	// create some enums
+	enum { NORTH, EAST, SOUTH, WEST };
+	enum { LEFT, RIGHT };
+
 	const int num_vertices = interfaces.size();
 	Graph     graph(num_vertices);
-	for (Interface &i : interfaces) {
-		const int u = i.my_id;
-		// add verticies in left domain
-		{
-			Domain &left = *i.left;
-			if (left.north != nullptr && left.north != &i) {
-				int v = left.north->my_id;
-				add_edge(u, v, graph);
+
+	// populate graph with edges
+	for (Interface &curr_iface : interfaces) {
+		const int u = curr_iface.my_id;
+		for (int i = LEFT; i <= RIGHT; i++) {
+			// get domain
+			Domain *domain_ptr;
+			if (i == LEFT) {
+				domain_ptr = curr_iface.left;
+			} else {
+				domain_ptr = curr_iface.right;
 			}
-			if (left.east != nullptr && left.east != &i) {
-				int v = left.east->my_id;
-				add_edge(u, v, graph);
-			}
-			if (left.south != nullptr && left.south != &i) {
-				int v = left.south->my_id;
-				add_edge(u, v, graph);
-			}
-			if (left.west != nullptr && left.west != &i) {
-				int v = left.west->my_id;
-				add_edge(u, v, graph);
-			}
-		}
-		// add verticies in right domain
-		{
-			Domain &right = *i.right;
-			if (right.north != nullptr && right.north != &i) {
-				int v = right.north->my_id;
-				add_edge(u, v, graph);
-			}
-			if (right.east != nullptr && right.east != &i) {
-				int v = right.east->my_id;
-				add_edge(u, v, graph);
-			}
-			if (right.south != nullptr && right.south != &i) {
-				int v = right.south->my_id;
-				add_edge(u, v, graph);
-			}
-			if (right.west != nullptr && right.west != &i) {
-				int v = right.west->my_id;
-				add_edge(u, v, graph);
+			Domain &domain = *domain_ptr;
+
+			for (int i = NORTH; i <= WEST; i++) {
+				// get neighbor interface
+				Interface *nbr_iface;
+				switch (i) {
+					case NORTH:
+						nbr_iface = domain.north;
+						break;
+					case EAST:
+						nbr_iface = domain.east;
+						break;
+					case SOUTH:
+						nbr_iface = domain.south;
+						break;
+					case WEST:
+						nbr_iface = domain.west;
+						break;
+				}
+
+				// add an edge for that interface
+				if (nbr_iface != nullptr && nbr_iface != &curr_iface) {
+					int v = nbr_iface->my_id;
+					add_edge(u, v, graph);
+				}
 			}
 		}
 	}
+
 	std::vector<size_t> color_vec(num_vertices);
 	iterator_property_map<size_t *, vertex_index_map> color(&color_vec.front(),
-	                                                                    get(vertex_index, graph));
+	                                                        get(vertex_index, graph));
 	vertices_size_type num_colors = sequential_vertex_coloring(graph, color);
 	cout << "Number of colors: " << num_colors << "\n";
-	//cout << "Colors: \n";
-	//for (size_t c : color_vec) {
-	//	cout << c << " ";
-	//}
-	//cout << "\n";
+	cout << "Colors: \n";
+	for (size_t c : color_vec) {
+		cout << c << " ";
+	}
+	cout << "\n";
 	// get b vector
 	VectorXd gamma = VectorXd::Zero(b.size());
 	b              = solveWithInterfaceValues(dmns, interfaces, gamma);
@@ -364,9 +366,9 @@ void graphAssistedMatrixFormation(DomainMatrix &dmns, vector<Interface> &interfa
 		for (int index = 0; index < max_size; index++) {
 			num_solves++;
 			// set value to one
-			for (Interface *i : vertices) {
-				if (index < max_size) {
-					i->gamma(index) = 1;
+			for (Interface *curr_iface : vertices) {
+				if (index < curr_iface->size) {
+					curr_iface->gamma(index) = 1;
 				}
 			}
 
@@ -377,124 +379,78 @@ void graphAssistedMatrixFormation(DomainMatrix &dmns, vector<Interface> &interfa
 				}
 			}
 
-            // fill matrix values
-			for (Interface *i : vertices) {
-				if (index < max_size) {
+			// fill matrix values
+			for (Interface *curr_iface : vertices) {
+				if (index < curr_iface->size) {
 					// set diagonal
 					{
-						int      vertex_i = i->start_index;
-						int      j        = vertex_i + index;
-						VectorXd diff
-						= b.block(i->start_index, 0, i->size, 1) - (VectorXd) i->getDiff();
-						for (int curr_i = 0; curr_i < i->size; curr_i++) {
-							int ind = curr_i + vertex_i;
-							tripletList.push_back(Trip(ind, j, diff(curr_i)));
+						int      iface_i = curr_iface->start_index;
+						int      j       = iface_i + index;
+						VectorXd diff    = b.block(curr_iface->start_index, 0, curr_iface->size, 1)
+						                - (VectorXd) curr_iface->getDiff();
+						for (int curr_i = 0; curr_i < curr_iface->size; curr_i++) {
+							int i = curr_i + iface_i;
+							tripletList.push_back(Trip(i, j, diff(curr_i)));
 						}
 					}
-					// add off diagonals from left domain
-					{
-						Domain &left = *i->left;
-						if (left.north != nullptr && left.north != i) {
-							Interface &nbr_i = *left.north;
-							VectorXd   diff  = b.block(nbr_i.start_index, 0, nbr_i.size, 1)
-							                - (VectorXd) nbr_i.getZeroDiffFromLeft();
-							int vertex_i = nbr_i.start_index;
-							int j        = i->start_index + index;
-							for (int curr_i = 0; curr_i < i->size; curr_i++) {
-								int ind = curr_i + vertex_i;
-								tripletList.push_back(Trip(ind, j, diff(curr_i)));
-							}
-						}
-						if (left.east != nullptr && left.east != i) {
-							Interface &nbr_i = *left.east;
-							VectorXd   diff  = b.block(nbr_i.start_index, 0, nbr_i.size, 1)
-							                - (VectorXd) nbr_i.getZeroDiffFromLeft();
-							int vertex_i = nbr_i.start_index;
-							int j        = i->start_index + index;
-							for (int curr_i = 0; curr_i < i->size; curr_i++) {
-								int ind = curr_i + vertex_i;
-								tripletList.push_back(Trip(ind, j, diff(curr_i)));
-							}
-						}
-						if (left.south != nullptr && left.south != i) {
-							Interface &nbr_i = *left.south;
-							VectorXd   diff  = b.block(nbr_i.start_index, 0, nbr_i.size, 1)
-							                - (VectorXd) nbr_i.getZeroDiffFromRight();
-							int vertex_i = nbr_i.start_index;
-							int j        = i->start_index + index;
-							for (int curr_i = 0; curr_i < i->size; curr_i++) {
-								int ind = curr_i + vertex_i;
-								tripletList.push_back(Trip(ind, j, diff(curr_i)));
-							}
-						}
-						if (left.west != nullptr && left.west != i) {
-							Interface &nbr_i = *left.west;
-							VectorXd   diff  = b.block(nbr_i.start_index, 0, nbr_i.size, 1)
-							                - (VectorXd) nbr_i.getZeroDiffFromRight();
-							int vertex_i = nbr_i.start_index;
-							int j        = i->start_index + index;
-							for (int curr_i = 0; curr_i < i->size; curr_i++) {
-								int ind = curr_i + vertex_i;
-								tripletList.push_back(Trip(ind, j, diff(curr_i)));
-							}
-						}
-					}
-					// add off diagonals from right domain
-					{
-						Domain &right = *i->right;
-						if (right.north != nullptr && right.north != i) {
-							Interface &nbr_i = *right.north;
-							VectorXd   diff  = b.block(nbr_i.start_index, 0, nbr_i.size, 1)
-							                - (VectorXd) nbr_i.getZeroDiffFromLeft();
-							int vertex_i = nbr_i.start_index;
-							int j        = i->start_index + index;
-							for (int curr_i = 0; curr_i < i->size; curr_i++) {
-								int ind = curr_i + vertex_i;
-								tripletList.push_back(Trip(ind, j, diff(curr_i)));
-							}
-						}
-						if (right.east != nullptr && right.east != i) {
-							Interface &nbr_i = *right.east;
-							VectorXd   diff  = b.block(nbr_i.start_index, 0, nbr_i.size, 1)
-							                - (VectorXd) nbr_i.getZeroDiffFromLeft();
-							int vertex_i = nbr_i.start_index;
-							int j        = i->start_index + index;
-							for (int curr_i = 0; curr_i < i->size; curr_i++) {
-								int ind = curr_i + vertex_i;
-								tripletList.push_back(Trip(ind, j, diff(curr_i)));
-							}
-						}
-						if (right.south != nullptr && right.south != i) {
-							Interface &nbr_i = *right.south;
-							VectorXd   diff  = b.block(nbr_i.start_index, 0, nbr_i.size, 1)
-							                - (VectorXd) nbr_i.getZeroDiffFromRight();
-							int vertex_i = nbr_i.start_index;
-							int j        = i->start_index + index;
-							for (int curr_i = 0; curr_i < i->size; curr_i++) {
-								int ind = curr_i + vertex_i;
-								tripletList.push_back(Trip(ind, j, diff(curr_i)));
-							}
-						}
-						if (right.west != nullptr && right.west != i) {
-							Interface &nbr_i = *right.west;
-							VectorXd   diff  = b.block(nbr_i.start_index, 0, nbr_i.size, 1)
-							                - (VectorXd) nbr_i.getZeroDiffFromRight();
-							int vertex_i = nbr_i.start_index;
-							int j        = i->start_index + index;
-							for (int curr_i = 0; curr_i < i->size; curr_i++) {
-								int ind = curr_i + vertex_i;
-								tripletList.push_back(Trip(ind, j, diff(curr_i)));
-							}
-						}
 
+					// set off-diagonal entries
+					for (int i = LEFT; i <= RIGHT; i++) {
+						// get domain
+						Domain *domain_ptr;
+						if (i == LEFT) {
+							domain_ptr = curr_iface->left;
+						} else {
+							domain_ptr = curr_iface->right;
+						}
+						Domain &domain = *domain_ptr;
+
+						for (int i = NORTH; i <= WEST; i++) {
+							// get neighbor interface
+							Interface *nbr_iface;
+							switch (i) {
+								case NORTH:
+									nbr_iface = domain.north;
+									break;
+								case EAST:
+									nbr_iface = domain.east;
+									break;
+								case SOUTH:
+									nbr_iface = domain.south;
+									break;
+								case WEST:
+									nbr_iface = domain.west;
+									break;
+							}
+
+							// add entries for that interface
+							if (nbr_iface != nullptr && nbr_iface != curr_iface) {
+								// get the difference
+								VectorXd diff
+								= b.block(nbr_iface->start_index, 0, nbr_iface->size, 1);
+								if (i == NORTH || i == EAST) {
+									diff -= (VectorXd) nbr_iface->getZeroDiffFromLeft();
+								} else {
+									diff -= (VectorXd) nbr_iface->getZeroDiffFromRight();
+								}
+
+								// fill matrix values
+								int iface_i = nbr_iface->start_index;
+								int j       = curr_iface->start_index + index;
+								for (int curr_i = 0; curr_i < nbr_iface->size; curr_i++) {
+									int i = curr_i + iface_i;
+									tripletList.push_back(Trip(i, j, diff(curr_i)));
+								}
+							}
+						}
 					}
 				}
 			}
 
 			// set value back to zero
-			for (Interface *i : vertices) {
-				if (index < max_size) {
-					i->gamma(index) = 0;
+			for (Interface *curr_iface : vertices) {
+				if (index < curr_iface->size) {
+					curr_iface->gamma(index) = 0;
 				}
 			}
 		}
@@ -509,18 +465,18 @@ void linkDomains(DomainMatrix &dmns)
 {
 	for (int i = 0; i < dmns.rows(); i++) {
 		for (int j = 0; j < dmns.cols(); j++) {
-            if(i!=dmns.rows()-1){
-                dmns(i,j).north_domain = &dmns(i+1,j);
-            }
-            if(j!=dmns.cols()-1){
-                dmns(i,j).east_domain = &dmns(i,j+1);
-            }
-            if(i!=0){
-                dmns(i,j).south_domain = &dmns(i-1,j);
-            }
-            if(j!=0){
-                dmns(i,j).west_domain = &dmns(i,j-1);
-            }
+			if (i != dmns.rows() - 1) {
+				dmns(i, j).north_domain = &dmns(i + 1, j);
+			}
+			if (j != dmns.cols() - 1) {
+				dmns(i, j).east_domain = &dmns(i, j + 1);
+			}
+			if (i != 0) {
+				dmns(i, j).south_domain = &dmns(i - 1, j);
+			}
+			if (j != 0) {
+				dmns(i, j).west_domain = &dmns(i, j - 1);
+			}
 		}
 	}
 }
@@ -635,20 +591,22 @@ int main(int argc, char *argv[])
 			dmns(i, j) = Domain(sub_grid, h_x, h_y);
 		}
 	}
-    linkDomains(dmns);
+	linkDomains(dmns);
 
 	// Generate Interfaces
 	vector<Interface> interfaces;
-    if(f_bfs){
-	interfaces = createAndLinkInterfacesBFS(dmns);
-    }else{
-	interfaces = createAndLinkInterfaces(dmns);
-    }
+	if (f_bfs) {
+		interfaces = createAndLinkInterfacesBFS(dmns);
+	} else {
+		interfaces = createAndLinkInterfaces(dmns);
+	}
+
 	// create gamma array
 	VectorXd gamma = VectorXd::Zero(m_y * (num_domains_x - 1) + m_x * (num_domains_y - 1));
 	double   condition_number = 0.0;
 	if (num_domains_x > 1 || num_domains_y > 1) {
 		if (f_cg) {
+			// Solve with a function wrapper
 			// get the b vector
 			VectorXd        b = solveWithInterfaceValues(dmns, interfaces, gamma);
 			FunctionWrapper F(&dmns, &interfaces, gamma.size(), b);
@@ -660,9 +618,14 @@ int main(int argc, char *argv[])
 			gamma = cg.solve(b);
 			std::cout << "CG: Number of iterations: " << cg.iterations() << "\n";
 		} else if (f_gp) {
+			// quickly form the matrix and then use CG to solve
 			SparseMatrix<double> A(gamma.size(), gamma.size());
 			VectorXd             b(gamma.size());
+
+			// form the matrix
 			graphAssistedMatrixFormation(dmns, interfaces, A, b);
+
+			// solve
 			Eigen::ConjugateGradient<SparseMatrix<double>, Eigen::Lower | Eigen::Upper,
 			                         Eigen::IdentityPreconditioner>
 			cg(A);
@@ -673,6 +636,7 @@ int main(int argc, char *argv[])
 				saveMarket(A, save_matrix_file);
 			}
 		} else {
+			// slowly form the matrix and then solve with LU decomposition
 			// get the b vector
 			VectorXd b = solveWithInterfaceValues(dmns, interfaces, gamma);
 			// create a matrix
@@ -687,7 +651,7 @@ int main(int argc, char *argv[])
 			cout << "Number of solves to form " << gamma.size() << "x" << gamma.size()
 			     << " Matrix: " << gamma.size() << "\n";
 
-			// solve for gamme values
+			// solve for gamma values
 			FullPivLU<MatrixXd> lu(A);
 			gamma            = lu.solve(b);
 			condition_number = 1.0 / lu.rcond();
