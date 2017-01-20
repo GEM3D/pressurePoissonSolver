@@ -41,6 +41,7 @@ class FunctionWrapper : public Eigen::EigenBase<FunctionWrapper>
 
 	public:
 	DomainMatrix *     dmns;
+	SparseMatrix<double> *block_diag;
 	vector<Interface> *interfaces;
 	VectorXd           b;
 	// Required typedefs, constants, and method:
@@ -269,6 +270,171 @@ vector<Interface> createAndLinkInterfacesBFS(DomainMatrix &dmns)
 		}
 	}
 	return interfaces;
+}
+class BlockPreconditioner
+{
+	public:
+	SparseMatrix<double> *block_diag;
+    SimplicialLDLT<SparseMatrix<double>> solver;
+	BlockPreconditioner() {}
+	template <typename MatrixType> BlockPreconditioner(const MatrixType &) {}
+	template <typename MatrixType> BlockPreconditioner &analyzePattern(const MatrixType &)
+	{
+		return *this;
+	}
+
+	template <typename MatrixType> BlockPreconditioner &factorize(const MatrixType & mat)
+	{
+	    block_diag = ((FunctionWrapper) mat).block_diag;
+        solver.compute(*block_diag);
+		return *this;
+	}
+
+	template <typename MatrixType> BlockPreconditioner &compute(const MatrixType &mat)
+	{
+		return factorize(mat);
+	}
+
+	template <typename Rhs> const Rhs solve(const Rhs &b) const {
+        return solver.solve(b); 
+
+    }
+        ComputationInfo info() { return Success; }
+
+};
+void graphAssistedBlockDiagFormation(DomainMatrix &dmns, vector<Interface> &interfaces,
+                                     SparseMatrix<double> &A, VectorXd &b)
+{
+	using namespace boost;
+	typedef adjacency_list<vecS, vecS, bidirectionalS> Graph;
+	// typedef std::pair<int, int> Edge;
+	// typedef graph_traits<Graph>::vertex_descriptor  vertex_descriptor;
+	typedef graph_traits<Graph>::vertices_size_type vertices_size_type;
+	typedef property_map<Graph, vertex_index_t>::const_type vertex_index_map;
+
+	// create some enums
+	enum { NORTH, EAST, SOUTH, WEST };
+	enum { LEFT, RIGHT };
+
+	const int num_vertices = interfaces.size();
+	Graph     graph(num_vertices);
+
+	// populate graph with edges
+	for (Interface &curr_iface : interfaces) {
+		const int u = curr_iface.my_id;
+		for (int i = LEFT; i <= RIGHT; i++) {
+			// get domain
+			Domain *domain_ptr;
+			if (i == LEFT) {
+				domain_ptr = curr_iface.left;
+			} else {
+				domain_ptr = curr_iface.right;
+			}
+			Domain &domain = *domain_ptr;
+
+			for (int i = NORTH; i <= WEST; i++) {
+				// get neighbor interface
+				Interface *nbr_iface;
+				switch (i) {
+					case NORTH:
+						nbr_iface = domain.north;
+						break;
+					case EAST:
+						nbr_iface = domain.east;
+						break;
+					case SOUTH:
+						nbr_iface = domain.south;
+						break;
+					case WEST:
+						nbr_iface = domain.west;
+						break;
+				}
+
+				// add an edge for that interface
+				if (nbr_iface != nullptr && nbr_iface != &curr_iface) {
+					int v = nbr_iface->my_id;
+					add_edge(u, v, graph);
+				}
+			}
+		}
+	}
+
+	std::vector<size_t> color_vec(num_vertices);
+	iterator_property_map<size_t *, vertex_index_map> color(&color_vec.front(),
+	                                                        get(vertex_index, graph));
+	vertices_size_type num_colors = sequential_vertex_coloring(graph, color);
+	cout << "Number of colors: " << num_colors << "\n";
+	// cout << "Colors: \n";
+	// for (size_t c : color_vec) {
+	//		cout << c << " ";
+	//	}
+	//	cout << "\n";
+	// get b vector
+	VectorXd gamma = VectorXd::Zero(b.size());
+	// save the edge results for zero, and get max interface size
+	int max_size = 0;
+	for (Interface &i : interfaces) {
+		if (i.size > max_size) {
+			max_size = i.size;
+		}
+	}
+
+	typedef Eigen::Triplet<double> Trip;
+	std::deque<Trip>               tripletList;
+	// start forming matrix
+	int num_solves = 0;
+	for (size_t c = 0; c < num_colors; c++) {
+		// get list of vertices with color c
+		list<Interface *> vertices;
+		for (size_t i = 0; i < color_vec.size(); i++) {
+			if (color_vec[i] == c) {
+				vertices.push_back(&interfaces[i]);
+			}
+		}
+		// set each value to one and solve
+		for (int index = 0; index < max_size; index++) {
+			num_solves++;
+			// set value to one
+			for (Interface *curr_iface : vertices) {
+				if (index < curr_iface->size) {
+					curr_iface->gamma(index) = 1;
+				}
+			}
+
+			// solve
+			for (int i = 0; i < dmns.rows(); i++) {
+				for (int j = 0; j < dmns.cols(); j++) {
+					dmns(i, j).solve();
+				}
+			}
+
+			// fill matrix values
+			for (Interface *curr_iface : vertices) {
+				if (index < curr_iface->size) {
+					// set diagonal
+					int      iface_i = curr_iface->start_index;
+					int      j       = iface_i + index;
+					VectorXd diff    = b.block(curr_iface->start_index, 0, curr_iface->size, 1)
+					                - (VectorXd) curr_iface->getDiff();
+					for (int curr_i = 0; curr_i < curr_iface->size; curr_i++) {
+						int i = curr_i + iface_i;
+						tripletList.push_back(Trip(i, j, diff(curr_i)));
+					}
+				}
+			}
+
+			// set value back to zero
+			for (Interface *curr_iface : vertices) {
+				if (index < curr_iface->size) {
+					curr_iface->gamma(index) = 0;
+				}
+			}
+		}
+	}
+	// form a from the list of triplets
+	A.setFromTriplets(tripletList.begin(), tripletList.end());
+	cout << "Number of solves to form " << A.rows() << "x" << A.cols() << " Matrix: " << num_solves
+	     << "\n";
 }
 void graphAssistedMatrixFormation(DomainMatrix &dmns, vector<Interface> &interfaces,
                                   SparseMatrix<double> &A, VectorXd &b)
@@ -616,9 +782,12 @@ int main(int argc, char *argv[])
 			// Solve with a function wrapper
 			// get the b vector
 			b = solveWithInterfaceValues(dmns, interfaces, gamma);
+            SparseMatrix<double> Diag(gamma.size(),gamma.size()); 
+			graphAssistedBlockDiagFormation(dmns, interfaces, Diag, b);
 			FunctionWrapper F(&dmns, &interfaces, gamma.size(), b);
+            F.block_diag = &Diag;
 			Eigen::ConjugateGradient<FunctionWrapper, Eigen::Lower | Eigen::Upper,
-			                         Eigen::IdentityPreconditioner>
+			                         BlockPreconditioner>
 			cg(F);
 			cg.setTolerance(1e-10);
 			// cg.compute(F);
