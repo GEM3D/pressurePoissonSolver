@@ -245,12 +245,11 @@ int main(int argc, char *argv[])
 	d.solveWithInterface(*gamma, *diff);
 
 	// Calcuate error
-	std::valarray<double> u          = d.u;
+	std::valarray<double> u = d.u;
 	map_type      err_map(-1, 1, 0, Comm);
 	Epetra_Vector exact_norm(err_map);
 	Epetra_Vector diff_norm(err_map);
 	exact_norm[0] = sqrt((exact*exact).sum());
-    exact -= u;
 	diff_norm[0] = sqrt(pow(exact-u,2).sum());
 	double global_diff_norm;
 	double global_exact_norm;
