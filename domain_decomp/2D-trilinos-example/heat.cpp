@@ -53,11 +53,6 @@ int main(int argc, char *argv[])
 
 	int my_global_rank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &my_global_rank);
-	// comunicator for subdomain
-	// for now, subdomains are going to be single threaded
-	MPI_Comm subdomain_comm_raw;
-	MPI_Comm_split(MPI_COMM_WORLD, my_global_rank, 0, &subdomain_comm_raw);
-	Epetra_MpiComm subdomain_comm(subdomain_comm_raw);
 
 	// parse input
 	args::ArgumentParser  parser("");
@@ -89,6 +84,7 @@ int main(int argc, char *argv[])
 		}
 		return 1;
 	}
+    double t1 = MPI::Wtime();
 	// Set the number of discretization points in the x and y direction.
 	int    num_domains_x = args::get(d_x);
 	int    num_domains_y = args::get(d_y);
@@ -104,12 +100,9 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	// create a map and matrix
-	RCP<map_type> Map = rcp(new map_type(nx * ny, 0, subdomain_comm));
-
 	// Generate RHS vector
-	RCP<vector_type> f     = rcp(new vector_type(*Map, 1, false));
-	RCP<vector_type> exact = rcp(new vector_type(*Map, 1, false));
+    std::valarray<double> f(nx*ny);
+    std::valarray<double> exact(nx*ny);
 
 	// Use local indices to access the entries of f_data.
 	for (int yi = 0; yi < ny; yi++) {
@@ -118,19 +111,19 @@ int main(int argc, char *argv[])
 			int    index_y            = domain_y * ny + yi;
 			double x                  = h_x / 2.0 + 1.0 * index_x / (nx * num_domains_x);
 			double y                  = h_y / 2.0 + 1.0 * index_y / (ny * num_domains_y);
-			(*f)[0][yi * nx + xi]     = ffun(x, y);
-			(*exact)[0][yi * nx + xi] = gfun(x, y);
+			f[yi * nx + xi]     = ffun(x, y);
+			exact[yi * nx + xi] = gfun(x, y);
 			if (index_x == 0) {
-				(*f)[0][yi * nx + xi] += -2.0 / (h_x * h_x) * gfun(0.0, y);
+				f[yi * nx + xi] += -2.0 / (h_x * h_x) * gfun(0.0, y);
 			}
 			if (index_x == num_domains_x * nx - 1) {
-				(*f)[0][yi * nx + xi] += -2.0 / (h_x * h_x) * gfun(1.0, y);
+				f[yi * nx + xi] += -2.0 / (h_x * h_x) * gfun(1.0, y);
 			}
 			if (index_y == 0) {
-				(*f)[0][yi * nx + xi] += -2.0 / (h_y * h_y) * gfun(x, 0.0);
+				f[yi * nx + xi] += -2.0 / (h_y * h_y) * gfun(x, 0.0);
 			}
 			if (index_y == num_domains_y * ny - 1) {
-				(*f)[0][yi * nx + xi] += -2.0 / (h_y * h_y) * gfun(x, 1.0);
+				f[yi * nx + xi] += -2.0 / (h_y * h_y) * gfun(x, 1.0);
 			}
 		}
 	}
@@ -163,10 +156,9 @@ int main(int argc, char *argv[])
 	}
 
 	// Now Calculate the global indicies for thos interface points
-	std::vector<int> global_i(num_interface_points);
-	RCP<vector_type> u          = d.u;
-	int              ns_start_i = num_domains_y * (num_domains_x - 1) * ny;
-	int              curr_i     = 0;
+	std::vector<int>      global_i(num_interface_points);
+	int                   ns_start_i = num_domains_y * (num_domains_x - 1) * ny;
+	int                   curr_i     = 0;
 	if (d.has_north) {
 		int curr_global_i = (domain_y * num_domains_x + domain_x) * nx + ns_start_i;
 		for (int i = 0; i < nx; i++) {
@@ -253,30 +245,26 @@ int main(int argc, char *argv[])
 	d.solveWithInterface(*gamma, *diff);
 
 	// Calcuate error
+	std::valarray<double> u          = d.u;
 	map_type      err_map(-1, 1, 0, Comm);
 	Epetra_Vector exact_norm(err_map);
 	Epetra_Vector diff_norm(err_map);
-	exact->Norm2(&exact_norm[0]);
-	{
-		// Use local indices to access the entries of f_data.
-		const int localLength      = f->MyLength();
-		int       NumMyElements    = Map->NumMyElements();
-		int *     MyGlobalElements = 0;
-		Map->MyGlobalElementsPtr(MyGlobalElements);
-		for (int i = 0; i < NumMyElements; i++) {
-			(*exact)[0][i] -= (*u)[0][i];
-		}
-	}
-	exact->Norm2(&diff_norm[0]);
+	exact_norm[0] = sqrt((exact*exact).sum());
+    exact -= u;
+	diff_norm[0] = sqrt(pow(exact-u,2).sum());
 	double global_diff_norm;
 	double global_exact_norm;
 	diff_norm.Norm2(&global_diff_norm);
 	exact_norm.Norm2(&global_exact_norm);
+    double t2 = MPI::Wtime();
 	if (my_global_rank == 0) {
         std::cout << std::scientific;
         std::cout.precision(13);
 		std::cout << "Error: " << global_diff_norm / global_exact_norm << "\n";
+        std::cout << std::defaultfloat;
+		std::cout << "Time: " << t2-t1 << "\n";
 	}
+
 
 	MPI_Finalize();
 	return 0;
