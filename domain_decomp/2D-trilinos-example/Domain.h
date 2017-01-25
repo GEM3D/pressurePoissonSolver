@@ -18,10 +18,10 @@ class Domain
 	int                    ny;
 	double                 h_x;
 	double                 h_y;
-	double *               boundary_north = nullptr;
-	double *               boundary_south = nullptr;
-	double *               boundary_east  = nullptr;
-	double *               boundary_west  = nullptr;
+	std::valarray<double>   boundary_north;
+	std::valarray<double>   boundary_south;
+	std::valarray<double>   boundary_east;
+	std::valarray<double>   boundary_west;
 	bool                   has_north      = false;
 	bool                   has_south      = false;
 	bool                   has_east       = false;
@@ -53,24 +53,12 @@ class Domain
 
 	void solve()
 	{
-		for (int y_i = 0; y_i < ny; y_i++) {
-			for (int x_i = 0; x_i < nx; x_i++) {
-				f_copy[y_i * nx + x_i] = f[y_i * nx + x_i];
-				if (y_i == ny - 1 && has_north) {
-					f_copy[y_i * nx + x_i] += -2.0 / (h_y * h_y) * boundary_north[x_i];
-				}
-				if (x_i == nx - 1 && has_east) {
-					f_copy[y_i * nx + x_i] += -2.0 / (h_x * h_x) * boundary_east[y_i];
-				}
-				if (y_i == 0 && has_south) {
-					f_copy[y_i * nx + x_i] += -2.0 / (h_y * h_y) * boundary_south[x_i];
-				}
-				if (x_i == 0 && has_west) {
-					f_copy[y_i * nx + x_i] += -2.0 / (h_x * h_x) * boundary_west[y_i];
-				}
-			}
-		}
-
+		f_copy = f;
+		if(has_north)f_copy[std::slice(nx*(ny-1),nx,1)] -= 2/(h_y*h_y)* boundary_north;
+		if(has_east)f_copy[std::slice((nx-1),ny,nx)] -=  2/(h_y*h_y)*boundary_east;
+		if(has_south)f_copy[std::slice(0,nx,1)] -= 2/(h_y*h_y)* boundary_south;
+		if(has_west)f_copy[std::slice(0,ny,nx)] -= 2/(h_y*h_y)* boundary_west;
+		
 		// create fftw plans
 		fftw_plan plan1 = fftw_plan_r2r_2d(ny, nx, &f_copy[0], &tmp[0], FFTW_RODFT10,
 		                                   FFTW_RODFT10, FFTW_MEASURE);
@@ -98,19 +86,19 @@ class Domain
 		local_vector.Import(gamma, importer, Insert);
 		int curr_i = 0;
 		if (has_north) {
-			boundary_north = &local_vector[0][curr_i];
+			boundary_north = std::valarray<double>(&local_vector[0][curr_i],nx);
 			curr_i += nx;
 		}
 		if (has_east) {
-			boundary_east = &local_vector[0][curr_i];
+			boundary_east = std::valarray<double>(&local_vector[0][curr_i],ny);
 			curr_i += ny;
 		}
 		if (has_south) {
-			boundary_south = &local_vector[0][curr_i];
+			boundary_south = std::valarray<double>(&local_vector[0][curr_i],nx);
 			curr_i += nx;
 		}
 		if (has_west) {
-			boundary_west = &local_vector[0][curr_i];
+			boundary_west = std::valarray<double>(&local_vector[0][curr_i],ny);
 		}
 
 		// solve
