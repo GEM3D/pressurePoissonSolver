@@ -5,17 +5,8 @@
 #include <Amesos2_Version.hpp>
 #include <BelosBlockCGSolMgr.hpp>
 #include <BelosConfigDefs.hpp>
-#include <BelosEpetraAdapter.hpp>
 #include <BelosLinearProblem.hpp>
-#include <Epetra_CombineMode.h>
-#include <Epetra_CrsMatrix.h>
-#include <Epetra_Export.h>
-#include <Epetra_Import.h>
-#include <Epetra_Map.h>
-#include <Epetra_MpiComm.h>
-#include <Epetra_MultiVector.h>
-#include <Epetra_SerialComm.h>
-#include <Epetra_Vector.h>
+#include <BelosTpetraAdapter.hpp>
 #include <Teuchos_GlobalMPISession.hpp>
 #include <Teuchos_ParameterList.hpp>
 #include <Teuchos_RCP.hpp>
@@ -46,7 +37,7 @@ int main(int argc, char *argv[])
 	using Teuchos::rcp;
 
 	MPI_Init(&argc, &argv);
-	Epetra_MpiComm Comm(MPI_COMM_WORLD);
+	RCP<const Teuchos::Comm<int>> comm = Tpetra::DefaultPlatform::getDefaultPlatform().getComm();
 
 	int num_procs;
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
@@ -84,7 +75,7 @@ int main(int argc, char *argv[])
 		}
 		return 1;
 	}
-    double t1 = MPI::Wtime();
+	double t1 = MPI::Wtime();
 	// Set the number of discretization points in the x and y direction.
 	int    num_domains_x = args::get(d_x);
 	int    num_domains_y = args::get(d_y);
@@ -101,16 +92,16 @@ int main(int argc, char *argv[])
 	}
 
 	// Generate RHS vector
-    std::valarray<double> f(nx*ny);
-    std::valarray<double> exact(nx*ny);
+	std::valarray<double> f(nx * ny);
+	std::valarray<double> exact(nx * ny);
 
 	// Use local indices to access the entries of f_data.
 	for (int yi = 0; yi < ny; yi++) {
 		for (int xi = 0; xi < nx; xi++) {
-			int    index_x            = domain_x * nx + xi;
-			int    index_y            = domain_y * ny + yi;
-			double x                  = h_x / 2.0 + 1.0 * index_x / (nx * num_domains_x);
-			double y                  = h_y / 2.0 + 1.0 * index_y / (ny * num_domains_y);
+			int    index_x      = domain_x * nx + xi;
+			int    index_y      = domain_y * ny + yi;
+			double x            = h_x / 2.0 + 1.0 * index_x / (nx * num_domains_x);
+			double y            = h_y / 2.0 + 1.0 * index_y / (ny * num_domains_y);
 			f[yi * nx + xi]     = ffun(x, y);
 			exact[yi * nx + xi] = gfun(x, y);
 			if (index_x == 0) {
@@ -198,23 +189,23 @@ int main(int argc, char *argv[])
 	= nx * num_domains_x * (num_domains_y - 1) + ny * num_domains_y * (num_domains_x - 1);
 	if (num_domains_x * num_domains_y == 1) {
 		// this is a special case for when there is only one domain
-		d.domain_map = rcp(new map_type(1, 0, Comm));
+		d.domain_map = rcp(new map_type(1, 0, comm));
 	} else {
-		d.domain_map = rcp(new map_type(-1, num_interface_points, &global_i[0], 0, Comm));
+		d.domain_map = rcp(new map_type(-1, &global_i[0], num_interface_points, 0, comm));
 	}
 
 	// Create a map that will be used in the iterative solver
-	RCP<map_type> diff_map = rcp(new map_type(num_global_elements, 0, Comm));
+	RCP<map_type> diff_map = rcp(new map_type(num_global_elements, 0, comm));
 
 	// Create the gamma and diff vectors
-	RCP<vector_type> gamma = rcp(new vector_type(*diff_map, 1));
-	RCP<vector_type> diff  = rcp(new vector_type(*diff_map, 1));
+	RCP<vector_type> gamma = rcp(new vector_type(diff_map, 1));
+	RCP<vector_type> diff  = rcp(new vector_type(diff_map, 1));
 
 	if (num_domains_x * num_domains_y != 1) {
 		// do iterative solve
 
 		// Get the b vector
-		RCP<vector_type> b = rcp(new vector_type(*diff_map, 1));
+		RCP<vector_type> b = rcp(new vector_type(diff_map, 1));
 		d.solveWithInterface(*gamma, *b);
 
 		// Create a function wrapper
@@ -245,25 +236,24 @@ int main(int argc, char *argv[])
 	d.solveWithInterface(*gamma, *diff);
 
 	// Calcuate error
-	std::valarray<double> u = d.u;
-	map_type      err_map(-1, 1, 0, Comm);
-	Epetra_Vector exact_norm(err_map);
-	Epetra_Vector diff_norm(err_map);
-	exact_norm[0] = sqrt((exact*exact).sum());
-	diff_norm[0] = sqrt(pow(exact-u,2).sum());
+	std::valarray<double> u       = d.u;
+	RCP<map_type>         err_map = rcp(new map_type(-1, 1, 0, comm));
+	Tpetra::Vector<>      exact_norm(err_map);
+	Tpetra::Vector<>      diff_norm(err_map);
+	exact_norm.getDataNonConst()[0] = sqrt((exact * exact).sum());
+	diff_norm.getDataNonConst()[0]  = sqrt(pow(exact - u, 2).sum());
 	double global_diff_norm;
 	double global_exact_norm;
-	diff_norm.Norm2(&global_diff_norm);
-	exact_norm.Norm2(&global_exact_norm);
-    double t2 = MPI::Wtime();
+	global_diff_norm  = diff_norm.norm2();
+	global_exact_norm = exact_norm.norm2();
+	double t2         = MPI::Wtime();
 	if (my_global_rank == 0) {
-        std::cout << std::scientific;
-        std::cout.precision(13);
+		std::cout << std::scientific;
+		std::cout.precision(13);
 		std::cout << "Error: " << global_diff_norm / global_exact_norm << "\n";
-        std::cout << std::defaultfloat;
-		std::cout << "Time: " << t2-t1 << "\n";
+		std::cout << std::defaultfloat;
+		std::cout << "Time: " << t2 - t1 << "\n";
 	}
-
 
 	MPI_Finalize();
 	return 0;

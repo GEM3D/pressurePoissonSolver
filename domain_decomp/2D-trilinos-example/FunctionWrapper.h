@@ -2,8 +2,8 @@
 #define FUNCTIONWRAPPER_H
 #include "Domain.h"
 #include "MyTypeDefs.h"
-#include <BelosEpetraAdapter.hpp>
 #include <BelosLinearProblem.hpp>
+#include <BelosTpetraAdapter.hpp>
 #include <Teuchos_RCP.hpp>
 class FuncWrap // : virtual Belos::Operator
 {
@@ -18,7 +18,7 @@ class FuncWrap // : virtual Belos::Operator
 	void Apply(const vector_type &x, vector_type &y) const
 	{
 		d->solveWithInterface(x, y);
-		y.Update(1, *b, -1);
+		y.update(1, *b, -1);
 	}
 };
 namespace Belos

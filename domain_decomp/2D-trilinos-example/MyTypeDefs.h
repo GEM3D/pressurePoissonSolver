@@ -1,11 +1,14 @@
 #ifndef MYTYPEDEFS_H
 #define MYTYPEDEFS_H
-#include <Amesos2.hpp>
-#include <Epetra_CrsMatrix.h>
-#include <Epetra_Map.h>
-#include <Epetra_MultiVector.h>
-typedef Epetra_CrsMatrix   matrix_type;
-typedef Epetra_MultiVector vector_type;
-typedef Amesos2::Solver<matrix_type, vector_type> solver_type;
-typedef Epetra_Map map_type;
+#include <Tpetra_CrsMatrix.hpp>
+#include <Tpetra_DefaultPlatform.hpp>
+#include <Kokkos_View.hpp>
+#include <Kokkos_Core.hpp>
+#include <Tpetra_Vector.hpp>
+#include <Tpetra_Map.hpp>
+#include <Tpetra_MultiVector.hpp>
+typedef Tpetra::CrsMatrix<>   matrix_type;
+typedef Tpetra::MultiVector<> vector_type;
+typedef Kokkos::View<double**,Kokkos::Serial> view_type;
+typedef Tpetra::Map<> map_type;
 #endif
