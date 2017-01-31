@@ -6,13 +6,7 @@ function coeffs = idct2(x,dim)
 %     if dim = 1 (default) then the inverse DCT is along the columns.
 %     if dim = 2 then the inverse DCT is along the rows.
 %
-%  See also dct2.
-
-% % IDCT-II is a scaled DCT-III.
-% y = ( 2 / n ) * chebfun.dct(u, 3); 
-% 
-% y = chebtech1.coeffs2vals( u );    
-% y = y(end:-1:1,:); 
+%  See also dct4, idct2, dct, idct, dst, dst2, idst, idst2.
 
 [m,n] = size(x);
 
@@ -30,8 +24,6 @@ if dim == 2
     % Account for constant term
     x(:,1) = .5*x(:,1); 
 
-    j = 1:m;
-    k = n:-1:1;
     % Mirror the values for FFT:
     tmp = [x ones(m,1) x(:,end:-1:2)];
     scale = n;
@@ -42,9 +34,6 @@ if dim == 2
     w(n+2:end) = -w(n+2:end);
 
 else
-    j = m:-1:1;
-    k = 1:n;
-
     % Account for constant term
     x(1,:) = .5*x(1,:); 
 
@@ -64,7 +53,6 @@ tmp = bsxfun(@times, tmp, w);
 coeffs = fft(tmp,[],dim);
 
 % Truncate, flip the order, and scale:
-% coeffs = (2/scale)*coeffs(j,k);
 coeffs = (2/scale)*coeffs(1:m,1:n);
 
 % Post-process:
@@ -77,16 +65,3 @@ elseif ( isreal(1i*x) )
 end
 
 end
-
-% 
-% % Scale the coefficient for the constant term:
-% coeffs = (scale)/2*coeffs;
-% 
-% % Post-process:
-% if ( isreal(x) )  
-%     % Real-valued case:
-%     coeffs = real(coeffs);
-% elseif ( isreal(1i*x) )  
-%     % Imaginary-valued case:
-%     coeffs = 1i*imag(coeffs);
-% end
