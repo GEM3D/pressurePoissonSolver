@@ -36,6 +36,8 @@ using namespace std;
 DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, int d_y, double h_x,
                                    double h_y, RCP<const Teuchos::Comm<int>> comm)
 {
+	// cerr<< "Low:  " << low << "\n";
+	// cerr<< "High: " << high << "\n";
 	this->comm = comm;
     this->nx = nx;
     this->ny = ny;
@@ -581,7 +583,7 @@ int main(int argc, char *argv[])
 		RCP<matrix_type>         A          = dc.formMatrix(diff_map);
         
 		MPI_Barrier(MPI_COMM_WORLD);
-		duration<double> form_time = steady_clock::now() - iter_start;
+		duration<double> form_time = steady_clock::now() - form_start;
 
 		if (my_global_rank == 0) cout << "Matrix Formation Time: " << form_time.count() << "\n";
     
@@ -591,7 +593,7 @@ int main(int argc, char *argv[])
 		Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A, "", "");
     
 		MPI_Barrier(MPI_COMM_WORLD);
-		duration<double> write_time = steady_clock::now() - iter_start;
+		duration<double> write_time = steady_clock::now() - write_start;
 		if (my_global_rank == 0)
 			cout << "Time to write matix to file: " << write_time.count() << "\n";
 	}

@@ -29,6 +29,6 @@ void OperatorTraits<double, vector_type, FuncWrap>::Apply(const FuncWrap &wrappe
                                                           Belos::ETrans trans)
 {
 	wrapper.Apply(x, y);
-};
+}
 }
 #endif
