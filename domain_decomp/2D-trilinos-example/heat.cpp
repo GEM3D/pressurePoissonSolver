@@ -13,7 +13,9 @@
 #include <Teuchos_Tuple.hpp>
 #include <Teuchos_VerboseObject.hpp>
 #include <Teuchos_oblackholestream.hpp>
+#include <MatrixMarket_Tpetra.hpp>
 #include <cmath>
+#include <chrono>
 #include <iostream>
 #include <iostream>
 #include <mpi.h>
@@ -35,6 +37,10 @@ DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, i
                                    double h_y, RCP<const Teuchos::Comm<int>> comm)
 {
 	this->comm = comm;
+    this->nx = nx;
+    this->ny = ny;
+    this->h_x = h_x;
+    this->h_y = h_y;
 	domains    = map<int, Domain *>();
 	for (int i = low; i <= high; i++) {
 		int domain_x = i % d_y;
@@ -242,11 +248,202 @@ double DomainCollection::exactNorm(){
 	}
     return sqrt(result);
 }
+RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
+{
+    //create domain for forming matrix
+	std::valarray<double> f(nx * ny);
+	Domain                d(f, f, nx, ny, h_x, h_y);
+	d.nbr_north = 1;
+	d.nbr_east  = 1;
+	d.nbr_south = 1;
+	d.nbr_west  = 1;
+    d.boundary_north = valarray<double>(nx);
+    d.boundary_south = valarray<double>(nx);
+    d.boundary_east = valarray<double>(ny);
+    d.boundary_west = valarray<double>(ny);
+    int size = max(nx,ny);
+    RCP<matrix_type> A = rcp(new matrix_type(map,size*6));
+	// north boundary
+	for(int i=0; i<nx; i++){
+        d.boundary_north[i]=1;
+        d.solve();
+		// create row and insert for each domain
+		for (auto &p : domains) {
+			Domain &d2 = *p.second;
+			if (d2.nbr_north != -1) {
+				vector<double> row;
+				vector<int> global;
+				row.reserve(nx * 2 + ny * 2);
+				global.reserve(nx * 3 + ny * 4);
+				int global_row = d2.global_i_north+i;
+                for(int i=0;i<nx;i++){
+                    row.push_back(d.u[nx*(ny-1)+i]);
+                    global.push_back(d2.global_i_north+i);
+                }
+                row[i]-=1;
+				if (d2.nbr_east != -1) {
+					for (int i = 0; i < ny; i++) {
+						row.push_back(d.u[(i + 1) * nx - 1]);
+						global.push_back(d2.global_i_east + i);
+					}
+				}
+				if (d2.nbr_south != -1) {
+					for (int i = 0; i < nx; i++) {
+						row.push_back(d.u[i]);
+						global.push_back(d2.global_i_south + i);
+					}
+				}
+				if (d2.nbr_west != -1) {
+					for (int i = 0; i < ny; i++) {
+						row.push_back(d.u[i*nx]);
+						global.push_back(d2.global_i_west + i);
+					}
+				}
+                //insert row for domain
+                A->insertGlobalValues(global_row,row.size(),&row[0],&global[0]);
+
+			}
+		}
+        d.boundary_north[i]=0;
+    }
+	// east boundary
+	for(int i=0; i<ny; i++){
+        d.boundary_east[i]=1;
+        d.solve();
+		// create row and insert for each domain
+		for (auto &p : domains) {
+			Domain &d2 = *p.second;
+			if (d2.nbr_east != -1) {
+				vector<double> row;
+				vector<int>    global;
+				row.reserve(nx * 2 + ny * 2);
+				global.reserve(nx * 3 + ny * 4);
+				int global_row = d2.global_i_east + i;
+				for (int i = 0; i < ny; i++) {
+					row.push_back(d.u[(i + 1) * nx - 1]);
+					global.push_back(d2.global_i_east + i);
+				}
+				row[i] -= 1;
+				if (d2.nbr_north != -1) {
+					for (int i = 0; i < nx; i++) {
+						row.push_back(d.u[nx * (ny - 1) + i]);
+						global.push_back(d2.global_i_north + i);
+					}
+				}
+				if (d2.nbr_south != -1) {
+					for (int i = 0; i < nx; i++) {
+						row.push_back(d.u[i]);
+						global.push_back(d2.global_i_south + i);
+					}
+				}
+				if (d2.nbr_west != -1) {
+					for (int i = 0; i < ny; i++) {
+						row.push_back(d.u[i*nx]);
+						global.push_back(d2.global_i_west + i);
+					}
+				}
+                //insert row for domain
+                A->insertGlobalValues(global_row,row.size(),&row[0],&global[0]);
+
+			}
+		}
+        d.boundary_east[i]=0;
+    }
+	// south boundary
+	for(int i=0; i<nx; i++){
+        d.boundary_south[i]=1;
+        d.solve();
+		// create row and insert for each domain
+		for (auto &p : domains) {
+			Domain &d2 = *p.second;
+			if (d2.nbr_south != -1) {
+				vector<double> row;
+				vector<int>    global;
+				row.reserve(nx * 2 + ny * 2);
+				global.reserve(nx * 3 + ny * 4);
+				int global_row = d2.global_i_south + i;
+				for (int i = 0; i < nx; i++) {
+					row.push_back(d.u[i]);
+					global.push_back(d2.global_i_south + i);
+				}
+				row[i] -= 1;
+				if (d2.nbr_north != -1) {
+					for (int i = 0; i < nx; i++) {
+						row.push_back(d.u[nx * (ny - 1) + i]);
+						global.push_back(d2.global_i_north + i);
+					}
+				}
+				if (d2.nbr_east != -1) {
+					for (int i = 0; i < ny; i++) {
+						row.push_back(d.u[(i + 1) * nx - 1]);
+						global.push_back(d2.global_i_east + i);
+					}
+				}
+				if (d2.nbr_west != -1) {
+					for (int i = 0; i < ny; i++) {
+						row.push_back(d.u[i*nx]);
+						global.push_back(d2.global_i_west + i);
+					}
+				}
+                //insert row for domain
+                A->insertGlobalValues(global_row,row.size(),&row[0],&global[0]);
+
+			}
+		}
+        d.boundary_south[i]=0;
+    }
+	// west boundary
+	for(int i=0; i<ny; i++){
+		d.boundary_west[i] = 1;
+		d.solve();
+		// create row and insert for each domain
+		for (auto &p : domains) {
+			Domain &d2 = *p.second;
+			if (d2.nbr_west != -1) {
+				vector<double> row;
+				vector<int>    global;
+				row.reserve(nx * 2 + ny * 2);
+				global.reserve(nx * 3 + ny * 4);
+				int global_row = d2.global_i_west + i;
+				for (int i = 0; i < ny; i++) {
+					row.push_back(d.u[i * nx]);
+					global.push_back(d2.global_i_west + i);
+				}
+				row[i] -= 1;
+				if (d2.nbr_north != -1) {
+					for (int i = 0; i < nx; i++) {
+						row.push_back(d.u[nx * (ny - 1) + i]);
+						global.push_back(d2.global_i_north + i);
+					}
+				}
+				if (d2.nbr_east != -1) {
+					for (int i = 0; i < ny; i++) {
+						row.push_back(d.u[(i + 1) * nx - 1]);
+						global.push_back(d2.global_i_east + i);
+					}
+				}
+				if (d2.nbr_south != -1) {
+					for (int i = 0; i < nx; i++) {
+						row.push_back(d.u[i]);
+						global.push_back(d2.global_i_south + i);
+					}
+				}
+				// insert row for domain
+				A->insertGlobalValues(global_row, row.size(), &row[0], &global[0]);
+			}
+		}
+        d.boundary_west[i]=0;
+    }
+    //transpose matrix and return
+    A->fillComplete();
+    return A;
+}
 int main(int argc, char *argv[])
 {
 	//    using Belos::FuncWrap;
 	using Teuchos::RCP;
 	using Teuchos::rcp;
+    using namespace std::chrono;
 
 	MPI_Init(&argc, &argv);
 	RCP<const Teuchos::Comm<int>> comm = Tpetra::DefaultPlatform::getDefaultPlatform().getComm();
@@ -264,6 +461,8 @@ int main(int argc, char *argv[])
 	args::Positional<int> d_y(parser, "d_y", "number of domains in the y direction");
 	args::Positional<int> n_x(parser, "n_x", "number of cells in the x direction, in each domain");
 	args::Positional<int> n_y(parser, "n_y", "number of cells in the y direction, in each domain");
+	args::ValueFlag<string> f_m(parser, "matrix filename", "the file to write the matrix to",
+	                            {'m'});
 
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;
@@ -287,7 +486,6 @@ int main(int argc, char *argv[])
 		}
 		return 1;
 	}
-	double t1 = MPI::Wtime();
 	// Set the number of discretization points in the x and y direction.
 	int    num_domains_x = args::get(d_x);
 	int    num_domains_y = args::get(d_y);
@@ -301,11 +499,18 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	string save_matrix_file = "";
+	if (f_m) {
+		save_matrix_file = args::get(f_m);
+	}
+
     int total_domains = num_domains_x*num_domains_y;
 	DomainCollection dc(total_domains * my_global_rank / num_procs,
 	                    total_domains * (my_global_rank + 1) / num_procs - 1, nx, ny, num_domains_x,
 	                    num_domains_y, h_x, h_y, comm);
 
+    MPI_Barrier(MPI_COMM_WORLD);
+	steady_clock::time_point iter_start = steady_clock::now();
 	// Create a map that will be used in the iterative solver
 	int num_global_elements
 	= nx * num_domains_x * (num_domains_y - 1) + ny * num_domains_y * (num_domains_x - 1);
@@ -360,13 +565,35 @@ int main(int argc, char *argv[])
 	double global_exact_norm;
 	global_diff_norm  = diff_norm.norm2();
 	global_exact_norm = exact_norm.norm2();
-	double t2         = MPI::Wtime();
+    MPI_Barrier(MPI_COMM_WORLD);
+	duration<double> iter_time = steady_clock::now() - iter_start;
 	if (my_global_rank == 0) {
 		std::cout << std::scientific;
 		std::cout.precision(13);
 		std::cout << "Error: " << global_diff_norm / global_exact_norm << "\n";
 		std::cout << std::defaultfloat;
-		std::cout << "Time: " << t2 - t1 << "\n";
+		std::cout << "Time: " << iter_time.count() << "\n";
+	}
+    if(save_matrix_file!=""){
+		MPI_Barrier(MPI_COMM_WORLD);
+		steady_clock::time_point form_start = steady_clock::now();
+
+		RCP<matrix_type>         A          = dc.formMatrix(diff_map);
+        
+		MPI_Barrier(MPI_COMM_WORLD);
+		duration<double> form_time = steady_clock::now() - iter_start;
+
+		if (my_global_rank == 0) cout << "Matrix Formation Time: " << form_time.count() << "\n";
+    
+		MPI_Barrier(MPI_COMM_WORLD);
+		steady_clock::time_point write_start = steady_clock::now();
+
+		Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A, "", "");
+    
+		MPI_Barrier(MPI_COMM_WORLD);
+		duration<double> write_time = steady_clock::now() - iter_start;
+		if (my_global_rank == 0)
+			cout << "Time to write matix to file: " << write_time.count() << "\n";
 	}
 
 	MPI_Finalize();
