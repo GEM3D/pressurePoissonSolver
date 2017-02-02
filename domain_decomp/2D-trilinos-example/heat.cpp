@@ -35,7 +35,7 @@ DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, i
                                    double h_y, RCP<const Teuchos::Comm<int>> comm)
 {
 	this->comm = comm;
-	domains    = map<int, Domain*>();
+	domains    = map<int, Domain *>();
 	for (int i = low; i <= high; i++) {
 		int domain_x = i % d_y;
 		int domain_y = i / d_x;
@@ -118,6 +118,10 @@ DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, i
 			try {
 				Domain &nbr       = *domains.at(d.nbr_north);
 				nbr.local_i_south = curr_i;
+				if (enqueued.count(d.nbr_north) == 0) {
+					queue.push_back(d.nbr_north);
+					enqueued.insert(d.nbr_north);
+				}
 			} catch (const out_of_range &oor) {
 				// do nothing
 			}
@@ -126,16 +130,16 @@ DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, i
 				global.push_back(d.global_i_north + i);
 			}
 			curr_i += nx;
-			if (enqueued.count(d.nbr_north) == 0) {
-				queue.push_back(d.nbr_north);
-				enqueued.insert(d.nbr_north);
-			}
 		}
 		if (d.nbr_east != -1 && visited.count(d.nbr_east) == 0) {
 			// a new edge that we have not assigned an index to
 			try {
 				Domain &nbr      = *domains.at(d.nbr_east);
 				nbr.local_i_west = curr_i;
+				if (enqueued.count(d.nbr_east) == 0) {
+					queue.push_back(d.nbr_east);
+					enqueued.insert(d.nbr_east);
+				}
 			} catch (const out_of_range &oor) {
 				// do nothing
 			}
@@ -144,16 +148,16 @@ DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, i
 				global.push_back(d.global_i_east + i);
 			}
 			curr_i += ny;
-			if (enqueued.count(d.nbr_east) == 0) {
-				queue.push_back(d.nbr_east);
-				enqueued.insert(d.nbr_east);
-			}
 		}
 		if (d.nbr_south != -1 && visited.count(d.nbr_south) == 0) {
 			// a new edge that we have not assigned an index to
 			try {
 				Domain &nbr       = *domains.at(d.nbr_south);
 				nbr.local_i_north = curr_i;
+				if (enqueued.count(d.nbr_south) == 0) {
+					queue.push_back(d.nbr_south);
+					enqueued.insert(d.nbr_south);
+				}
 			} catch (const out_of_range &oor) {
 				// do nothing
 			}
@@ -162,16 +166,16 @@ DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, i
 				global.push_back(d.global_i_south + i);
 			}
 			curr_i += nx;
-			if (enqueued.count(d.nbr_south) == 0) {
-				queue.push_back(d.nbr_south);
-				enqueued.insert(d.nbr_south);
-			}
 		}
 		if (d.nbr_west != -1 && visited.count(d.nbr_west) == 0) {
 			// a new edge that we have not assigned an index to
 			try {
 				Domain &nbr      = *domains.at(d.nbr_west);
 				nbr.local_i_east = curr_i;
+				if (enqueued.count(d.nbr_west) == 0) {
+					queue.push_back(d.nbr_west);
+					enqueued.insert(d.nbr_west);
+				}
 			} catch (const out_of_range &oor) {
 				// do nothing
 			}
@@ -180,10 +184,6 @@ DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, i
 				global.push_back(d.global_i_west + i);
 			}
 			curr_i += ny;
-			if (enqueued.count(d.nbr_west) == 0) {
-				queue.push_back(d.nbr_west);
-				enqueued.insert(d.nbr_west);
-			}
 		}
 	}
 	// Now that the global indices have been calculated, we can create a map for the interface
