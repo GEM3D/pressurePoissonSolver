@@ -83,6 +83,7 @@ include_directories(${Belos_INCLUDE_DIRS})
 include_directories(${Tpetra_TPL_INCLUDE_DIRS})
 include_directories(${Tpetra_INCLUDE_DIRS})
 include_directories(${FFTW_INCLUDES})
+include_directories(${MPI_CXX_INCLUDE_PATH})
 
 # Add to the library path Trilinos' library path, and the library
 # paths of the third-party libraries (TPLs) with which Trilinos was
@@ -111,5 +112,6 @@ target_link_libraries(heat
   ${FFTW_LIB}
   ${Belos_LIBRARIES} 
   ${Tpetra_LIBRARIES} 
+  ${MPI_CXX_LIBRARIES} 
 )
 
