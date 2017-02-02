@@ -12,6 +12,7 @@ class Domain
 	std::valarray<double>  f;
 	std::valarray<double>  f_copy;
 	std::valarray<double>  u;
+	std::valarray<double>  exact;
 	std::valarray<double>  tmp;
 	std::valarray<double>  denom;
 	int                    nx;
@@ -22,21 +23,32 @@ class Domain
 	std::valarray<double>  boundary_south;
 	std::valarray<double>  boundary_east;
 	std::valarray<double>  boundary_west;
-	bool                   has_north = false;
-	bool                   has_south = false;
-	bool                   has_east  = false;
-	bool                   has_west  = false;
+	int                    nbr_north = -1;
+	int                    nbr_east  = -1;
+	int                    nbr_south = -1;
+	int                    nbr_west  = -1;
+	int                    local_i_north;
+	int                    local_i_east;
+	int                    local_i_south;
+	int                    local_i_west;
+	int                    global_i_north;
+	int                    global_i_east;
+	int                    global_i_south;
+	int                    global_i_west;
 	Teuchos::RCP<map_type> domain_map;
 	fftw_plan              plan1;
 	fftw_plan              plan2;
 
-	Domain(std::valarray<double> &f, int nx, int ny, double h_x, double h_y)
+	Domain() {}
+	Domain(std::valarray<double> f, std::valarray<double> exact, int nx, int ny, double h_x,
+	       double h_y)
 	{
-		this->f   = f;
-		this->nx  = nx;
-		this->ny  = ny;
-		this->h_x = h_x;
-		this->h_y = h_y;
+		this->f     = f;
+		this->exact = exact;
+		this->nx    = nx;
+		this->ny    = ny;
+		this->h_x   = h_x;
+		this->h_y   = h_y;
 
 		f_copy = f;
 		tmp    = std::valarray<double>(nx * ny);
@@ -68,16 +80,16 @@ class Domain
 	void solve()
 	{
 		f_copy = f;
-		if (has_north) {
+		if (nbr_north != -1) {
 			f_copy[std::slice(nx * (ny - 1), nx, 1)] -= 2 / (h_y * h_y) * boundary_north;
 		}
-		if (has_east) {
+		if (nbr_east != -1) {
 			f_copy[std::slice((nx - 1), ny, nx)] -= 2 / (h_x * h_x) * boundary_east;
 		}
-		if (has_south) {
+		if (nbr_south != -1) {
 			f_copy[std::slice(0, nx, 1)] -= 2 / (h_y * h_y) * boundary_south;
 		}
-		if (has_west) {
+		if (nbr_west != -1) {
 			f_copy[std::slice(0, ny, nx)] -= 2 / (h_x * h_x) * boundary_west;
 		}
 
@@ -92,42 +104,37 @@ class Domain
 
 	void solveWithInterface(const vector_type &gamma, vector_type &diff)
 	{
-		// auto out = Teuchos::getFancyOStream (Teuchos::rcpFromRef (std::cout));
-		// if(has_east)std::cout << "Gamma begin\n";
-		// gamma.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
-		diff.update(1, gamma, 0);
-		Tpetra::Import<> importer(diff.getMap(), domain_map);
-		Tpetra::Export<> exporter(domain_map, diff.getMap());
-		vector_type      local_vector(domain_map, 1);
-		local_vector.doImport(diff, importer, Tpetra::CombineMode::INSERT);
-		auto data_ptr = local_vector.getDataNonConst(0);
-		int  curr_i   = 0;
-		auto view     = local_vector.getLocalView<Kokkos::HostSpace>();
-		if (has_north) {
+		auto gamma_view = gamma.getLocalView<Kokkos::HostSpace>();
+		auto diff_view  = diff.getLocalView<Kokkos::HostSpace>();
+		if (nbr_north != -1) {
 			boundary_north = std::valarray<double>(nx);
+			int curr_i     = local_i_north;
 			for (int i = 0; i < nx; i++) {
-				boundary_north[i] = view(curr_i, 0);
+				boundary_north[i] = gamma_view(curr_i, 0);
 				curr_i++;
 			}
 		}
-		if (has_east) {
+		if (nbr_east != -1) {
 			boundary_east = std::valarray<double>(ny);
+			int curr_i    = local_i_east;
 			for (int i = 0; i < ny; i++) {
-				boundary_east[i] = view(curr_i, 0);
+				boundary_east[i] = gamma_view(curr_i, 0);
 				curr_i++;
 			}
 		}
-		if (has_south) {
+		if (nbr_south != -1) {
 			boundary_south = std::valarray<double>(nx);
+			int curr_i     = local_i_south;
 			for (int i = 0; i < nx; i++) {
-				boundary_south[i] = view(curr_i, 0);
+				boundary_south[i] = gamma_view(curr_i, 0);
 				curr_i++;
 			}
 		}
-		if (has_west) {
+		if (nbr_west != -1) {
 			boundary_west = std::valarray<double>(ny);
+			int curr_i    = local_i_west;
 			for (int i = 0; i < ny; i++) {
-				boundary_west[i] = view(curr_i, 0);
+				boundary_west[i] = gamma_view(curr_i, 0);
 				curr_i++;
 			}
 		}
@@ -137,45 +144,38 @@ class Domain
 
 		// if(has_east)std::cout <<"LOCAL Before\n";
 		// local_vector.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
-		local_vector.scale(0);
 		// if(has_east)std::cout <<"LOCAL zero\n";
 		// local_vector.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
-		curr_i = 0;
-		if (has_north) {
+		if (nbr_north != -1) {
+			int curr_i = local_i_north;
 			for (int i = 0; i < nx; i++) {
-				view(curr_i, 0) = u[nx * (ny - 1) + i];
+				diff_view(curr_i, 0) += u[nx * (ny - 1) + i];
 				curr_i++;
 			}
 		}
-		if (has_east) {
+		if (nbr_east != -1) {
+			int curr_i = local_i_east;
 			for (int i = 0; i < ny; i++) {
-				view(curr_i, 0) = u[(i + 1) * nx - 1];
+				diff_view(curr_i, 0) += u[(i + 1) * nx - 1];
 				curr_i++;
 			}
 		}
-		if (has_south) {
+		if (nbr_south != -1) {
+			int curr_i = local_i_south;
 			for (int i = 0; i < nx; i++) {
-				view(curr_i, 0) = u[i];
+				diff_view(curr_i, 0) += u[i];
 				curr_i++;
 			}
 		}
-		if (has_west) {
+		if (nbr_west != -1) {
+			int curr_i = local_i_west;
 			for (int i = 0; i < ny; i++) {
-				view(curr_i, 0) = u[i * nx];
+				diff_view(curr_i, 0) += u[i * nx];
 				curr_i++;
 			}
 		}
-		// if(has_east)std::cout <<"LOCAL AFEr\n";
-		// local_vector.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
-		diff.scale(0);
-		// if(has_east)std::cout <<"DIFFBEFORE\n";
-		// diff.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
-		diff.doExport(local_vector, importer, Tpetra::CombineMode::ADD);
-		// if(has_east)std::cout <<"DIFF\n";
-		// diff.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
-		// if(has_east)std::cout <<"GAMMA\n";
-		// gamma.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
-		diff.update(-2, gamma, 1);
 	}
+	double diffNorm() { return std::sqrt(std::pow(exact - u, 2).sum()); }
+	double exactNorm() { return std::sqrt((exact * exact).sum()); }
 };
 #endif

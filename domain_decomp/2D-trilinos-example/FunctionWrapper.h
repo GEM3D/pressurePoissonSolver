@@ -1,6 +1,6 @@
 #ifndef FUNCTIONWRAPPER_H
 #define FUNCTIONWRAPPER_H
-#include "Domain.h"
+#include "DomainCollection.h"
 #include "MyTypeDefs.h"
 #include <BelosLinearProblem.hpp>
 #include <BelosTpetraAdapter.hpp>
@@ -9,15 +9,15 @@ class FuncWrap // : virtual Belos::Operator
 {
 	public:
 	Teuchos::RCP<vector_type> b;
-	Domain *                  d;
-	FuncWrap(Teuchos::RCP<vector_type> b, Domain *d)
+	DomainCollection *        dc;
+	FuncWrap(Teuchos::RCP<vector_type> b, DomainCollection *dc)
 	{
-		this->b = b;
-		this->d = d;
+		this->b  = b;
+		this->dc = dc;
 	}
 	void Apply(const vector_type &x, vector_type &y) const
 	{
-		d->solveWithInterface(x, y);
+		dc->solveWithInterface(x, y);
 		y.update(1, *b, -1);
 	}
 };

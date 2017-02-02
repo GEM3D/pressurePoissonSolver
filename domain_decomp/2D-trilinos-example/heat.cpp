@@ -30,6 +30,218 @@ double gfun(double x, double y) { return sin(M_PI * x) * cos(2 * M_PI * y); }
 // main driver //
 // =========== //
 
+using namespace std;
+DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, int d_y, double h_x,
+                                   double h_y, RCP<const Teuchos::Comm<int>> comm)
+{
+	this->comm = comm;
+	domains    = map<int, Domain*>();
+	for (int i = low; i <= high; i++) {
+		int domain_x = i % d_y;
+		int domain_y = i / d_x;
+
+		// Generate RHS vector
+		std::valarray<double> f(nx * ny);
+		std::valarray<double> exact(nx * ny);
+		// Use local indices to access the entries of f_data.
+		for (int yi = 0; yi < ny; yi++) {
+			for (int xi = 0; xi < nx; xi++) {
+				int    index_x      = domain_x * nx + xi;
+				int    index_y      = domain_y * ny + yi;
+				double x            = h_x / 2.0 + 1.0 * index_x / (nx * d_x);
+				double y            = h_y / 2.0 + 1.0 * index_y / (ny * d_y);
+				f[yi * nx + xi]     = ffun(x, y);
+				exact[yi * nx + xi] = gfun(x, y);
+				if (index_x == 0) {
+					f[yi * nx + xi] += -2.0 / (h_x * h_x) * gfun(0.0, y);
+				}
+				if (index_x == d_x * nx - 1) {
+					f[yi * nx + xi] += -2.0 / (h_x * h_x) * gfun(1.0, y);
+				}
+				if (index_y == 0) {
+					f[yi * nx + xi] += -2.0 / (h_y * h_y) * gfun(x, 0.0);
+				}
+				if (index_y == d_y * ny - 1) {
+					f[yi * nx + xi] += -2.0 / (h_y * h_y) * gfun(x, 1.0);
+				}
+			}
+		}
+		// create a domain
+		Domain *d_ptr = new Domain(f, exact, nx, ny, h_x, h_y);
+		Domain &d     = *d_ptr;
+
+		// determine its neighbors
+		// north
+		int ns_start_i = d_y * (d_x - 1) * ny;
+		if (domain_y != d_y - 1) {
+			int nbr_y        = domain_y + 1;
+			d.nbr_north      = nbr_y * d_x + domain_x;
+			d.global_i_north = (domain_y * d_x + domain_x) * nx + ns_start_i;
+		}
+		// east
+		if (domain_x != d_x - 1) {
+			int nbr_x       = domain_x + 1;
+			d.nbr_east      = domain_y * d_x + nbr_x;
+			d.global_i_east = (domain_x * d_x + domain_y) * ny;
+		}
+		// south
+		if (domain_y != 0) {
+			int nbr_y        = domain_y - 1;
+			d.nbr_south      = nbr_y * d_x + domain_x;
+			d.global_i_south = ((domain_y - 1) * d_x + domain_x) * nx + ns_start_i;
+		}
+		// west
+		if (domain_x != 0) {
+			int nbr_x       = domain_x - 1;
+			d.nbr_west      = domain_y * d_x + nbr_x;
+			d.global_i_west = (domain_x * d_x + (domain_y - 1)) * ny;
+		}
+		domains[i] = d_ptr;
+	}
+
+	// create map for domains
+	set<int>   visited;
+	set<int>   enqueued;
+	deque<int> queue;
+	queue.push_back(low);
+	enqueued.insert(low);
+	int            curr_i = 0;
+	vector<int> global;
+	global.reserve((high - low+1) * (2 * nx + 2 * ny));
+	while (!queue.empty()) {
+		int     curr = queue.front();
+		Domain &d    = *domains[curr];
+		queue.pop_front();
+		visited.insert(curr);
+		if (d.nbr_north != -1 && visited.count(d.nbr_north) == 0) {
+			// a new edge that we have not assigned an index to
+			try {
+				Domain &nbr       = *domains.at(d.nbr_north);
+				nbr.local_i_south = curr_i;
+			} catch (const out_of_range &oor) {
+				// do nothing
+			}
+			d.local_i_north = curr_i;
+			for (int i = 0; i < nx; i++) {
+				global.push_back(d.global_i_north + i);
+			}
+			curr_i += nx;
+			if (enqueued.count(d.nbr_north) == 0) {
+				queue.push_back(d.nbr_north);
+				enqueued.insert(d.nbr_north);
+			}
+		}
+		if (d.nbr_east != -1 && visited.count(d.nbr_east) == 0) {
+			// a new edge that we have not assigned an index to
+			try {
+				Domain &nbr      = *domains.at(d.nbr_east);
+				nbr.local_i_west = curr_i;
+			} catch (const out_of_range &oor) {
+				// do nothing
+			}
+			d.local_i_east = curr_i;
+			for (int i = 0; i < ny; i++) {
+				global.push_back(d.global_i_east + i);
+			}
+			curr_i += ny;
+			if (enqueued.count(d.nbr_east) == 0) {
+				queue.push_back(d.nbr_east);
+				enqueued.insert(d.nbr_east);
+			}
+		}
+		if (d.nbr_south != -1 && visited.count(d.nbr_south) == 0) {
+			// a new edge that we have not assigned an index to
+			try {
+				Domain &nbr       = *domains.at(d.nbr_south);
+				nbr.local_i_north = curr_i;
+			} catch (const out_of_range &oor) {
+				// do nothing
+			}
+			d.local_i_south = curr_i;
+			for (int i = 0; i < nx; i++) {
+				global.push_back(d.global_i_south + i);
+			}
+			curr_i += nx;
+			if (enqueued.count(d.nbr_south) == 0) {
+				queue.push_back(d.nbr_south);
+				enqueued.insert(d.nbr_south);
+			}
+		}
+		if (d.nbr_west != -1 && visited.count(d.nbr_west) == 0) {
+			// a new edge that we have not assigned an index to
+			try {
+				Domain &nbr      = *domains.at(d.nbr_west);
+				nbr.local_i_east = curr_i;
+			} catch (const out_of_range &oor) {
+				// do nothing
+			}
+			d.local_i_west = curr_i;
+			for (int i = 0; i < ny; i++) {
+				global.push_back(d.global_i_west + i);
+			}
+			curr_i += ny;
+			if (enqueued.count(d.nbr_west) == 0) {
+				queue.push_back(d.nbr_west);
+				enqueued.insert(d.nbr_west);
+			}
+		}
+	}
+	// Now that the global indices have been calculated, we can create a map for the interface
+	// points
+	if (d_x * d_y == 1) {
+		// this is a special case for when there is only one domain
+		collection_map = Teuchos::rcp(new map_type(1, 0, comm));
+	} else {
+		int num_global_elements = nx * d_x * (d_y - 1) + ny * d_y * (d_x - 1);
+		collection_map
+		= Teuchos::rcp(new map_type(num_global_elements, &global[0], curr_i, 0, this->comm));
+	}
+}
+void DomainCollection::solveWithInterface(const vector_type &gamma, vector_type &diff)
+{
+	// auto out = Teuchos::getFancyOStream (Teuchos::rcpFromRef (std::cout));
+	// if(has_east)std::cout << "Gamma begin\n";
+	// gamma.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
+	diff.update(1, gamma, 0);
+	Tpetra::Import<> importer(diff.getMap(), collection_map);
+	Tpetra::Export<> exporter(collection_map, diff.getMap());
+	vector_type      local_gamma(collection_map, 1);
+	vector_type      local_diff(collection_map, 1);
+	local_gamma.doImport(diff, importer, Tpetra::CombineMode::INSERT);
+
+	// solve over domains on this proc
+	for (auto &p : domains) {
+		p.second->solveWithInterface(local_gamma, local_diff);
+	}
+
+	// export diff vector
+
+	// if(has_east)std::cout <<"LOCAL AFEr\n";
+	// local_vector.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
+	diff.scale(0);
+	// if(has_east)std::cout <<"DIFFBEFORE\n";
+	// diff.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
+	diff.doExport(local_diff, importer, Tpetra::CombineMode::ADD);
+	// if(has_east)std::cout <<"DIFF\n";
+	// diff.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
+	// if(has_east)std::cout <<"GAMMA\n";
+	// gamma.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
+	diff.update(-2, gamma, 1);
+}
+double DomainCollection::diffNorm(){
+    double result = 0;
+	for (auto &p : domains) {
+		result += pow(p.second->diffNorm(),2);
+	}
+    return sqrt(result);
+}
+double DomainCollection::exactNorm(){
+    double result = 0;
+	for (auto &p : domains) {
+		result += pow(p.second->exactNorm(),2);
+	}
+    return sqrt(result);
+}
 int main(int argc, char *argv[])
 {
 	//    using Belos::FuncWrap;
@@ -83,118 +295,20 @@ int main(int argc, char *argv[])
 	int    ny            = args::get(n_y);
 	double h_x           = 1.0 / (nx * num_domains_x);
 	double h_y           = 1.0 / (ny * num_domains_y);
-	int    domain_x      = my_global_rank % num_domains_x;
-	int    domain_y      = my_global_rank / num_domains_x;
 
-	if (num_domains_x * num_domains_y != num_procs) {
-		std::cerr << "number of domains must be equal to the number of processes\n";
+	if (num_domains_x * num_domains_y < num_procs) {
+		std::cerr << "number of domains must be greater than or equal to the number of processes\n";
 		return 1;
 	}
 
-	// Generate RHS vector
-	std::valarray<double> f(nx * ny);
-	std::valarray<double> exact(nx * ny);
-
-	// Use local indices to access the entries of f_data.
-	for (int yi = 0; yi < ny; yi++) {
-		for (int xi = 0; xi < nx; xi++) {
-			int    index_x      = domain_x * nx + xi;
-			int    index_y      = domain_y * ny + yi;
-			double x            = h_x / 2.0 + 1.0 * index_x / (nx * num_domains_x);
-			double y            = h_y / 2.0 + 1.0 * index_y / (ny * num_domains_y);
-			f[yi * nx + xi]     = ffun(x, y);
-			exact[yi * nx + xi] = gfun(x, y);
-			if (index_x == 0) {
-				f[yi * nx + xi] += -2.0 / (h_x * h_x) * gfun(0.0, y);
-			}
-			if (index_x == num_domains_x * nx - 1) {
-				f[yi * nx + xi] += -2.0 / (h_x * h_x) * gfun(1.0, y);
-			}
-			if (index_y == 0) {
-				f[yi * nx + xi] += -2.0 / (h_y * h_y) * gfun(x, 0.0);
-			}
-			if (index_y == num_domains_y * ny - 1) {
-				f[yi * nx + xi] += -2.0 / (h_y * h_y) * gfun(x, 1.0);
-			}
-		}
-	}
-
-	// create a domain
-	Domain d(f, nx, ny, h_x, h_y);
-
-	// Detertime on which sides this domain has a neighboring domain
-	// and calculate how many interface points this domain is going to have
-	int num_interface_points = 0;
-	// north
-	if (domain_y != num_domains_y - 1) {
-		num_interface_points += nx;
-		d.has_north = true;
-	}
-	// east
-	if (domain_x != num_domains_x - 1) {
-		num_interface_points += ny;
-		d.has_east = true;
-	}
-	// south
-	if (domain_y != 0) {
-		num_interface_points += nx;
-		d.has_south = true;
-	}
-	// west
-	if (domain_x != 0) {
-		num_interface_points += ny;
-		d.has_west = true;
-	}
-
-	// Now Calculate the global indicies for thos interface points
-	std::vector<int>      global_i(num_interface_points);
-	int                   ns_start_i = num_domains_y * (num_domains_x - 1) * ny;
-	int                   curr_i     = 0;
-	if (d.has_north) {
-		int curr_global_i = (domain_y * num_domains_x + domain_x) * nx + ns_start_i;
-		for (int i = 0; i < nx; i++) {
-			global_i[curr_i] = curr_global_i;
-			curr_global_i++;
-			curr_i++;
-		}
-	}
-	if (d.has_east) {
-		int curr_global_i = (domain_x * num_domains_y + domain_y) * ny;
-		for (int i = 0; i < ny; i++) {
-			global_i[curr_i] = curr_global_i;
-			curr_global_i++;
-			curr_i++;
-		}
-	}
-	if (d.has_south) {
-		int curr_global_i = ((domain_y - 1) * num_domains_x + domain_x) * nx + ns_start_i;
-		for (int i = 0; i < nx; i++) {
-			global_i[curr_i] = curr_global_i;
-			curr_global_i++;
-			curr_i++;
-		}
-	}
-	if (d.has_west) {
-		int curr_global_i = ((domain_x - 1) * num_domains_y + domain_y) * ny;
-		for (int i = 0; i < ny; i++) {
-			global_i[curr_i] = curr_global_i;
-			curr_global_i++;
-			curr_i++;
-		}
-	}
-
-	// Now that the global indices have been calculated, we can create a map for the interface
-	// points
-	int num_global_elements
-	= nx * num_domains_x * (num_domains_y - 1) + ny * num_domains_y * (num_domains_x - 1);
-	if (num_domains_x * num_domains_y == 1) {
-		// this is a special case for when there is only one domain
-		d.domain_map = rcp(new map_type(1, 0, comm));
-	} else {
-		d.domain_map = rcp(new map_type(-1, &global_i[0], num_interface_points, 0, comm));
-	}
+    int total_domains = num_domains_x*num_domains_y;
+	DomainCollection dc(total_domains * my_global_rank / num_procs,
+	                    total_domains * (my_global_rank + 1) / num_procs - 1, nx, ny, num_domains_x,
+	                    num_domains_y, h_x, h_y, comm);
 
 	// Create a map that will be used in the iterative solver
+	int num_global_elements
+	= nx * num_domains_x * (num_domains_y - 1) + ny * num_domains_y * (num_domains_x - 1);
 	RCP<map_type> diff_map = rcp(new map_type(num_global_elements, 0, comm));
 
 	// Create the gamma and diff vectors
@@ -206,10 +320,10 @@ int main(int argc, char *argv[])
 
 		// Get the b vector
 		RCP<vector_type> b = rcp(new vector_type(diff_map, 1));
-		d.solveWithInterface(*gamma, *b);
+		dc.solveWithInterface(*gamma, *b);
 
 		// Create a function wrapper
-		RCP<FuncWrap> wrapper = rcp(new FuncWrap(b, &d));
+		RCP<FuncWrap> wrapper = rcp(new FuncWrap(b, &dc));
 
 		// Create linear problem for the Belos solver
 		Belos::LinearProblem<double, vector_type, FuncWrap> problem(wrapper, gamma, b);
@@ -219,7 +333,7 @@ int main(int argc, char *argv[])
 		Teuchos::ParameterList belosList;
 		belosList.set("Block Size", 1);
 		belosList.set("Maximum Iterations", 1000);
-		belosList.set("Convergence Tolerance", 10e-10);
+		belosList.set("Convergence Tolerance", 1e-10);
 		int verbosity = Belos::Errors + Belos::StatusTestDetails + Belos::Warnings
 		                + Belos::TimingDetails + Belos::Debug;
 		belosList.set("Verbosity", verbosity);
@@ -233,15 +347,15 @@ int main(int argc, char *argv[])
 	}
 
 	// Do one last solve
-	d.solveWithInterface(*gamma, *diff);
+	dc.solveWithInterface(*gamma, *diff);
 
 	// Calcuate error
-	std::valarray<double> u       = d.u;
 	RCP<map_type>         err_map = rcp(new map_type(-1, 1, 0, comm));
 	Tpetra::Vector<>      exact_norm(err_map);
 	Tpetra::Vector<>      diff_norm(err_map);
-	exact_norm.getDataNonConst()[0] = sqrt((exact * exact).sum());
-	diff_norm.getDataNonConst()[0]  = sqrt(pow(exact - u, 2).sum());
+
+	exact_norm.getDataNonConst()[0] = dc.exactNorm();
+	diff_norm.getDataNonConst()[0]  = dc.diffNorm();
 	double global_diff_norm;
 	double global_exact_norm;
 	global_diff_norm  = diff_norm.norm2();
