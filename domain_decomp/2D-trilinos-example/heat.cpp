@@ -281,25 +281,25 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 				global.reserve(nx * 3 + ny * 4);
 				int global_row = d2.global_i_north + i;
 				for (int i = 0; i < nx; i++) {
-					row.push_back(d.u[nx * (ny - 1) + i]);
+					row.push_back(-d.u[nx * (ny - 1) + i]);
 					global.push_back(d2.global_i_north + i);
 				}
-				row[i] -= 1;
+				row[i] += 1;
 				if (d2.nbr_east != -1) {
 					for (int i = 0; i < ny; i++) {
-						row.push_back(d.u[(i + 1) * nx - 1]);
+						row.push_back(-d.u[(i + 1) * nx - 1]);
 						global.push_back(d2.global_i_east + i);
 					}
 				}
 				if (d2.nbr_south != -1) {
 					for (int i = 0; i < nx; i++) {
-						row.push_back(d.u[i]);
+						row.push_back(-d.u[i]);
 						global.push_back(d2.global_i_south + i);
 					}
 				}
 				if (d2.nbr_west != -1) {
 					for (int i = 0; i < ny; i++) {
-						row.push_back(d.u[i * nx]);
+						row.push_back(-d.u[i * nx]);
 						global.push_back(d2.global_i_west + i);
 					}
 				}
@@ -323,25 +323,25 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 				global.reserve(nx * 3 + ny * 4);
 				int global_row = d2.global_i_east + i;
 				for (int i = 0; i < ny; i++) {
-					row.push_back(d.u[(i + 1) * nx - 1]);
+					row.push_back(-d.u[(i + 1) * nx - 1]);
 					global.push_back(d2.global_i_east + i);
 				}
-				row[i] -= 1;
+				row[i] += 1;
 				if (d2.nbr_north != -1) {
 					for (int i = 0; i < nx; i++) {
-						row.push_back(d.u[nx * (ny - 1) + i]);
+						row.push_back(-d.u[nx * (ny - 1) + i]);
 						global.push_back(d2.global_i_north + i);
 					}
 				}
 				if (d2.nbr_south != -1) {
 					for (int i = 0; i < nx; i++) {
-						row.push_back(d.u[i]);
+						row.push_back(-d.u[i]);
 						global.push_back(d2.global_i_south + i);
 					}
 				}
 				if (d2.nbr_west != -1) {
 					for (int i = 0; i < ny; i++) {
-						row.push_back(d.u[i * nx]);
+						row.push_back(-d.u[i * nx]);
 						global.push_back(d2.global_i_west + i);
 					}
 				}
@@ -365,25 +365,25 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 				global.reserve(nx * 3 + ny * 4);
 				int global_row = d2.global_i_south + i;
 				for (int i = 0; i < nx; i++) {
-					row.push_back(d.u[i]);
+					row.push_back(-d.u[i]);
 					global.push_back(d2.global_i_south + i);
 				}
-				row[i] -= 1;
+				row[i] += 1;
 				if (d2.nbr_north != -1) {
 					for (int i = 0; i < nx; i++) {
-						row.push_back(d.u[nx * (ny - 1) + i]);
+						row.push_back(-d.u[nx * (ny - 1) + i]);
 						global.push_back(d2.global_i_north + i);
 					}
 				}
 				if (d2.nbr_east != -1) {
 					for (int i = 0; i < ny; i++) {
-						row.push_back(d.u[(i + 1) * nx - 1]);
+						row.push_back(-d.u[(i + 1) * nx - 1]);
 						global.push_back(d2.global_i_east + i);
 					}
 				}
 				if (d2.nbr_west != -1) {
 					for (int i = 0; i < ny; i++) {
-						row.push_back(d.u[i * nx]);
+						row.push_back(-d.u[i * nx]);
 						global.push_back(d2.global_i_west + i);
 					}
 				}
@@ -407,25 +407,25 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 				global.reserve(nx * 3 + ny * 4);
 				int global_row = d2.global_i_west + i;
 				for (int i = 0; i < ny; i++) {
-					row.push_back(d.u[i * nx]);
+					row.push_back(-d.u[i * nx]);
 					global.push_back(d2.global_i_west + i);
 				}
-				row[i] -= 1;
+				row[i] += 1;
 				if (d2.nbr_north != -1) {
 					for (int i = 0; i < nx; i++) {
-						row.push_back(d.u[nx * (ny - 1) + i]);
+						row.push_back(-d.u[nx * (ny - 1) + i]);
 						global.push_back(d2.global_i_north + i);
 					}
 				}
 				if (d2.nbr_east != -1) {
 					for (int i = 0; i < ny; i++) {
-						row.push_back(d.u[(i + 1) * nx - 1]);
+						row.push_back(-d.u[(i + 1) * nx - 1]);
 						global.push_back(d2.global_i_east + i);
 					}
 				}
 				if (d2.nbr_south != -1) {
 					for (int i = 0; i < nx; i++) {
-						row.push_back(d.u[i]);
+						row.push_back(-d.u[i]);
 						global.push_back(d2.global_i_south + i);
 					}
 				}
@@ -464,6 +464,7 @@ int main(int argc, char *argv[])
 	args::Positional<int> n_y(parser, "n_y", "number of cells in the y direction, in each domain");
 	args::ValueFlag<string> f_m(parser, "matrix filename", "the file to write the matrix to",
 	                            {'m'});
+	args::Flag f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
 
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;
@@ -510,8 +511,6 @@ int main(int argc, char *argv[])
 	                    total_domains * (my_global_rank + 1) / num_procs - 1, nx, ny, num_domains_x,
 	                    num_domains_y, h_x, h_y, comm);
 
-	MPI_Barrier(MPI_COMM_WORLD);
-	steady_clock::time_point iter_start = steady_clock::now();
 	// Create a map that will be used in the iterative solver
 	int num_global_elements
 	= nx * num_domains_x * (num_domains_y - 1) + ny * num_domains_y * (num_domains_x - 1);
@@ -528,11 +527,42 @@ int main(int argc, char *argv[])
 		RCP<vector_type> b = rcp(new vector_type(diff_map, 1));
 		dc.solveWithInterface(*gamma, *b);
 
-		// Create a function wrapper
-		RCP<FuncWrap> wrapper = rcp(new FuncWrap(b, &dc));
+		RCP<Tpetra::Operator<>> op;
 
+		if (f_wrapper) {
+			// Create a function wrapper
+			op = rcp(new FuncWrap(b, &dc));
+		} else {
+			MPI_Barrier(MPI_COMM_WORLD);
+			steady_clock::time_point form_start = steady_clock::now();
+
+			RCP<matrix_type> A = dc.formMatrix(diff_map);
+
+			MPI_Barrier(MPI_COMM_WORLD);
+			duration<double> form_time = steady_clock::now() - form_start;
+
+			if (my_global_rank == 0) cout << "Matrix Formation Time: " << form_time.count() << "\n";
+
+			if (save_matrix_file != "") {
+				MPI_Barrier(MPI_COMM_WORLD);
+				steady_clock::time_point write_start = steady_clock::now();
+
+				Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A, "",
+				                                                           "");
+
+				MPI_Barrier(MPI_COMM_WORLD);
+				duration<double> write_time = steady_clock::now() - write_start;
+				if (my_global_rank == 0)
+					cout << "Time to write matix to file: " << write_time.count() << "\n";
+			}
+
+			op = A;
+		}
+
+		MPI_Barrier(MPI_COMM_WORLD);
+		steady_clock::time_point iter_start = steady_clock::now();
 		// Create linear problem for the Belos solver
-		Belos::LinearProblem<double, vector_type, Tpetra::Operator<>> problem(wrapper, gamma, b);
+		Belos::LinearProblem<double, vector_type, Tpetra::Operator<>> problem(op, gamma, b);
 		problem.setProblem();
 
 		// Set the parameters
@@ -550,6 +580,9 @@ int main(int argc, char *argv[])
 		= rcp(new Belos::BlockCGSolMgr<double, vector_type, Tpetra::Operator<>>(
 		rcp(&problem, false), rcp(&belosList, false)));
 		solver->solve();
+		MPI_Barrier(MPI_COMM_WORLD);
+		duration<double> iter_time = steady_clock::now() - iter_start;
+		if (my_global_rank == 0) std::cout << "CG Time: " << iter_time.count() << "\n";
 	}
 
 	// Do one last solve
@@ -566,35 +599,11 @@ int main(int argc, char *argv[])
 	double global_exact_norm;
 	global_diff_norm  = diff_norm.norm2();
 	global_exact_norm = exact_norm.norm2();
-	MPI_Barrier(MPI_COMM_WORLD);
-	duration<double> iter_time = steady_clock::now() - iter_start;
 	if (my_global_rank == 0) {
 		std::cout << std::scientific;
 		std::cout.precision(13);
 		std::cout << "Error: " << global_diff_norm / global_exact_norm << "\n";
 		std::cout << std::defaultfloat;
-		std::cout << "Time: " << iter_time.count() << "\n";
-	}
-	if (save_matrix_file != "") {
-		MPI_Barrier(MPI_COMM_WORLD);
-		steady_clock::time_point form_start = steady_clock::now();
-
-		RCP<matrix_type> A = dc.formMatrix(diff_map);
-
-		MPI_Barrier(MPI_COMM_WORLD);
-		duration<double> form_time = steady_clock::now() - form_start;
-
-		if (my_global_rank == 0) cout << "Matrix Formation Time: " << form_time.count() << "\n";
-
-		MPI_Barrier(MPI_COMM_WORLD);
-		steady_clock::time_point write_start = steady_clock::now();
-
-		Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A, "", "");
-
-		MPI_Barrier(MPI_COMM_WORLD);
-		duration<double> write_time = steady_clock::now() - write_start;
-		if (my_global_rank == 0)
-			cout << "Time to write matix to file: " << write_time.count() << "\n";
 	}
 
 	MPI_Finalize();
