@@ -532,7 +532,7 @@ int main(int argc, char *argv[])
 		RCP<FuncWrap> wrapper = rcp(new FuncWrap(b, &dc));
 
 		// Create linear problem for the Belos solver
-		Belos::LinearProblem<double, vector_type, FuncWrap> problem(wrapper, gamma, b);
+		Belos::LinearProblem<double, vector_type, Tpetra::Operator<>> problem(wrapper, gamma, b);
 		problem.setProblem();
 
 		// Set the parameters
@@ -546,9 +546,9 @@ int main(int argc, char *argv[])
 		Belos::OutputManager<double> my_om();
 
 		// Create solver and solve
-		RCP<Belos::SolverManager<double, vector_type, FuncWrap>> solver
-		= rcp(new Belos::BlockCGSolMgr<double, vector_type, FuncWrap>(rcp(&problem, false),
-		                                                              rcp(&belosList, false)));
+		RCP<Belos::SolverManager<double, vector_type, Tpetra::Operator<>>> solver
+		= rcp(new Belos::BlockCGSolMgr<double, vector_type, Tpetra::Operator<>>(
+		rcp(&problem, false), rcp(&belosList, false)));
 		solver->solve();
 	}
 

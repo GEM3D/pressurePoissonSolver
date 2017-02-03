@@ -5,7 +5,7 @@
 #include <BelosLinearProblem.hpp>
 #include <BelosTpetraAdapter.hpp>
 #include <Teuchos_RCP.hpp>
-class FuncWrap // : virtual Belos::Operator
+class FuncWrap : public Tpetra::Operator<>
 {
 	public:
 	Teuchos::RCP<vector_type> b;
@@ -15,20 +15,14 @@ class FuncWrap // : virtual Belos::Operator
 		this->b  = b;
 		this->dc = dc;
 	}
-	void Apply(const vector_type &x, vector_type &y) const
+	void apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode = Teuchos::NO_TRANS,
+	           double alpha = Teuchos::ScalarTraits<double>::one(),
+	           double beta  = Teuchos::ScalarTraits<double>::zero()) const
 	{
 		dc->solveWithInterface(x, y);
 		y.update(1, *b, -1);
 	}
+	Teuchos::RCP<const map_type> getDomainMap() const { return b->getMap(); }
+	Teuchos::RCP<const map_type> getRangeMap() const { return b->getMap(); }
 };
-namespace Belos
-{
-template <>
-void OperatorTraits<double, vector_type, FuncWrap>::Apply(const FuncWrap &wrapper,
-                                                          const vector_type &x, vector_type &y,
-                                                          Belos::ETrans trans)
-{
-	wrapper.Apply(x, y);
-}
-}
 #endif
