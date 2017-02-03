@@ -33,6 +33,177 @@ double gfun(double x, double y) { return sin(M_PI * x) * cos(2 * M_PI * y); }
 // =========== //
 
 using namespace std;
+
+int main(int argc, char *argv[])
+{
+	//    using Belos::FuncWrap;
+	using Teuchos::RCP;
+	using Teuchos::rcp;
+	using namespace std::chrono;
+
+	MPI_Init(&argc, &argv);
+	RCP<const Teuchos::Comm<int>> comm = Tpetra::DefaultPlatform::getDefaultPlatform().getComm();
+
+	int num_procs;
+	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+
+	int my_global_rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &my_global_rank);
+
+	// parse input
+	args::ArgumentParser  parser("");
+	args::HelpFlag        help(parser, "help", "Display this help menu", {'h', "help"});
+	args::Positional<int> d_x(parser, "d_x", "number of domains in the x direction");
+	args::Positional<int> d_y(parser, "d_y", "number of domains in the y direction");
+	args::Positional<int> n_x(parser, "n_x", "number of cells in the x direction, in each domain");
+	args::Positional<int> n_y(parser, "n_y", "number of cells in the y direction, in each domain");
+	args::ValueFlag<string> f_m(parser, "matrix filename", "the file to write the matrix to",
+	                            {'m'});
+	args::Flag f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
+
+	if (argc < 5) {
+		if (my_global_rank == 0) std::cout << parser;
+		return 0;
+	}
+	try {
+		parser.ParseCLI(argc, argv);
+	} catch (args::Help) {
+		if (my_global_rank == 0) std::cout << parser;
+		return 0;
+	} catch (args::ParseError e) {
+		if (my_global_rank == 0) {
+			std::cerr << e.what() << std::endl;
+			std::cerr << parser;
+		}
+		return 1;
+	} catch (args::ValidationError e) {
+		if (my_global_rank == 0) {
+			std::cerr << e.what() << std::endl;
+			std::cerr << parser;
+		}
+		return 1;
+	}
+	// Set the number of discretization points in the x and y direction.
+	int    num_domains_x = args::get(d_x);
+	int    num_domains_y = args::get(d_y);
+	int    nx            = args::get(n_x);
+	int    ny            = args::get(n_y);
+	double h_x           = 1.0 / (nx * num_domains_x);
+	double h_y           = 1.0 / (ny * num_domains_y);
+
+	if (num_domains_x * num_domains_y < num_procs) {
+		std::cerr << "number of domains must be greater than or equal to the number of processes\n";
+		return 1;
+	}
+
+	string save_matrix_file = "";
+	if (f_m) {
+		save_matrix_file = args::get(f_m);
+	}
+
+	int              total_domains = num_domains_x * num_domains_y;
+	DomainCollection dc(total_domains * my_global_rank / num_procs,
+	                    total_domains * (my_global_rank + 1) / num_procs - 1, nx, ny, num_domains_x,
+	                    num_domains_y, h_x, h_y, comm);
+
+	// Create a map that will be used in the iterative solver
+	int num_global_elements
+	= nx * num_domains_x * (num_domains_y - 1) + ny * num_domains_y * (num_domains_x - 1);
+	RCP<map_type> diff_map = rcp(new map_type(num_global_elements, 0, comm));
+
+	// Create the gamma and diff vectors
+	RCP<vector_type> gamma = rcp(new vector_type(diff_map, 1));
+	RCP<vector_type> diff  = rcp(new vector_type(diff_map, 1));
+
+	if (num_domains_x * num_domains_y != 1) {
+		// do iterative solve
+
+		// Get the b vector
+		RCP<vector_type> b = rcp(new vector_type(diff_map, 1));
+		dc.solveWithInterface(*gamma, *b);
+
+		RCP<Tpetra::Operator<>> op;
+
+		if (f_wrapper) {
+			// Create a function wrapper
+			op = rcp(new FuncWrap(b, &dc));
+		} else {
+            // Form the matrix
+			MPI_Barrier(MPI_COMM_WORLD);
+			steady_clock::time_point form_start = steady_clock::now();
+
+			RCP<matrix_type> A = dc.formMatrix(diff_map);
+
+			MPI_Barrier(MPI_COMM_WORLD);
+			duration<double> form_time = steady_clock::now() - form_start;
+
+			if (my_global_rank == 0) cout << "Matrix Formation Time: " << form_time.count() << "\n";
+
+			if (save_matrix_file != "") {
+				MPI_Barrier(MPI_COMM_WORLD);
+				steady_clock::time_point write_start = steady_clock::now();
+
+				Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A, "",
+				                                                           "");
+
+				MPI_Barrier(MPI_COMM_WORLD);
+				duration<double> write_time = steady_clock::now() - write_start;
+				if (my_global_rank == 0)
+					cout << "Time to write matix to file: " << write_time.count() << "\n";
+			}
+
+			op = A;
+		}
+
+		MPI_Barrier(MPI_COMM_WORLD);
+		steady_clock::time_point iter_start = steady_clock::now();
+		// Create linear problem for the Belos solver
+		Belos::LinearProblem<double, vector_type, Tpetra::Operator<>> problem(op, gamma, b);
+		problem.setProblem();
+
+		// Set the parameters
+		Teuchos::ParameterList belosList;
+		belosList.set("Block Size", 1);
+		belosList.set("Maximum Iterations", 1000);
+		belosList.set("Convergence Tolerance", 1e-10);
+		int verbosity = Belos::Errors + Belos::StatusTestDetails + Belos::Warnings
+		                + Belos::TimingDetails + Belos::Debug;
+		belosList.set("Verbosity", verbosity);
+		Belos::OutputManager<double> my_om();
+
+		// Create solver and solve
+		RCP<Belos::SolverManager<double, vector_type, Tpetra::Operator<>>> solver
+		= rcp(new Belos::BlockCGSolMgr<double, vector_type, Tpetra::Operator<>>(
+		rcp(&problem, false), rcp(&belosList, false)));
+		solver->solve();
+		MPI_Barrier(MPI_COMM_WORLD);
+		duration<double> iter_time = steady_clock::now() - iter_start;
+		if (my_global_rank == 0) std::cout << "CG Time: " << iter_time.count() << "\n";
+	}
+
+	// Do one last solve
+	dc.solveWithInterface(*gamma, *diff);
+
+	// Calcuate error
+	RCP<map_type>    err_map = rcp(new map_type(-1, 1, 0, comm));
+	Tpetra::Vector<> exact_norm(err_map);
+	Tpetra::Vector<> diff_norm(err_map);
+
+	exact_norm.getDataNonConst()[0] = dc.exactNorm();
+	diff_norm.getDataNonConst()[0]  = dc.diffNorm();
+	double global_diff_norm;
+	double global_exact_norm;
+	global_diff_norm  = diff_norm.norm2();
+	global_exact_norm = exact_norm.norm2();
+	if (my_global_rank == 0) {
+		std::cout << std::scientific;
+		std::cout.precision(13);
+		std::cout << "Error: " << global_diff_norm / global_exact_norm << "\n";
+	}
+
+	MPI_Finalize();
+	return 0;
+}
 DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, int d_y, double h_x,
                                    double h_y, RCP<const Teuchos::Comm<int>> comm)
 {
@@ -438,174 +609,4 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 	// transpose matrix and return
 	A->fillComplete();
 	return A;
-}
-int main(int argc, char *argv[])
-{
-	//    using Belos::FuncWrap;
-	using Teuchos::RCP;
-	using Teuchos::rcp;
-	using namespace std::chrono;
-
-	MPI_Init(&argc, &argv);
-	RCP<const Teuchos::Comm<int>> comm = Tpetra::DefaultPlatform::getDefaultPlatform().getComm();
-
-	int num_procs;
-	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
-
-	int my_global_rank;
-	MPI_Comm_rank(MPI_COMM_WORLD, &my_global_rank);
-
-	// parse input
-	args::ArgumentParser  parser("");
-	args::HelpFlag        help(parser, "help", "Display this help menu", {'h', "help"});
-	args::Positional<int> d_x(parser, "d_x", "number of domains in the x direction");
-	args::Positional<int> d_y(parser, "d_y", "number of domains in the y direction");
-	args::Positional<int> n_x(parser, "n_x", "number of cells in the x direction, in each domain");
-	args::Positional<int> n_y(parser, "n_y", "number of cells in the y direction, in each domain");
-	args::ValueFlag<string> f_m(parser, "matrix filename", "the file to write the matrix to",
-	                            {'m'});
-	args::Flag f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
-
-	if (argc < 5) {
-		if (my_global_rank == 0) std::cout << parser;
-		return 0;
-	}
-	try {
-		parser.ParseCLI(argc, argv);
-	} catch (args::Help) {
-		if (my_global_rank == 0) std::cout << parser;
-		return 0;
-	} catch (args::ParseError e) {
-		if (my_global_rank == 0) {
-			std::cerr << e.what() << std::endl;
-			std::cerr << parser;
-		}
-		return 1;
-	} catch (args::ValidationError e) {
-		if (my_global_rank == 0) {
-			std::cerr << e.what() << std::endl;
-			std::cerr << parser;
-		}
-		return 1;
-	}
-	// Set the number of discretization points in the x and y direction.
-	int    num_domains_x = args::get(d_x);
-	int    num_domains_y = args::get(d_y);
-	int    nx            = args::get(n_x);
-	int    ny            = args::get(n_y);
-	double h_x           = 1.0 / (nx * num_domains_x);
-	double h_y           = 1.0 / (ny * num_domains_y);
-
-	if (num_domains_x * num_domains_y < num_procs) {
-		std::cerr << "number of domains must be greater than or equal to the number of processes\n";
-		return 1;
-	}
-
-	string save_matrix_file = "";
-	if (f_m) {
-		save_matrix_file = args::get(f_m);
-	}
-
-	int              total_domains = num_domains_x * num_domains_y;
-	DomainCollection dc(total_domains * my_global_rank / num_procs,
-	                    total_domains * (my_global_rank + 1) / num_procs - 1, nx, ny, num_domains_x,
-	                    num_domains_y, h_x, h_y, comm);
-
-	// Create a map that will be used in the iterative solver
-	int num_global_elements
-	= nx * num_domains_x * (num_domains_y - 1) + ny * num_domains_y * (num_domains_x - 1);
-	RCP<map_type> diff_map = rcp(new map_type(num_global_elements, 0, comm));
-
-	// Create the gamma and diff vectors
-	RCP<vector_type> gamma = rcp(new vector_type(diff_map, 1));
-	RCP<vector_type> diff  = rcp(new vector_type(diff_map, 1));
-
-	if (num_domains_x * num_domains_y != 1) {
-		// do iterative solve
-
-		// Get the b vector
-		RCP<vector_type> b = rcp(new vector_type(diff_map, 1));
-		dc.solveWithInterface(*gamma, *b);
-
-		RCP<Tpetra::Operator<>> op;
-
-		if (f_wrapper) {
-			// Create a function wrapper
-			op = rcp(new FuncWrap(b, &dc));
-		} else {
-			MPI_Barrier(MPI_COMM_WORLD);
-			steady_clock::time_point form_start = steady_clock::now();
-
-			RCP<matrix_type> A = dc.formMatrix(diff_map);
-
-			MPI_Barrier(MPI_COMM_WORLD);
-			duration<double> form_time = steady_clock::now() - form_start;
-
-			if (my_global_rank == 0) cout << "Matrix Formation Time: " << form_time.count() << "\n";
-
-			if (save_matrix_file != "") {
-				MPI_Barrier(MPI_COMM_WORLD);
-				steady_clock::time_point write_start = steady_clock::now();
-
-				Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A, "",
-				                                                           "");
-
-				MPI_Barrier(MPI_COMM_WORLD);
-				duration<double> write_time = steady_clock::now() - write_start;
-				if (my_global_rank == 0)
-					cout << "Time to write matix to file: " << write_time.count() << "\n";
-			}
-
-			op = A;
-		}
-
-		MPI_Barrier(MPI_COMM_WORLD);
-		steady_clock::time_point iter_start = steady_clock::now();
-		// Create linear problem for the Belos solver
-		Belos::LinearProblem<double, vector_type, Tpetra::Operator<>> problem(op, gamma, b);
-		problem.setProblem();
-
-		// Set the parameters
-		Teuchos::ParameterList belosList;
-		belosList.set("Block Size", 1);
-		belosList.set("Maximum Iterations", 1000);
-		belosList.set("Convergence Tolerance", 1e-10);
-		int verbosity = Belos::Errors + Belos::StatusTestDetails + Belos::Warnings
-		                + Belos::TimingDetails + Belos::Debug;
-		belosList.set("Verbosity", verbosity);
-		Belos::OutputManager<double> my_om();
-
-		// Create solver and solve
-		RCP<Belos::SolverManager<double, vector_type, Tpetra::Operator<>>> solver
-		= rcp(new Belos::BlockCGSolMgr<double, vector_type, Tpetra::Operator<>>(
-		rcp(&problem, false), rcp(&belosList, false)));
-		solver->solve();
-		MPI_Barrier(MPI_COMM_WORLD);
-		duration<double> iter_time = steady_clock::now() - iter_start;
-		if (my_global_rank == 0) std::cout << "CG Time: " << iter_time.count() << "\n";
-	}
-
-	// Do one last solve
-	dc.solveWithInterface(*gamma, *diff);
-
-	// Calcuate error
-	RCP<map_type>    err_map = rcp(new map_type(-1, 1, 0, comm));
-	Tpetra::Vector<> exact_norm(err_map);
-	Tpetra::Vector<> diff_norm(err_map);
-
-	exact_norm.getDataNonConst()[0] = dc.exactNorm();
-	diff_norm.getDataNonConst()[0]  = dc.diffNorm();
-	double global_diff_norm;
-	double global_exact_norm;
-	global_diff_norm  = diff_norm.norm2();
-	global_exact_norm = exact_norm.norm2();
-	if (my_global_rank == 0) {
-		std::cout << std::scientific;
-		std::cout.precision(13);
-		std::cout << "Error: " << global_diff_norm / global_exact_norm << "\n";
-		std::cout << std::defaultfloat;
-	}
-
-	MPI_Finalize();
-	return 0;
 }
