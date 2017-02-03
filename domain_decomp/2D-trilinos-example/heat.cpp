@@ -7,15 +7,15 @@
 #include <BelosConfigDefs.hpp>
 #include <BelosLinearProblem.hpp>
 #include <BelosTpetraAdapter.hpp>
+#include <MatrixMarket_Tpetra.hpp>
 #include <Teuchos_GlobalMPISession.hpp>
 #include <Teuchos_ParameterList.hpp>
 #include <Teuchos_RCP.hpp>
 #include <Teuchos_Tuple.hpp>
 #include <Teuchos_VerboseObject.hpp>
 #include <Teuchos_oblackholestream.hpp>
-#include <MatrixMarket_Tpetra.hpp>
-#include <cmath>
 #include <chrono>
+#include <cmath>
 #include <iostream>
 #include <iostream>
 #include <mpi.h>
@@ -39,10 +39,10 @@ DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, i
 	// cerr<< "Low:  " << low << "\n";
 	// cerr<< "High: " << high << "\n";
 	this->comm = comm;
-    this->nx = nx;
-    this->ny = ny;
-    this->h_x = h_x;
-    this->h_y = h_y;
+	this->nx   = nx;
+	this->ny   = ny;
+	this->h_x  = h_x;
+	this->h_y  = h_y;
 	domains    = map<int, Domain *>();
 	for (int i = low; i <= high; i++) {
 		int domain_x = i % d_y;
@@ -102,7 +102,7 @@ DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, i
 		if (domain_x != 0) {
 			int nbr_x       = domain_x - 1;
 			d.nbr_west      = domain_y * d_x + nbr_x;
-			d.global_i_west = (domain_x * d_x + (domain_y - 1)) * ny;
+			d.global_i_west = ((domain_x - 1) * d_x + domain_y) * ny;
 		}
 		domains[i] = d_ptr;
 	}
@@ -113,9 +113,9 @@ DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, i
 	deque<int> queue;
 	queue.push_back(low);
 	enqueued.insert(low);
-	int            curr_i = 0;
+	int         curr_i = 0;
 	vector<int> global;
-	global.reserve((high - low+1) * (2 * nx + 2 * ny));
+	global.reserve((high - low + 1) * (2 * nx + 2 * ny));
 	while (!queue.empty()) {
 		int     curr = queue.front();
 		Domain &d    = *domains[curr];
@@ -236,53 +236,55 @@ void DomainCollection::solveWithInterface(const vector_type &gamma, vector_type 
 	// gamma.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
 	diff.update(-2, gamma, 1);
 }
-double DomainCollection::diffNorm(){
-    double result = 0;
+double DomainCollection::diffNorm()
+{
+	double result = 0;
 	for (auto &p : domains) {
-		result += pow(p.second->diffNorm(),2);
+		result += pow(p.second->diffNorm(), 2);
 	}
-    return sqrt(result);
+	return sqrt(result);
 }
-double DomainCollection::exactNorm(){
-    double result = 0;
+double DomainCollection::exactNorm()
+{
+	double result = 0;
 	for (auto &p : domains) {
-		result += pow(p.second->exactNorm(),2);
+		result += pow(p.second->exactNorm(), 2);
 	}
-    return sqrt(result);
+	return sqrt(result);
 }
 RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 {
-    //create domain for forming matrix
+	// create domain for forming matrix
 	std::valarray<double> f(nx * ny);
 	Domain                d(f, f, nx, ny, h_x, h_y);
-	d.nbr_north = 1;
-	d.nbr_east  = 1;
-	d.nbr_south = 1;
-	d.nbr_west  = 1;
-    d.boundary_north = valarray<double>(nx);
-    d.boundary_south = valarray<double>(nx);
-    d.boundary_east = valarray<double>(ny);
-    d.boundary_west = valarray<double>(ny);
-    int size = max(nx,ny);
-    RCP<matrix_type> A = rcp(new matrix_type(map,size*6));
+	d.nbr_north           = 1;
+	d.nbr_east            = 1;
+	d.nbr_south           = 1;
+	d.nbr_west            = 1;
+	d.boundary_north      = valarray<double>(nx);
+	d.boundary_south      = valarray<double>(nx);
+	d.boundary_east       = valarray<double>(ny);
+	d.boundary_west       = valarray<double>(ny);
+	int              size = max(nx, ny);
+	RCP<matrix_type> A    = rcp(new matrix_type(map, size * 6));
 	// north boundary
-	for(int i=0; i<nx; i++){
-        d.boundary_north[i]=1;
-        d.solve();
+	for (int i = 0; i < nx; i++) {
+		d.boundary_north[i] = 1;
+		d.solve();
 		// create row and insert for each domain
 		for (auto &p : domains) {
 			Domain &d2 = *p.second;
 			if (d2.nbr_north != -1) {
 				vector<double> row;
-				vector<int> global;
+				vector<int>    global;
 				row.reserve(nx * 2 + ny * 2);
 				global.reserve(nx * 3 + ny * 4);
-				int global_row = d2.global_i_north+i;
-                for(int i=0;i<nx;i++){
-                    row.push_back(d.u[nx*(ny-1)+i]);
-                    global.push_back(d2.global_i_north+i);
-                }
-                row[i]-=1;
+				int global_row = d2.global_i_north + i;
+				for (int i = 0; i < nx; i++) {
+					row.push_back(d.u[nx * (ny - 1) + i]);
+					global.push_back(d2.global_i_north + i);
+				}
+				row[i] -= 1;
 				if (d2.nbr_east != -1) {
 					for (int i = 0; i < ny; i++) {
 						row.push_back(d.u[(i + 1) * nx - 1]);
@@ -297,21 +299,20 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 				}
 				if (d2.nbr_west != -1) {
 					for (int i = 0; i < ny; i++) {
-						row.push_back(d.u[i*nx]);
+						row.push_back(d.u[i * nx]);
 						global.push_back(d2.global_i_west + i);
 					}
 				}
-                //insert row for domain
-                A->insertGlobalValues(global_row,row.size(),&row[0],&global[0]);
-
+				// insert row for domain
+				A->insertGlobalValues(global_row, row.size(), &row[0], &global[0]);
 			}
 		}
-        d.boundary_north[i]=0;
-    }
+		d.boundary_north[i] = 0;
+	}
 	// east boundary
-	for(int i=0; i<ny; i++){
-        d.boundary_east[i]=1;
-        d.solve();
+	for (int i = 0; i < ny; i++) {
+		d.boundary_east[i] = 1;
+		d.solve();
 		// create row and insert for each domain
 		for (auto &p : domains) {
 			Domain &d2 = *p.second;
@@ -340,21 +341,20 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 				}
 				if (d2.nbr_west != -1) {
 					for (int i = 0; i < ny; i++) {
-						row.push_back(d.u[i*nx]);
+						row.push_back(d.u[i * nx]);
 						global.push_back(d2.global_i_west + i);
 					}
 				}
-                //insert row for domain
-                A->insertGlobalValues(global_row,row.size(),&row[0],&global[0]);
-
+				// insert row for domain
+				A->insertGlobalValues(global_row, row.size(), &row[0], &global[0]);
 			}
 		}
-        d.boundary_east[i]=0;
-    }
+		d.boundary_east[i] = 0;
+	}
 	// south boundary
-	for(int i=0; i<nx; i++){
-        d.boundary_south[i]=1;
-        d.solve();
+	for (int i = 0; i < nx; i++) {
+		d.boundary_south[i] = 1;
+		d.solve();
 		// create row and insert for each domain
 		for (auto &p : domains) {
 			Domain &d2 = *p.second;
@@ -383,19 +383,18 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 				}
 				if (d2.nbr_west != -1) {
 					for (int i = 0; i < ny; i++) {
-						row.push_back(d.u[i*nx]);
+						row.push_back(d.u[i * nx]);
 						global.push_back(d2.global_i_west + i);
 					}
 				}
-                //insert row for domain
-                A->insertGlobalValues(global_row,row.size(),&row[0],&global[0]);
-
+				// insert row for domain
+				A->insertGlobalValues(global_row, row.size(), &row[0], &global[0]);
 			}
 		}
-        d.boundary_south[i]=0;
-    }
+		d.boundary_south[i] = 0;
+	}
 	// west boundary
-	for(int i=0; i<ny; i++){
+	for (int i = 0; i < ny; i++) {
 		d.boundary_west[i] = 1;
 		d.solve();
 		// create row and insert for each domain
@@ -434,18 +433,18 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 				A->insertGlobalValues(global_row, row.size(), &row[0], &global[0]);
 			}
 		}
-        d.boundary_west[i]=0;
-    }
-    //transpose matrix and return
-    A->fillComplete();
-    return A;
+		d.boundary_west[i] = 0;
+	}
+	// transpose matrix and return
+	A->fillComplete();
+	return A;
 }
 int main(int argc, char *argv[])
 {
 	//    using Belos::FuncWrap;
 	using Teuchos::RCP;
 	using Teuchos::rcp;
-    using namespace std::chrono;
+	using namespace std::chrono;
 
 	MPI_Init(&argc, &argv);
 	RCP<const Teuchos::Comm<int>> comm = Tpetra::DefaultPlatform::getDefaultPlatform().getComm();
@@ -506,12 +505,12 @@ int main(int argc, char *argv[])
 		save_matrix_file = args::get(f_m);
 	}
 
-    int total_domains = num_domains_x*num_domains_y;
+	int              total_domains = num_domains_x * num_domains_y;
 	DomainCollection dc(total_domains * my_global_rank / num_procs,
 	                    total_domains * (my_global_rank + 1) / num_procs - 1, nx, ny, num_domains_x,
 	                    num_domains_y, h_x, h_y, comm);
 
-    MPI_Barrier(MPI_COMM_WORLD);
+	MPI_Barrier(MPI_COMM_WORLD);
 	steady_clock::time_point iter_start = steady_clock::now();
 	// Create a map that will be used in the iterative solver
 	int num_global_elements
@@ -557,9 +556,9 @@ int main(int argc, char *argv[])
 	dc.solveWithInterface(*gamma, *diff);
 
 	// Calcuate error
-	RCP<map_type>         err_map = rcp(new map_type(-1, 1, 0, comm));
-	Tpetra::Vector<>      exact_norm(err_map);
-	Tpetra::Vector<>      diff_norm(err_map);
+	RCP<map_type>    err_map = rcp(new map_type(-1, 1, 0, comm));
+	Tpetra::Vector<> exact_norm(err_map);
+	Tpetra::Vector<> diff_norm(err_map);
 
 	exact_norm.getDataNonConst()[0] = dc.exactNorm();
 	diff_norm.getDataNonConst()[0]  = dc.diffNorm();
@@ -567,7 +566,7 @@ int main(int argc, char *argv[])
 	double global_exact_norm;
 	global_diff_norm  = diff_norm.norm2();
 	global_exact_norm = exact_norm.norm2();
-    MPI_Barrier(MPI_COMM_WORLD);
+	MPI_Barrier(MPI_COMM_WORLD);
 	duration<double> iter_time = steady_clock::now() - iter_start;
 	if (my_global_rank == 0) {
 		std::cout << std::scientific;
@@ -576,22 +575,22 @@ int main(int argc, char *argv[])
 		std::cout << std::defaultfloat;
 		std::cout << "Time: " << iter_time.count() << "\n";
 	}
-    if(save_matrix_file!=""){
+	if (save_matrix_file != "") {
 		MPI_Barrier(MPI_COMM_WORLD);
 		steady_clock::time_point form_start = steady_clock::now();
 
-		RCP<matrix_type>         A          = dc.formMatrix(diff_map);
-        
+		RCP<matrix_type> A = dc.formMatrix(diff_map);
+
 		MPI_Barrier(MPI_COMM_WORLD);
 		duration<double> form_time = steady_clock::now() - form_start;
 
 		if (my_global_rank == 0) cout << "Matrix Formation Time: " << form_time.count() << "\n";
-    
+
 		MPI_Barrier(MPI_COMM_WORLD);
 		steady_clock::time_point write_start = steady_clock::now();
 
 		Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A, "", "");
-    
+
 		MPI_Barrier(MPI_COMM_WORLD);
 		duration<double> write_time = steady_clock::now() - write_start;
 		if (my_global_rank == 0)
