@@ -98,7 +98,8 @@ link_directories(${Tpetra_TPL_LIBRARY_DIRS})
 # file that you want to build.  This line tells CMake which source
 # file(s) to use to build the executable.
 #
-add_executable(heat ${SOURCES})
+add_executable(heat heat.cpp)
+add_library(DomainCollection DomainCollection.cpp)
 
 #
 # EDIT HERE: Change trilinosExample to the name of the executable
@@ -107,6 +108,7 @@ add_executable(heat ${SOURCES})
 # (TPLs) with which Trilinos was built.
 #
 target_link_libraries(heat
+    DomainCollection
   ${Belos_TPL_LIBRARIES}
   ${Tpetra_TPL_LIBRARIES}
   ${FFTW_LIB}
@@ -114,4 +116,11 @@ target_link_libraries(heat
   ${Tpetra_LIBRARIES} 
   ${MPI_CXX_LIBRARIES} 
 )
-
+target_link_libraries(DomainCollection
+  ${Belos_TPL_LIBRARIES}
+  ${Tpetra_TPL_LIBRARIES}
+  ${FFTW_LIB}
+  ${Belos_LIBRARIES} 
+  ${Tpetra_LIBRARIES} 
+  ${MPI_CXX_LIBRARIES} 
+)
