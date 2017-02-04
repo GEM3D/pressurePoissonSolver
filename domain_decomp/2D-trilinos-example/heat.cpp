@@ -156,10 +156,19 @@ int main(int argc, char *argv[])
 		gfun = gauss_g;
 	}
 
+	MPI_Barrier(MPI_COMM_WORLD);
+	steady_clock::time_point domain_start = steady_clock::now();
+
 	int              total_domains = num_domains_x * num_domains_y;
 	DomainCollection dc(total_domains * my_global_rank / num_procs,
 	                    total_domains * (my_global_rank + 1) / num_procs - 1, nx, ny, num_domains_x,
 	                    num_domains_y, h_x, h_y, comm,ffun,gfun);
+
+	MPI_Barrier(MPI_COMM_WORLD);
+    steady_clock::time_point domain_stop = steady_clock::now();
+	duration<double> domain_time = domain_stop - domain_start;
+
+	if (my_global_rank == 0) cout << "Domain Initialization Time: " << domain_time.count() << "\n";
 
 	// Create a map that will be used in the iterative solver
 	RCP<map_type> matrix_map = dc.matrix_map;
@@ -247,7 +256,15 @@ int main(int argc, char *argv[])
 	double global_exact_norm;
 	global_diff_norm  = diff_norm.norm2();
 	global_exact_norm = exact_norm.norm2();
+
+	MPI_Barrier(MPI_COMM_WORLD);
+	steady_clock::time_point total_stop = steady_clock::now();
+	duration<double>         total_time = total_stop - domain_start;
+
 	if (my_global_rank == 0) {
+		std::cout << "Total run time: " << total_time.count() << "\n";
+		std::cout << "Total run time (excluding Domain Intitialization Time): "
+		          << total_time.count() - domain_time.count() << "\n";
 		std::cout << std::scientific;
 		std::cout.precision(13);
 		std::cout << "Error: " << global_diff_norm / global_exact_norm << "\n";
