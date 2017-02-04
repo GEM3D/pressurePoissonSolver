@@ -12,7 +12,8 @@ class DomainCollection
     double h_y;
 	public:
 	DomainCollection(int low, int high, int nx, int ny, int d_x, int d_y, double h_x, double h_y,
-	                 Teuchos::RCP<const Teuchos::Comm<int>> comm);
+	                 Teuchos::RCP<const Teuchos::Comm<int>> comm,
+	                 std::function<double(double, double)> ffun, std::function<double(double, double)> gfun);
 	void solveWithInterface(const vector_type &gamma, vector_type &diff);
 	double diffNorm();
 	double exactNorm();
