@@ -9,12 +9,14 @@ DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, i
 {
 	// cerr<< "Low:  " << low << "\n";
 	// cerr<< "High: " << high << "\n";
-	this->comm = comm;
-	this->nx   = nx;
-	this->ny   = ny;
-	this->h_x  = h_x;
-	this->h_y  = h_y;
-	domains    = map<int, Domain *>();
+	this->comm         = comm;
+	this->nx           = nx;
+	this->ny           = ny;
+	this->h_x          = h_x;
+	this->h_y          = h_y;
+	num_domains        = high - low;
+	num_global_domains = d_x * d_y;
+	domains            = map<int, Domain *>();
 	for (int i = low; i <= high; i++) {
 		int domain_x = i % d_y;
 		int domain_y = i / d_x;
@@ -79,14 +81,19 @@ DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, i
 	}
 
 	// create map for domains
+    generateMaps();
+}
+void DomainCollection::generateMaps()
+{
 	set<int>   visited;
 	set<int>   enqueued;
 	deque<int> queue;
-	queue.push_back(low);
-	enqueued.insert(low);
+	int        first = domains.begin()->first;
+	queue.push_back(first);
+	enqueued.insert(first);
 	int         curr_i = 0;
 	vector<int> global;
-	global.reserve((high - low + 1) * (2 * nx + 2 * ny));
+	global.reserve(num_domains * (2 * nx + 2 * ny));
 	while (!queue.empty()) {
 		int     curr = queue.front();
 		Domain &d    = *domains[curr];
@@ -167,13 +174,11 @@ DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, i
 	}
 	// Now that the global indices have been calculated, we can create a map for the interface
 	// points
-	if (d_x * d_y == 1) {
+	if (num_global_domains == 1) {
 		// this is a special case for when there is only one domain
 		collection_map = Teuchos::rcp(new map_type(1, 0, comm));
 	} else {
-		int num_global_elements = nx * d_x * (d_y - 1) + ny * d_y * (d_x - 1);
-		collection_map
-		= Teuchos::rcp(new map_type(num_global_elements, &global[0], curr_i, 0, this->comm));
+		collection_map = Teuchos::rcp(new map_type(-1, &global[0], curr_i, 0, this->comm));
 	}
 }
 void DomainCollection::solveWithInterface(const vector_type &gamma, vector_type &diff)
