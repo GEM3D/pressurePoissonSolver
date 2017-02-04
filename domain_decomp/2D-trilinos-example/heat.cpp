@@ -224,7 +224,6 @@ int main(int argc, char *argv[])
 		int verbosity = Belos::Errors + Belos::StatusTestDetails + Belos::Warnings
 		                + Belos::TimingDetails + Belos::Debug;
 		belosList.set("Verbosity", verbosity);
-		Belos::OutputManager<double> my_om();
 
 		// Create solver and solve
 		RCP<Belos::SolverManager<double, vector_type, Tpetra::Operator<>>> solver
