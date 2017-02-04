@@ -162,19 +162,17 @@ int main(int argc, char *argv[])
 	                    num_domains_y, h_x, h_y, comm,ffun,gfun);
 
 	// Create a map that will be used in the iterative solver
-	int num_global_elements
-	= nx * num_domains_x * (num_domains_y - 1) + ny * num_domains_y * (num_domains_x - 1);
-	RCP<map_type> diff_map = rcp(new map_type(num_global_elements, 0, comm));
+	RCP<map_type> matrix_map = dc.matrix_map;
 
 	// Create the gamma and diff vectors
-	RCP<vector_type> gamma = rcp(new vector_type(diff_map, 1));
-	RCP<vector_type> diff  = rcp(new vector_type(diff_map, 1));
+	RCP<vector_type> gamma = rcp(new vector_type(matrix_map, 1));
+	RCP<vector_type> diff  = rcp(new vector_type(matrix_map, 1));
 
 	if (num_domains_x * num_domains_y != 1) {
 		// do iterative solve
 
 		// Get the b vector
-		RCP<vector_type> b = rcp(new vector_type(diff_map, 1));
+		RCP<vector_type> b = rcp(new vector_type(matrix_map, 1));
 		dc.solveWithInterface(*gamma, *b);
 
 		RCP<Tpetra::Operator<>> op;
@@ -187,7 +185,7 @@ int main(int argc, char *argv[])
 			MPI_Barrier(MPI_COMM_WORLD);
 			steady_clock::time_point form_start = steady_clock::now();
 
-			RCP<matrix_type> A = dc.formMatrix(diff_map);
+			RCP<matrix_type> A = dc.formMatrix(matrix_map);
 
 			MPI_Barrier(MPI_COMM_WORLD);
 			duration<double> form_time = steady_clock::now() - form_start;

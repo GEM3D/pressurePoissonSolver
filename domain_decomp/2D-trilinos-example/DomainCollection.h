@@ -4,7 +4,6 @@ class DomainCollection
 {
 	private:
 	std::map<int, Domain *> domains;
-	Teuchos::RCP<map_type>                 collection_map;
 	Teuchos::RCP<const Teuchos::Comm<int>> comm;
 	int                                    nx;
 	int                                    ny;
@@ -14,6 +13,8 @@ class DomainCollection
 	int                                    num_global_domains;
 
 	public:
+	Teuchos::RCP<map_type>                 collection_map;
+	Teuchos::RCP<map_type>                 matrix_map;
 	DomainCollection(int low, int high, int nx, int ny, int d_x, int d_y, double h_x, double h_y,
 	                 Teuchos::RCP<const Teuchos::Comm<int>> comm,
 	                 std::function<double(double, double)> ffun,
