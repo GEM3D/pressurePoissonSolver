@@ -270,14 +270,13 @@ void DomainCollection::distributeIfaceInfo(){
     //
 	int_vector_type dist(collection_iface_map, 1);
 	iface_info = rcp(new int_vector_type(iface_map, 1));
-	Tpetra::Export<> exporter(collection_iface_map, iface_map);
 	auto             dist_view = dist.getLocalView<Kokkos::HostSpace>();
 	for (auto &p : domains) {
 		Domain &d2 = *p.second;
 		if (d2.nbr_north != -1) {
-			dist_view(d2.iface_local_i_north, 0)      = d2.global_i_north;
-			dist_view(d2.iface_local_i_north + 1, 0)  = 0;
-			dist_view(d2.iface_local_i_north + 2, 0)  = nx;
+			//dist_view(d2.iface_local_i_north, 0)      = d2.global_i_north;
+			//dist_view(d2.iface_local_i_north + 1, 0)  = 0;
+			//dist_view(d2.iface_local_i_north + 2, 0)  = nx;
 			dist_view(d2.iface_local_i_north + 12, 0) = d2.global_i_east;
 			dist_view(d2.iface_local_i_north + 13, 0) = 0;
 			dist_view(d2.iface_local_i_north + 14, 0) = ny;
@@ -290,9 +289,9 @@ void DomainCollection::distributeIfaceInfo(){
 			dist_view(d2.iface_local_i_north + 21, 0) = X_AXIS;
 		}
 		if (d2.nbr_east != -1) {
-			dist_view(d2.iface_local_i_east, 0)      = d2.global_i_east;
-			dist_view(d2.iface_local_i_east + 1, 0)  = 0;
-			dist_view(d2.iface_local_i_east + 2, 0)  = ny;
+			//dist_view(d2.iface_local_i_east, 0)      = d2.global_i_east;
+			//dist_view(d2.iface_local_i_east + 1, 0)  = 0;
+			//dist_view(d2.iface_local_i_east + 2, 0)  = ny;
 			dist_view(d2.iface_local_i_east + 12, 0) = d2.global_i_south;
 			dist_view(d2.iface_local_i_east + 13, 0) = 0;
 			dist_view(d2.iface_local_i_east + 14, 0) = nx;
@@ -317,7 +316,7 @@ void DomainCollection::distributeIfaceInfo(){
 			dist_view(d2.iface_local_i_south + 9, 0)  = d2.global_i_east;
 			dist_view(d2.iface_local_i_south + 10, 0) = 0;
 			dist_view(d2.iface_local_i_south + 11, 0) = ny;
-			dist_view(d2.iface_local_i_south + 21, 0) = X_AXIS;
+			//dist_view(d2.iface_local_i_south + 21, 0) = X_AXIS;
 		}
 		if (d2.nbr_west != -1) {
 			dist_view(d2.iface_local_i_west, 0)      = d2.global_i_west;
@@ -332,10 +331,11 @@ void DomainCollection::distributeIfaceInfo(){
 			dist_view(d2.iface_local_i_west + 9, 0)  = d2.global_i_south;
 			dist_view(d2.iface_local_i_west + 10, 0) = 0;
 			dist_view(d2.iface_local_i_west + 11, 0) = nx;
-			dist_view(d2.iface_local_i_west + 21, 0) = Y_AXIS;
+			//dist_view(d2.iface_local_i_west + 21, 0) = Y_AXIS;
 		}
 	}
-	iface_info->doExport(dist, exporter, Tpetra::CombineMode::INSERT);
+	Tpetra::Export<> exporter(collection_iface_map, iface_map);
+	iface_info->doExport(dist, exporter, Tpetra::CombineMode::ADD);
 }
 void DomainCollection::solveWithInterface(const vector_type &gamma, vector_type &diff)
 {
@@ -391,6 +391,8 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
     // create iface objects
 	set<Iface> ifaces;
 	auto       iface_view = iface_info->getLocalView<Kokkos::HostSpace>();
+	int        my_rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 	for (size_t i = 0; i < iface_view.dimension(0); i += 22) {
 		Iface right;
 		Iface left;
