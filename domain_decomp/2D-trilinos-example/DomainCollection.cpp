@@ -53,35 +53,41 @@ DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, i
 
 		// determine its neighbors
 		// north
-		int ns_start_i = d_y * (d_x - 1) * ny;
+		int ns_start_i       = d_y * (d_x - 1) * ny;
+		int ns_iface_start_i = d_y * (d_x - 1) * 21;
 		if (domain_y != d_y - 1) {
 			int nbr_y        = domain_y + 1;
 			d.nbr_north      = nbr_y * d_x + domain_x;
 			d.global_i_north = (domain_y * d_x + domain_x) * nx + ns_start_i;
+			d.iface_i_north  = (domain_y * d_x + domain_x) * 21 + ns_iface_start_i;
 		}
 		// east
 		if (domain_x != d_x - 1) {
 			int nbr_x       = domain_x + 1;
 			d.nbr_east      = domain_y * d_x + nbr_x;
 			d.global_i_east = (domain_x * d_x + domain_y) * ny;
+			d.iface_i_east  = (domain_x * d_x + domain_y) * 21;
 		}
 		// south
 		if (domain_y != 0) {
 			int nbr_y        = domain_y - 1;
 			d.nbr_south      = nbr_y * d_x + domain_x;
 			d.global_i_south = ((domain_y - 1) * d_x + domain_x) * nx + ns_start_i;
+			d.iface_i_south  = ((domain_y - 1) * d_x + domain_x) * 21 + ns_iface_start_i;
 		}
 		// west
 		if (domain_x != 0) {
 			int nbr_x       = domain_x - 1;
 			d.nbr_west      = domain_y * d_x + nbr_x;
 			d.global_i_west = ((domain_x - 1) * d_x + domain_y) * ny;
+			d.iface_i_west  = ((domain_x - 1) * d_x + domain_y) * 21;
 		}
 		domains[i] = d_ptr;
 	}
 
 	// create map for domains
     generateMaps();
+    distributeIfaceInfo();
 }
 void DomainCollection::generateMaps()
 {
@@ -91,10 +97,14 @@ void DomainCollection::generateMaps()
 	int        first = domains.begin()->first;
 	queue.push_back(first);
 	enqueued.insert(first);
-	int         curr_i = 0;
-	int         curr_matrix_i = 0;
 	vector<int> global;
-    vector<int> matrix_global;
+	int         curr_i = 0;
+	vector<int> c_iface_global;
+	int         curr_c_i = 0;
+	vector<int> matrix_global;
+	int         curr_matrix_i = 0;
+	vector<int> iface_global;
+    int         curr_iface_i = 0;
 	global.reserve(num_domains * (2 * nx + 2 * ny));
 	while (!queue.empty()) {
 		int     curr = queue.front();
@@ -104,8 +114,9 @@ void DomainCollection::generateMaps()
 		if (d.nbr_north != -1 && visited.count(d.nbr_north) == 0) {
 			// a new edge that we have not assigned an index to
 			try {
-				Domain &nbr       = *domains.at(d.nbr_north);
-				nbr.local_i_south = curr_i;
+				Domain &nbr             = *domains.at(d.nbr_north);
+				nbr.local_i_south       = curr_i;
+				nbr.iface_local_i_south = curr_c_i;
 				if (enqueued.count(d.nbr_north) == 0) {
 					queue.push_back(d.nbr_north);
 					enqueued.insert(d.nbr_north);
@@ -113,7 +124,13 @@ void DomainCollection::generateMaps()
 			} catch (const out_of_range &oor) {
 				// do nothing
 			}
-			d.local_i_north = curr_i;
+			d.local_i_north       = curr_i;
+			d.iface_local_i_north = curr_c_i;
+			for (int i = 0; i < 21; i++) {
+				c_iface_global.push_back(d.iface_i_north + i);
+				iface_global.push_back(d.iface_i_north + i);
+				curr_c_i++;
+            }
 			for (int i = 0; i < nx; i++) {
 				global.push_back(d.global_i_north + i);
 				matrix_global.push_back(d.global_i_north + i);
@@ -124,8 +141,9 @@ void DomainCollection::generateMaps()
 		if (d.nbr_east != -1 && visited.count(d.nbr_east) == 0) {
 			// a new edge that we have not assigned an index to
 			try {
-				Domain &nbr      = *domains.at(d.nbr_east);
-				nbr.local_i_west = curr_i;
+				Domain &nbr            = *domains.at(d.nbr_east);
+				nbr.local_i_west       = curr_i;
+				nbr.iface_local_i_west = curr_c_i;
 				if (enqueued.count(d.nbr_east) == 0) {
 					queue.push_back(d.nbr_east);
 					enqueued.insert(d.nbr_east);
@@ -133,7 +151,13 @@ void DomainCollection::generateMaps()
 			} catch (const out_of_range &oor) {
 				// do nothing
 			}
-			d.local_i_east = curr_i;
+			d.local_i_east       = curr_i;
+			d.iface_local_i_east = curr_c_i;
+			for (int i = 0; i < 21; i++) {
+				c_iface_global.push_back(d.iface_i_east + i);
+				iface_global.push_back(d.iface_i_east + i);
+				curr_c_i++;
+            }
 			for (int i = 0; i < ny; i++) {
 				global.push_back(d.global_i_east + i);
 				matrix_global.push_back(d.global_i_east + i);
@@ -144,8 +168,9 @@ void DomainCollection::generateMaps()
 		if (d.nbr_south != -1 && visited.count(d.nbr_south) == 0) {
 			// a new edge that we have not assigned an index to
 			try {
-				Domain &nbr       = *domains.at(d.nbr_south);
-				nbr.local_i_north = curr_i;
+				Domain &nbr             = *domains.at(d.nbr_south);
+				nbr.local_i_north       = curr_i;
+				nbr.iface_local_i_north = curr_c_i;
 				if (enqueued.count(d.nbr_south) == 0) {
 					queue.push_back(d.nbr_south);
 					enqueued.insert(d.nbr_south);
@@ -153,7 +178,12 @@ void DomainCollection::generateMaps()
 			} catch (const out_of_range &oor) {
 				// do nothing
 			}
-			d.local_i_south = curr_i;
+			d.local_i_south       = curr_i;
+			d.iface_local_i_south = curr_c_i;
+			for (int i = 0; i < 21; i++) {
+				c_iface_global.push_back(d.iface_i_south + i);
+				curr_c_i++;
+            }
 			for (int i = 0; i < nx; i++) {
 				global.push_back(d.global_i_south + i);
 			}
@@ -162,8 +192,9 @@ void DomainCollection::generateMaps()
 		if (d.nbr_west != -1 && visited.count(d.nbr_west) == 0) {
 			// a new edge that we have not assigned an index to
 			try {
-				Domain &nbr      = *domains.at(d.nbr_west);
-				nbr.local_i_east = curr_i;
+				Domain &nbr            = *domains.at(d.nbr_west);
+				nbr.local_i_east       = curr_i;
+				nbr.iface_local_i_east = curr_c_i;
 				if (enqueued.count(d.nbr_west) == 0) {
 					queue.push_back(d.nbr_west);
 					enqueued.insert(d.nbr_west);
@@ -171,7 +202,12 @@ void DomainCollection::generateMaps()
 			} catch (const out_of_range &oor) {
 				// do nothing
 			}
-			d.local_i_west = curr_i;
+			d.local_i_west       = curr_i;
+			d.iface_local_i_west = curr_c_i;
+			for (int i = 0; i < 21; i++) {
+				c_iface_global.push_back(d.iface_i_west + i);
+				curr_c_i++;
+			}
 			for (int i = 0; i < ny; i++) {
 				global.push_back(d.global_i_west + i);
 			}
@@ -185,10 +221,81 @@ void DomainCollection::generateMaps()
 		collection_map = Teuchos::rcp(new map_type(1, 0, comm));
 		matrix_map     = Teuchos::rcp(new map_type(1, 0, comm));
 	} else {
-		collection_map = Teuchos::rcp(new map_type(-1, &global[0], curr_i, 0, this->comm));
+		collection_map       = Teuchos::rcp(new map_type(-1, &global[0], curr_i, 0, this->comm));
+		collection_iface_map
+		= Teuchos::rcp(new map_type(-1, &c_iface_global[0], c_iface_global.size(), 0, this->comm));
 		matrix_map
 		= Teuchos::rcp(new map_type(-1, &matrix_global[0], curr_matrix_i, 0, this->comm));
+		iface_map
+		= Teuchos::rcp(new map_type(-1, &iface_global[0], iface_global.size(), 0, this->comm));
 	}
+}
+void DomainCollection::distributeIfaceInfo(){
+    //
+	int_vector_type dist(collection_iface_map, 1);
+	iface_info = rcp(new int_vector_type(iface_map, 1));
+	Tpetra::Export<> exporter(collection_iface_map, iface_map);
+	auto             dist_view = dist.getLocalView<Kokkos::HostSpace>();
+	for (auto &p : domains) {
+		Domain &d2 = *p.second;
+		if (d2.nbr_north != -1) {
+			dist_view(d2.iface_local_i_north, 0)      = d2.global_i_north;
+			dist_view(d2.iface_local_i_north + 1, 0)  = 0;
+			dist_view(d2.iface_local_i_north + 2, 0)  = nx;
+			dist_view(d2.iface_local_i_north + 12, 0) = d2.global_i_east;
+			dist_view(d2.iface_local_i_north + 13, 0) = 0;
+			dist_view(d2.iface_local_i_north + 14, 0) = ny;
+			dist_view(d2.iface_local_i_north + 15, 0) = d2.global_i_south;
+			dist_view(d2.iface_local_i_north + 16, 0) = 0;
+			dist_view(d2.iface_local_i_north + 17, 0) = nx;
+			dist_view(d2.iface_local_i_north + 18, 0) = d2.global_i_west;
+			dist_view(d2.iface_local_i_north + 19, 0) = 0;
+			dist_view(d2.iface_local_i_north + 20, 0) = ny;
+		}
+		if (d2.nbr_east != -1) {
+			dist_view(d2.iface_local_i_east, 0)      = d2.global_i_east;
+			dist_view(d2.iface_local_i_east + 1, 0)  = 0;
+			dist_view(d2.iface_local_i_east + 2, 0)  = ny;
+			dist_view(d2.iface_local_i_east + 12, 0) = d2.global_i_south;
+			dist_view(d2.iface_local_i_east + 13, 0) = 0;
+			dist_view(d2.iface_local_i_east + 14, 0) = nx;
+			dist_view(d2.iface_local_i_east + 15, 0) = d2.global_i_west;
+			dist_view(d2.iface_local_i_east + 16, 0) = 0;
+			dist_view(d2.iface_local_i_east + 17, 0) = ny;
+			dist_view(d2.iface_local_i_east + 18, 0) = d2.global_i_north;
+			dist_view(d2.iface_local_i_east + 19, 0) = 0;
+			dist_view(d2.iface_local_i_east + 20, 0) = nx;
+		}
+		if (d2.nbr_south != -1) {
+			dist_view(d2.iface_local_i_south, 0)      = d2.global_i_south;
+			dist_view(d2.iface_local_i_south + 1, 0)  = 0;
+			dist_view(d2.iface_local_i_south + 2, 0)  = nx;
+			dist_view(d2.iface_local_i_south + 3, 0)  = d2.global_i_west;
+			dist_view(d2.iface_local_i_south + 4, 0)  = 0;
+			dist_view(d2.iface_local_i_south + 5, 0)  = ny;
+			dist_view(d2.iface_local_i_south + 6, 0)  = d2.global_i_north;
+			dist_view(d2.iface_local_i_south + 7, 0)  = 0;
+			dist_view(d2.iface_local_i_south + 8, 0)  = nx;
+			dist_view(d2.iface_local_i_south + 9, 0)  = d2.global_i_east;
+			dist_view(d2.iface_local_i_south + 10, 0) = 0;
+			dist_view(d2.iface_local_i_south + 11, 0) = ny;
+		}
+		if (d2.nbr_west != -1) {
+			dist_view(d2.iface_local_i_west, 0)      = d2.global_i_west;
+			dist_view(d2.iface_local_i_west + 1, 0)  = 0;
+			dist_view(d2.iface_local_i_west + 2, 0)  = ny;
+			dist_view(d2.iface_local_i_west + 3, 0)  = d2.global_i_north;
+			dist_view(d2.iface_local_i_west + 4, 0)  = 0;
+			dist_view(d2.iface_local_i_west + 5, 0)  = nx;
+			dist_view(d2.iface_local_i_west + 6, 0)  = d2.global_i_east;
+			dist_view(d2.iface_local_i_west + 7, 0)  = 0;
+			dist_view(d2.iface_local_i_west + 8, 0)  = ny;
+			dist_view(d2.iface_local_i_west + 9, 0)  = d2.global_i_south;
+			dist_view(d2.iface_local_i_west + 10, 0) = 0;
+			dist_view(d2.iface_local_i_west + 11, 0) = nx;
+		}
+	}
+	iface_info->doExport(dist, exporter, Tpetra::CombineMode::INSERT);
 }
 void DomainCollection::solveWithInterface(const vector_type &gamma, vector_type &diff)
 {

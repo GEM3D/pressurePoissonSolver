@@ -35,6 +35,14 @@ class Domain
 	int                    global_i_east;
 	int                    global_i_south;
 	int                    global_i_west;
+	int                    iface_i_north;
+	int                    iface_i_east;
+	int                    iface_i_south;
+	int                    iface_i_west;
+	int                    iface_local_i_north;
+	int                    iface_local_i_east;
+	int                    iface_local_i_south;
+	int                    iface_local_i_west;
 	Teuchos::RCP<map_type> domain_map;
 	fftw_plan              plan1;
 	fftw_plan              plan2;
