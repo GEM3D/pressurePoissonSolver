@@ -424,3 +424,109 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 	A->fillComplete();
 	return A;
 }
+RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map)
+{
+	// create domain for forming matrix
+	std::valarray<double> f(nx * ny);
+	Domain                d(f, f, nx, ny, h_x, h_y);
+	d.nbr_north           = 1;
+	d.nbr_east            = 1;
+	d.nbr_south           = 1;
+	d.nbr_west            = 1;
+	d.boundary_north      = valarray<double>(nx);
+	d.boundary_south      = valarray<double>(nx);
+	d.boundary_east       = valarray<double>(ny);
+	d.boundary_west       = valarray<double>(ny);
+	int              size = max(nx, ny);
+	RCP<RBMatrix> A    = rcp(new RBMatrix(map, nx));
+
+	// create block
+	RCP<valarray<double>> north_block_ptr = rcp(new valarray<double>(nx * ny));
+	RCP<valarray<double>> east_block_ptr  = rcp(new valarray<double>(nx * ny));
+	RCP<valarray<double>> south_block_ptr = rcp(new valarray<double>(nx * ny));
+	RCP<valarray<double>> west_block_ptr  = rcp(new valarray<double>(nx * ny));
+	valarray<double> &    north_block     = *north_block_ptr;
+	valarray<double> &    east_block      = *east_block_ptr;
+	valarray<double> &    south_block     = *south_block_ptr;
+	valarray<double> &    west_block      = *west_block_ptr;
+	for (int i = 0; i < nx; i++) {
+		d.boundary_north[i] = 1;
+		d.solve();
+		// fill the blocks
+		north_block[slice(i, nx, nx)] = d.u[slice(nx * (ny - 1), nx, 1)];
+		east_block[slice(i, nx, nx)] = d.u[slice((nx - 1), ny, nx)];
+		south_block[slice(i, nx, nx)] = d.u[slice(0, nx, 1)];
+		west_block[slice(i, nx, nx)] = d.u[slice(0, ny, nx)];
+		d.boundary_north[i] = 0;
+	}
+    // insert into matrix
+	for (auto &p : domains) {
+		Domain &d2 = *p.second;
+        if(d2.nbr_north!=-1){
+            int j = d2.global_i_north;
+            A->insertBlock(j,j,north_block_ptr);
+            if(d2.nbr_east!=-1){
+                int i = d2.global_i_east;
+				A->insertBlock(i, j, east_block_ptr);
+			}
+            if(d2.nbr_south!=-1){
+                int i = d2.global_i_south;
+				A->insertBlock(i, j, south_block_ptr);
+            }
+            if(d2.nbr_west!=-1){
+                int i = d2.global_i_west;
+				A->insertBlock(i, j, west_block_ptr);
+            }
+        }
+        if(d2.nbr_east!=-1){
+            int j = d2.global_i_east;
+            A->insertBlock(j,j,north_block_ptr);
+            if(d2.nbr_east!=-1){
+                int i = d2.global_i_south;
+				A->insertBlock(i, j, east_block_ptr);
+			}
+            if(d2.nbr_south!=-1){
+                int i = d2.global_i_west;
+				A->insertBlock(i, j, south_block_ptr);
+            }
+            if(d2.nbr_west!=-1){
+                int i = d2.global_i_north;
+				A->insertBlock(i, j, west_block_ptr);
+            }
+        }
+        if(d2.nbr_south!=-1){
+            int j = d2.global_i_south;
+            A->insertBlock(j,j,north_block_ptr);
+            if(d2.nbr_east!=-1){
+                int i = d2.global_i_west;
+				A->insertBlock(i, j, east_block_ptr);
+			}
+            if(d2.nbr_south!=-1){
+                int i = d2.global_i_north;
+				A->insertBlock(i, j, south_block_ptr);
+            }
+            if(d2.nbr_west!=-1){
+                int i = d2.global_i_east;
+				A->insertBlock(i, j, west_block_ptr);
+            }
+        }
+        if(d2.nbr_west!=-1){
+            int j = d2.global_i_west;
+            A->insertBlock(j,j,north_block_ptr);
+            if(d2.nbr_east!=-1){
+                int i = d2.global_i_north;
+				A->insertBlock(i, j, east_block_ptr);
+			}
+            if(d2.nbr_south!=-1){
+                int i = d2.global_i_east;
+				A->insertBlock(i, j, south_block_ptr);
+            }
+            if(d2.nbr_west!=-1){
+                int i = d2.global_i_south;
+				A->insertBlock(i, j, west_block_ptr);
+            }
+        }
+	}
+	return A;
+}
+

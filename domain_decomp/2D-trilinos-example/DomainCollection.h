@@ -1,5 +1,6 @@
 #include "Domain.h"
 #include "MyTypeDefs.h"
+#include "RBMatrix.h"
 class DomainCollection
 {
 	private:
@@ -24,4 +25,5 @@ class DomainCollection
 	double                    diffNorm();
 	double                    exactNorm();
 	Teuchos::RCP<matrix_type> formMatrix(Teuchos::RCP<map_type> map);
+	Teuchos::RCP<RBMatrix> formRBMatrix(Teuchos::RCP<map_type> map);
 };
