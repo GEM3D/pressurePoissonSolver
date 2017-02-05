@@ -254,8 +254,10 @@ void DomainCollection::generateMaps()
 	// points
 	if (num_global_domains == 1) {
 		// this is a special case for when there is only one domain
-		collection_map = Teuchos::rcp(new map_type(1, 0, comm));
-		matrix_map     = Teuchos::rcp(new map_type(1, 0, comm));
+		collection_map       = Teuchos::rcp(new map_type(1, 0, comm));
+		collection_iface_map = Teuchos::rcp(new map_type(1, 0, comm));
+		matrix_map           = Teuchos::rcp(new map_type(1, 0, comm));
+		iface_map            = Teuchos::rcp(new map_type(1, 0, comm));
 	} else {
 		collection_map       = Teuchos::rcp(new map_type(-1, &global[0], curr_i, 0, this->comm));
 		collection_iface_map
@@ -391,8 +393,6 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
     // create iface objects
 	set<Iface> ifaces;
 	auto       iface_view = iface_info->getLocalView<Kokkos::HostSpace>();
-	int        my_rank;
-	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 	for (size_t i = 0; i < iface_view.dimension(0); i += 22) {
 		Iface right;
 		Iface left;
