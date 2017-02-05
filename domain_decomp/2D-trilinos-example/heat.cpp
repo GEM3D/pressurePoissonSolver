@@ -243,7 +243,16 @@ int main(int argc, char *argv[])
 	}
 
 	// Do one last solve
+	MPI_Barrier(MPI_COMM_WORLD);
+	steady_clock::time_point solve_start = steady_clock::now();
+
 	dc.solveWithInterface(*gamma, *diff);
+
+	MPI_Barrier(MPI_COMM_WORLD);
+	duration<double> solve_time = steady_clock::now() - solve_start;
+
+	if (my_global_rank == 0)
+		std::cout << "Time to solve with given set of gammas: " << solve_time.count() << "\n";
 
 	// Calcuate error
 	RCP<map_type>    err_map = rcp(new map_type(-1, 1, 0, comm));
@@ -263,8 +272,6 @@ int main(int argc, char *argv[])
 
 	if (my_global_rank == 0) {
 		std::cout << "Total run time: " << total_time.count() << "\n";
-		std::cout << "Total run time (excluding Domain Intitialization Time): "
-		          << total_time.count() - domain_time.count() << "\n";
 		std::cout << std::scientific;
 		std::cout.precision(13);
 		std::cout << "Error: " << global_diff_norm / global_exact_norm << "\n";
