@@ -85,6 +85,37 @@ class Domain
 		fftw_destroy_plan(plan2);
 	}
 
+    void planNeumann(){
+		fftw_r2r_kind x_transform     = FFTW_RODFT10;
+		fftw_r2r_kind x_transform_inv = FFTW_RODFT01;
+		fftw_r2r_kind y_transform     = FFTW_RODFT10;
+		fftw_r2r_kind y_transform_inv = FFTW_RODFT01;
+		if (nbr_east == -1 && nbr_west == -1) {
+			x_transform     = FFTW_REDFT01;
+			x_transform_inv = FFTW_REDFT10;
+		} else if (nbr_west == -1) {
+			x_transform     = FFTW_REDFT11;
+			x_transform_inv = FFTW_REDFT11;
+		} else if (nbr_east == -1) {
+			x_transform     = FFTW_RODFT11;
+			x_transform_inv = FFTW_RODFT11;
+		}
+		if (nbr_north == -1 && nbr_south == -1) {
+			x_transform     = FFTW_REDFT01;
+			x_transform_inv = FFTW_REDFT10;
+		} else if (nbr_south == -1) {
+			x_transform     = FFTW_REDFT11;
+			x_transform_inv = FFTW_REDFT11;
+		} else if (nbr_north == -1) {
+			x_transform     = FFTW_RODFT11;
+			x_transform_inv = FFTW_RODFT11;
+		}
+		plan1
+		= fftw_plan_r2r_2d(ny, nx, &f_copy[0], &tmp[0], y_transform, x_transform, FFTW_MEASURE);
+
+		plan2
+		= fftw_plan_r2r_2d(ny, nx, &tmp[0], &u[0], y_transform_inv, x_transform_inv, FFTW_MEASURE);
+	}
 	void solve()
 	{
 		f_copy = f;
