@@ -596,7 +596,7 @@ RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map)
 		ifaces.erase(ifaces.begin());
 		Iface      curr_type_right = *ifaces.begin();
 		ifaces.erase(ifaces.begin());
-		todo.insert(curr_type_left);
+		//todo.insert(curr_type_left);
 		todo.insert(curr_type_right);
 		for (auto iter = ifaces.begin(); iter != ifaces.end(); iter++) {
 			if (*iter == curr_type_left) {
@@ -644,6 +644,7 @@ RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map)
         int info;
 		dgetrf_(&nx, &nx, &south_block[0], &nx, &ipiv[0], &info);
 		dgetri_(&nx, &south_block[0], &nx, &ipiv[0], &work[0], &lwork, &info);
+
 		// now insert these results into the matrix for each interface
 		for(Iface iface: todo){
 			for (int x = 0; x < iface.l_south; x++) {
