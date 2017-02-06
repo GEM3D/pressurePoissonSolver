@@ -3,6 +3,14 @@
 using Teuchos::RCP;
 using Teuchos::rcp;
 using namespace std;
+extern "C" {
+// LU decomoposition of a general matrix
+void dgetrf_(int *M, int *N, double *A, int *lda, int *IPIV, int *INFO);
+
+// generate inverse of a matrix given its LU decomposition
+void dgetri_(int *N, double *A, int *lda, int *IPIV, double *WORK, int *lwork, int *INFO);
+}
+
 enum axis_enum { X_AXIS, Y_AXIS };
 class Iface{
     public:
@@ -525,6 +533,128 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 							global.push_back(iface.i_east + iface.l_south - 1 - y);
 						}
 					}
+				}
+				// insert row for domain
+				A->insertGlobalValues(j, row.size(), &row[0], &global[0]);
+			}
+		}
+	}
+
+	// transpose matrix and return
+	A->fillComplete();
+	return A;
+}
+RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map)
+{
+	int              size = max(nx, ny);
+	RCP<matrix_type> A    = rcp(new matrix_type(map, size * 6));
+    // create iface objects
+	set<Iface> ifaces;
+	auto       iface_view = iface_info->getLocalView<Kokkos::HostSpace>();
+	for (size_t i = 0; i < iface_view.dimension(0); i += 22) {
+		Iface right;
+		Iface left;
+
+		right.right   = true;
+		right.axis    = iface_view(i + 21, 0);
+		right.i_south = iface_view(i, 0);
+		right.t_south = iface_view(i + 1, 0);
+		right.l_south = iface_view(i + 2, 0);
+		right.i_west  = iface_view(i + 3, 0);
+		right.t_west  = iface_view(i + 4, 0);
+		right.l_west  = iface_view(i + 5, 0);
+		right.i_north = iface_view(i + 6, 0);
+		right.t_north = iface_view(i + 7, 0);
+		right.l_north = iface_view(i + 8, 0);
+		right.i_east  = iface_view(i + 9, 0);
+		right.t_east  = iface_view(i + 10, 0);
+		right.l_east  = iface_view(i + 11, 0);
+
+		left.right   = false;
+		left.axis    = iface_view(i + 21, 0);
+		left.i_south = iface_view(i, 0);
+		left.t_south = iface_view(i + 1, 0);
+		left.l_south = iface_view(i + 2, 0);
+		left.i_west  = iface_view(i + 12, 0);
+		left.t_west  = iface_view(i + 13, 0);
+		left.l_west  = iface_view(i + 14, 0);
+		left.i_north = iface_view(i + 15, 0);
+		left.t_north = iface_view(i + 16, 0);
+		left.l_north = iface_view(i + 17, 0);
+		left.i_east  = iface_view(i + 18, 0);
+		left.t_east  = iface_view(i + 19, 0);
+		left.l_east  = iface_view(i + 20, 0);
+        
+        ifaces.insert(left);
+        ifaces.insert(right);
+	}
+    
+	while(!ifaces.empty()){
+		// the first in the set is the type of interface that we are going to solve for
+		set<Iface> todo;
+		Iface      curr_type_left = *ifaces.begin();
+		ifaces.erase(ifaces.begin());
+		Iface      curr_type_right = *ifaces.begin();
+		ifaces.erase(ifaces.begin());
+		todo.insert(curr_type_left);
+		todo.insert(curr_type_right);
+		for (auto iter = ifaces.begin(); iter != ifaces.end(); iter++) {
+			if (*iter == curr_type_left) {
+				Iface left = *iter;
+				ifaces.erase(*iter);
+                iter++;
+				if (*iter == curr_type_right) {
+					//todo.insert(left);
+					todo.insert(*iter);
+					ifaces.erase(*iter);
+				}else{
+                    ifaces.insert(left);
+                }
+			}
+		}
+		// create domain representing curr_type
+		std::valarray<double> f(nx * ny);
+		Domain                d(f, f, nx, ny, h_x, h_y);
+		d.nbr_north      = 1;
+		d.nbr_east       = 1;
+		d.nbr_south      = 1;
+		d.nbr_west       = 1;
+		d.boundary_north = valarray<double>(nx);
+		d.boundary_south = valarray<double>(nx);
+		d.boundary_east  = valarray<double>(ny);
+		d.boundary_west  = valarray<double>(ny);
+
+		// solve over south interface, and save results
+		valarray<double> south_block(nx * ny);
+		for (int i = 0; i < nx; i++) {
+			d.boundary_south[i] = 1;
+			d.solve();
+			// fill the blocks
+			south_block[slice(i * nx, nx, 1)] = d.u[slice(0, nx, 1)];
+			south_block[i * nx + i] -= 1;
+			d.boundary_south[i] = 0;
+		}
+
+		south_block *= 2;
+
+        //compute inverse of block
+        valarray<int> ipiv(nx+1);
+        int lwork = nx*nx;
+        valarray<double> work(lwork);
+        int info;
+		dgetrf_(&nx, &nx, &south_block[0], &nx, &ipiv[0], &info);
+		dgetri_(&nx, &south_block[0], &nx, &ipiv[0], &work[0], &lwork, &info);
+		// now insert these results into the matrix for each interface
+		for(Iface iface: todo){
+			for (int x = 0; x < iface.l_south; x++) {
+				int j = iface.i_south + x;
+				vector<double> row;
+				vector<int>    global;
+				row.reserve(nx * 2 + ny * 2);
+				global.reserve(nx * 3 + ny * 4);
+				for (int y = 0; y < iface.l_south; y++) {
+					row.push_back(-south_block[x * nx + y]);
+					global.push_back(iface.i_south + y);
 				}
 				// insert row for domain
 				A->insertGlobalValues(j, row.size(), &row[0], &global[0]);

@@ -57,6 +57,7 @@ int main(int argc, char *argv[])
 	                            {'m'});
 	args::Flag f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
 	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
+	args::Flag f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
 
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;
@@ -217,12 +218,28 @@ int main(int argc, char *argv[])
 			op = A;
 		}
 
-		MPI_Barrier(MPI_COMM_WORLD);
-		steady_clock::time_point iter_start = steady_clock::now();
 		// Create linear problem for the Belos solver
 		Belos::LinearProblem<double, vector_type, Tpetra::Operator<>> problem(op, gamma, b);
+
+        if(f_prec){
+			// form preconditioner
+			MPI_Barrier(MPI_COMM_WORLD);
+			steady_clock::time_point prec_start = steady_clock::now();
+
+			RCP<matrix_type> P = dc.formInvDiag(matrix_map);
+            problem.setLeftPrec(P);
+
+			MPI_Barrier(MPI_COMM_WORLD);
+			duration<double> prec_time = steady_clock::now() - prec_start;
+
+			if (my_global_rank == 0)
+				cout << "Preconditioner Formation Time: " << prec_time.count() << "\n";
+		}
+
 		problem.setProblem();
 
+		MPI_Barrier(MPI_COMM_WORLD);
+		steady_clock::time_point iter_start = steady_clock::now();
 		// Set the parameters
 		Teuchos::ParameterList belosList;
 		belosList.set("Block Size", 1);
