@@ -12,6 +12,8 @@ void dgetri_(int *N, double *A, int *lda, int *IPIV, double *WORK, int *lwork, i
 }
 
 enum axis_enum { X_AXIS, Y_AXIS };
+enum bc_enum { DIRICHLET, NEUMANN };
+
 class Iface{
     public:
 	bool        right;
@@ -47,10 +49,9 @@ class Iface{
 		                   r.t_east);
 	}
 };
+
 DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, int d_y, double h_x,
-                                   double h_y, RCP<const Teuchos::Comm<int>> comm,
-                                   function<double(double, double)>          ffun,
-                                   function<double(double, double)>          gfun)
+                                   double h_y, RCP<const Teuchos::Comm<int>> comm)
 {
 	// cerr<< "Low:  " << low << "\n";
 	// cerr<< "High: " << high << "\n";
@@ -59,6 +60,8 @@ DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, i
 	this->ny           = ny;
 	this->h_x          = h_x;
 	this->h_y          = h_y;
+	this->d_x          = d_x;
+	this->d_y          = d_y;
 	num_domains        = high - low;
 	num_global_domains = d_x * d_y;
 	domains            = map<int, Domain *>();
@@ -66,34 +69,8 @@ DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, i
 		int domain_x = i % d_y;
 		int domain_y = i / d_x;
 
-		// Generate RHS vector
-		std::valarray<double> f(nx * ny);
-		std::valarray<double> exact(nx * ny);
-		// Use local indices to access the entries of f_data.
-		for (int yi = 0; yi < ny; yi++) {
-			for (int xi = 0; xi < nx; xi++) {
-				int    index_x      = domain_x * nx + xi;
-				int    index_y      = domain_y * ny + yi;
-				double x            = h_x / 2.0 + 1.0 * index_x / (nx * d_x);
-				double y            = h_y / 2.0 + 1.0 * index_y / (ny * d_y);
-				f[yi * nx + xi]     = ffun(x, y);
-				exact[yi * nx + xi] = gfun(x, y);
-				if (index_x == 0) {
-					f[yi * nx + xi] += -2.0 / (h_x * h_x) * gfun(0.0, y);
-				}
-				if (index_x == d_x * nx - 1) {
-					f[yi * nx + xi] += -2.0 / (h_x * h_x) * gfun(1.0, y);
-				}
-				if (index_y == 0) {
-					f[yi * nx + xi] += -2.0 / (h_y * h_y) * gfun(x, 0.0);
-				}
-				if (index_y == d_y * ny - 1) {
-					f[yi * nx + xi] += -2.0 / (h_y * h_y) * gfun(x, 1.0);
-				}
-			}
-		}
 		// create a domain
-		Domain *d_ptr = new Domain(f, exact, nx, ny, h_x, h_y);
+		Domain *d_ptr = new Domain(nx, ny, h_x, h_y);
 		Domain &d     = *d_ptr;
 
 		// determine its neighbors
@@ -129,10 +106,47 @@ DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, i
 		}
 		domains[i] = d_ptr;
 	}
+}
 
+void DomainCollection::initDirichlet(function<double(double, double)> ffun,
+                                     function<double(double, double)> gfun)
+{
+	for (auto &p : domains) {
+		Domain &d        = *p.second;
+		int     i        = p.first;
+		int     domain_x = i % d_y;
+		int     domain_y = i / d_x;
+		// Generate RHS vector
+		std::valarray<double> &f     = d.f;
+		std::valarray<double> &exact = d.exact;
+		// Use local indices to access the entries of f_data.
+		for (int yi = 0; yi < ny; yi++) {
+			for (int xi = 0; xi < nx; xi++) {
+				int    index_x      = domain_x * nx + xi;
+				int    index_y      = domain_y * ny + yi;
+				double x            = h_x / 2.0 + 1.0 * index_x / (nx * d_x);
+				double y            = h_y / 2.0 + 1.0 * index_y / (ny * d_y);
+				f[yi * nx + xi]     = ffun(x, y);
+				exact[yi * nx + xi] = gfun(x, y);
+				if (index_x == 0) {
+					f[yi * nx + xi] += -2.0 / (h_x * h_x) * gfun(0.0, y);
+				}
+				if (index_x == d_x * nx - 1) {
+					f[yi * nx + xi] += -2.0 / (h_x * h_x) * gfun(1.0, y);
+				}
+				if (index_y == 0) {
+					f[yi * nx + xi] += -2.0 / (h_y * h_y) * gfun(x, 0.0);
+				}
+				if (index_y == d_y * ny - 1) {
+					f[yi * nx + xi] += -2.0 / (h_y * h_y) * gfun(x, 1.0);
+				}
+			}
+		}
+		d.planDirichlet();
+	}
 	// create map for domains
-    generateMaps();
-    distributeIfaceInfo();
+	generateMaps();
+	distributeIfaceInfo();
 }
 void DomainCollection::generateMaps()
 {
@@ -455,7 +469,8 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 		}
 		// create domain representing curr_type
 		std::valarray<double> f(nx * ny);
-		Domain                d(f, f, nx, ny, h_x, h_y);
+		Domain                d(nx, ny, h_x, h_y);
+		d.planDirichlet();
 		d.nbr_north      = 1;
 		d.nbr_east       = 1;
 		d.nbr_south      = 1;
@@ -614,7 +629,8 @@ RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map)
 		}
 		// create domain representing curr_type
 		std::valarray<double> f(nx * ny);
-		Domain                d(f, f, nx, ny, h_x, h_y);
+		Domain                d(nx, ny, h_x, h_y);
+		d.planDirichlet();
 		d.nbr_north      = 1;
 		d.nbr_east       = 1;
 		d.nbr_south      = 1;
@@ -671,7 +687,7 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map)
 {
 	// create domain for forming matrix
 	std::valarray<double> f(nx * ny);
-	Domain                d(f, f, nx, ny, h_x, h_y);
+	Domain                d(nx, ny, h_x, h_y);
 	d.nbr_north           = 1;
 	d.nbr_east            = 1;
 	d.nbr_south           = 1;

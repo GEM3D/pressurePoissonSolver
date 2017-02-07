@@ -46,37 +46,34 @@ class Domain
 	Teuchos::RCP<map_type> domain_map;
 	fftw_plan              plan1;
 	fftw_plan              plan2;
+	bool                   neumann = false;
 
 	Domain() {}
-	Domain(std::valarray<double> f, std::valarray<double> exact, int nx, int ny, double h_x,
-	       double h_y)
+	Domain(int nx, int ny, double h_x, double h_y)
 	{
-		this->f     = f;
-		this->exact = exact;
-		this->nx    = nx;
-		this->ny    = ny;
-		this->h_x   = h_x;
-		this->h_y   = h_y;
+		this->nx  = nx;
+		this->ny  = ny;
+		this->h_x = h_x;
+		this->h_y = h_y;
 
-		f_copy = f;
+		f      = std::valarray<double>(nx * ny);
+		f_copy = std::valarray<double>(nx * ny);
+		exact  = std::valarray<double>(nx * ny);
 		tmp    = std::valarray<double>(nx * ny);
 		u      = std::valarray<double>(nx * ny);
 		denom  = std::valarray<double>(nx * ny);
+
 		for (int xi = 1; xi <= nx; xi++) {
 			denom[std::slice((xi - 1) * ny, nx, 1)]
 			= -4 / (h_x * h_x) * std::pow(std::sin(xi * M_PI / (2 * nx)), 2);
 		}
+
 		std::valarray<double> ones(ny);
 		ones = 1;
 		for (int yi = 1; yi <= ny; yi++) {
 			denom[std::slice((yi - 1), ny, nx)]
 			-= 4 / (h_y * h_y) * std::pow(std::sin(yi * M_PI / (2 * ny)), 2) * ones;
 		}
-		// create fftw plans
-		plan1
-		= fftw_plan_r2r_2d(ny, nx, &f_copy[0], &tmp[0], FFTW_RODFT10, FFTW_RODFT10, FFTW_MEASURE);
-
-		plan2 = fftw_plan_r2r_2d(ny, nx, &tmp[0], &u[0], FFTW_RODFT01, FFTW_RODFT01, FFTW_MEASURE);
 	}
 
 	~Domain()
@@ -85,7 +82,17 @@ class Domain
 		fftw_destroy_plan(plan2);
 	}
 
-    void planNeumann(){
+	void planDirichlet()
+	{
+		plan1
+		= fftw_plan_r2r_2d(ny, nx, &f_copy[0], &tmp[0], FFTW_RODFT10, FFTW_RODFT10, FFTW_MEASURE);
+
+		plan2 = fftw_plan_r2r_2d(ny, nx, &tmp[0], &u[0], FFTW_RODFT01, FFTW_RODFT01, FFTW_MEASURE);
+	}
+
+	void planNeumann()
+	{
+		neumann                       = true;
 		fftw_r2r_kind x_transform     = FFTW_RODFT10;
 		fftw_r2r_kind x_transform_inv = FFTW_RODFT01;
 		fftw_r2r_kind y_transform     = FFTW_RODFT10;
@@ -116,6 +123,7 @@ class Domain
 		plan2
 		= fftw_plan_r2r_2d(ny, nx, &tmp[0], &u[0], y_transform_inv, x_transform_inv, FFTW_MEASURE);
 	}
+
 	void solve()
 	{
 		f_copy = f;

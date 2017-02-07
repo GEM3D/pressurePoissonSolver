@@ -163,7 +163,9 @@ int main(int argc, char *argv[])
 	int              total_domains = num_domains_x * num_domains_y;
 	DomainCollection dc(total_domains * my_global_rank / num_procs,
 	                    total_domains * (my_global_rank + 1) / num_procs - 1, nx, ny, num_domains_x,
-	                    num_domains_y, h_x, h_y, comm,ffun,gfun);
+	                    num_domains_y, h_x, h_y, comm);
+
+	dc.initDirichlet(ffun, gfun);
 
 	MPI_Barrier(MPI_COMM_WORLD);
     steady_clock::time_point domain_stop = steady_clock::now();

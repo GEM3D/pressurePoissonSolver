@@ -8,6 +8,8 @@ class DomainCollection
 	Teuchos::RCP<const Teuchos::Comm<int>> comm;
 	int                                    nx;
 	int                                    ny;
+	int                                    d_x;
+	int                                    d_y;
 	double                                 h_x;
 	double                                 h_y;
 	int                                    num_domains;
@@ -19,10 +21,13 @@ class DomainCollection
 	Teuchos::RCP<map_type>                 matrix_map;
 	Teuchos::RCP<map_type>                 iface_map;
 	Teuchos::RCP<int_vector_type>          iface_info;
+
 	DomainCollection(int low, int high, int nx, int ny, int d_x, int d_y, double h_x, double h_y,
-	                 Teuchos::RCP<const Teuchos::Comm<int>> comm,
-	                 std::function<double(double, double)> ffun,
-	                 std::function<double(double, double)> gfun);
+	                 Teuchos::RCP<const Teuchos::Comm<int>> comm);
+
+	void initDirichlet(std::function<double(double, double)> ffun,
+	                   std::function<double(double, double)> gfun);
+
 	void solveWithInterface(const vector_type &gamma, vector_type &diff);
 	void                      generateMaps();
 	void                      distributeIfaceInfo();
