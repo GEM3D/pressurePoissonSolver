@@ -56,6 +56,8 @@ int main(int argc, char *argv[])
 	args::Positional<int> n_y(parser, "n_y", "number of cells in the y direction, in each domain");
 	args::ValueFlag<string> f_m(parser, "matrix filename", "the file to write the matrix to",
 	                            {'m'});
+	args::ValueFlag<string> f_r(parser, "rhs filename", "the file to write the rhs vector to",
+	                            {'r'});
 	args::ValueFlag<string> f_p(parser, "preconditioner filename",
 	                            "the file to write the preconditoiner to", {'p'});
 	args::Flag f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
@@ -102,6 +104,11 @@ int main(int argc, char *argv[])
 	string save_matrix_file = "";
 	if (f_m) {
 		save_matrix_file = args::get(f_m);
+	}
+
+	string save_rhs_file = "";
+	if (f_r) {
+		save_rhs_file = args::get(f_r);
 	}
 
 	string save_prec_file = "";
@@ -225,13 +232,17 @@ int main(int argc, char *argv[])
 		RCP<vector_type> b = rcp(new vector_type(matrix_map, 1));
 		dc.solveWithInterface(*gamma, *b);
 
+		if (save_rhs_file != "") {
+			Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_rhs_file, b, "", "");
+		}
+
 		RCP<Tpetra::Operator<>> op;
 
 		if (f_wrapper) {
 			// Create a function wrapper
 			op = rcp(new FuncWrap(b, &dc));
 		} else {
-            // Form the matrix
+			// Form the matrix
 			MPI_Barrier(MPI_COMM_WORLD);
 			steady_clock::time_point form_start = steady_clock::now();
 
