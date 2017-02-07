@@ -352,13 +352,25 @@ void DomainCollection::distributeIfaceInfo(){
 			//dist_view(d2.iface_local_i_north + 1, 0)  = 0;
 			//dist_view(d2.iface_local_i_north + 2, 0)  = nx;
 			dist_view(d2.iface_local_i_north + 12, 0) = d2.global_i_east;
-			dist_view(d2.iface_local_i_north + 13, 0) = 0;
+			if (d2.neumann && d2.nbr_east == -1) {
+				dist_view(d2.iface_local_i_north + 13, 0) = NEUMANN;
+			} else {
+				dist_view(d2.iface_local_i_north + 13, 0) = DIRICHLET;
+			}
 			dist_view(d2.iface_local_i_north + 14, 0) = ny;
 			dist_view(d2.iface_local_i_north + 15, 0) = d2.global_i_south;
-			dist_view(d2.iface_local_i_north + 16, 0) = 0;
+			if (d2.neumann && d2.nbr_south == -1) {
+				dist_view(d2.iface_local_i_north + 16, 0) = NEUMANN;
+			} else {
+				dist_view(d2.iface_local_i_north + 16, 0) = DIRICHLET;
+			}
 			dist_view(d2.iface_local_i_north + 17, 0) = nx;
 			dist_view(d2.iface_local_i_north + 18, 0) = d2.global_i_west;
-			dist_view(d2.iface_local_i_north + 19, 0) = 0;
+			if (d2.neumann && d2.nbr_west == -1) {
+				dist_view(d2.iface_local_i_north + 19, 0) = NEUMANN;
+			} else {
+				dist_view(d2.iface_local_i_north + 19, 0) = DIRICHLET;
+			}
 			dist_view(d2.iface_local_i_north + 20, 0) = ny;
 			dist_view(d2.iface_local_i_north + 21, 0) = X_AXIS;
 		}
@@ -367,45 +379,90 @@ void DomainCollection::distributeIfaceInfo(){
 			//dist_view(d2.iface_local_i_east + 1, 0)  = 0;
 			//dist_view(d2.iface_local_i_east + 2, 0)  = ny;
 			dist_view(d2.iface_local_i_east + 12, 0) = d2.global_i_south;
-			dist_view(d2.iface_local_i_east + 13, 0) = 0;
+			if (d2.neumann && d2.nbr_south == -1) {
+				dist_view(d2.iface_local_i_east + 13, 0) = NEUMANN;
+			} else {
+				dist_view(d2.iface_local_i_east + 13, 0) = DIRICHLET;
+			}
 			dist_view(d2.iface_local_i_east + 14, 0) = nx;
 			dist_view(d2.iface_local_i_east + 15, 0) = d2.global_i_west;
-			dist_view(d2.iface_local_i_east + 16, 0) = 0;
+			if (d2.neumann && d2.nbr_west == -1) {
+				dist_view(d2.iface_local_i_east + 16, 0) = NEUMANN;
+			} else {
+				dist_view(d2.iface_local_i_east + 16, 0) = DIRICHLET;
+			}
 			dist_view(d2.iface_local_i_east + 17, 0) = ny;
 			dist_view(d2.iface_local_i_east + 18, 0) = d2.global_i_north;
-			dist_view(d2.iface_local_i_east + 19, 0) = 0;
+			if (d2.neumann && d2.nbr_north == -1) {
+				dist_view(d2.iface_local_i_east + 19, 0) = NEUMANN;
+			} else {
+				dist_view(d2.iface_local_i_east + 19, 0) = DIRICHLET;
+			}
 			dist_view(d2.iface_local_i_east + 20, 0) = nx;
 			dist_view(d2.iface_local_i_east + 21, 0) = Y_AXIS;
 		}
 		if (d2.nbr_south != -1) {
 			dist_view(d2.iface_local_i_south, 0)      = d2.global_i_south;
 			dist_view(d2.iface_local_i_south + 1, 0)  = 0;
+			if (d2.neumann && d2.nbr_south == -1) {
+				dist_view(d2.iface_local_i_south + 1, 0) = NEUMANN;
+			} else {
+				dist_view(d2.iface_local_i_south + 1, 0) = DIRICHLET;
+			}
 			dist_view(d2.iface_local_i_south + 2, 0)  = nx;
 			dist_view(d2.iface_local_i_south + 3, 0)  = d2.global_i_west;
-			dist_view(d2.iface_local_i_south + 4, 0)  = 0;
+			if (d2.neumann && d2.nbr_west == -1) {
+				dist_view(d2.iface_local_i_south + 4, 0) = NEUMANN;
+			} else {
+				dist_view(d2.iface_local_i_south + 4, 0) = DIRICHLET;
+			}
 			dist_view(d2.iface_local_i_south + 5, 0)  = ny;
 			dist_view(d2.iface_local_i_south + 6, 0)  = d2.global_i_north;
-			dist_view(d2.iface_local_i_south + 7, 0)  = 0;
+			if (d2.neumann && d2.nbr_north == -1) {
+				dist_view(d2.iface_local_i_south + 7, 0) = NEUMANN;
+			} else {
+				dist_view(d2.iface_local_i_south + 7, 0) = DIRICHLET;
+			}
 			dist_view(d2.iface_local_i_south + 8, 0)  = nx;
 			dist_view(d2.iface_local_i_south + 9, 0)  = d2.global_i_east;
-			dist_view(d2.iface_local_i_south + 10, 0) = 0;
+			if (d2.neumann && d2.nbr_east == -1) {
+				dist_view(d2.iface_local_i_south + 10, 0) = NEUMANN;
+			} else {
+				dist_view(d2.iface_local_i_south + 10, 0) = DIRICHLET;
+			}
 			dist_view(d2.iface_local_i_south + 11, 0) = ny;
 			//dist_view(d2.iface_local_i_south + 21, 0) = X_AXIS;
 		}
 		if (d2.nbr_west != -1) {
 			dist_view(d2.iface_local_i_west, 0)      = d2.global_i_west;
-			dist_view(d2.iface_local_i_west + 1, 0)  = 0;
-			dist_view(d2.iface_local_i_west + 2, 0)  = ny;
-			dist_view(d2.iface_local_i_west + 3, 0)  = d2.global_i_north;
-			dist_view(d2.iface_local_i_west + 4, 0)  = 0;
-			dist_view(d2.iface_local_i_west + 5, 0)  = nx;
-			dist_view(d2.iface_local_i_west + 6, 0)  = d2.global_i_east;
-			dist_view(d2.iface_local_i_west + 7, 0)  = 0;
-			dist_view(d2.iface_local_i_west + 8, 0)  = ny;
-			dist_view(d2.iface_local_i_west + 9, 0)  = d2.global_i_south;
-			dist_view(d2.iface_local_i_west + 10, 0) = 0;
+			if (d2.neumann && d2.nbr_west == -1) {
+				dist_view(d2.iface_local_i_west + 1, 0) = NEUMANN;
+			} else {
+				dist_view(d2.iface_local_i_west + 1, 0) = DIRICHLET;
+			}
+			dist_view(d2.iface_local_i_west + 2, 0) = ny;
+			dist_view(d2.iface_local_i_west + 3, 0) = d2.global_i_north;
+			if (d2.neumann && d2.nbr_north == -1) {
+				dist_view(d2.iface_local_i_west + 4, 0) = NEUMANN;
+			} else {
+				dist_view(d2.iface_local_i_west + 4, 0) = DIRICHLET;
+			}
+			dist_view(d2.iface_local_i_west + 5, 0) = nx;
+			dist_view(d2.iface_local_i_west + 6, 0) = d2.global_i_east;
+			if (d2.neumann && d2.nbr_east == -1) {
+				dist_view(d2.iface_local_i_west + 7, 0) = NEUMANN;
+			} else {
+				dist_view(d2.iface_local_i_west + 7, 0) = DIRICHLET;
+			}
+			dist_view(d2.iface_local_i_west + 8, 0) = ny;
+			dist_view(d2.iface_local_i_west + 9, 0) = d2.global_i_south;
+			if (d2.neumann && d2.nbr_south == -1) {
+				dist_view(d2.iface_local_i_west + 10, 0) = NEUMANN;
+			} else {
+				dist_view(d2.iface_local_i_west + 10, 0) = DIRICHLET;
+			}
 			dist_view(d2.iface_local_i_west + 11, 0) = nx;
-			//dist_view(d2.iface_local_i_west + 21, 0) = Y_AXIS;
+			// dist_view(d2.iface_local_i_west + 21, 0) = Y_AXIS;
 		}
 	}
 	Tpetra::Export<> exporter(collection_iface_map, iface_map);
@@ -535,7 +592,9 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
         ifaces.insert(right);
 	}
     
+    int num_types=0;
 	while(!ifaces.empty()){
+        num_types++;
 		// the first in the set is the type of interface that we are going to solve for
 		set<Iface> todo;
 		Iface      curr_type = *ifaces.begin();
@@ -552,15 +611,31 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 		// create domain representing curr_type
 		std::valarray<double> f(nx * ny);
 		Domain                d(nx, ny, h_x, h_y);
-		d.planDirichlet();
-		d.nbr_north      = 1;
-		d.nbr_east       = 1;
-		d.nbr_south      = 1;
-		d.nbr_west       = 1;
+		if (curr_type.t_north == NEUMANN) {
+			d.nbr_north = -1;
+		} else {
+			d.nbr_north = 1;
+		}
+		if (curr_type.t_east == NEUMANN) {
+			d.nbr_east = -1;
+		} else {
+			d.nbr_east = 1;
+		}
+		if (curr_type.t_south == NEUMANN) {
+			d.nbr_south = -1;
+		} else {
+			d.nbr_south = 1;
+		}
+		if (curr_type.t_west == NEUMANN) {
+			d.nbr_west = -1;
+		} else {
+			d.nbr_west = 1;
+		}
 		d.boundary_north = valarray<double>(nx);
 		d.boundary_south = valarray<double>(nx);
 		d.boundary_east  = valarray<double>(ny);
 		d.boundary_west  = valarray<double>(ny);
+		d.planNeumann();
 
 		// solve over south interface, and save results
 		valarray<double> north_block(nx * ny);
@@ -571,7 +646,7 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 			d.boundary_south[i] = 1;
 			d.solve();
 			// fill the blocks
-            
+
 			north_block[slice(i * nx, nx, 1)] = d.u[slice(nx * (ny - 1), nx, 1)];
 			east_block[slice(i * nx, ny, 1)]  = d.u[slice((nx - 1), ny, nx)];
 			south_block[slice(i * nx, nx, 1)] = d.u[slice(0, nx, 1)];
@@ -582,27 +657,34 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 
 		//now insert these results into the matrix for each interface
         for(Iface iface: todo){
+			bool reverse_x = false;
+			if ((iface.axis == X_AXIS && !iface.right) || (iface.axis == Y_AXIS && iface.right)) {
+				reverse_x = true;
+			}
+
 			for (int x = 0; x < iface.l_south; x++) {
-				int j = iface.i_south + x;
-				//if (iface.axis == Y_AXIS) {
-				//	j = iface.i_south + iface.l_south - 1 - x;
-				//}
+				int j       = iface.i_south + x;
+				int block_i = x;
+				if (reverse_x) {
+					block_i = iface.l_south - 1 - x;
+				}
+
 				vector<double> row;
 				vector<int>    global;
 				row.reserve(nx * 2 + ny * 2);
 				global.reserve(nx * 3 + ny * 4);
 				for (int y = 0; y < iface.l_south; y++) {
-					row.push_back(-south_block[x * nx + y]);
+                    int block_j = y;
+                    if(reverse_x){
+						block_j = iface.l_south - 1 - y;
+					}
+					row.push_back(-south_block[block_i * nx + block_j]);
 					global.push_back(iface.i_south + y);
 				}
 				if (iface.i_west != -1) {
 					for (int y = 0; y < iface.l_south; y++) {
-						if ((iface.axis == X_AXIS && iface.right)
-						    || (iface.axis == Y_AXIS && !iface.right)) {
-							row.push_back(-west_block[x * nx + y]);
-						} else {
-							row.push_back(-east_block[x * nx + y]);
-						}
+						int block_j = y;
+						row.push_back(-west_block[block_i * nx + block_j]);
 						if (iface.right) {
 							global.push_back(iface.i_west + y);
 						} else {
@@ -612,18 +694,18 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 				}
 				if (iface.i_north != -1) {
 					for (int y = 0; y < iface.l_south; y++) {
-						row.push_back(-north_block[x * nx + y]);
+						int block_j = y;
+						if (reverse_x) {
+							block_j = iface.l_south - 1 - y;
+						}
+						row.push_back(-north_block[block_i * nx + block_j]);
 						global.push_back(iface.i_north + y);
 					}
 				}
 				if (iface.i_east != -1) {
 					for (int y = 0; y < iface.l_south; y++) {
-						if ((iface.axis == X_AXIS && iface.right)
-						    || (iface.axis == Y_AXIS && !iface.right)) {
-							row.push_back(-east_block[x * nx + y]);
-						} else {
-							row.push_back(-west_block[x * nx + y]);
-						}
+						int block_j = y;
+						row.push_back(-east_block[block_i * nx + block_j]);
 						if (iface.right) {
 							global.push_back(iface.i_east + y);
 						} else {
@@ -637,6 +719,7 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 		}
 	}
 
+	// cerr << "Num types: " << num_types << "\n";
 	// transpose matrix and return
 	A->fillComplete();
 	return A;
