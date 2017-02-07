@@ -608,8 +608,8 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
                 //iter=ifaces.begin();
 			}
 		}
+
 		// create domain representing curr_type
-		std::valarray<double> f(nx * ny);
 		Domain                d(nx, ny, h_x, h_y);
 		if (curr_type.t_north == NEUMANN) {
 			d.nbr_north = -1;
@@ -729,7 +729,7 @@ RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map)
 	int              size = max(nx, ny);
 	RCP<matrix_type> A    = rcp(new matrix_type(map, size * 6));
     // create iface objects
-	set<Iface> ifaces;
+	set<pair<Iface,Iface>> ifaces;
 	auto       iface_view = iface_info->getLocalView<Kokkos::HostSpace>();
 	for (size_t i = 0; i < iface_view.dimension(0); i += 22) {
 		Iface right;
@@ -765,58 +765,110 @@ RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map)
 		left.t_east  = iface_view(i + 19, 0);
 		left.l_east  = iface_view(i + 20, 0);
         
-        ifaces.insert(left);
-        ifaces.insert(right);
+        pair<Iface,Iface> p;
+        p.first = left;
+        p.second = right;
+		ifaces.insert(p);
 	}
-    
-	while(!ifaces.empty()){
+
+	while (!ifaces.empty()) {
 		// the first in the set is the type of interface that we are going to solve for
 		set<Iface> todo;
-		Iface      curr_type_left = *ifaces.begin();
+		pair<Iface, Iface> curr_pair = *ifaces.begin();
+
 		ifaces.erase(ifaces.begin());
-		Iface      curr_type_right = *ifaces.begin();
-		ifaces.erase(ifaces.begin());
-		//todo.insert(curr_type_left);
+		Iface curr_type_left  = curr_pair.first;
+		Iface curr_type_right = curr_pair.second;
+		// todo.insert(curr_type_left);
 		todo.insert(curr_type_right);
 		for (auto iter = ifaces.begin(); iter != ifaces.end(); iter++) {
-			if (*iter == curr_type_left) {
-				Iface left = *iter;
-				ifaces.erase(*iter);
-                iter++;
-				if (*iter == curr_type_right) {
-					//todo.insert(left);
-					todo.insert(*iter);
-					ifaces.erase(*iter);
-				}else{
-                    ifaces.insert(left);
-                }
+			if (*iter == curr_pair) {
+				todo.insert(iter->second);
+				auto old = *iter;
+				iter--;
+				ifaces.erase(old);
+				if (ifaces.size() == 0) {
+					break;
+				}
 			}
 		}
-		// create domain representing curr_type
-		std::valarray<double> f(nx * ny);
-		Domain                d(nx, ny, h_x, h_y);
-		d.planDirichlet();
-		d.nbr_north      = 1;
-		d.nbr_east       = 1;
-		d.nbr_south      = 1;
-		d.nbr_west       = 1;
-		d.boundary_north = valarray<double>(nx);
-		d.boundary_south = valarray<double>(nx);
-		d.boundary_east  = valarray<double>(ny);
-		d.boundary_west  = valarray<double>(ny);
+
+		// create domain representing curr_type_left
+		Domain d_left(nx, ny, h_x, h_y);
+		if (curr_type_left.t_north == NEUMANN) {
+			d_left.nbr_north = -1;
+		} else {
+			d_left.nbr_north = 1;
+		}
+		if (curr_type_left.t_east == NEUMANN) {
+			d_left.nbr_east = -1;
+		} else {
+			d_left.nbr_east = 1;
+		}
+		if (curr_type_left.t_south == NEUMANN) {
+			d_left.nbr_south = -1;
+		} else {
+			d_left.nbr_south = 1;
+		}
+		if (curr_type_left.t_west == NEUMANN) {
+			d_left.nbr_west = -1;
+		} else {
+			d_left.nbr_west = 1;
+		}
+		d_left.boundary_north = valarray<double>(nx);
+		d_left.boundary_south = valarray<double>(nx);
+		d_left.boundary_east  = valarray<double>(ny);
+		d_left.boundary_west  = valarray<double>(ny);
+		d_left.planNeumann();
+
+        // create domain representing curr_type_right
+		Domain d_right(nx, ny, h_x, h_y);
+		if (curr_type_right.t_north == NEUMANN) {
+			d_right.nbr_north = -1;
+		} else {
+			d_right.nbr_north = 1;
+		}
+		if (curr_type_right.t_east == NEUMANN) {
+			d_right.nbr_east = -1;
+		} else {
+			d_right.nbr_east = 1;
+		}
+		if (curr_type_right.t_south == NEUMANN) {
+			d_right.nbr_south = -1;
+		} else {
+			d_right.nbr_south = 1;
+		}
+		if (curr_type_right.t_west == NEUMANN) {
+			d_right.nbr_west = -1;
+		} else {
+			d_right.nbr_west = 1;
+		}
+		d_right.boundary_north = valarray<double>(nx);
+		d_right.boundary_south = valarray<double>(nx);
+		d_right.boundary_east  = valarray<double>(ny);
+		d_right.boundary_west  = valarray<double>(ny);
+		d_right.planNeumann();
 
 		// solve over south interface, and save results
 		valarray<double> south_block(nx * ny);
 		for (int i = 0; i < nx; i++) {
-			d.boundary_south[i] = 1;
-			d.solve();
+			d_right.boundary_south[i] = 1;
+            d_left.boundary_south[nx-1-i] =1;
+			d_right.solve();
+			d_left.solve();
+
 			// fill the blocks
-			south_block[slice(i * nx, nx, 1)] = d.u[slice(0, nx, 1)];
-			south_block[i * nx + i] -= 1;
-			d.boundary_south[i] = 0;
+			south_block[slice(i * nx, nx, 1)] = d_right.u[slice(0, nx, 1)];
+			for (int j = 0; j < nx; j++) {
+				south_block[i * nx + j] += d_left.u[nx - 1 - j];
+			}
+			south_block[i * nx + i] -= 2;
+
+			d_right.boundary_south[i] = 0;
+            d_left.boundary_south[nx-1-i] =0;
 		}
 
-		south_block *= 2;
+		//south_block *= 2;
 
         //compute inverse of block
         valarray<int> ipiv(nx+1);

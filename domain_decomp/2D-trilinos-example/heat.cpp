@@ -56,6 +56,8 @@ int main(int argc, char *argv[])
 	args::Positional<int> n_y(parser, "n_y", "number of cells in the y direction, in each domain");
 	args::ValueFlag<string> f_m(parser, "matrix filename", "the file to write the matrix to",
 	                            {'m'});
+	args::ValueFlag<string> f_p(parser, "preconditioner filename",
+	                            "the file to write the preconditoiner to", {'p'});
 	args::Flag f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
 	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
 	args::Flag f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
@@ -100,6 +102,11 @@ int main(int argc, char *argv[])
 	string save_matrix_file = "";
 	if (f_m) {
 		save_matrix_file = args::get(f_m);
+	}
+
+	string save_prec_file = "";
+	if (f_p) {
+		save_prec_file = args::get(f_p);
 	}
 
 	// the functions that we are using
@@ -244,6 +251,19 @@ int main(int argc, char *argv[])
 
 			if (my_global_rank == 0)
 				cout << "Preconditioner Formation Time: " << prec_time.count() << "\n";
+
+			if (save_prec_file != "") {
+				MPI_Barrier(MPI_COMM_WORLD);
+				steady_clock::time_point write_start = steady_clock::now();
+
+				Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_prec_file, P, "",
+				                                                           "");
+
+				MPI_Barrier(MPI_COMM_WORLD);
+				duration<double> write_time = steady_clock::now() - write_start;
+				if (my_global_rank == 0)
+					cout << "Time to write preconditioner to file: " << write_time.count() << "\n";
+			}
 		}
 
 		problem.setProblem();
