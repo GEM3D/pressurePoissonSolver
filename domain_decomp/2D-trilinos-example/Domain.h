@@ -62,18 +62,6 @@ class Domain
 		tmp    = std::valarray<double>(nx * ny);
 		u      = std::valarray<double>(nx * ny);
 		denom  = std::valarray<double>(nx * ny);
-
-		for (int xi = 1; xi <= nx; xi++) {
-			denom[std::slice((xi - 1) * ny, nx, 1)]
-			= -4 / (h_x * h_x) * std::pow(std::sin(xi * M_PI / (2 * nx)), 2);
-		}
-
-		std::valarray<double> ones(ny);
-		ones = 1;
-		for (int yi = 1; yi <= ny; yi++) {
-			denom[std::slice((yi - 1), ny, nx)]
-			-= 4 / (h_y * h_y) * std::pow(std::sin(yi * M_PI / (2 * ny)), 2) * ones;
-		}
 	}
 
 	~Domain()
@@ -84,10 +72,24 @@ class Domain
 
 	void planDirichlet()
 	{
+        //create plan
 		plan1
 		= fftw_plan_r2r_2d(ny, nx, &f_copy[0], &tmp[0], FFTW_RODFT10, FFTW_RODFT10, FFTW_MEASURE);
 
 		plan2 = fftw_plan_r2r_2d(ny, nx, &tmp[0], &u[0], FFTW_RODFT01, FFTW_RODFT01, FFTW_MEASURE);
+        //create denom vector
+
+		for (int xi = 0; xi < nx; xi++) {
+			denom[std::slice(xi * ny, nx, 1)]
+			= -4 / (h_x * h_x) * std::pow(std::sin((xi + 1) * M_PI / (2 * nx)), 2);
+		}
+
+		std::valarray<double> ones(ny);
+		ones = 1;
+		for (int yi = 0; yi < ny; yi++) {
+			denom[std::slice(yi, ny, nx)]
+			-= 4 / (h_y * h_y) * std::pow(std::sin((yi + 1) * M_PI / (2 * ny)), 2) * ones;
+		}
 	}
 
 	void planNeumann()
@@ -98,8 +100,8 @@ class Domain
 		fftw_r2r_kind y_transform     = FFTW_RODFT10;
 		fftw_r2r_kind y_transform_inv = FFTW_RODFT01;
 		if (nbr_east == -1 && nbr_west == -1) {
-			x_transform     = FFTW_REDFT01;
-			x_transform_inv = FFTW_REDFT10;
+			x_transform     = FFTW_REDFT10;
+			x_transform_inv = FFTW_REDFT01;
 		} else if (nbr_west == -1) {
 			x_transform     = FFTW_REDFT11;
 			x_transform_inv = FFTW_REDFT11;
@@ -108,20 +110,58 @@ class Domain
 			x_transform_inv = FFTW_RODFT11;
 		}
 		if (nbr_north == -1 && nbr_south == -1) {
-			x_transform     = FFTW_REDFT01;
-			x_transform_inv = FFTW_REDFT10;
+			y_transform     = FFTW_REDFT10;
+			y_transform_inv = FFTW_REDFT01;
 		} else if (nbr_south == -1) {
-			x_transform     = FFTW_REDFT11;
-			x_transform_inv = FFTW_REDFT11;
+			y_transform     = FFTW_REDFT11;
+			y_transform_inv = FFTW_REDFT11;
 		} else if (nbr_north == -1) {
-			x_transform     = FFTW_RODFT11;
-			x_transform_inv = FFTW_RODFT11;
+			y_transform     = FFTW_RODFT11;
+			y_transform_inv = FFTW_RODFT11;
 		}
 		plan1
 		= fftw_plan_r2r_2d(ny, nx, &f_copy[0], &tmp[0], y_transform, x_transform, FFTW_MEASURE);
 
 		plan2
 		= fftw_plan_r2r_2d(ny, nx, &tmp[0], &u[0], y_transform_inv, x_transform_inv, FFTW_MEASURE);
+
+		// create denom vector
+		if (nbr_east == -1 && nbr_west == -1) {
+			for (int xi = 0; xi < nx; xi++) {
+				denom[std::slice(xi * ny, nx, 1)]
+				= -4 / (h_x * h_x) * std::pow(std::sin(xi * M_PI / (2 * nx)), 2);
+			}
+		} else if (nbr_west == -1||nbr_east==-1) {
+			for (int xi = 0; xi < nx; xi++) {
+				denom[std::slice(xi * ny, nx, 1)]
+				= -4 / (h_x * h_x) * std::pow(std::sin((xi + 0.5) * M_PI / (2 * nx)), 2);
+			}
+		} else {
+			for (int xi = 0; xi < nx; xi++) {
+				denom[std::slice(xi * ny, nx, 1)]
+				= -4 / (h_x * h_x) * std::pow(std::sin((xi + 1) * M_PI / (2 * nx)), 2);
+			}
+		}
+
+		std::valarray<double> ones(ny);
+		ones = 1;
+
+		if (nbr_north == -1 && nbr_south == -1) {
+			for (int yi = 0; yi < ny; yi++) {
+				denom[std::slice(yi, ny, nx)]
+				-= 4 / (h_y * h_y) * std::pow(std::sin(yi * M_PI / (2 * ny)), 2) * ones;
+			}
+		} else if (nbr_south == -1 || nbr_north == -1) {
+			for (int yi = 0; yi < ny; yi++) {
+				denom[std::slice(yi, ny, nx)]
+				-= 4 / (h_y * h_y) * std::pow(std::sin((yi + 0.5) * M_PI / (2 * ny)), 2) * ones;
+			}
+		} else {
+			for (int yi = 0; yi < ny; yi++) {
+				denom[std::slice(yi, ny, nx)]
+				-= 4 / (h_y * h_y) * std::pow(std::sin((yi + 1) * M_PI / (2 * ny)), 2) * ones;
+			}
+		}
 	}
 
 	void solve()
@@ -143,6 +183,10 @@ class Domain
 		fftw_execute(plan1);
 
 		tmp /= denom;
+
+		if (neumann && nbr_north == -1 && nbr_east == -1 && nbr_south == -1 && nbr_west == -1) {
+			tmp[0] = 0;
+		}
 
 		fftw_execute(plan2);
 
@@ -223,6 +267,13 @@ class Domain
 		}
 	}
 	double diffNorm() { return std::sqrt(std::pow(exact - u, 2).sum()); }
+	double diffNorm(double uavg, double eavg)
+	{
+		return std::sqrt(std::pow(exact - u - eavg + uavg, 2).sum());
+	}
+	double uSum() { return u.sum(); }
 	double exactNorm() { return std::sqrt((exact * exact).sum()); }
+	double exactNorm(double eavg) { return std::sqrt(std::pow(exact - eavg, 2).sum()); }
+	double                  exactSum() { return exact.sum(); }
 };
 #endif

@@ -28,11 +28,20 @@ class DomainCollection
 	void initDirichlet(std::function<double(double, double)> ffun,
 	                   std::function<double(double, double)> gfun);
 
+	void initNeumann(std::function<double(double, double)> ffun,
+	                 std::function<double(double, double)> efun,
+	                 std::function<double(double, double)> nfunx,
+	                 std::function<double(double, double)> nfuny);
+
 	void solveWithInterface(const vector_type &gamma, vector_type &diff);
 	void                      generateMaps();
 	void                      distributeIfaceInfo();
 	double                    diffNorm();
+	double diffNorm(double uavg, double eavg);
 	double                    exactNorm();
+	double exactNorm(double eavg);
+	double                    uSum();
+	double                    exactSum();
 	Teuchos::RCP<matrix_type> formMatrix(Teuchos::RCP<map_type> map);
 	Teuchos::RCP<matrix_type> formInvDiag(Teuchos::RCP<map_type> map);
 	Teuchos::RCP<RBMatrix> formRBMatrix(Teuchos::RCP<map_type> map);

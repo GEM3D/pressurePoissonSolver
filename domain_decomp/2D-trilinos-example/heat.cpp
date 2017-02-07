@@ -58,6 +58,7 @@ int main(int argc, char *argv[])
 	args::Flag f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
 	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
 	args::Flag f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
+	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {'n', "neumann"});
 
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;
@@ -86,6 +87,7 @@ int main(int argc, char *argv[])
 	int    num_domains_y = args::get(d_y);
 	int    nx            = args::get(n_x);
 	int    ny            = args::get(n_y);
+	int    total_cells   = nx * num_domains_x * ny * num_domains_y;
 	double h_x           = 1.0 / (nx * num_domains_x);
 	double h_y           = 1.0 / (ny * num_domains_y);
 
@@ -100,11 +102,6 @@ int main(int argc, char *argv[])
 	}
 
 	// the functions that we are using
-	function<double(double, double)> trig_f
-	= [](double x, double y) { return -5 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y); };
-	function<double(double, double)> trig_g
-	= [](double x, double y) { return sin(M_PI * x) * cos(2 * M_PI * y); };
-
 	vector<double> xval
 	= {0.07768174089481361, 0.4208838472612919,  0.9473139111796449,  0.5089692183323905,
 	   0.9570464247595821,  0.15905126169737582, 0.11849894156700524, 0.40999270280625555,
@@ -125,36 +122,42 @@ int main(int argc, char *argv[])
 	79.61010770157222, 77.8956019831367,  76.6795489632914,  71.36011508633008, 99.5339946457969,
 	59.75741874591391, 77.37272321552643, 91.75611892120241, 85.7168895671343,  68.55489734818805};
 
-	function<double(double, double)> gauss_g = [xval, yval, alpha](double x, double y) {
-		double retval = 0;
-		for (int i = 0; i < 20; i++) {
-			double xv = xval[i];
-			double yv = yval[i];
-			double a  = alpha[i];
-			double r2 = (xv - x) * (xv - x) + (yv - y) * (yv - y);
-			retval += exp(-a * r2);
-		}
-		return retval;
-	};
-
-	function<double(double, double)> gauss_f = [xval, yval, alpha](double x, double y) {
-		double retval = 0;
-		for (int i = 0; i < 20; i++) {
-			double xv = xval[i];
-			double yv = yval[i];
-			double a  = alpha[i];
-			double r2 = (xv - x) * (xv - x) + (yv - y) * (yv - y);
-			retval += 4 * a * (a * r2 - 1) * exp(-a * r2);
-		}
-		return retval;
-	};
-
-	function<double(double,double)> ffun = trig_f;
-    function<double(double,double)> gfun = trig_g;
+	function<double(double,double)> ffun;
+    function<double(double,double)> gfun;
+	function<double(double,double)> nfunx;
+    function<double(double,double)> nfuny;
 
 	if (f_gauss) {
-		ffun = gauss_f;
-		gfun = gauss_g;
+		ffun = [xval, yval, alpha](double x, double y) {
+			double retval = 0;
+			for (int i = 0; i < 20; i++) {
+				double xv = xval[i];
+				double yv = yval[i];
+				double a  = alpha[i];
+				double r2 = (xv - x) * (xv - x) + (yv - y) * (yv - y);
+				retval += 4 * a * (a * r2 - 1) * exp(-a * r2);
+			}
+			return retval;
+		};
+
+		gfun = [xval, yval, alpha](double x, double y) {
+			double retval = 0;
+			for (int i = 0; i < 20; i++) {
+				double xv = xval[i];
+				double yv = yval[i];
+				double a  = alpha[i];
+				double r2 = (xv - x) * (xv - x) + (yv - y) * (yv - y);
+				retval += exp(-a * r2);
+			}
+			return retval;
+		};
+
+	} else {
+		ffun
+		= [](double x, double y) { return -5 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y); };
+		gfun = [](double x, double y) { return sin(M_PI * x) * cos(2 * M_PI * y); };
+		nfunx = [](double x, double y) { return M_PI * cos(M_PI * x) * cos(2 * M_PI * y); };
+		nfuny = [](double x, double y) { return -2 * M_PI * sin(M_PI * x) * sin(2 * M_PI * y); };
 	}
 
 	MPI_Barrier(MPI_COMM_WORLD);
@@ -165,7 +168,11 @@ int main(int argc, char *argv[])
 	                    total_domains * (my_global_rank + 1) / num_procs - 1, nx, ny, num_domains_x,
 	                    num_domains_y, h_x, h_y, comm);
 
-	dc.initDirichlet(ffun, gfun);
+	if (f_neumann) {
+		dc.initNeumann(ffun, gfun, nfunx, nfuny);
+	} else {
+		dc.initDirichlet(ffun, gfun);
+	}
 
 	MPI_Barrier(MPI_COMM_WORLD);
     steady_clock::time_point domain_stop = steady_clock::now();
@@ -278,8 +285,15 @@ int main(int argc, char *argv[])
 	Tpetra::Vector<> exact_norm(err_map);
 	Tpetra::Vector<> diff_norm(err_map);
 
-	exact_norm.getDataNonConst()[0] = dc.exactNorm();
-	diff_norm.getDataNonConst()[0]  = dc.diffNorm();
+	if (f_neumann) {
+		double uavg                     = dc.uSum() / total_cells;
+		double eavg                     = dc.exactSum() / total_cells;
+		exact_norm.getDataNonConst()[0] = dc.exactNorm(eavg);
+		diff_norm.getDataNonConst()[0]  = dc.diffNorm(uavg, eavg);
+	} else {
+		exact_norm.getDataNonConst()[0] = dc.exactNorm();
+		diff_norm.getDataNonConst()[0]  = dc.diffNorm();
+	}
 	double global_diff_norm;
 	double global_exact_norm;
 	global_diff_norm  = diff_norm.norm2();

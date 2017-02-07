@@ -108,6 +108,55 @@ DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, i
 	}
 }
 
+void DomainCollection::initNeumann(function<double(double, double)> ffun,
+                                   function<double(double, double)> efun,
+                                   function<double(double, double)> nfunx,
+                                   function<double(double, double)> nfuny)
+{
+	for (auto &p : domains) {
+		Domain &d        = *p.second;
+		int     i        = p.first;
+		int     domain_x = i % d_y;
+		int     domain_y = i / d_x;
+
+		// Generate RHS vector
+		std::valarray<double> &f     = d.f;
+		std::valarray<double> &exact = d.exact;
+
+		for (int yi = 0; yi < ny; yi++) {
+			for (int xi = 0; xi < nx; xi++) {
+				int    index_x      = domain_x * nx + xi;
+				int    index_y      = domain_y * ny + yi;
+				double x            = h_x / 2.0 + 1.0 * index_x / (nx * d_x);
+				double y            = h_y / 2.0 + 1.0 * index_y / (ny * d_y);
+				f[yi * nx + xi]     = ffun(x, y);
+				exact[yi * nx + xi] = efun(x, y);
+				// north
+				if (index_y == d_y * ny - 1) {
+					f[yi * nx + xi] -= nfuny(x, 1.0) / h_y;
+				}
+				// south
+				if (index_y == 0) {
+					f[yi * nx + xi] += nfuny(x, 0.0) / h_y;
+				}
+				// east
+				if (index_x == d_x * nx - 1) {
+					f[yi * nx + xi] -= nfunx(1.0, y) / h_x;
+				}
+				// west
+				if (index_x == 0) {
+					f[yi * nx + xi] += nfunx(0.0, y) / h_x;
+				}
+			}
+		}
+		d.planNeumann();
+	}
+
+	// create map for domains
+	generateMaps();
+	distributeIfaceInfo();
+}
+
 void DomainCollection::initDirichlet(function<double(double, double)> ffun,
                                      function<double(double, double)> gfun)
 {
@@ -148,6 +197,7 @@ void DomainCollection::initDirichlet(function<double(double, double)> ffun,
 	generateMaps();
 	distributeIfaceInfo();
 }
+
 void DomainCollection::generateMaps()
 {
 	set<int>   visited;
@@ -400,6 +450,22 @@ double DomainCollection::diffNorm()
 	}
 	return sqrt(result);
 }
+double DomainCollection::diffNorm(double uavg, double eavg)
+{
+	double result = 0;
+	for (auto &p : domains) {
+		result += pow(p.second->diffNorm(uavg, eavg), 2);
+	}
+	return sqrt(result);
+}
+double DomainCollection::uSum()
+{
+	double result = 0;
+	for (auto &p : domains) {
+		result += p.second->uSum();
+	}
+	return result;
+}
 double DomainCollection::exactNorm()
 {
 	double result = 0;
@@ -407,6 +473,22 @@ double DomainCollection::exactNorm()
 		result += pow(p.second->exactNorm(), 2);
 	}
 	return sqrt(result);
+}
+double DomainCollection::exactNorm(double eavg)
+{
+	double result = 0;
+	for (auto &p : domains) {
+		result += pow(p.second->exactNorm(eavg), 2);
+	}
+	return sqrt(result);
+}
+double DomainCollection::exactSum()
+{
+	double result = 0;
+	for (auto &p : domains) {
+		result += p.second->exactSum();
+	}
+	return result;
 }
 RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 {
