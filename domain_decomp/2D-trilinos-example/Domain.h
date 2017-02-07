@@ -79,16 +79,16 @@ class Domain
 		plan2 = fftw_plan_r2r_2d(ny, nx, &tmp[0], &u[0], FFTW_RODFT01, FFTW_RODFT01, FFTW_MEASURE);
         //create denom vector
 
-		for (int xi = 0; xi < nx; xi++) {
-			denom[std::slice(xi * ny, nx, 1)]
-			= -4 / (h_x * h_x) * std::pow(std::sin((xi + 1) * M_PI / (2 * nx)), 2);
+		for (int yi = 0; yi < nx; yi++) {
+			denom[std::slice(yi * ny, nx, 1)]
+			= -4 / (h_x * h_x) * std::pow(std::sin((yi + 1) * M_PI / (2 * nx)), 2);
 		}
 
 		std::valarray<double> ones(ny);
 		ones = 1;
-		for (int yi = 0; yi < ny; yi++) {
-			denom[std::slice(yi, ny, nx)]
-			-= 4 / (h_y * h_y) * std::pow(std::sin((yi + 1) * M_PI / (2 * ny)), 2) * ones;
+		for (int xi = 0; xi < ny; xi++) {
+			denom[std::slice(xi, ny, nx)]
+			-= 4 / (h_y * h_y) * std::pow(std::sin((xi + 1) * M_PI / (2 * ny)), 2) * ones;
 		}
 	}
 
@@ -126,40 +126,40 @@ class Domain
 		= fftw_plan_r2r_2d(ny, nx, &tmp[0], &u[0], y_transform_inv, x_transform_inv, FFTW_MEASURE);
 
 		// create denom vector
-		if (nbr_east == -1 && nbr_west == -1) {
-			for (int xi = 0; xi < nx; xi++) {
-				denom[std::slice(xi * ny, nx, 1)]
-				= -4 / (h_x * h_x) * std::pow(std::sin(xi * M_PI / (2 * nx)), 2);
+		if (nbr_north == -1 && nbr_south == -1) {
+			for (int yi = 0; yi < nx; yi++) {
+				denom[std::slice(yi * ny, nx, 1)]
+				= -4 / (h_x * h_x) * std::pow(std::sin(yi * M_PI / (2 * nx)), 2);
 			}
-		} else if (nbr_west == -1||nbr_east==-1) {
-			for (int xi = 0; xi < nx; xi++) {
-				denom[std::slice(xi * ny, nx, 1)]
-				= -4 / (h_x * h_x) * std::pow(std::sin((xi + 0.5) * M_PI / (2 * nx)), 2);
+		} else if (nbr_south == -1 || nbr_north == -1) {
+			for (int yi = 0; yi < nx; yi++) {
+				denom[std::slice(yi * ny, nx, 1)]
+				= -4 / (h_x * h_x) * std::pow(std::sin((yi + 0.5) * M_PI / (2 * nx)), 2);
 			}
 		} else {
-			for (int xi = 0; xi < nx; xi++) {
-				denom[std::slice(xi * ny, nx, 1)]
-				= -4 / (h_x * h_x) * std::pow(std::sin((xi + 1) * M_PI / (2 * nx)), 2);
+			for (int yi = 0; yi < nx; yi++) {
+				denom[std::slice(yi * ny, nx, 1)]
+				= -4 / (h_x * h_x) * std::pow(std::sin((yi + 1) * M_PI / (2 * nx)), 2);
 			}
 		}
 
 		std::valarray<double> ones(ny);
 		ones = 1;
 
-		if (nbr_north == -1 && nbr_south == -1) {
-			for (int yi = 0; yi < ny; yi++) {
-				denom[std::slice(yi, ny, nx)]
-				-= 4 / (h_y * h_y) * std::pow(std::sin(yi * M_PI / (2 * ny)), 2) * ones;
+		if (nbr_east == -1 && nbr_west == -1) {
+			for (int xi = 0; xi < ny; xi++) {
+				denom[std::slice(xi, ny, nx)]
+				-= 4 / (h_y * h_y) * std::pow(std::sin(xi * M_PI / (2 * ny)), 2) * ones;
 			}
-		} else if (nbr_south == -1 || nbr_north == -1) {
-			for (int yi = 0; yi < ny; yi++) {
-				denom[std::slice(yi, ny, nx)]
-				-= 4 / (h_y * h_y) * std::pow(std::sin((yi + 0.5) * M_PI / (2 * ny)), 2) * ones;
+		} else if (nbr_west == -1 || nbr_east == -1) {
+			for (int xi = 0; xi < ny; xi++) {
+				denom[std::slice(xi, ny, nx)]
+				-= 4 / (h_y * h_y) * std::pow(std::sin((xi + 0.5) * M_PI / (2 * ny)), 2) * ones;
 			}
 		} else {
-			for (int yi = 0; yi < ny; yi++) {
-				denom[std::slice(yi, ny, nx)]
-				-= 4 / (h_y * h_y) * std::pow(std::sin((yi + 1) * M_PI / (2 * ny)), 2) * ones;
+			for (int xi = 0; xi < ny; xi++) {
+				denom[std::slice(xi, ny, nx)]
+				-= 4 / (h_y * h_y) * std::pow(std::sin((xi + 1) * M_PI / (2 * ny)), 2) * ones;
 			}
 		}
 	}
