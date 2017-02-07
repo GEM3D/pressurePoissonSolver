@@ -8,6 +8,7 @@
 #include <BelosLinearProblem.hpp>
 #include <BelosTpetraAdapter.hpp>
 #include <MatrixMarket_Tpetra.hpp>
+#include <Teuchos_Comm.hpp>
 #include <Teuchos_GlobalMPISession.hpp>
 #include <Teuchos_ParameterList.hpp>
 #include <Teuchos_RCP.hpp>
@@ -286,8 +287,20 @@ int main(int argc, char *argv[])
 	Tpetra::Vector<> diff_norm(err_map);
 
 	if (f_neumann) {
-		double uavg                     = dc.uSum() / total_cells;
-		double eavg                     = dc.exactSum() / total_cells;
+		double usum = dc.uSum();
+		double uavg;
+		Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &usum, &uavg);
+		uavg /= total_cells;
+		double esum = dc.exactSum();
+		double eavg;
+		Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &esum, &eavg);
+		eavg /= total_cells;
+
+		if (my_global_rank == 0) {
+			cerr << "Average of computed solution: " << uavg << "\n";
+			cerr << "Average of exact solution: " << eavg << "\n";
+		}
+
 		exact_norm.getDataNonConst()[0] = dc.exactNorm(eavg);
 		diff_norm.getDataNonConst()[0]  = dc.diffNorm(uavg, eavg);
 	} else {
