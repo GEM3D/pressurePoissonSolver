@@ -160,6 +160,29 @@ int main(int argc, char *argv[])
 			return retval;
 		};
 
+		nfunx = [xval, yval, alpha](double x, double y) {
+			double retval = 0;
+			for (int i = 0; i < 20; i++) {
+				double xv = xval[i];
+				double yv = yval[i];
+				double a  = alpha[i];
+				double r2 = (xv - x) * (xv - x) + (yv - y) * (yv - y);
+				retval += 2 * a * (xv - x) * exp(-a * r2);
+			}
+			return retval;
+		};
+
+		nfuny = [xval, yval, alpha](double x, double y) {
+			double retval = 0;
+			for (int i = 0; i < 20; i++) {
+				double xv = xval[i];
+				double yv = yval[i];
+				double a  = alpha[i];
+				double r2 = (xv - x) * (xv - x) + (yv - y) * (yv - y);
+				retval += 2 * a * (yv - y) * exp(-a * r2);
+			}
+			return retval;
+		};
 	} else {
 		ffun
 		= [](double x, double y) { return -5 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y); };
@@ -238,7 +261,12 @@ int main(int argc, char *argv[])
 		// Create linear problem for the Belos solver
 		Belos::LinearProblem<double, vector_type, Tpetra::Operator<>> problem(op, gamma, b);
 
-        if(f_prec){
+		/*toif (f_neumann) {
+			RCP<Tpetra::Operator<>> P;
+			P = rcp(new ZeroAvg(matrix_map));
+			problem.setLeftPrec(P);
+
+		} else*/ if (f_prec) {
 			// form preconditioner
 			MPI_Barrier(MPI_COMM_WORLD);
 			steady_clock::time_point prec_start = steady_clock::now();
