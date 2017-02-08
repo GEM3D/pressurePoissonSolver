@@ -33,6 +33,7 @@ class DomainCollection
 	                 std::function<double(double, double)> nfunx,
 	                 std::function<double(double, double)> nfuny);
 
+    void indexBFS();
 	void solveWithInterface(const vector_type &gamma, vector_type &diff);
 	void                      generateMaps();
 	void                      distributeIfaceInfo();

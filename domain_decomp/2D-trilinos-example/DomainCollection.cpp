@@ -198,6 +198,66 @@ void DomainCollection::initDirichlet(function<double(double, double)> ffun,
 	distributeIfaceInfo();
 }
 
+void DomainCollection::indexBFS(){
+	set<int>   visited;
+	set<int>   enqueued;
+	deque<int> queue;
+	int        first = domains.begin()->first;
+	queue.push_back(first);
+	enqueued.insert(first);
+	int         curr_i = 0;
+	while (!queue.empty()) {
+		int     curr = queue.front();
+		Domain &d    = *domains[curr];
+		queue.pop_front();
+		visited.insert(curr);
+		if (d.nbr_north != -1 && visited.count(d.nbr_north) == 0) {
+			// a new edge that we have not assigned an index to
+			Domain &nbr        = *domains.at(d.nbr_north);
+			d.global_i_north   = curr_i;
+			nbr.global_i_south = curr_i;
+			if (enqueued.count(d.nbr_north) == 0) {
+				queue.push_back(d.nbr_north);
+				enqueued.insert(d.nbr_north);
+			}
+			curr_i += nx;
+		}
+		if (d.nbr_east != -1 && visited.count(d.nbr_east) == 0) {
+			// a new edge that we have not assigned an index to
+			Domain &nbr        = *domains.at(d.nbr_east);
+			d.global_i_east   = curr_i;
+			nbr.global_i_west = curr_i;
+			if (enqueued.count(d.nbr_east) == 0) {
+				queue.push_back(d.nbr_east);
+				enqueued.insert(d.nbr_east);
+			}
+			curr_i += ny;
+		}
+		if (d.nbr_south != -1 && visited.count(d.nbr_south) == 0) {
+			// a new edge that we have not assigned an index to
+			Domain &nbr        = *domains.at(d.nbr_south);
+			d.global_i_south   = curr_i;
+			nbr.global_i_north = curr_i;
+			if (enqueued.count(d.nbr_south) == 0) {
+				queue.push_back(d.nbr_south);
+				enqueued.insert(d.nbr_south);
+			}
+			curr_i += nx;
+		}
+		if (d.nbr_west != -1 && visited.count(d.nbr_west) == 0) {
+			// a new edge that we have not assigned an index to
+			Domain &nbr        = *domains.at(d.nbr_west);
+			d.global_i_west   = curr_i;
+			nbr.global_i_east = curr_i;
+			if (enqueued.count(d.nbr_west) == 0) {
+				queue.push_back(d.nbr_west);
+				enqueued.insert(d.nbr_west);
+			}
+			curr_i += ny;
+		}
+	}
+}
+
 void DomainCollection::generateMaps()
 {
 	set<int>   visited;

@@ -1,3 +1,4 @@
+//#include "BelosCGIter.hpp"
 #include "FunctionWrapper.h"
 #include "MyTypeDefs.h"
 #include "args.h"
@@ -64,6 +65,7 @@ int main(int argc, char *argv[])
 	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
 	args::Flag f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
 	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {'n', "neumann"});
+	args::Flag f_bfs(parser, "bfs", "index using BFS", {"bfs"});
 
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;
@@ -206,6 +208,14 @@ int main(int argc, char *argv[])
 	                    total_domains * (my_global_rank + 1) / num_procs - 1, nx, ny, num_domains_x,
 	                    num_domains_y, h_x, h_y, comm);
 
+	if (f_bfs) {
+		if (num_procs > 1) {
+			std::cerr << "BFS indexing currently only works with a single thread.\n";
+			return 1;
+		}
+		dc.indexBFS();
+	}
+
 	if (f_neumann) {
 		dc.initNeumann(ffun, gfun, nfunx, nfuny);
 	} else {
@@ -312,7 +322,7 @@ int main(int argc, char *argv[])
 		// Set the parameters
 		Teuchos::ParameterList belosList;
 		belosList.set("Block Size", 1);
-		belosList.set("Maximum Iterations", 1000);
+		belosList.set("Maximum Iterations", 5000);
 		belosList.set("Convergence Tolerance", 1e-10);
 		int verbosity = Belos::Errors + Belos::StatusTestDetails + Belos::Warnings
 		                + Belos::TimingDetails + Belos::Debug;
