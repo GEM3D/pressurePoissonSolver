@@ -1,6 +1,7 @@
-//#include "BelosCGIter.hpp"
+#include "BelosCGIter.hpp"
 #include "FunctionWrapper.h"
 #include "MyTypeDefs.h"
+#include "ZeroSum.h"
 #include "args.h"
 #include <Amesos2.hpp>
 #include <Amesos2_Version.hpp>
@@ -216,15 +217,17 @@ int main(int argc, char *argv[])
 		dc.indexBFS();
 	}
 
+	ZeroSum zs;
 	if (f_neumann) {
+		zs.setTrue();
 		dc.initNeumann(ffun, gfun, nfunx, nfuny);
 	} else {
 		dc.initDirichlet(ffun, gfun);
 	}
 
 	MPI_Barrier(MPI_COMM_WORLD);
-    steady_clock::time_point domain_stop = steady_clock::now();
-	duration<double> domain_time = domain_stop - domain_start;
+	steady_clock::time_point domain_stop = steady_clock::now();
+	duration<double>         domain_time = domain_stop - domain_start;
 
 	if (my_global_rank == 0) cout << "Domain Initialization Time: " << domain_time.count() << "\n";
 
