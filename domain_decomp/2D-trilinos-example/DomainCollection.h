@@ -4,7 +4,7 @@
 class DomainCollection
 {
 	private:
-	std::map<int, Domain *> domains;
+	std::map<int, Teuchos::RCP<Domain>> domains;
 	Teuchos::RCP<const Teuchos::Comm<int>> comm;
 	int                                    nx;
 	int                                    ny;

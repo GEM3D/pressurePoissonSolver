@@ -64,13 +64,13 @@ DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, i
 	this->d_y          = d_y;
 	num_domains        = high - low;
 	num_global_domains = d_x * d_y;
-	domains            = map<int, Domain *>();
+	domains            = map<int, RCP<Domain>>();
 	for (int i = low; i <= high; i++) {
 		int domain_x = i % d_y;
 		int domain_y = i / d_x;
 
 		// create a domain
-		Domain *d_ptr = new Domain(nx, ny, h_x, h_y);
+		RCP<Domain> d_ptr = rcp(new Domain(nx, ny, h_x, h_y));
 		Domain &d     = *d_ptr;
 
 		// determine its neighbors
@@ -662,8 +662,17 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 		todo.insert(curr_type);
 		for (auto iter = ifaces.begin(); iter != ifaces.end(); iter++) {
 			if (*iter == curr_type) {
-				todo.insert(*iter);
-				ifaces.erase(*iter);
+				bool begin = iter == ifaces.begin();
+				auto old = iter;
+                if(!begin){
+                    iter--;
+                }
+				todo.insert(*old);
+				ifaces.erase(*old);
+                if(begin){
+                    iter = ifaces.begin();
+                }
+
                 //TODO fix this iterator
                 //iter=ifaces.begin();
 			}
