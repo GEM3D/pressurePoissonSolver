@@ -62,6 +62,8 @@ int main(int argc, char *argv[])
 	                            {'r'});
 	args::ValueFlag<string> f_p(parser, "preconditioner filename",
 	                            "the file to write the preconditoiner to", {'p'});
+	args::ValueFlag<double> f_t(
+	parser, "tolerance", "set the tolerance of the iterative solver (default is 1e-10)", {'t'});
 	args::Flag f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
 	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
 	args::Flag f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
@@ -102,6 +104,11 @@ int main(int argc, char *argv[])
 	if (num_domains_x * num_domains_y < num_procs) {
 		std::cerr << "number of domains must be greater than or equal to the number of processes\n";
 		return 1;
+	}
+
+	double tol = 1e-10;
+	if (f_t) {
+		tol = args::get(f_t);
 	}
 
 	string save_matrix_file = "";
@@ -285,12 +292,7 @@ int main(int argc, char *argv[])
 		// Create linear problem for the Belos solver
 		Belos::LinearProblem<double, vector_type, Tpetra::Operator<>> problem(op, gamma, b);
 
-		/*toif (f_neumann) {
-			RCP<Tpetra::Operator<>> P;
-			P = rcp(new ZeroAvg(matrix_map));
-			problem.setLeftPrec(P);
-
-		} else*/ if (f_prec) {
+		if (f_prec) {
 			// form preconditioner
 			MPI_Barrier(MPI_COMM_WORLD);
 			steady_clock::time_point prec_start = steady_clock::now();
@@ -326,7 +328,7 @@ int main(int argc, char *argv[])
 		Teuchos::ParameterList belosList;
 		belosList.set("Block Size", 1);
 		belosList.set("Maximum Iterations", 5000);
-		belosList.set("Convergence Tolerance", 1e-10);
+		belosList.set("Convergence Tolerance", tol);
 		int verbosity = Belos::Errors + Belos::StatusTestDetails + Belos::Warnings
 		                + Belos::TimingDetails + Belos::Debug;
 		belosList.set("Verbosity", verbosity);
