@@ -43,7 +43,7 @@ find_package(MPI REQUIRED)
 set (CMAKE_CXX_FLAGS "--std=c++11 -Wall --pedantic -g ${CMAKE_CXX_FLAGS}")
 IF(NOT CMAKE_CXX_COMPILER)
   MESSAGE("Setting CXX compiler.")
-  SET(CMAKE_CXX_COMPILER MPI_CXX_COMPILER)
+  SET(CMAKE_CXX_COMPILER ${Trilinos_CXX_COMPILER})
 ENDIF()
 
 # If you haven't already set the C compiler, use the same compiler
@@ -51,7 +51,7 @@ ENDIF()
 # need to edit this line.
 IF(NOT CMAKE_C_COMPILER)
   MESSAGE("Setting C compiler.")
-  SET(CMAKE_C_COMPILE MPI_C_COMPILER)
+  SET(CMAKE_C_COMPILE ${Trilinos_C_COMPILER})
 ENDIF()
 
 #
