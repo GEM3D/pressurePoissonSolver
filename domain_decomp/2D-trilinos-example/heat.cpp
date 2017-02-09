@@ -43,11 +43,9 @@ int main(int argc, char *argv[])
 	MPI_Init(&argc, &argv);
 	RCP<const Teuchos::Comm<int>> comm = Tpetra::DefaultPlatform::getDefaultPlatform().getComm();
 
-	int num_procs;
-	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+	int num_procs = comm->getSize();
 
-	int my_global_rank;
-	MPI_Comm_rank(MPI_COMM_WORLD, &my_global_rank);
+	int my_global_rank = comm->getRank();
 
 	// parse input
 	args::ArgumentParser  parser("");
@@ -147,10 +145,10 @@ int main(int argc, char *argv[])
 	79.61010770157222, 77.8956019831367,  76.6795489632914,  71.36011508633008, 99.5339946457969,
 	59.75741874591391, 77.37272321552643, 91.75611892120241, 85.7168895671343,  68.55489734818805};
 
-	function<double(double,double)> ffun;
-    function<double(double,double)> gfun;
-	function<double(double,double)> nfunx;
-    function<double(double,double)> nfuny;
+	function<double(double, double)> ffun;
+	function<double(double, double)> gfun;
+	function<double(double, double)> nfunx;
+	function<double(double, double)> nfuny;
 
 	if (f_gauss) {
 		ffun = [xval, yval, alpha](double x, double y) {
@@ -208,7 +206,7 @@ int main(int argc, char *argv[])
 		nfuny = [](double x, double y) { return -2 * M_PI * sin(M_PI * x) * sin(2 * M_PI * y); };
 	}
 
-	MPI_Barrier(MPI_COMM_WORLD);
+	comm->barrier();
 	steady_clock::time_point domain_start = steady_clock::now();
 
 	int              total_domains = num_domains_x * num_domains_y;
@@ -232,7 +230,7 @@ int main(int argc, char *argv[])
 		dc.initDirichlet(ffun, gfun);
 	}
 
-	MPI_Barrier(MPI_COMM_WORLD);
+	comm->barrier();
 	steady_clock::time_point domain_stop = steady_clock::now();
 	duration<double>         domain_time = domain_stop - domain_start;
 
@@ -263,24 +261,24 @@ int main(int argc, char *argv[])
 			op = rcp(new FuncWrap(b, &dc));
 		} else {
 			// Form the matrix
-			MPI_Barrier(MPI_COMM_WORLD);
+			comm->barrier();
 			steady_clock::time_point form_start = steady_clock::now();
 
 			RCP<matrix_type> A = dc.formMatrix(matrix_map);
 
-			MPI_Barrier(MPI_COMM_WORLD);
+			comm->barrier();
 			duration<double> form_time = steady_clock::now() - form_start;
 
 			if (my_global_rank == 0) cout << "Matrix Formation Time: " << form_time.count() << "\n";
 
 			if (save_matrix_file != "") {
-				MPI_Barrier(MPI_COMM_WORLD);
+				comm->barrier();
 				steady_clock::time_point write_start = steady_clock::now();
 
 				Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A, "",
 				                                                           "");
 
-				MPI_Barrier(MPI_COMM_WORLD);
+				comm->barrier();
 				duration<double> write_time = steady_clock::now() - write_start;
 				if (my_global_rank == 0)
 					cout << "Time to write matix to file: " << write_time.count() << "\n";
@@ -294,26 +292,26 @@ int main(int argc, char *argv[])
 
 		if (f_prec) {
 			// form preconditioner
-			MPI_Barrier(MPI_COMM_WORLD);
+			comm->barrier();
 			steady_clock::time_point prec_start = steady_clock::now();
 
 			RCP<matrix_type> P = dc.formInvDiag(matrix_map);
-            problem.setLeftPrec(P);
+			problem.setLeftPrec(P);
 
-			MPI_Barrier(MPI_COMM_WORLD);
+			comm->barrier();
 			duration<double> prec_time = steady_clock::now() - prec_start;
 
 			if (my_global_rank == 0)
 				cout << "Preconditioner Formation Time: " << prec_time.count() << "\n";
 
 			if (save_prec_file != "") {
-				MPI_Barrier(MPI_COMM_WORLD);
+				comm->barrier();
 				steady_clock::time_point write_start = steady_clock::now();
 
 				Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_prec_file, P, "",
 				                                                           "");
 
-				MPI_Barrier(MPI_COMM_WORLD);
+				comm->barrier();
 				duration<double> write_time = steady_clock::now() - write_start;
 				if (my_global_rank == 0)
 					cout << "Time to write preconditioner to file: " << write_time.count() << "\n";
@@ -322,7 +320,7 @@ int main(int argc, char *argv[])
 
 		problem.setProblem();
 
-		MPI_Barrier(MPI_COMM_WORLD);
+		comm->barrier();
 		steady_clock::time_point iter_start = steady_clock::now();
 		// Set the parameters
 		Teuchos::ParameterList belosList;
@@ -338,18 +336,19 @@ int main(int argc, char *argv[])
 		= rcp(new Belos::BlockCGSolMgr<double, vector_type, Tpetra::Operator<>>(
 		rcp(&problem, false), rcp(&belosList, false)));
 		solver->solve();
-		MPI_Barrier(MPI_COMM_WORLD);
+
+		comm->barrier();
 		duration<double> iter_time = steady_clock::now() - iter_start;
 		if (my_global_rank == 0) std::cout << "CG Time: " << iter_time.count() << "\n";
 	}
 
 	// Do one last solve
-	MPI_Barrier(MPI_COMM_WORLD);
+	comm->barrier();
 	steady_clock::time_point solve_start = steady_clock::now();
 
 	dc.solveWithInterface(*gamma, *diff);
 
-	MPI_Barrier(MPI_COMM_WORLD);
+	comm->barrier();
 	duration<double> solve_time = steady_clock::now() - solve_start;
 
 	if (my_global_rank == 0)
@@ -386,7 +385,7 @@ int main(int argc, char *argv[])
 	global_diff_norm  = diff_norm.norm2();
 	global_exact_norm = exact_norm.norm2();
 
-	MPI_Barrier(MPI_COMM_WORLD);
+	comm->barrier();
 	steady_clock::time_point total_stop = steady_clock::now();
 	duration<double>         total_time = total_stop - domain_start;
 
