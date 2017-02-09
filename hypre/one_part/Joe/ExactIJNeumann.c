@@ -359,9 +359,26 @@ int main(int argc, char *argv[]) {
     HYPRE_BoomerAMGSetPrintLevel(solver, 3);
     HYPRE_BoomerAMGSetCoarsenType(solver, 6);
     HYPRE_BoomerAMGSetRelaxType(solver, 3);
-    HYPRE_BoomerAMGSetNumSweeps(solver, 1);
+    HYPRE_BoomerAMGSetNumSweeps(solver, 2);
     HYPRE_BoomerAMGSetMaxLevels(solver, 20);
     HYPRE_BoomerAMGSetTol(solver, 1.0e-12);
+    HYPRE_BoomerAMGSetMaxIter(solver, 20);
+
+        //HYPRE_BoomerAMGSetStrongThreshold(solver,.25);
+        //HYPRE_BoomerAMGSetCoarsenType(solver, 6);
+        //HYPRE_BoomerAMGSetTol(solver, 1.0e-12);
+        //HYPRE_BoomerAMGSetPrintLevel(solver, 0);
+        //HYPRE_BoomerAMGSetMaxIter(solver, 200);
+        //HYPRE_BoomerAMGSetNumSweeps(solver, 3);
+        //HYPRE_BoomerAMGSetRelaxType(solver, 0);
+        //HYPRE_BoomerAMGSetRelaxWeight(precond, .3);
+        //HYPRE_BoomerAMGSetRelaxWt(solver, .3);
+                
+
+
+
+
+
 
     //HYPRE_BoomerAMGSetMaxIter(solver, 100);
     // Set up and solve 
@@ -477,26 +494,33 @@ int main(int argc, char *argv[]) {
 	HYPRE_ParCSRGMRESCreate(MPI_COMM_WORLD, &gmres_solver);
 
 	//Set the GMRES solver parameters
-	HYPRE_GMRESSetMaxIter(gmres_solver,100);
+	HYPRE_GMRESSetMaxIter(gmres_solver,200);
 	HYPRE_GMRESSetTol(gmres_solver, 1e-12);
 	HYPRE_GMRESSetPrintLevel(gmres_solver, 3);
 	HYPRE_GMRESSetLogging(gmres_solver, 0);	
-	HYPRE_GMRESSetKDim(gmres_solver, 1);
+	HYPRE_GMRESSetKDim(gmres_solver, 30);
 
 	//Create Euclid precondtioner
 	HYPRE_Solver euclid_precond;
-	HYPRE_EuclidCreate(MPI_COMM_WORLD, &euclid_precond);
+	//HYPRE_EuclidCreate(MPI_COMM_WORLD, &euclid_precond);
 	//HYPRE_ParaSailsCreate(MPI_COMM_WORLD, &euclid_precond);
 
 	//Set the euclid precondioner parameters
-	HYPRE_EuclidSetLevel(euclid_precond, 1);
+	//HYPRE_EuclidSetLevel(euclid_precond, 1);
 	//HYPRE_EuclidSetBJ(euclid_precond, 0);
-	HYPRE_ParaSailsSetParams(euclid_precond, .01, 2);
+	//HYPRE_EuclidSetParams(euclid_precond, int argc, char *argv[]);
+	//HYPRE_EuclidSetSparseA(euclid_precond, .01);
+	//HYPRE_EuclidSetParams(level 1, bj , rowScale 1); 
 	//HYPRE_ParaSailsSetSym(euclid_precond, 2);
+
+	HYPRE_ParCSRPilutCreate(MPI_COMM_WORLD, &euclid_precond);
+	HYPRE_ParCSRPilutSetMaxIter(euclid_precond, 5);
+	HYPRE_ParCSRPilutSetDropTolerance(euclid_precond, .001);
+	HYPRE_ParCSRPilutSetFactorRowSize(euclid_precond, 1);
 
 
 	//Setup and solve the system
-	HYPRE_ParCSRGMRESSetPrecond(gmres_solver, HYPRE_EuclidSolve, HYPRE_EuclidSetup, euclid_precond);
+	HYPRE_ParCSRGMRESSetPrecond(gmres_solver, HYPRE_ParCSRPilutSolve, HYPRE_ParCSRPilutSetup, euclid_precond);
 	//HYPRE_ParCSRGMRESSetPrecond(gmres_solver, HYPRE_ParaSailsSolve, HYPRE_ParaSailsSetup, euclid_precond);
 	HYPRE_ParCSRGMRESSetup(gmres_solver, parcsr_A, par_b, par_x);
 	t1 = MPI_Wtime();
@@ -568,7 +592,7 @@ int main(int argc, char *argv[]) {
         HYPRE_BoomerAMGSetPrintLevel(amg_precond, 0);
         HYPRE_BoomerAMGSetMaxIter(amg_precond, 5);
         HYPRE_BoomerAMGSetNumSweeps(amg_precond, 2);
-        HYPRE_BoomerAMGSetRelaxType(amg_precond, 0);
+        HYPRE_BoomerAMGSetRelaxType(amg_precond, 17);
         //HYPRE_BoomerAMGSetRelaxWeight(amg_precond, .3);
         HYPRE_BoomerAMGSetRelaxWt(amg_precond, .3);
 	
@@ -591,6 +615,73 @@ int main(int argc, char *argv[]) {
   if (solver_id == 6){
 	}
 
+
+
+ if (solver_id == 7){
+        //Create GMRES solver
+        HYPRE_Solver gmres_solver;
+        
+        //Set GMRES solver parameters
+        HYPRE_ParCSRFlexGMRESCreate(MPI_COMM_WORLD, &gmres_solver);
+        HYPRE_FlexGMRESSetMaxIter(gmres_solver, 50);
+        //HYPRE_GMRESSetAbsoluteTol(gmres_solver, 1.0e-12);
+        HYPRE_FlexGMRESSetTol(gmres_solver, 1.0e-12);
+        HYPRE_FlexGMRESSetPrintLevel(gmres_solver, 0);
+        HYPRE_FlexGMRESSetLogging(gmres_solver, 0);
+        
+        //Create AMG preconditioner
+        HYPRE_Solver precond;
+        
+        //Set AMG preconditioner parameters
+        HYPRE_BoomerAMGCreate(&precond);
+        HYPRE_BoomerAMGSetStrongThreshold(precond, .25);
+        HYPRE_BoomerAMGSetCoarsenType(precond, 6);
+        HYPRE_BoomerAMGSetTol(precond, 1.0e-3);
+        HYPRE_BoomerAMGSetPrintLevel(precond, 0);
+        HYPRE_BoomerAMGSetMaxIter(precond, 1);
+        HYPRE_BoomerAMGSetNumSweeps(precond, 2);
+        HYPRE_BoomerAMGSetRelaxType(precond, 17);
+        //HYPRE_BoomerAMGSetRelaxWeight(precond, .3);
+        HYPRE_BoomerAMGSetRelaxWt(precond, .3);
+        
+        //Setup and solve the system
+        HYPRE_ParCSRGMRESSetPrecond(gmres_solver, HYPRE_BoomerAMGSolve, HYPRE_BoomerAMGSetup, precond);
+        HYPRE_ParCSRGMRESSetup(gmres_solver, parcsr_A, par_b, par_x);
+        t1 = MPI_Wtime();
+        HYPRE_ParCSRGMRESSolve(gmres_solver, parcsr_A, par_b, par_x);
+        t2 = MPI_Wtime();
+        //Get run info
+        HYPRE_ParCSRGMRESGetNumIterations(gmres_solver, &num_iterations);
+        HYPRE_ParCSRGMRESGetFinalRelativeResidualNorm(gmres_solver, &final_res_norm);
+        
+        //Cleanup
+        HYPRE_ParCSRGMRESDestroy(gmres_solver);
+        HYPRE_BoomerAMGDestroy(precond);
+        }
+
+
+ if (solver_id == 8){
+
+	//HYPRE_Int* plev = {2, 2};
+	//Create FAC solver
+	HYPRE_SStructSolver fac_solver;
+	HYPRE_SStructFACCreate(MPI_COMM_WORLD, &fac_solver);
+	
+
+	//HYPRE_SStructFACSetPLevels(fac_solver, nparts, *plev);
+	//HYPRE_SStructSetPRefinements(facsolvr, nparts, 2);
+	HYPRE_SStructFACSetTol(fac_solver, 1e-12);
+	
+	t1 = MPI_Wtime();
+	HYPRE_SStructFACSolve3(fac_solver, A, b, x);
+	t2 = MPI_Wtime();
+	HYPRE_SStructFACGetNumIterations(fac_solver, &num_iterations);
+	HYPRE_SStructFACGetFinalRelativeResidualNorm(fac_solver, &final_res_norm);
+	HYPRE_SStructFACDestroy2(fac_solver);
+}
+
+
+        
 
     if (myid == 0) {
       printf("\n");

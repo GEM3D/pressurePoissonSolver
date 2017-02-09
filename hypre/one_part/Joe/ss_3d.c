@@ -5,7 +5,10 @@
  * on a SemiStructured mesh. The code can be run in serial or in parallel.
  *
  * Compile with: make ss_3d.c
- * Execute with: mpirun -np 1 ss_3d
+ * Execute with: mpirun -np 8 ss_3d
+ *
+ * Nx,Ny,Nz are the number of procesors in each direction
+ * nx, ny, nz are the TOTAL number of points for the problem
  */
 
 
@@ -24,6 +27,7 @@
 #include "mpi.h"
 
 int main(int argc, char *argv[]) {
+
 	//Set variables
 	int i, j,k, pi, pj, pk;
 	int myid, num_procs;
@@ -38,10 +42,7 @@ int main(int argc, char *argv[]) {
 	int nvars = 1;
 	int var = 0;
 	int nentries = 7;
-	int index = 1;
-	
 	int object_type = HYPRE_PARCSR;
-
 
 	double hx, hy, hz;
 	double X, Y, Z;
@@ -60,52 +61,73 @@ int main(int argc, char *argv[]) {
 	HYPRE_SStructVector x;
 	HYPRE_ParVector par_b;
 	HYPRE_ParVector par_x;
-printf("variables set\n");	
+
+//printf("variables set\n");	
+
 	//Initialize MPi
 	MPI_Init(&argc, &argv);
 	MPI_Comm_rank(MPI_COMM_WORLD, &myid);
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
-printf("mpi setup\n");
+
+//printf("mpi setup\n");
+
 	//Set default problem parameters
 	nx = 100;
 	ny = 100;
 	nz = 100;
-	Nx = 1;
-	Ny = 1;
-	Nz = 1;
+	Nx = 2;
+	Ny = 2;
+	Nz = 2;
 	solver_id = 0;
 	vis = 1;
-printf("default parameters set\n");
-	nvalues = nentries * nx * ny;
-	hx = 1.0 / (Nx * nx);
-	hy = 1.0 / (Ny * ny);
-	hz = 1.0 / (Nz * nz);
-printf("gird spacing calculated\n");
+
+//printf("default parameters set\n");
+
+	nvalues = nentries * nx * ny * nz;
+	hx = 1.0 / (nx);
+	hy = 1.0 / (ny);
+	hz = 1.0 / (nz);
+
+//printf("gird spacing calculated\n");
+
 	//Set the processors in a grid
-	pi = 0;
-	pj = 0;
-	pk = 0;
+	if(Ny <= Nx){
+		pj = myid/Nx;
+		pi = myid - pj*Nx;
+		pk = myid / (Nx * Ny);
+	}
+	else {
+		pi = myid/Nx;
+		pj = myid - pi * Nx;
+		pk = myid / (Nx * Ny);
+	}
 
 	//Determine each processors part of the grid
-	ilower[0] = 0;
-	ilower[1] = 0;
-	ilower[2] = 0;
+	ilower[0] = nx/Nx * pi;
+	ilower[1] = ny/Ny * pj;
+	ilower[2] = nz/Nz * pk;
 
-	iupper[0] = nx + ilower[0] - 1;
-	iupper[1] = ny + ilower[1] - 1;
-	iupper[2] = nz + ilower[2] - 1;
-printf("processor grid and division set\n");
+	iupper[0] = nx/Nx + ilower[0] - 1;
+	iupper[1] = ny/Ny + ilower[1] - 1;
+	iupper[2] = nz/Nz + ilower[2] - 1;
+
+//printf("processor grid and division set\n");
+
 	//Create and setup a 3d grid
 	HYPRE_SStructGridCreate(MPI_COMM_WORLD, 3, nparts, &grid);
 	HYPRE_SStructGridSetExtents(grid, part, ilower, iupper);
-printf("3d grid setup\n");
+
+//printf("3d grid setup\n");
+
 	//Set variable types to cell centered
 	HYPRE_SStructVariable vartypes[1] = {HYPRE_SSTRUCT_VARIABLE_CELL};
 
 	for(i = 0; i < nparts; i++){
 		HYPRE_SStructGridSetVariables(grid, i, nvars, vartypes);
 	}
-printf("variable types set\n");
+
+//printf("variable types set\n");
+
 	//Assemble the grid
 	HYPRE_SStructGridAssemble(grid);
 	
@@ -113,10 +135,12 @@ printf("variable types set\n");
 	HYPRE_SStructStencilCreate(3, 7, &stencil);
 	int offsets[7][3] = {{0,0,0},{-1,0,0},{1,0,0},{0,-1,0},{0,1,0},{0,0,-1},{0,0,1}};
 	
-	for (entry = 0; entry < 5; entry++) {
+	for (entry = 0; entry < 7; entry++) {
 		HYPRE_SStructStencilSetEntry(stencil,entry, offsets[entry], var);	
 	}
-printf("stencil created\n");
+
+//printf("stencil created\n");
+
 	//Create the graph
 	HYPRE_SStructGraphCreate(MPI_COMM_WORLD, grid, &graph);
 	
@@ -146,7 +170,7 @@ printf("stencil created\n");
 	hz2inv = 1 / (hz * hz);
 
 	for(i = 0; i < nvalues; i += nentries) {
-		values[i] = -2.0 * hx2inv -2.0 * hy2inv;
+		values[i] = -2.0 * hx2inv -2.0 * hy2inv - 2.0 * hz2inv;
 		values[i+1] = hx2inv;
 		values[i+2] = hx2inv;
 		values[i+3] = hy2inv;
@@ -155,14 +179,26 @@ printf("stencil created\n");
 		values[i+6] = hz2inv;
 	}
 
+//printf("%f, %f, %f, %f, %f, %f, %f\n", values[0], values[1], values[2], values[3], values[4], values[5], values[6]);
+
+
+
+//printf("%d, %d, %d\n %d, %d, %d\n", ilower[0], ilower[1], ilower[2], iupper[0], iupper[1], iupper[2]);
+
 	//Set the stencil values
 	HYPRE_SStructMatrixSetBoxValues(A, part, ilower, iupper, var, nentries, stencil_indices, values);
-printf("Stencils set\n");
+
+//printf("Stencils set\n");
+
+        HYPRE_SStructMatrixAssemble(A);
+	HYPRE_SStructMatrixPrint("3d_ss_data/ss.initial.A", A, 0);
+
+
 	//Set the Neumann boundary condition
-	index = 1;
-	nvaluesx = index * nx * ny;
-	nvaluesy = index * nx * nz;
-	nvaluesz = index * nz *ny;
+	nentries = 1;
+	nvaluesx = nentries * nx/Nx * ny/Ny;
+	nvaluesy = nentries * nx/Nx * nz/Ny;
+	nvaluesz = nentries * nz/Nz *ny/Ny;
 	center_index[0] = 0;
 
 	valuesx = calloc(nvaluesx, sizeof(double));
@@ -188,17 +224,18 @@ printf("Stencils set\n");
 		center_valuesz[i] = hz2inv;
 	}
 
-printf("bc memory allocated\n");
+//printf("bc memory allocated\n");
+
 	//Recall: pi, pj, and pk describe the position in the precessor grid
 	//Bottom face
 	if(pj == 0){
-		bc_ilower[0] = pi * nx;
-		bc_ilower[1] = pj * ny;
-		bc_ilower[2] = pk * nz;
+		bc_ilower[0] = pi * nx/Nx;
+		bc_ilower[1] = pj * ny/Ny;
+		bc_ilower[2] = pk * nz/Nz;
 	
-		bc_iupper[0] = bc_ilower[0] + nx -1;
+		bc_iupper[0] = bc_ilower[0] + nx/Nx -1;
 		bc_iupper[1] = bc_ilower[1];
-		bc_iupper[2] = bc_ilower[2] + nz -1;
+		bc_iupper[2] = bc_ilower[2] + nz/Nz -1;
 		//Set the index corresponding to the bottom of the stencil
 		stencil_index[0] = 3;
 
@@ -207,109 +244,142 @@ printf("bc memory allocated\n");
 			center_valuesy[1] = -hy2inv;
 		}
 
-printf("bc_lower: [%i,%i,%i]\n", bc_ilower[0], bc_ilower[1], bc_ilower[2]);
-printf("bc_upper: [%i,%i,%i]\n", bc_iupper[0], bc_iupper[1], bc_iupper[2]);
-printf("bc bot start\n");
+//printf("bc_lower: [%i,%i,%i]\n", bc_ilower[0], bc_ilower[1], bc_ilower[2]);
+//printf("bc_upper: [%i,%i,%i]\n", bc_iupper[0], bc_iupper[1], bc_iupper[2]);
+
 		//Sets the boundary condition on the bottom face of the domain. Set outsides to 0 and hx2inv to the center entry
-		HYPRE_SStructMatrixSetBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesy);
-printf("bc bot box vals set\n");
-		HYPRE_SStructMatrixAddToBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesy);
-printf("bc bot box add\n");
+		HYPRE_SStructMatrixSetBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesx);
+		HYPRE_SStructMatrixAddToBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesx);
 		//Changes back to the full Neumann condition
 		center_valuesy[1] = hy2inv;
-
 	}	
-printf("bottom face set\n");	
+
+//printf("bottom face set\n");	
+
+
 	//Top face
 	if (pj == Ny -1){
-		bc_ilower[0] = pi * nx;
-		bc_ilower[1] = pj * ny + ny - 1;
-		bc_ilower[2] = pk * nz;
+		bc_ilower[0] = pi * nx/Nx;
+		bc_ilower[1] = pj * ny/Ny + ny/Ny - 1;
+		bc_ilower[2] = pk * nz/Nz;
 
-		bc_iupper[0] = bc_ilower[0] + nx - 1;
+		bc_iupper[0] = bc_ilower[0] + nx/Nx - 1;
 		bc_iupper[1] = bc_ilower[1];
-		bc_iupper[2] = bc_ilower[2] + nz -1;
+		bc_iupper[2] = bc_ilower[2] + nz/Nz -1;
+
+//printf("bc_lower: [%i,%i,%i]\n", bc_ilower[0], bc_ilower[1], bc_ilower[2]);
+//printf("bc_upper: [%i,%i,%i]\n", bc_iupper[0], bc_iupper[1], bc_iupper[2]);
+
 
 		//Set the index corresponding to the top of the stencil
 		stencil_index[0] = 4;
 
 		//Enforces the Neumann condition on the top face of the domain
-		HYPRE_SStructMatrixSetBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesy);
-		HYPRE_SStructMatrixAddToBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesy);
+		HYPRE_SStructMatrixSetBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesx);
+		HYPRE_SStructMatrixAddToBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesx);
 	}
-printf("top face set\n");
+//printf("top face set\n");
+
+
+
 	//Left face
 	if (pi == 0){
-		bc_ilower[0] = pi * nx;
-		bc_ilower[1] = pj * ny;
-		bc_ilower[2] = pk * nz;
+		bc_ilower[0] = pi * nx/Nx;
+		bc_ilower[1] = pj * ny/Ny;
+		bc_ilower[2] = pk * nz/Nz;
 
 		bc_iupper[0] = bc_ilower[0];
-		bc_iupper[1] = bc_ilower[1] + ny -1;
-		bc_iupper[2] = bc_ilower[2] + nz -1;
+		bc_iupper[1] = bc_ilower[1] + ny/Ny -1;
+		bc_iupper[2] = bc_ilower[2] + nz/Nz -1;
+
+//printf("bc_lower: [%i,%i,%i]\n", bc_ilower[0], bc_ilower[1], bc_ilower[2]);
+//printf("bc_upper: [%i,%i,%i]\n", bc_iupper[0], bc_iupper[1], bc_iupper[2]);
+
 
 		//Set the index corresponding to the left of the stencil
 		stencil_index[0] = 1;
 
 		//Enforces the Neumann condition on the left face of the domain
-		HYPRE_SStructMatrixSetBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesx);
-		HYPRE_SStructMatrixAddToBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesx);
+		HYPRE_SStructMatrixSetBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesz);
+		HYPRE_SStructMatrixAddToBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesz);
 	}
-printf("left face set\n");
+//printf("left face set\n");
+
+
+
 	//Right face
 	if (pi == Nx -1){
-		bc_ilower[0] = pi * nx + nx -1;
-		bc_ilower[1] = pj * ny;
-		bc_ilower[2] = pk * nz;
+		bc_ilower[0] = pi * nx/Nx + nx/Nx -1;
+		bc_ilower[1] = pj * ny/Nx;
+		bc_ilower[2] = pk * nz/Nz;
 
 		bc_iupper[0] = bc_ilower[0];
-		bc_iupper[1] = bc_ilower[1] + ny -1;
-		bc_iupper[2] = bc_ilower[2] + nz -1;
+		bc_iupper[1] = bc_ilower[1] + ny/Ny -1;
+		bc_iupper[2] = bc_ilower[2] + nz/Nz -1;
+
+//printf("bc_lower: [%i,%i,%i]\n", bc_ilower[0], bc_ilower[1], bc_ilower[2]);
+//printf("bc_upper: [%i,%i,%i]\n", bc_iupper[0], bc_iupper[1], bc_iupper[2]);
+
 
 		//Set the index corresponding to the right of the stencil
 		stencil_index[0] = 2;
 
 		//Enforces the Neumann condition on the right face of the domain
-		HYPRE_SStructMatrixSetBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesx);
-		HYPRE_SStructMatrixAddToBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesx);
+		HYPRE_SStructMatrixSetBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesz);
+		HYPRE_SStructMatrixAddToBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesz);
 	}
-printf("right face set\n");
+//printf("right face set\n");
+
+
+
 	//Back face
 	if (pk == Nz-1){
-		bc_ilower[0] = pi * nx;
-		bc_ilower[1] = pj * ny; 
-		bc_ilower[2] = pk * nz + nz -1;
+		bc_ilower[0] = pi * nx/Nx;
+		bc_ilower[1] = pj * ny/Ny; 
+		bc_ilower[2] = pk * nz/Nz + nz/Nz -1;
 
-		bc_iupper[0] = bc_ilower[0] + nx -1;
-		bc_iupper[1] = bc_ilower[1] + ny -1;
+		bc_iupper[0] = bc_ilower[0] + nx/Nx -1;
+		bc_iupper[1] = bc_ilower[1] + ny/Ny -1;
 		bc_iupper[2] = bc_ilower[2];
+
+//printf("bc_lower: [%i,%i,%i]\n", bc_ilower[0], bc_ilower[1], bc_ilower[2]);
+//printf("bc_upper: [%i,%i,%i]\n", bc_iupper[0], bc_iupper[1], bc_iupper[2]);
+
 
 		//Set the index corresponding to the back of the stencil
 		stencil_index[0] = 5;
 
 		//Enforces the Neumann condition on the back face of the domain
-		HYPRE_SStructMatrixSetBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesz);
-		HYPRE_SStructMatrixAddToBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesz);
+		HYPRE_SStructMatrixSetBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesy);
+		HYPRE_SStructMatrixAddToBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesy);
 	}
-printf("back face set\n");
+//printf("back face set\n");
+
+
+
 	//Front face
         if (pk == 0){
-                bc_ilower[0] = pi * nx;
-                bc_ilower[1] = pj * ny;
-                bc_ilower[2] = pk * nz;
+                bc_ilower[0] = pi * nx/Nx;
+                bc_ilower[1] = pj * ny/Ny;
+                bc_ilower[2] = pk * nz/Nz;
 
-                bc_iupper[0] = bc_ilower[0] + nx -1;
-                bc_iupper[1] = bc_ilower[1] + ny -1;
+                bc_iupper[0] = bc_ilower[0] + nx/Nx -1;
+                bc_iupper[1] = bc_ilower[1] + ny/Ny -1;
                 bc_iupper[2] = bc_ilower[2];
+
+//printf("bc_lower: [%i,%i,%i]\n", bc_ilower[0], bc_ilower[1], bc_ilower[2]);
+//printf("bc_upper: [%i,%i,%i]\n", bc_iupper[0], bc_iupper[1], bc_iupper[2]);
 
 		//Set the index correspoinding to the front of the stencil
 		stencil_index[0] = 6;
 
 		//Enforces the Neumann condition of the front face of the domain
-		HYPRE_SStructMatrixSetBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesz);
-		HYPRE_SStructMatrixAddToBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesz);
+		//HYPRE_SStructMatrixSetBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesy);
+		HYPRE_SStructMatrixAddToBoxValues(A, part, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesy);
 	}
-printf("front face set\n");
+//printf("front face set\n");
+
+
 
 	//Free memory used to enforce boundary conditions
 	free(valuesx);
@@ -318,7 +388,9 @@ printf("front face set\n");
 	free(center_valuesx);
 	free(center_valuesy);
 	free(center_valuesz);
-printf("face boundary conditions set\n");
+//printf("face boundary conditions set\n");
+
+
 	//Assemble the Matrix
 	HYPRE_SStructMatrixAssemble(A);
 
@@ -339,36 +411,37 @@ printf("face boundary conditions set\n");
 	HYPRE_SStructVectorInitialize(x);
 
 	//Allocate memory for the right hand side, exact solution, and initial guess values
-        nvalues = nx * ny * nz;
+        nvalues = nx/Nx * ny/Ny * nz/Nz;
 	
 	rhs_values = calloc(nvalues, sizeof(double));
 	x_values = calloc(nvalues, sizeof(double));
 	exactsolution = calloc(nvalues, sizeof(double));
 	
-printf("begin initial value calculation\n");
+//printf("begin initial value calculation\n");
+
 	//Calculate the rhs and exact solution at each point
-	for(k = 0; k < nz; k++){
+	for(k = 0; k < nz/Nz; k++){
 		Z = (ilower[2] + k + .5) * hz;
-		for(j = 0; j < ny; j++){
+		for(j = 0; j < ny/Ny; j++){
 			Y = (ilower[1] + j + .5) * hy;
-			for(i = 0; j < nx; i++){
+			for(i = 0; i < nx/Nx; i++){
 				X = (ilower[0] + i + .5) * hx;
 				//Change this to a real calculation
-				rhs_values[i+j*nx+k*nx*ny] = (X+Y+Z)*0. + 1.;
-				exactsolution[i+j*nx+k*nx*ny] = 1.;
-				x_values[i+j*nx+k*nx*ny] = 0.0;
-				
+				rhs_values[i+j*nx/Nx+k*nx/Nx*ny/Ny] = -6. * M_PI*M_PI * cos(2.*M_PI*X) * cos(M_PI*Y) * cos(M_PI*Z);
+				exactsolution[i+j*nx/Nx+k*nx/Nx*ny/Ny] = 1.0 * cos(2.*M_PI*X)*cos(M_PI*Y)*cos(M_PI*Z);
+				x_values[i+j*nx/Nx+k*nx/Nx*ny/Nx] = 0.0;
 			}
 		}
 	}
 
-printf("initial values calculated\n");
+//printf("initial values calculated\n");
 
 
 	//Set values for the rhs and exact solution vectors
 	HYPRE_SStructVectorSetBoxValues(b, part, ilower, iupper, var, rhs_values);
 	HYPRE_SStructVectorSetBoxValues(x, part, ilower, iupper, var, x_values);
 
+//printf("x and b values set\n");
 	//Free memory used in calculation of right hand side and x vectors
 	free(rhs_values);
 	free(x_values);		
@@ -393,9 +466,9 @@ printf("initial values calculated\n");
 
 		//Set GMRES solver parameters
 		HYPRE_ParCSRGMRESCreate(MPI_COMM_WORLD, &gmres_solver);
-		HYPRE_GMRESSetMaxIter(gmres_solver, 1000);
+		HYPRE_GMRESSetMaxIter(gmres_solver, 50);
 		HYPRE_GMRESSetTol(gmres_solver, 1e-12);
-		HYPRE_GMRESSetPrintLevel(gmres_solver, 0);
+		HYPRE_GMRESSetPrintLevel(gmres_solver, 3);
 		HYPRE_GMRESSetLogging(gmres_solver, 0);
 
 		//Create AMG preconditioner
@@ -407,11 +480,13 @@ printf("initial values calculated\n");
         	HYPRE_BoomerAMGSetCoarsenType(precond, 6);
         	HYPRE_BoomerAMGSetTol(precond, 1.0e-3);
         	HYPRE_BoomerAMGSetPrintLevel(precond, 0);
-        	HYPRE_BoomerAMGSetMaxIter(precond, 1);
+        	HYPRE_BoomerAMGSetMaxIter(precond, 5);
         	HYPRE_BoomerAMGSetNumSweeps(precond, 2);
 		HYPRE_BoomerAMGSetRelaxType(precond, 0);
         	//HYPRE_BoomerAMGSetRelaxWeight(precond, .3);
                 HYPRE_BoomerAMGSetRelaxWt(precond, .3);
+
+//printf("solver and preconditioner parameters set\n");
                 
 		//Setup and solve the system
 		HYPRE_ParCSRGMRESSetPrecond(gmres_solver, HYPRE_BoomerAMGSolve, HYPRE_BoomerAMGSetup, precond);
@@ -432,6 +507,19 @@ printf("initial values calculated\n");
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
+	//Prints the number of iterations and the Final Relative Residual Norm
+	if (myid == 0) {
+      		printf("\n");
+      		printf("Iterations = %d\n", num_iterations);
+      		printf("Final Relative Residual Norm = %e\n", final_res_norm);
+      		printf("\n");
+    	}
+
+	//Prints the solution vector, x to the solution file
+        char solutionfile[255];
+        sprintf(solutionfile, "%s.%06d", "3d_ss_data/3d.ss.final.x", myid);
+        HYPRE_ParVectorPrint(par_x, solutionfile);
+                 
 
 	//Uses MPI to find the maximum time taken to solve the equation
 	double *time, *timemax;
@@ -459,10 +547,10 @@ printf("initial values calculated\n");
     		char filename[255];
     		char solutionfile[255];
 
-    		sprintf(solutionfile, "%s.%06d.%d", "3d.ss.final.x", myid, myid);
+    		sprintf(solutionfile, "%s.%06d.%d", "3d_ss_data/3d.ss.final.x", myid, myid);
 
 		//Determines the number of values the solution file needs to hold
-    		int nvalues = nx * ny * nz;
+    		int nvalues = nx/Nx * ny/Ny * nz/Nz;
 
 		int root = 0;
 		int count = 1;
