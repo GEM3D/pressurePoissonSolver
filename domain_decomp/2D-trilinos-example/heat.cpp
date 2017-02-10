@@ -41,7 +41,8 @@ int main(int argc, char *argv[])
 	using namespace std::chrono;
 
 	MPI_Init(&argc, &argv);
-	RCP<const Teuchos::Comm<int>> comm = Tpetra::DefaultPlatform::getDefaultPlatform().getComm();
+    Teuchos::Comm<int>* comm_raw = new Teuchos::MpiComm<int>(MPI_COMM_WORLD);
+	RCP<const Teuchos::Comm<int>> comm  = rcp(comm_raw);
 
 	int num_procs = comm->getSize();
 
