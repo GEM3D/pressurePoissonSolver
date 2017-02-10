@@ -660,26 +660,22 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 		Iface      curr_type = *ifaces.begin();
 		ifaces.erase(ifaces.begin());
 		todo.insert(curr_type);
+        set<Iface> to_be_deleted;
 		for (auto iter = ifaces.begin(); iter != ifaces.end(); iter++) {
 			if (*iter == curr_type) {
-				bool begin = iter == ifaces.begin();
-				auto old = iter;
-                if(!begin){
-                    iter--;
-                }
-				todo.insert(*old);
-				ifaces.erase(*old);
-                if(begin){
-                    iter = ifaces.begin();
-                }
+				todo.insert(*iter);
+				to_be_deleted.insert(*iter);
 
-                //TODO fix this iterator
-                //iter=ifaces.begin();
+				// TODO fix this iterator
+				// iter=ifaces.begin();
 			}
+		}
+		for (Iface i : to_be_deleted) {
+			ifaces.erase(i);
 		}
 
 		// create domain representing curr_type
-		Domain                d(nx, ny, h_x, h_y);
+		Domain d(nx, ny, h_x, h_y);
 		if (curr_type.t_north == NEUMANN) {
 			d.nbr_north = -1;
 		} else {
