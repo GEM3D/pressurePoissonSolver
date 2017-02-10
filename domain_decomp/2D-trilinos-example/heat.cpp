@@ -11,6 +11,7 @@
 #include <BelosTpetraAdapter.hpp>
 #include <MatrixMarket_Tpetra.hpp>
 #include <Teuchos_Comm.hpp>
+#include <Teuchos_DefaultMpiComm.hpp>
 #include <Teuchos_GlobalMPISession.hpp>
 #include <Teuchos_ParameterList.hpp>
 #include <Teuchos_RCP.hpp>
