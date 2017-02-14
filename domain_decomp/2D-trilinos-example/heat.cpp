@@ -6,6 +6,7 @@
 //#include <Amesos2.hpp>
 //#include <Amesos2_Version.hpp>
 #include <BelosBlockCGSolMgr.hpp>
+#include <BelosBlockGmresSolMgr.hpp>
 #include <BelosConfigDefs.hpp>
 #include <BelosLinearProblem.hpp>
 #include <BelosTpetraAdapter.hpp>
@@ -69,6 +70,7 @@ int main(int argc, char *argv[])
 	args::Flag f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
 	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {'n', "neumann"});
 	args::Flag f_bfs(parser, "bfs", "index using BFS", {"bfs"});
+	args::Flag f_gmres(parser, "gmres", "use GMRES for iterative solver", {"gmres"});
 
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;
@@ -334,9 +336,14 @@ int main(int argc, char *argv[])
 		belosList.set("Verbosity", verbosity);
 
 		// Create solver and solve
-		RCP<Belos::SolverManager<double, vector_type, Tpetra::Operator<>>> solver
-		= rcp(new Belos::BlockCGSolMgr<double, vector_type, Tpetra::Operator<>>(
-		rcp(&problem, false), rcp(&belosList, false)));
+		RCP<Belos::SolverManager<double, vector_type, Tpetra::Operator<>>> solver;
+		if (f_gmres) {
+			solver = rcp(new Belos::BlockGmresSolMgr<double, vector_type, Tpetra::Operator<>>(
+			rcp(&problem, false), rcp(&belosList, false)));
+		} else {
+			solver = rcp(new Belos::BlockCGSolMgr<double, vector_type, Tpetra::Operator<>>(
+			rcp(&problem, false), rcp(&belosList, false)));
+		}
 		solver->solve();
 
 		comm->barrier();
