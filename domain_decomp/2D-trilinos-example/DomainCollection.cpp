@@ -637,7 +637,7 @@ double DomainCollection::residual()
 	Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &residual, &retval);
 	return sqrt(retval);
 }
-RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
+RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map, int delete_row)
 {
 	int              size = max(nx, ny);
 	RCP<matrix_type> A    = rcp(new matrix_type(map, size * 6));
@@ -809,7 +809,12 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 					}
 				}
 				// insert row for domain
-				A->insertGlobalValues(j, row.size(), &row[0], &global[0]);
+				if (j == delete_row) {
+					double one=1;
+					A->insertGlobalValues(j, 1, &one, &j);
+				} else {
+					A->insertGlobalValues(j, row.size(), &row[0], &global[0]);
+				}
 			}
 		}
 	}

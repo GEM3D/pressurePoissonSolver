@@ -62,15 +62,20 @@ int main(int argc, char *argv[])
 	args::ValueFlag<string> f_r(parser, "rhs filename", "the file to write the rhs vector to",
 	                            {'r'});
 	args::ValueFlag<string> f_p(parser, "preconditioner filename",
-	                            "the file to write the preconditoiner to", {'p'});
+	                            "the file to write the preconditioner to", {'p'});
 	args::ValueFlag<double> f_t(
 	parser, "tolerance", "set the tolerance of the iterative solver (default is 1e-10)", {'t'});
+	args::ValueFlag<int> f_d(
+	parser, "row", "pin gamma value to zero (by modifying that row of the schur compliment matrix)",
+	{'z'});
 	args::Flag f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
 	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
 	args::Flag f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
 	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {'n', "neumann"});
 	args::Flag f_bfs(parser, "bfs", "index using BFS", {"bfs"});
 	args::Flag f_gmres(parser, "gmres", "use GMRES for iterative solver", {"gmres"});
+	args::Flag f_nozero(parser, "nozero", "don't make the average of vector zero in CG solver",
+	                    {"nozero"});
 
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;
@@ -111,6 +116,11 @@ int main(int argc, char *argv[])
 	double tol = 1e-10;
 	if (f_t) {
 		tol = args::get(f_t);
+	}
+
+	int del = -1;
+	if (f_d) {
+		del = args::get(f_d);
 	}
 
 	string save_matrix_file = "";
@@ -228,7 +238,9 @@ int main(int argc, char *argv[])
 
 	ZeroSum zs;
 	if (f_neumann) {
-		zs.setTrue();
+		if (!f_nozero) {
+			zs.setTrue();
+		}
 		dc.initNeumann(ffun, gfun, nfunx, nfuny);
 	} else {
 		dc.initDirichlet(ffun, gfun);
@@ -268,7 +280,7 @@ int main(int argc, char *argv[])
 			comm->barrier();
 			steady_clock::time_point form_start = steady_clock::now();
 
-			RCP<matrix_type> A = dc.formMatrix(matrix_map);
+			RCP<matrix_type> A = dc.formMatrix(matrix_map, del);
 
 			comm->barrier();
 			duration<double> form_time = steady_clock::now() - form_start;
