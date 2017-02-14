@@ -3,8 +3,8 @@
 #include "MyTypeDefs.h"
 #include "ZeroSum.h"
 #include "args.h"
-#include <Amesos2.hpp>
-#include <Amesos2_Version.hpp>
+//#include <Amesos2.hpp>
+//#include <Amesos2_Version.hpp>
 #include <BelosBlockCGSolMgr.hpp>
 #include <BelosConfigDefs.hpp>
 #include <BelosLinearProblem.hpp>
@@ -391,11 +391,14 @@ int main(int argc, char *argv[])
 	steady_clock::time_point total_stop = steady_clock::now();
 	duration<double>         total_time = total_stop - domain_start;
 
+    double residual = dc.residual();
+    double fnorm = dc.fNorm();
 	if (my_global_rank == 0) {
 		std::cout << "Total run time: " << total_time.count() << "\n";
 		std::cout << std::scientific;
 		std::cout.precision(13);
 		std::cout << "Error: " << global_diff_norm / global_exact_norm << "\n";
+		std::cout << "Residual: " << residual/fnorm << "\n";
 	}
 
 	MPI_Finalize();

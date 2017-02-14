@@ -178,16 +178,16 @@ void DomainCollection::initDirichlet(function<double(double, double)> ffun,
 				f[yi * nx + xi]     = ffun(x, y);
 				exact[yi * nx + xi] = gfun(x, y);
 				if (index_x == 0) {
-					f[yi * nx + xi] += -2.0 / (h_x * h_x) * gfun(0.0, y);
+					d.boundary_west[yi] = gfun(0.0, y);
 				}
 				if (index_x == d_x * nx - 1) {
-					f[yi * nx + xi] += -2.0 / (h_x * h_x) * gfun(1.0, y);
+					d.boundary_east[yi] = gfun(1.0, y);
 				}
 				if (index_y == 0) {
-					f[yi * nx + xi] += -2.0 / (h_y * h_y) * gfun(x, 0.0);
+					d.boundary_south[xi] = gfun(x, 0.0);
 				}
 				if (index_y == d_y * ny - 1) {
-					f[yi * nx + xi] += -2.0 / (h_y * h_y) * gfun(x, 1.0);
+					d.boundary_north[xi] = gfun(x, 1.0);
 				}
 			}
 		}
@@ -591,6 +591,16 @@ double DomainCollection::exactNorm()
 	}
 	return sqrt(result);
 }
+double DomainCollection::fNorm()
+{
+	double result = 0;
+	for (auto &p : domains) {
+		result += pow(p.second->fNorm(), 2);
+	}
+    double retval;
+	Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &result, &retval);
+	return sqrt(retval);
+}
 double DomainCollection::exactNorm(double eavg)
 {
 	double result = 0;
@@ -606,6 +616,26 @@ double DomainCollection::exactSum()
 		result += p.second->exactSum();
 	}
 	return result;
+}
+double DomainCollection::residual()
+{
+	vector_type      ghost(collection_map, 2);
+	vector_type      one_ghost(matrix_map, 2);
+	for (auto &p : domains) {
+		p.second->putGhostCells(ghost);
+	}
+	Tpetra::Export<> exporter(collection_map, matrix_map);
+	one_ghost.doExport(ghost, exporter, Tpetra::CombineMode::ADD);
+	ghost.putScalar(0);
+	ghost.doImport(one_ghost, exporter, Tpetra::CombineMode::ADD);
+
+	double residual = 0;
+	for (auto &p : domains) {
+		residual += pow(p.second->residual(ghost), 2);
+	}
+	double retval;
+	Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &residual, &retval);
+	return sqrt(retval);
 }
 RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map)
 {

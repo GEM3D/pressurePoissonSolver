@@ -40,9 +40,11 @@ class DomainCollection
 	double                    diffNorm();
 	double diffNorm(double uavg, double eavg);
 	double                    exactNorm();
+	double                    fNorm();
 	double exactNorm(double eavg);
 	double                    uSum();
 	double                    exactSum();
+	double                    residual();
 	Teuchos::RCP<matrix_type> formMatrix(Teuchos::RCP<map_type> map);
 	Teuchos::RCP<matrix_type> formInvDiag(Teuchos::RCP<map_type> map);
 	Teuchos::RCP<RBMatrix> formRBMatrix(Teuchos::RCP<map_type> map);

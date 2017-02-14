@@ -62,6 +62,11 @@ class Domain
 		tmp    = std::valarray<double>(nx * ny);
 		u      = std::valarray<double>(nx * ny);
 		denom  = std::valarray<double>(nx * ny);
+
+		boundary_north = std::valarray<double>(nx);
+		boundary_south = std::valarray<double>(nx);
+		boundary_east  = std::valarray<double>(ny);
+		boundary_west  = std::valarray<double>(ny);
 	}
 
 	~Domain()
@@ -167,18 +172,26 @@ class Domain
 	void solve()
 	{
 		f_copy = f;
-		if (nbr_north != -1) {
+        if(nbr_north==-1&&neumann){
 			f_copy[std::slice(nx * (ny - 1), nx, 1)] -= 2 / (h_y * h_y) * boundary_north;
-		}
-		if (nbr_east != -1) {
+        }else{
+			f_copy[std::slice(nx * (ny - 1), nx, 1)] -= 2 / (h_y * h_y) * boundary_north;
+        }
+		if (nbr_east == -1&&neumann) {
 			f_copy[std::slice((nx - 1), ny, nx)] -= 2 / (h_x * h_x) * boundary_east;
-		}
-		if (nbr_south != -1) {
+		}else{
+			f_copy[std::slice((nx - 1), ny, nx)] -= 2 / (h_x * h_x) * boundary_east;
+        }
+		if (nbr_south == -1&&neumann) {
 			f_copy[std::slice(0, nx, 1)] -= 2 / (h_y * h_y) * boundary_south;
-		}
-		if (nbr_west != -1) {
+		}else{
+			f_copy[std::slice(0, nx, 1)] -= 2 / (h_y * h_y) * boundary_south;
+        }
+		if (nbr_west == -1&&neumann) {
 			f_copy[std::slice(0, ny, nx)] -= 2 / (h_x * h_x) * boundary_west;
-		}
+		}else{
+			f_copy[std::slice(0, ny, nx)] -= 2 / (h_x * h_x) * boundary_west;
+        }
 
 		fftw_execute(plan1);
 
@@ -191,6 +204,153 @@ class Domain
 		fftw_execute(plan2);
 
 		u /= 4 * nx * ny;
+	}
+
+	void putGhostCells(vector_type &ghost)
+	{
+		auto ghost_view = ghost.getLocalView<Kokkos::HostSpace>();
+		if (nbr_north != -1) {
+			int curr_i = local_i_north;
+			for (int i = 0; i < nx; i++) {
+				ghost_view(curr_i, 1) += u[nx * (ny - 1) + i];
+				curr_i++;
+			}
+		}
+		if (nbr_east != -1) {
+			int curr_i = local_i_east;
+			for (int i = 0; i < ny; i++) {
+				ghost_view(curr_i, 1) += u[(i + 1) * nx - 1];
+				curr_i++;
+			}
+		}
+		if (nbr_south != -1) {
+			int curr_i = local_i_south;
+			for (int i = 0; i < nx; i++) {
+				ghost_view(curr_i, 0) += u[i];
+				curr_i++;
+			}
+		}
+		if (nbr_west != -1) {
+			int curr_i = local_i_west;
+			for (int i = 0; i < ny; i++) {
+				ghost_view(curr_i, 0) += u[i * nx];
+				curr_i++;
+			}
+		}
+	}
+
+	double residual(vector_type &ghost)
+	{
+		auto ghost_view = ghost.getLocalView<Kokkos::HostSpace>();
+		if (nbr_north != -1) {
+			boundary_north = std::valarray<double>(nx);
+			int curr_i     = local_i_north;
+			for (int i = 0; i < nx; i++) {
+				boundary_north[i] = ghost_view(curr_i, 0);
+				curr_i++;
+			}
+		}
+		if (nbr_east != -1) {
+			boundary_east = std::valarray<double>(ny);
+			int curr_i    = local_i_east;
+			for (int i = 0; i < ny; i++) {
+				boundary_east[i] = ghost_view(curr_i, 0);
+				curr_i++;
+			}
+		}
+		if (nbr_south != -1) {
+			boundary_south = std::valarray<double>(nx);
+			int curr_i     = local_i_south;
+			for (int i = 0; i < nx; i++) {
+				boundary_south[i] = ghost_view(curr_i, 1);
+				curr_i++;
+			}
+		}
+		if (nbr_west != -1) {
+			boundary_west = std::valarray<double>(ny);
+			int curr_i    = local_i_west;
+			for (int i = 0; i < ny; i++) {
+				boundary_west[i] = ghost_view(curr_i, 1);
+				curr_i++;
+			}
+		}
+
+		std::valarray<double> f_comp = std::valarray<double>(nx * ny);
+		// integrate in x directon
+		double center, north, east, south, west;
+		// west
+		for (int j = 0; j < ny; j++) {
+			west   = boundary_west[j];
+			center = u[j * nx];
+			east   = u[j * nx + 1];
+			if (neumann && nbr_west == -1) {
+				f_comp[j * nx] = (-h_x * west - center + east) / (h_x * h_x);
+			} else if (nbr_west == -1) {
+				f_comp[j * nx] = (2 * west - 3 * center + east) / (h_x * h_x);
+			} else {
+				f_comp[j * nx] = (west - 2 * center + east) / (h_x * h_x);
+			}
+		}
+		// middle
+		for (int i = 1; i < nx - 1; i++) {
+			for (int j = 0; j < ny; j++) {
+				east   = u[j * nx + i - 1];
+				center = u[j * nx + i];
+				west   = u[j * nx + i + 1];
+
+				f_comp[j * nx + i] = (west - 2 * center + east) / (h_x * h_x);
+			}
+		}
+		// east
+		for (int j = 0; j < ny; j++) {
+			west   = u[j * nx + nx - 2];
+			center = u[j * nx + nx - 1];
+			east   = boundary_east[j];
+			if (neumann && nbr_east == -1) {
+				f_comp[j * nx + nx - 1] = (west - center + h_x * east) / (h_x * h_x);
+			} else if (nbr_east == -1) {
+				f_comp[j * nx + nx - 1] = (west - 3 * center + 2 * east) / (h_x * h_x);
+			} else {
+				f_comp[j * nx + nx - 1] = (west - 2 * center + east) / (h_x * h_x);
+			}
+		}
+		// south
+		for (int i = 0; i < nx; i++) {
+			south  = boundary_south[i];
+			center = u[i];
+			north  = u[nx + i];
+			if (neumann && nbr_south == -1) {
+				f_comp[i] += (-h_y * south - center + north) / (h_y * h_y);
+			} else if (nbr_south == -1) {
+				f_comp[i] += (2 * south - 3 * center + north) / (h_y * h_y);
+			} else {
+				f_comp[i] += (south - 2 * center + north) / (h_y * h_y);
+			}
+		}
+		// middle
+		for (int i = 0; i < nx; i++) {
+			for (int j = 1; j < ny - 1; j++) {
+				south  = u[(j - 1) * nx + i];
+				center = u[j * nx + i];
+				north  = u[(j + 1) * nx + i];
+
+				f_comp[j * nx + i] += (south - 2 * center + north) / (h_y * h_y);
+			}
+		}
+		// north
+		for (int i = 0; i < nx; i++) {
+			south  = u[(ny - 2) * nx + i];
+			center = u[(ny - 1) * nx + i];
+			north  = boundary_north[i];
+			if (neumann && nbr_north == -1) {
+				f_comp[(ny - 1) * nx + i] += (south - center + h_y * north) / (h_y * h_y);
+			} else if (nbr_north == -1) {
+				f_comp[(ny - 1) * nx + i] += (south - 3 * center + 2 * north) / (h_y * h_y);
+			} else {
+				f_comp[(ny - 1) * nx + i] += (south - 2 * center + north) / (h_y * h_y);
+			}
+		}
+		return sqrt(pow(f - f_comp, 2).sum());
 	}
 
 	void solveWithInterface(const vector_type &gamma, vector_type &diff)
@@ -273,6 +433,7 @@ class Domain
 	}
 	double uSum() { return u.sum(); }
 	double exactNorm() { return std::sqrt((exact * exact).sum()); }
+	double fNorm() { return std::sqrt((f * f).sum()); }
 	double exactNorm(double eavg) { return std::sqrt(std::pow(exact - eavg, 2).sum()); }
 	double                  exactSum() { return exact.sum(); }
 };
