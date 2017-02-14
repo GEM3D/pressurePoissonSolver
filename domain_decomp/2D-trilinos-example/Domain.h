@@ -172,26 +172,26 @@ class Domain
 	void solve()
 	{
 		f_copy = f;
-        if(nbr_north==-1&&neumann){
+		if (nbr_north == -1 && neumann) {
+			f_copy[std::slice(nx * (ny - 1), nx, 1)] -= 1 / h_y * boundary_north;
+		} else {
 			f_copy[std::slice(nx * (ny - 1), nx, 1)] -= 2 / (h_y * h_y) * boundary_north;
-        }else{
-			f_copy[std::slice(nx * (ny - 1), nx, 1)] -= 2 / (h_y * h_y) * boundary_north;
-        }
-		if (nbr_east == -1&&neumann) {
+		}
+		if (nbr_east == -1 && neumann) {
+			f_copy[std::slice((nx - 1), ny, nx)] -= 1 / h_x * boundary_east;
+		} else {
 			f_copy[std::slice((nx - 1), ny, nx)] -= 2 / (h_x * h_x) * boundary_east;
-		}else{
-			f_copy[std::slice((nx - 1), ny, nx)] -= 2 / (h_x * h_x) * boundary_east;
-        }
-		if (nbr_south == -1&&neumann) {
+		}
+		if (nbr_south == -1 && neumann) {
+			f_copy[std::slice(0, nx, 1)] += 1 / h_y * boundary_south;
+		} else {
 			f_copy[std::slice(0, nx, 1)] -= 2 / (h_y * h_y) * boundary_south;
-		}else{
-			f_copy[std::slice(0, nx, 1)] -= 2 / (h_y * h_y) * boundary_south;
-        }
-		if (nbr_west == -1&&neumann) {
+		}
+		if (nbr_west == -1 && neumann) {
+			f_copy[std::slice(0, ny, nx)] += 1 / h_x * boundary_west;
+		} else {
 			f_copy[std::slice(0, ny, nx)] -= 2 / (h_x * h_x) * boundary_west;
-		}else{
-			f_copy[std::slice(0, ny, nx)] -= 2 / (h_x * h_x) * boundary_west;
-        }
+		}
 
 		fftw_execute(plan1);
 
