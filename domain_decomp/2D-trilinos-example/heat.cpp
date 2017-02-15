@@ -402,8 +402,8 @@ int main(int argc, char *argv[])
 			eavg /= total_cells;
 
 			if (my_global_rank == 0) {
-				cerr << "Average of computed solution: " << uavg << "\n";
-				cerr << "Average of exact solution: " << eavg << "\n";
+				cout << "Average of computed solution: " << uavg << "\n";
+				cout << "Average of exact solution: " << eavg << "\n";
 			}
 
 			exact_norm.getDataNonConst()[0] = dc.exactNorm(eavg);
