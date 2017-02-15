@@ -12,7 +12,6 @@
 #include <BelosTpetraAdapter.hpp>
 #include <MatrixMarket_Tpetra.hpp>
 #include <Teuchos_Comm.hpp>
-#include <Teuchos_DefaultMpiComm.hpp>
 #include <Teuchos_GlobalMPISession.hpp>
 #include <Teuchos_ParameterList.hpp>
 #include <Teuchos_RCP.hpp>
@@ -42,9 +41,8 @@ int main(int argc, char *argv[])
 	using Teuchos::rcp;
 	using namespace std::chrono;
 
-	MPI_Init(&argc, &argv);
-    Teuchos::Comm<int>* comm_raw = new Teuchos::MpiComm<int>(MPI_COMM_WORLD);
-	RCP<const Teuchos::Comm<int>> comm  = rcp(comm_raw);
+	Teuchos::GlobalMPISession global(&argc, &argv);
+	RCP<const Teuchos::Comm<int>> comm  = rcp (new Teuchos::MpiComm<int> (MPI_COMM_WORLD));
 
 	int num_procs = comm->getSize();
 
@@ -420,6 +418,5 @@ int main(int argc, char *argv[])
 		std::cout << "Residual: " << residual/fnorm << "\n";
 	}
 
-	MPI_Finalize();
 	return 0;
 }

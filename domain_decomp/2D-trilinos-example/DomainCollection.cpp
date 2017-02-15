@@ -881,16 +881,15 @@ RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map)
 		Iface curr_type_right = curr_pair.second;
 		// todo.insert(curr_type_left);
 		todo.insert(curr_type_right);
+        set<pair<Iface,Iface>> to_be_deleted;
 		for (auto iter = ifaces.begin(); iter != ifaces.end(); iter++) {
 			if (*iter == curr_pair) {
 				todo.insert(iter->second);
-				auto old = *iter;
-				iter--;
-				ifaces.erase(old);
-				if (ifaces.size() == 0) {
-					break;
-				}
+				to_be_deleted.insert(*iter);
 			}
+		}
+		for (auto i : to_be_deleted) {
+			ifaces.erase(i);
 		}
 
 		// create domain representing curr_type_left
