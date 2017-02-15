@@ -7,6 +7,7 @@
 //#include <Amesos2.hpp>
 //#include <Amesos2_Version.hpp>
 #include <BelosBlockCGSolMgr.hpp>
+#include <BelosBiCGStabSolMgr.hpp>
 #include <BelosBlockGmresSolMgr.hpp>
 #include <BelosConfigDefs.hpp>
 #include <BelosLinearProblem.hpp>
@@ -75,6 +76,7 @@ int main(int argc, char *argv[])
 	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {'n', "neumann"});
 	args::Flag f_bfs(parser, "bfs", "index using BFS", {"bfs"});
 	args::Flag f_gmres(parser, "gmres", "use GMRES for iterative solver", {"gmres"});
+	args::Flag f_bicg(parser, "gmres", "use BiCGStab for iterative solver", {"bicg"});
 	args::Flag f_nozero(parser, "nozero", "don't make the average of vector zero in CG solver",
 	                    {"nozero"});
 
@@ -362,6 +364,9 @@ int main(int argc, char *argv[])
 			RCP<Belos::SolverManager<double, vector_type, Tpetra::Operator<>>> solver;
 			if (f_gmres) {
 				solver = rcp(new Belos::BlockGmresSolMgr<double, vector_type, Tpetra::Operator<>>(
+				rcp(&problem, false), rcp(&belosList, false)));
+			} else if (f_bicg) {
+				solver = rcp(new Belos::BiCGStabSolMgr<double, vector_type, Tpetra::Operator<>>(
 				rcp(&problem, false), rcp(&belosList, false)));
 			} else {
 				solver = rcp(new Belos::BlockCGSolMgr<double, vector_type, Tpetra::Operator<>>(
