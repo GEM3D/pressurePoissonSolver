@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
 	using Teuchos::rcp;
 	using namespace std::chrono;
 
-	Teuchos::GlobalMPISession global(&argc, &argv);
+	Teuchos::GlobalMPISession global(&argc, &argv, nullptr);
 	RCP<const Teuchos::Comm<int>> comm = Tpetra::DefaultPlatform::getDefaultPlatform().getComm();
 
 	int num_procs = comm->getSize();
