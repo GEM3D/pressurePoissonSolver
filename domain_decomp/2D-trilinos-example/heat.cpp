@@ -1,4 +1,5 @@
 #include "BelosCGIter.hpp"
+#include "BelosOutputManager.hpp"
 #include "FunctionWrapper.h"
 #include "MyTypeDefs.h"
 #include "ZeroSum.h"
@@ -22,7 +23,7 @@
 #include <cmath>
 #include <iostream>
 #include <iostream>
-#include <mpi.h>
+//#include <mpi.h>
 #include <string>
 #include <unistd.h>
 
