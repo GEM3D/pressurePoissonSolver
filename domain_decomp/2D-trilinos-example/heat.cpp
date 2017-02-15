@@ -56,6 +56,8 @@ int main(int argc, char *argv[])
 	args::Positional<int> d_y(parser, "d_y", "number of domains in the y direction");
 	args::Positional<int> n_x(parser, "n_x", "number of cells in the x direction, in each domain");
 	args::Positional<int> n_y(parser, "n_y", "number of cells in the y direction, in each domain");
+	args::ValueFlag<int>  f_l(parser, "n", "run the program n times and print out the average",
+	                         {'l'});
 	args::ValueFlag<string> f_m(parser, "matrix filename", "the file to write the matrix to",
 	                            {'m'});
 	args::ValueFlag<string> f_r(parser, "rhs filename", "the file to write the rhs vector to",
@@ -120,6 +122,11 @@ int main(int argc, char *argv[])
 	int del = -1;
 	if (f_d) {
 		del = args::get(f_d);
+	}
+
+	int loop_count = 1;
+	if (f_l) {
+		loop_count = args::get(f_l);
 	}
 
 	string save_matrix_file = "";
@@ -219,204 +226,222 @@ int main(int argc, char *argv[])
 		nfuny = [](double x, double y) { return -2 * M_PI * sin(M_PI * x) * sin(2 * M_PI * y); };
 	}
 
-	comm->barrier();
-	steady_clock::time_point domain_start = steady_clock::now();
+    valarray<double> times(loop_count);
+	for (int loop = 0; loop < loop_count; loop++) {
+		comm->barrier();
+		steady_clock::time_point domain_start = steady_clock::now();
 
-	int              total_domains = num_domains_x * num_domains_y;
-	DomainCollection dc(total_domains * my_global_rank / num_procs,
-	                    total_domains * (my_global_rank + 1) / num_procs - 1, nx, ny, num_domains_x,
-	                    num_domains_y, h_x, h_y, comm);
+		int              total_domains = num_domains_x * num_domains_y;
+		DomainCollection dc(total_domains * my_global_rank / num_procs,
+		                    total_domains * (my_global_rank + 1) / num_procs - 1, nx, ny,
+		                    num_domains_x, num_domains_y, h_x, h_y, comm);
 
-	if (f_bfs) {
-		if (num_procs > 1) {
-			std::cerr << "BFS indexing currently only works with a single thread.\n";
-			return 1;
-		}
-		dc.indexBFS();
-	}
-
-	ZeroSum zs;
-	if (f_neumann) {
-		if (!f_nozero) {
-			zs.setTrue();
-		}
-		dc.initNeumann(ffun, gfun, nfunx, nfuny);
-	} else {
-		dc.initDirichlet(ffun, gfun);
-	}
-
-	comm->barrier();
-	steady_clock::time_point domain_stop = steady_clock::now();
-	duration<double>         domain_time = domain_stop - domain_start;
-
-	if (my_global_rank == 0) cout << "Domain Initialization Time: " << domain_time.count() << "\n";
-
-	// Create a map that will be used in the iterative solver
-	RCP<map_type> matrix_map = dc.matrix_map;
-
-	// Create the gamma and diff vectors
-	RCP<vector_type> gamma = rcp(new vector_type(matrix_map, 1));
-	RCP<vector_type> diff  = rcp(new vector_type(matrix_map, 1));
-
-	if (num_domains_x * num_domains_y != 1) {
-		// do iterative solve
-
-		// Get the b vector
-		RCP<vector_type> b = rcp(new vector_type(matrix_map, 1));
-		dc.solveWithInterface(*gamma, *b);
-
-		if (save_rhs_file != "") {
-			Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_rhs_file, b, "", "");
+		if (f_bfs) {
+			if (num_procs > 1) {
+				std::cerr << "BFS indexing currently only works with a single thread.\n";
+				return 1;
+			}
+			dc.indexBFS();
 		}
 
-		RCP<Tpetra::Operator<>> op;
-
-		if (f_wrapper) {
-			// Create a function wrapper
-			op = rcp(new FuncWrap(b, &dc));
+		ZeroSum zs;
+		if (f_neumann) {
+			if (!f_nozero) {
+				zs.setTrue();
+			}
+			dc.initNeumann(ffun, gfun, nfunx, nfuny);
 		} else {
-			// Form the matrix
-			comm->barrier();
-			steady_clock::time_point form_start = steady_clock::now();
-
-			RCP<matrix_type> A = dc.formMatrix(matrix_map, del);
-
-			comm->barrier();
-			duration<double> form_time = steady_clock::now() - form_start;
-
-			if (my_global_rank == 0) cout << "Matrix Formation Time: " << form_time.count() << "\n";
-
-			if (save_matrix_file != "") {
-				comm->barrier();
-				steady_clock::time_point write_start = steady_clock::now();
-
-				Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A, "",
-				                                                           "");
-
-				comm->barrier();
-				duration<double> write_time = steady_clock::now() - write_start;
-				if (my_global_rank == 0)
-					cout << "Time to write matix to file: " << write_time.count() << "\n";
-			}
-
-			op = A;
+			dc.initDirichlet(ffun, gfun);
 		}
-
-		// Create linear problem for the Belos solver
-		Belos::LinearProblem<double, vector_type, Tpetra::Operator<>> problem(op, gamma, b);
-
-		if (f_prec) {
-			// form preconditioner
-			comm->barrier();
-			steady_clock::time_point prec_start = steady_clock::now();
-
-			RCP<matrix_type> P = dc.formInvDiag(matrix_map);
-			problem.setLeftPrec(P);
-
-			comm->barrier();
-			duration<double> prec_time = steady_clock::now() - prec_start;
-
-			if (my_global_rank == 0)
-				cout << "Preconditioner Formation Time: " << prec_time.count() << "\n";
-
-			if (save_prec_file != "") {
-				comm->barrier();
-				steady_clock::time_point write_start = steady_clock::now();
-
-				Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_prec_file, P, "",
-				                                                           "");
-
-				comm->barrier();
-				duration<double> write_time = steady_clock::now() - write_start;
-				if (my_global_rank == 0)
-					cout << "Time to write preconditioner to file: " << write_time.count() << "\n";
-			}
-		}
-
-		problem.setProblem();
 
 		comm->barrier();
-		steady_clock::time_point iter_start = steady_clock::now();
-		// Set the parameters
-		Teuchos::ParameterList belosList;
-		belosList.set("Block Size", 1);
-		belosList.set("Maximum Iterations", 5000);
-		belosList.set("Convergence Tolerance", tol);
-		int verbosity = Belos::Errors + Belos::StatusTestDetails + Belos::Warnings
-		                + Belos::TimingDetails + Belos::Debug;
-		belosList.set("Verbosity", verbosity);
+		steady_clock::time_point domain_stop = steady_clock::now();
+		duration<double>         domain_time = domain_stop - domain_start;
 
-		// Create solver and solve
-		RCP<Belos::SolverManager<double, vector_type, Tpetra::Operator<>>> solver;
-		if (f_gmres) {
-			solver = rcp(new Belos::BlockGmresSolMgr<double, vector_type, Tpetra::Operator<>>(
-			rcp(&problem, false), rcp(&belosList, false)));
-		} else {
-			solver = rcp(new Belos::BlockCGSolMgr<double, vector_type, Tpetra::Operator<>>(
-			rcp(&problem, false), rcp(&belosList, false)));
+		if (my_global_rank == 0)
+			cout << "Domain Initialization Time: " << domain_time.count() << "\n";
+
+		// Create a map that will be used in the iterative solver
+		RCP<map_type> matrix_map = dc.matrix_map;
+
+		// Create the gamma and diff vectors
+		RCP<vector_type> gamma = rcp(new vector_type(matrix_map, 1));
+		RCP<vector_type> diff  = rcp(new vector_type(matrix_map, 1));
+
+		if (num_domains_x * num_domains_y != 1) {
+			// do iterative solve
+
+			// Get the b vector
+			RCP<vector_type> b = rcp(new vector_type(matrix_map, 1));
+			dc.solveWithInterface(*gamma, *b);
+
+			if (save_rhs_file != "") {
+				Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_rhs_file, b, "", "");
+			}
+
+			RCP<Tpetra::Operator<>> op;
+
+			if (f_wrapper) {
+				// Create a function wrapper
+				op = rcp(new FuncWrap(b, &dc));
+			} else {
+				// Form the matrix
+				comm->barrier();
+				steady_clock::time_point form_start = steady_clock::now();
+
+				RCP<matrix_type> A = dc.formMatrix(matrix_map, del);
+
+				comm->barrier();
+				duration<double> form_time = steady_clock::now() - form_start;
+
+				if (my_global_rank == 0)
+					cout << "Matrix Formation Time: " << form_time.count() << "\n";
+
+				if (save_matrix_file != "") {
+					comm->barrier();
+					steady_clock::time_point write_start = steady_clock::now();
+
+					Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A,
+					                                                           "", "");
+
+					comm->barrier();
+					duration<double> write_time = steady_clock::now() - write_start;
+					if (my_global_rank == 0)
+						cout << "Time to write matix to file: " << write_time.count() << "\n";
+				}
+
+				op = A;
+			}
+
+			// Create linear problem for the Belos solver
+			Belos::LinearProblem<double, vector_type, Tpetra::Operator<>> problem(op, gamma, b);
+
+			if (f_prec) {
+				// form preconditioner
+				comm->barrier();
+				steady_clock::time_point prec_start = steady_clock::now();
+
+				RCP<matrix_type> P = dc.formInvDiag(matrix_map);
+				problem.setLeftPrec(P);
+
+				comm->barrier();
+				duration<double> prec_time = steady_clock::now() - prec_start;
+
+				if (my_global_rank == 0)
+					cout << "Preconditioner Formation Time: " << prec_time.count() << "\n";
+
+				if (save_prec_file != "") {
+					comm->barrier();
+					steady_clock::time_point write_start = steady_clock::now();
+
+					Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_prec_file, P,
+					                                                           "", "");
+
+					comm->barrier();
+					duration<double> write_time = steady_clock::now() - write_start;
+					if (my_global_rank == 0)
+						cout << "Time to write preconditioner to file: " << write_time.count()
+						     << "\n";
+				}
+			}
+
+			problem.setProblem();
+
+			comm->barrier();
+			steady_clock::time_point iter_start = steady_clock::now();
+			// Set the parameters
+			Teuchos::ParameterList belosList;
+			belosList.set("Block Size", 1);
+			belosList.set("Maximum Iterations", 5000);
+			belosList.set("Convergence Tolerance", tol);
+			int verbosity = Belos::Errors + Belos::StatusTestDetails + Belos::Warnings
+			                + Belos::TimingDetails + Belos::Debug;
+			belosList.set("Verbosity", verbosity);
+
+			// Create solver and solve
+			RCP<Belos::SolverManager<double, vector_type, Tpetra::Operator<>>> solver;
+			if (f_gmres) {
+				solver = rcp(new Belos::BlockGmresSolMgr<double, vector_type, Tpetra::Operator<>>(
+				rcp(&problem, false), rcp(&belosList, false)));
+			} else {
+				solver = rcp(new Belos::BlockCGSolMgr<double, vector_type, Tpetra::Operator<>>(
+				rcp(&problem, false), rcp(&belosList, false)));
+			}
+			solver->solve();
+
+			comm->barrier();
+			duration<double> iter_time = steady_clock::now() - iter_start;
+			if (my_global_rank == 0) std::cout << "CG Time: " << iter_time.count() << "\n";
 		}
-		solver->solve();
+
+		// Do one last solve
+		comm->barrier();
+		steady_clock::time_point solve_start = steady_clock::now();
+
+		dc.solveWithInterface(*gamma, *diff);
 
 		comm->barrier();
-		duration<double> iter_time = steady_clock::now() - iter_start;
-		if (my_global_rank == 0) std::cout << "CG Time: " << iter_time.count() << "\n";
-	}
+		duration<double> solve_time = steady_clock::now() - solve_start;
 
-	// Do one last solve
-	comm->barrier();
-	steady_clock::time_point solve_start = steady_clock::now();
+		if (my_global_rank == 0)
+			std::cout << "Time to solve with given set of gammas: " << solve_time.count() << "\n";
 
-	dc.solveWithInterface(*gamma, *diff);
+		// Calcuate error
+		RCP<map_type>    err_map = rcp(new map_type(-1, 1, 0, comm));
+		Tpetra::Vector<> exact_norm(err_map);
+		Tpetra::Vector<> diff_norm(err_map);
 
-	comm->barrier();
-	duration<double> solve_time = steady_clock::now() - solve_start;
+		if (f_neumann) {
+			double usum = dc.uSum();
+			double uavg;
+			Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &usum, &uavg);
+			uavg /= total_cells;
+			double esum = dc.exactSum();
+			double eavg;
+			Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &esum, &eavg);
+			eavg /= total_cells;
 
-	if (my_global_rank == 0)
-		std::cout << "Time to solve with given set of gammas: " << solve_time.count() << "\n";
+			if (my_global_rank == 0) {
+				cerr << "Average of computed solution: " << uavg << "\n";
+				cerr << "Average of exact solution: " << eavg << "\n";
+			}
 
-	// Calcuate error
-	RCP<map_type>    err_map = rcp(new map_type(-1, 1, 0, comm));
-	Tpetra::Vector<> exact_norm(err_map);
-	Tpetra::Vector<> diff_norm(err_map);
+			exact_norm.getDataNonConst()[0] = dc.exactNorm(eavg);
+			diff_norm.getDataNonConst()[0]  = dc.diffNorm(uavg, eavg);
+		} else {
+			exact_norm.getDataNonConst()[0] = dc.exactNorm();
+			diff_norm.getDataNonConst()[0]  = dc.diffNorm();
+		}
+		double global_diff_norm;
+		double global_exact_norm;
+		global_diff_norm  = diff_norm.norm2();
+		global_exact_norm = exact_norm.norm2();
 
-	if (f_neumann) {
-		double usum = dc.uSum();
-		double uavg;
-		Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &usum, &uavg);
-		uavg /= total_cells;
-		double esum = dc.exactSum();
-		double eavg;
-		Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &esum, &eavg);
-		eavg /= total_cells;
+		comm->barrier();
+		steady_clock::time_point total_stop = steady_clock::now();
+		duration<double>         total_time = total_stop - domain_start;
 
+		double residual = dc.residual();
+		double fnorm    = dc.fNorm();
 		if (my_global_rank == 0) {
-			cerr << "Average of computed solution: " << uavg << "\n";
-			cerr << "Average of exact solution: " << eavg << "\n";
+			std::cout << "Total run time: " << total_time.count() << "\n";
+			std::cout << std::scientific;
+			std::cout.precision(13);
+			std::cout << "Error: " << global_diff_norm / global_exact_norm << "\n";
+			std::cout << "Residual: " << residual / fnorm << "\n";
 		}
-
-		exact_norm.getDataNonConst()[0] = dc.exactNorm(eavg);
-		diff_norm.getDataNonConst()[0]  = dc.diffNorm(uavg, eavg);
-	} else {
-		exact_norm.getDataNonConst()[0] = dc.exactNorm();
-		diff_norm.getDataNonConst()[0]  = dc.diffNorm();
+		times[loop] = total_time.count();
 	}
-	double global_diff_norm;
-	double global_exact_norm;
-	global_diff_norm  = diff_norm.norm2();
-	global_exact_norm = exact_norm.norm2();
 
-	comm->barrier();
-	steady_clock::time_point total_stop = steady_clock::now();
-	duration<double>         total_time = total_stop - domain_start;
-
-    double residual = dc.residual();
-    double fnorm = dc.fNorm();
-	if (my_global_rank == 0) {
-		std::cout << "Total run time: " << total_time.count() << "\n";
-		std::cout << std::scientific;
-		std::cout.precision(13);
-		std::cout << "Error: " << global_diff_norm / global_exact_norm << "\n";
-		std::cout << "Residual: " << residual/fnorm << "\n";
+	if (loop_count > 1 && my_global_rank == 0) {
+        cout<<std::fixed;
+		cout.precision(2);
+		std::cout << "Times: ";
+		for (double t : times) {
+			cout << t << " ";
+		}
+		cout << "\n";
+		cout << "Average: " << times.sum() / times.size() << "\n";
 	}
 
 	return 0;
