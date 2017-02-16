@@ -18,7 +18,41 @@ RBMatrix::RBMatrix(Teuchos::RCP<map_type> map, int block_size, int num_blocks)
 void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode, double alpha,
                      double beta) const
 {
-	y.update(1, x, 1);
+    cerr << "apply has been called with alpha: " << alpha << " beta: " << beta << "\n";
+	auto x_view = x.getLocalView<Kokkos::HostSpace>();
+    y.putScalar(0);
+	auto y_view = y.getLocalView<Kokkos::HostSpace>();
+    //column loop
+    for(size_t index = 0;index<block_cols.size();index++){
+		int start_j = index * block_size;
+		valarray<double> slot(block_size);
+		valarray<double> slot_rev(block_size);
+		for (int i = 0; i < block_size; i++) {
+			slot[i]     = x_view(start_j + i, 0);
+			slot_rev[i] = x_view(start_j + block_size - 1 - i, 0);
+		}
+		// go down the column
+		for (auto &p : block_cols[index]) {
+			Block             curr_block    = p.second;
+			valarray<double> *curr_slot_ptr = &slot;
+			if (curr_block.flip_j) {
+				curr_slot_ptr = &slot_rev;
+			}
+			valarray<double> &curr_slot = *curr_slot_ptr;
+			for (int index = 0; index < block_size; index++) {
+				int block_i = index;
+				if (curr_block.flip_i) {
+					block_i = block_size - 1 - index;
+				}
+				valarray<double> &curr_blk = *curr_block.block;
+				valarray<double> blk_slice = curr_blk[slice(block_i * block_size, block_size, 1)];
+
+				int               matrix_i  = p.first + index;
+				y_view(matrix_i, 0) += (curr_slot * blk_slice).sum();
+			}
+		}
+	}
+    cerr<<"norm of resulting vector " << y.getVector(0)->norm2()<<"\n";
 }
 void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_i, bool flip_j)
 {
@@ -69,12 +103,12 @@ void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_
 					if (b.flip_j) {
 						block_j = block_size - j - 1;
 					}
-					new_blk[i * block_size + j] = second_blk[block_i * block_size + block_j];
+					new_blk[i * block_size + j] += second_blk[block_i * block_size + block_j];
 				}
 			}
 			block_cols[index][i] = new_block;
 			combos[bpair]        = new_block;
-			cerr << "new combo matrix created! \n\n";
+			cerr << "new combo block created! \n\n";
 		}
 	} else {
 		// do nothing

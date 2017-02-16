@@ -769,8 +769,8 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map, int delete_row)
 				row.reserve(nx * 2 + ny * 2);
 				global.reserve(nx * 3 + ny * 4);
 				for (int y = 0; y < iface.l_south; y++) {
-                    int block_j = y;
-                    if(reverse_x){
+					int block_j = y;
+					if (reverse_x) {
 						block_j = iface.l_south - 1 - y;
 					}
 					row.push_back(-south_block[block_i * nx + block_j]);
@@ -1112,36 +1112,40 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map)
 			d.solve();
 			// fill the blocks
 
-			north_block[slice(i * nx, nx, 1)] = d.u[slice(nx * (ny - 1), nx, 1)];
-			east_block[slice(i * nx, ny, 1)]  = d.u[slice((nx - 1), ny, nx)];
-			south_block[slice(i * nx, nx, 1)] = d.u[slice(0, nx, 1)];
-			west_block[slice(i * nx, ny, 1)]  = d.u[slice(0, ny, nx)];
+			north_block[slice(i, nx, nx)] = d.u[slice(nx * (ny - 1), nx, 1)];
+			east_block[slice(i, ny, ny)]  = d.u[slice((nx - 1), ny, nx)];
+			south_block[slice(i, nx, nx)] = d.u[slice(0, nx, 1)];
+			west_block[slice(i, ny, ny)]  = d.u[slice(0, ny, nx)];
 			south_block[i * nx + i] -= 1;
 			d.boundary_south[i] = 0;
 		}
 
+		north_block = -north_block;
+		south_block = -south_block;
+		east_block = -east_block;
+		west_block = -west_block;
 		//now insert these results into the matrix for each interface
 		for (Iface iface : todo) {
-			bool flip_j
+			bool reverse_x
 			= (iface.axis == X_AXIS && !iface.right) || (iface.axis == Y_AXIS && iface.right);
-			bool flip_i = !iface.right;
+			bool reverse_y = !iface.right;
 
 			int j = iface.i_south;
 			int i = iface.i_south;
 
-			A->insertBlock(i, j, south_block_ptr, flip_i, flip_j);
+			A->insertBlock(i, j, south_block_ptr, reverse_x, reverse_x);
 
 			if (iface.i_west != -1) {
 				i = iface.i_west;
-				A->insertBlock(i, j, west_block_ptr, flip_i, flip_j);
+				A->insertBlock(i, j, west_block_ptr, reverse_y, reverse_x);
 			}
 			if (iface.i_north != -1) {
 				i = iface.i_north;
-				A->insertBlock(i, j, north_block_ptr, flip_i, flip_j);
+				A->insertBlock(i, j, north_block_ptr, reverse_x, reverse_x);
 			}
 			if (iface.i_east != -1) {
 				i = iface.i_east;
-				A->insertBlock(i, j, east_block_ptr, flip_i, flip_j);
+				A->insertBlock(i, j, east_block_ptr, reverse_y, reverse_x);
 			}
 		}
 	}
