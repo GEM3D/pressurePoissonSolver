@@ -100,6 +100,7 @@ link_directories(${Tpetra_TPL_LIBRARY_DIRS})
 #
 add_executable(heat heat.cpp)
 add_library(DomainCollection DomainCollection.cpp)
+add_library(RBMatrix RBMatrix.cpp)
 
 #
 # EDIT HERE: Change trilinosExample to the name of the executable
@@ -109,6 +110,15 @@ add_library(DomainCollection DomainCollection.cpp)
 #
 target_link_libraries(heat
     DomainCollection
+    RBMatrix
+  ${Belos_TPL_LIBRARIES}
+  ${Tpetra_TPL_LIBRARIES}
+  ${FFTW_LIB}
+  ${Belos_LIBRARIES} 
+  ${Tpetra_LIBRARIES} 
+  ${MPI_CXX_LIBRARIES} 
+)
+target_link_libraries(RBMatrix
   ${Belos_TPL_LIBRARIES}
   ${Tpetra_TPL_LIBRARIES}
   ${FFTW_LIB}
@@ -117,6 +127,7 @@ target_link_libraries(heat
   ${MPI_CXX_LIBRARIES} 
 )
 target_link_libraries(DomainCollection
+  RBMatrix
   ${Belos_TPL_LIBRARIES}
   ${Tpetra_TPL_LIBRARIES}
   ${FFTW_LIB}

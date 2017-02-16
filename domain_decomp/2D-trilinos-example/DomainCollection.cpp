@@ -1001,106 +1001,155 @@ RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map)
 }
 RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map)
 {
-	// create domain for forming matrix
-	std::valarray<double> f(nx * ny);
-	Domain                d(nx, ny, h_x, h_y);
-	d.nbr_north           = 1;
-	d.nbr_east            = 1;
-	d.nbr_south           = 1;
-	d.nbr_west            = 1;
-	d.boundary_north      = valarray<double>(nx);
-	d.boundary_south      = valarray<double>(nx);
-	d.boundary_east       = valarray<double>(ny);
-	d.boundary_west       = valarray<double>(ny);
-	RCP<RBMatrix> A    = rcp(new RBMatrix(map, nx));
+	int              size = max(nx, ny);
+	RCP<RBMatrix>    A    = rcp(new RBMatrix(map, size, (d_x - 1) * d_y + d_x * (d_y - 1)));
+	// create iface objects
+	set<Iface> ifaces;
+	auto       iface_view = iface_info->getLocalView<Kokkos::HostSpace>();
+	for (size_t i = 0; i < iface_view.dimension(0); i += 22) {
+		Iface right;
+		Iface left;
 
-	// create block
-	RCP<valarray<double>> north_block_ptr = rcp(new valarray<double>(nx * ny));
-	RCP<valarray<double>> east_block_ptr  = rcp(new valarray<double>(nx * ny));
-	RCP<valarray<double>> south_block_ptr = rcp(new valarray<double>(nx * ny));
-	RCP<valarray<double>> west_block_ptr  = rcp(new valarray<double>(nx * ny));
-	valarray<double> &    north_block     = *north_block_ptr;
-	valarray<double> &    east_block      = *east_block_ptr;
-	valarray<double> &    south_block     = *south_block_ptr;
-	valarray<double> &    west_block      = *west_block_ptr;
-	for (int i = 0; i < nx; i++) {
-		d.boundary_north[i] = 1;
-		d.solve();
-		// fill the blocks
-		north_block[slice(i, nx, nx)] = d.u[slice(nx * (ny - 1), nx, 1)];
-		east_block[slice(i, nx, nx)] = d.u[slice((nx - 1), ny, nx)];
-		south_block[slice(i, nx, nx)] = d.u[slice(0, nx, 1)];
-		west_block[slice(i, nx, nx)] = d.u[slice(0, ny, nx)];
-		d.boundary_north[i] = 0;
+		right.right   = true;
+		right.axis    = iface_view(i + 21, 0);
+		right.i_south = iface_view(i, 0);
+		right.t_south = iface_view(i + 1, 0);
+		right.l_south = iface_view(i + 2, 0);
+		right.i_west  = iface_view(i + 3, 0);
+		right.t_west  = iface_view(i + 4, 0);
+		right.l_west  = iface_view(i + 5, 0);
+		right.i_north = iface_view(i + 6, 0);
+		right.t_north = iface_view(i + 7, 0);
+		right.l_north = iface_view(i + 8, 0);
+		right.i_east  = iface_view(i + 9, 0);
+		right.t_east  = iface_view(i + 10, 0);
+		right.l_east  = iface_view(i + 11, 0);
+
+		left.right   = false;
+		left.axis    = iface_view(i + 21, 0);
+		left.i_south = iface_view(i, 0);
+		left.t_south = iface_view(i + 1, 0);
+		left.l_south = iface_view(i + 2, 0);
+		left.i_west  = iface_view(i + 12, 0);
+		left.t_west  = iface_view(i + 13, 0);
+		left.l_west  = iface_view(i + 14, 0);
+		left.i_north = iface_view(i + 15, 0);
+		left.t_north = iface_view(i + 16, 0);
+		left.l_north = iface_view(i + 17, 0);
+		left.i_east  = iface_view(i + 18, 0);
+		left.t_east  = iface_view(i + 19, 0);
+		left.l_east  = iface_view(i + 20, 0);
+
+		ifaces.insert(left);
+		ifaces.insert(right);
 	}
-    // insert into matrix
-	for (auto &p : domains) {
-		Domain &d2 = *p.second;
-        if(d2.nbr_north!=-1){
-            int j = d2.global_i_north;
-            A->insertBlock(j,j,north_block_ptr);
-            if(d2.nbr_east!=-1){
-                int i = d2.global_i_east;
-				A->insertBlock(i, j, east_block_ptr);
+
+	int num_types = 0;
+	while (!ifaces.empty()) {
+		num_types++;
+		// the first in the set is the type of interface that we are going to solve for
+		set<Iface> todo;
+		Iface      curr_type = *ifaces.begin();
+		ifaces.erase(ifaces.begin());
+		todo.insert(curr_type);
+		set<Iface> to_be_deleted;
+		for (auto iter = ifaces.begin(); iter != ifaces.end(); iter++) {
+			if (*iter == curr_type) {
+				todo.insert(*iter);
+				to_be_deleted.insert(*iter);
+
+				// TODO fix this iterator
+				// iter=ifaces.begin();
 			}
-            if(d2.nbr_south!=-1){
-                int i = d2.global_i_south;
-				A->insertBlock(i, j, south_block_ptr);
-            }
-            if(d2.nbr_west!=-1){
-                int i = d2.global_i_west;
-				A->insertBlock(i, j, west_block_ptr);
-            }
-        }
-        if(d2.nbr_east!=-1){
-            int j = d2.global_i_east;
-            A->insertBlock(j,j,north_block_ptr);
-            if(d2.nbr_east!=-1){
-                int i = d2.global_i_south;
-				A->insertBlock(i, j, east_block_ptr);
+		}
+		for (Iface i : to_be_deleted) {
+			ifaces.erase(i);
+		}
+
+		// create domain representing curr_type
+		Domain d(nx, ny, h_x, h_y);
+		if (curr_type.t_north == NEUMANN) {
+			d.nbr_north = -1;
+		} else {
+			d.nbr_north = 1;
+		}
+		if (curr_type.t_east == NEUMANN) {
+			d.nbr_east = -1;
+		} else {
+			d.nbr_east = 1;
+		}
+		if (curr_type.t_south == NEUMANN) {
+			d.nbr_south = -1;
+		} else {
+			d.nbr_south = 1;
+		}
+		if (curr_type.t_west == NEUMANN) {
+			d.nbr_west = -1;
+		} else {
+			d.nbr_west = 1;
+		}
+		d.boundary_north = valarray<double>(nx);
+		d.boundary_south = valarray<double>(nx);
+		d.boundary_east  = valarray<double>(ny);
+		d.boundary_west  = valarray<double>(ny);
+		d.planNeumann();
+
+		// solve over south interface, and save results
+		RCP<valarray<double>> north_block_ptr = rcp(new valarray<double>(nx * ny));
+		valarray<double> &    north_block     = *north_block_ptr;
+
+		RCP<valarray<double>> east_block_ptr = rcp(new valarray<double>(nx * ny));
+		valarray<double> &    east_block     = *east_block_ptr;
+
+		RCP<valarray<double>> south_block_ptr = rcp(new valarray<double>(nx * ny));
+		valarray<double> &    south_block     = *south_block_ptr;
+
+		RCP<valarray<double>> west_block_ptr = rcp(new valarray<double>(nx * ny));
+		valarray<double> &    west_block     = *west_block_ptr;
+
+		for (int i = 0; i < nx; i++) {
+			d.boundary_south[i] = 1;
+			d.solve();
+			// fill the blocks
+
+			north_block[slice(i * nx, nx, 1)] = d.u[slice(nx * (ny - 1), nx, 1)];
+			east_block[slice(i * nx, ny, 1)]  = d.u[slice((nx - 1), ny, nx)];
+			south_block[slice(i * nx, nx, 1)] = d.u[slice(0, nx, 1)];
+			west_block[slice(i * nx, ny, 1)]  = d.u[slice(0, ny, nx)];
+			south_block[i * nx + i] -= 1;
+			d.boundary_south[i] = 0;
+		}
+
+		//now insert these results into the matrix for each interface
+		for (Iface iface : todo) {
+			bool flip_j
+			= (iface.axis == X_AXIS && !iface.right) || (iface.axis == Y_AXIS && iface.right);
+			bool flip_i = !iface.right;
+
+			int j = iface.i_south;
+			int i = iface.i_south;
+
+			A->insertBlock(i, j, south_block_ptr, flip_i, flip_j);
+
+			if (iface.i_west != -1) {
+				i = iface.i_west;
+				A->insertBlock(i, j, west_block_ptr, flip_i, flip_j);
 			}
-            if(d2.nbr_south!=-1){
-                int i = d2.global_i_west;
-				A->insertBlock(i, j, south_block_ptr);
-            }
-            if(d2.nbr_west!=-1){
-                int i = d2.global_i_north;
-				A->insertBlock(i, j, west_block_ptr);
-            }
-        }
-        if(d2.nbr_south!=-1){
-            int j = d2.global_i_south;
-            A->insertBlock(j,j,north_block_ptr);
-            if(d2.nbr_east!=-1){
-                int i = d2.global_i_west;
-				A->insertBlock(i, j, east_block_ptr);
+			if (iface.i_north != -1) {
+				i = iface.i_north;
+				A->insertBlock(i, j, north_block_ptr, flip_i, flip_j);
 			}
-            if(d2.nbr_south!=-1){
-                int i = d2.global_i_north;
-				A->insertBlock(i, j, south_block_ptr);
-            }
-            if(d2.nbr_west!=-1){
-                int i = d2.global_i_east;
-				A->insertBlock(i, j, west_block_ptr);
-            }
-        }
-        if(d2.nbr_west!=-1){
-            int j = d2.global_i_west;
-            A->insertBlock(j,j,north_block_ptr);
-            if(d2.nbr_east!=-1){
-                int i = d2.global_i_north;
-				A->insertBlock(i, j, east_block_ptr);
+			if (iface.i_east != -1) {
+				i = iface.i_east;
+				A->insertBlock(i, j, east_block_ptr, flip_i, flip_j);
 			}
-            if(d2.nbr_south!=-1){
-                int i = d2.global_i_east;
-				A->insertBlock(i, j, south_block_ptr);
-            }
-            if(d2.nbr_west!=-1){
-                int i = d2.global_i_south;
-				A->insertBlock(i, j, west_block_ptr);
-            }
-        }
+		}
 	}
+
+	// cerr << "Num types: " << num_types << "\n";
+	// transpose matrix and return
+	//A->fillComplete();
 	return A;
+
 }
 

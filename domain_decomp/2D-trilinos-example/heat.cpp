@@ -71,6 +71,7 @@ int main(int argc, char *argv[])
 	parser, "row", "pin gamma value to zero (by modifying that row of the schur compliment matrix)",
 	{'z'});
 	args::Flag f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
+	args::Flag f_rbmatrix(parser, "wrapper", "use a repetative block sparse matrix", {"rbmatrix"});
 	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
 	args::Flag f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
 	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {'n', "neumann"});
@@ -286,6 +287,20 @@ int main(int argc, char *argv[])
 			if (f_wrapper) {
 				// Create a function wrapper
 				op = rcp(new FuncWrap(b, &dc));
+			} else if (f_rbmatrix) {
+				// Form the matrix
+				comm->barrier();
+				steady_clock::time_point form_start = steady_clock::now();
+
+				RCP<RBMatrix> A = dc.formRBMatrix(matrix_map);
+
+				comm->barrier();
+				duration<double> form_time = steady_clock::now() - form_start;
+
+				if (my_global_rank == 0)
+					cout << "Matrix Formation Time: " << form_time.count() << "\n";
+
+				op = A;
 			} else {
 				// Form the matrix
 				comm->barrier();
