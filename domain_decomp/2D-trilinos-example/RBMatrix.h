@@ -20,18 +20,32 @@ class Block{
 		this->flip_i = flip_i;
 		this->flip_j = flip_j;
 	}
+	friend bool operator==(const Block &l, const Block &r)
+	{
+		return std::tie(l.flip_i, l.flip_j, l.block) == std::tie(r.flip_i, r.flip_j, r.block);
+	}
+	friend bool operator<(const Block &l, const Block &r)
+	{
+        double* left_ptr = &(*l.block)[0];
+        double* right_ptr = &(*r.block)[0];
+		return std::tie(l.flip_i, l.flip_j, left_ptr)
+		       < std::tie(r.flip_i, r.flip_j, right_ptr);
+	}
 };
 class RBMatrix : public Tpetra::Operator<>
 {
-	public:
+    private:
 	Teuchos::RCP<map_type> domain;
 	Teuchos::RCP<map_type> range;
 	std::vector<std::map<int, Block>> block_cols;
 
+	std::map<std::pair<Block, Block>, Block> combos;
+
 	int block_size;
 	int num_blocks;
 
-	RBMatrix(Teuchos::RCP<map_type> map,int block_size,int num_blocks);
+	public:
+	RBMatrix(Teuchos::RCP<map_type> map, int block_size, int num_blocks);
 
 	void apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode = Teuchos::NO_TRANS,
 	           double alpha = Teuchos::ScalarTraits<double>::one(),
