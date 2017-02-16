@@ -61,6 +61,8 @@ int main(int argc, char *argv[])
 	                         {'l'});
 	args::ValueFlag<string> f_m(parser, "matrix filename", "the file to write the matrix to",
 	                            {'m'});
+	args::ValueFlag<string> f_s(parser, "solution filename", "the file to write the solution to",
+	                            {'s'});
 	args::ValueFlag<string> f_r(parser, "rhs filename", "the file to write the rhs vector to",
 	                            {'r'});
 	args::ValueFlag<string> f_p(parser, "preconditioner filename",
@@ -135,6 +137,11 @@ int main(int argc, char *argv[])
 	string save_matrix_file = "";
 	if (f_m) {
 		save_matrix_file = args::get(f_m);
+	}
+
+	string save_solution_file = "";
+	if (f_s) {
+		save_solution_file = args::get(f_s);
 	}
 
 	string save_rhs_file = "";
@@ -462,12 +469,19 @@ int main(int argc, char *argv[])
 			std::cout.precision(13);
 			std::cout << "Error: " << global_diff_norm / global_exact_norm << "\n";
 			std::cout << "Residual: " << residual / fnorm << "\n";
+			cout << std::fixed;
+			cout.precision(2);
 		}
 		times[loop] = total_time.count();
+		if (save_solution_file != "") {
+			ofstream out_file(save_solution_file);
+			dc.outputSolution(out_file);
+			out_file.close();
+		}
 	}
 
 	if (loop_count > 1 && my_global_rank == 0) {
-        cout<<std::fixed;
+		cout << std::fixed;
 		cout.precision(2);
 		std::cout << "Times: ";
 		for (double t : times) {

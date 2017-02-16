@@ -21,12 +21,6 @@ class FuncWrap : public Tpetra::Operator<>
 	{
 		dc->solveWithInterface(x, y);
 		y.update(1, *b, -1);
-
-		auto y_view = y.getLocalView<Kokkos::HostSpace>();
-		for (int i = 0; i < 400; i++) {
-            std::cerr << y_view(i, 0) << " ";
-		}
-        std::cerr << std::endl;
 	}
 	Teuchos::RCP<const map_type> getDomainMap() const { return b->getMap(); }
 	Teuchos::RCP<const map_type> getRangeMap() const { return b->getMap(); }
