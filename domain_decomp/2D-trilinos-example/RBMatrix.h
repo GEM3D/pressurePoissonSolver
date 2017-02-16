@@ -6,6 +6,7 @@
 #include <Teuchos_RCP.hpp>
 #include <valarray>
 #include <map>
+#include <iostream>
 class Block{
 	public:
 	bool flip_i;
@@ -43,6 +44,7 @@ class RBMatrix : public Tpetra::Operator<>
 
 	int block_size;
 	int num_blocks;
+    int nz = 0;
 
 	public:
 	RBMatrix(Teuchos::RCP<map_type> map, int block_size, int num_blocks);
@@ -54,5 +56,6 @@ class RBMatrix : public Tpetra::Operator<>
 	                 bool flip_j);
 	Teuchos::RCP<const map_type> getDomainMap() const { return domain; }
 	Teuchos::RCP<const map_type> getRangeMap() const { return range; }
+	friend std::ostream &operator<<(std::ostream &os, const RBMatrix &A);
 };
 #endif

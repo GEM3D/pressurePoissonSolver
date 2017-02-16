@@ -50,6 +50,7 @@ void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 				int               matrix_i  = p.first + index;
 				y_view(matrix_i, 0) += (curr_slot * blk_slice).sum();
 			}
+
 		}
 	}
     cerr<<"norm of resulting vector " << y.getVector(0)->norm2()<<"\n";
@@ -112,6 +113,39 @@ void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_
 		}
 	} else {
 		// do nothing
+        nz+=block->size();
 		block_cols[index][i] = b;
 	}
+}
+ostream& operator<<(ostream& os, const RBMatrix& A) {
+    os << scientific;
+    int size= A.num_blocks*A.block_size;
+    os.precision(15);
+	os << "%%MatrixMarket matrix coordinate real general\n";
+	os << size << ' ' << size << ' ' << A.nz << '\n';
+	for (size_t index = 0; index < A.block_cols.size(); index++) {
+		int start_j = index * A.block_size;
+		for (auto &p : A.block_cols[index]) {
+			Block                 curr_block = p.second;
+			std::valarray<double> curr_blk   = *curr_block.block;
+			int                   start_i    = p.first;
+			for (int iii = 0; iii < A.block_size; iii++) {
+				int i = start_i + iii;
+                int block_i = iii;
+				if (curr_block.flip_i) {
+					block_i = A.block_size - 1 - iii;
+				}
+				for (int jjj = 0; jjj < A.block_size; jjj++) {
+					int j       = start_j + jjj;
+					int block_j = jjj;
+					if (curr_block.flip_j) {
+						block_j = A.block_size - 1 - jjj;
+					}
+					os << i + 1 << ' ' << j + 1 << ' ' << curr_blk[block_i * A.block_size + block_j]
+					   << "\n";
+				}
+			}
+		}
+	}
+    return os;
 }

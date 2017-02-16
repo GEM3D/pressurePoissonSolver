@@ -300,6 +300,19 @@ int main(int argc, char *argv[])
 				if (my_global_rank == 0)
 					cout << "Matrix Formation Time: " << form_time.count() << "\n";
 
+				if (save_matrix_file != "") {
+					comm->barrier();
+					steady_clock::time_point write_start = steady_clock::now();
+
+					ofstream out_file(save_matrix_file);
+					out_file << *A;
+					out_file.close();
+
+					comm->barrier();
+					duration<double> write_time = steady_clock::now() - write_start;
+					if (my_global_rank == 0)
+						cout << "Time to write matix to file: " << write_time.count() << "\n";
+				}
 				op = A;
 			} else {
 				// Form the matrix
