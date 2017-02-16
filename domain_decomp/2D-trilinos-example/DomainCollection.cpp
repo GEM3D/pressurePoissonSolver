@@ -1157,3 +1157,6 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map)
 
 }
 
+void DomainCollection::outputSolution(std::ostream &out){
+
+}

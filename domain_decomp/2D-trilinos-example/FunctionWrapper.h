@@ -21,27 +21,14 @@ class FuncWrap : public Tpetra::Operator<>
 	{
 		dc->solveWithInterface(x, y);
 		y.update(1, *b, -1);
+
+		auto y_view = y.getLocalView<Kokkos::HostSpace>();
+		for (int i = 0; i < 400; i++) {
+            std::cerr << y_view(i, 0) << " ";
+		}
+        std::cerr << std::endl;
 	}
 	Teuchos::RCP<const map_type> getDomainMap() const { return b->getMap(); }
 	Teuchos::RCP<const map_type> getRangeMap() const { return b->getMap(); }
-};
-class ZeroAvg : public Tpetra::Operator<>
-{
-	public:
-    Teuchos::RCP<const map_type> map;
-	ZeroAvg(Teuchos::RCP<const map_type> map)
-	{
-        this->map = map;
-	}
-	void apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode = Teuchos::NO_TRANS,
-	           double alpha = Teuchos::ScalarTraits<double>::one(),
-	           double beta  = Teuchos::ScalarTraits<double>::zero()) const
-	{
-        double avg = x.getVector(0)->meanValue();
-        y.putScalar(-avg);
-		y.update(1, x, 1);
-	}
-	Teuchos::RCP<const map_type> getDomainMap() const { return map; }
-	Teuchos::RCP<const map_type> getRangeMap() const { return map; }
 };
 #endif
