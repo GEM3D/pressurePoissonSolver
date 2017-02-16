@@ -11,6 +11,7 @@ class Domain
 	public:
 	std::valarray<double>  f;
 	std::valarray<double>  f_copy;
+	std::valarray<double>  resid;
 	std::valarray<double>  u;
 	std::valarray<double>  exact;
 	std::valarray<double>  tmp;
@@ -350,6 +351,7 @@ class Domain
 				f_comp[(ny - 1) * nx + i] += (south - 2 * center + north) / (h_y * h_y);
 			}
 		}
+		resid = f - f_comp;
 		return sqrt(pow(f - f_comp, 2).sum());
 	}
 

@@ -63,6 +63,8 @@ int main(int argc, char *argv[])
 	                            {'m'});
 	args::ValueFlag<string> f_s(parser, "solution filename", "the file to write the solution to",
 	                            {'s'});
+	args::ValueFlag<string> f_resid(parser, "residual filename",
+	                                "the file to write the residual to", {"residual"});
 	args::ValueFlag<string> f_r(parser, "rhs filename", "the file to write the rhs vector to",
 	                            {'r'});
 	args::ValueFlag<string> f_p(parser, "preconditioner filename",
@@ -144,6 +146,10 @@ int main(int argc, char *argv[])
 		save_solution_file = args::get(f_s);
 	}
 
+	string save_residual_file = "";
+	if (f_resid) {
+		save_residual_file = args::get(f_resid);
+	}
 	string save_rhs_file = "";
 	if (f_r) {
 		save_rhs_file = args::get(f_r);
@@ -359,7 +365,7 @@ int main(int argc, char *argv[])
 				steady_clock::time_point prec_start = steady_clock::now();
 
 				RCP<matrix_type> P = dc.formInvDiag(matrix_map);
-				problem.setLeftPrec(P);
+				problem.setRightPrec(P);
 
 				comm->barrier();
 				duration<double> prec_time = steady_clock::now() - prec_start;
@@ -476,6 +482,11 @@ int main(int argc, char *argv[])
 		if (save_solution_file != "") {
 			ofstream out_file(save_solution_file);
 			dc.outputSolution(out_file);
+			out_file.close();
+		}
+		if (save_residual_file != "") {
+			ofstream out_file(save_residual_file);
+			dc.outputResidual(out_file);
 			out_file.close();
 		}
 	}

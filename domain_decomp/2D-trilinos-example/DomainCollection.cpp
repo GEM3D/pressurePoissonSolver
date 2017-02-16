@@ -131,21 +131,21 @@ void DomainCollection::initNeumann(function<double(double, double)> ffun,
 				double y            = h_y / 2.0 + 1.0 * index_y / (ny * d_y);
 				f[yi * nx + xi]     = ffun(x, y);
 				exact[yi * nx + xi] = efun(x, y);
-				// north
-				if (index_y == d_y * ny - 1) {
-					f[yi * nx + xi] -= nfuny(x, 1.0) / h_y;
-				}
-				// south
-				if (index_y == 0) {
-					f[yi * nx + xi] += nfuny(x, 0.0) / h_y;
-				}
-				// east
-				if (index_x == d_x * nx - 1) {
-					f[yi * nx + xi] -= nfunx(1.0, y) / h_x;
-				}
-				// west
+                //west
 				if (index_x == 0) {
-					f[yi * nx + xi] += nfunx(0.0, y) / h_x;
+					d.boundary_west[yi] = nfunx(0.0, y);
+				}
+                //east
+				if (index_x == d_x * nx - 1) {
+					d.boundary_east[yi] = nfunx(1.0, y);
+				}
+                //south
+				if (index_y == 0) {
+					d.boundary_south[xi] = nfuny(x, 0.0);
+				}
+                //north
+				if (index_y == d_y * ny - 1) {
+					d.boundary_north[xi] = nfuny(x, 1.0);
 				}
 			}
 		}
@@ -1172,6 +1172,24 @@ void DomainCollection::outputSolution(std::ostream &os)
 			int internal_i = i % ny;
 			int id         = domain_i * d_x + domain_j;
 			os << domains[id]->u[internal_i * nx + internal_j] << '\n';
+		}
+	}
+}
+void DomainCollection::outputResidual(std::ostream &os)
+{
+	int num_i = ny * d_y;
+	int num_j = nx * d_x;
+	os << "%%MatrixMarket matrix array real general\n";
+	os << num_i << ' ' << num_j << '\n';
+	os.precision(15);
+	for (int j = 0; j < num_j; j++) {
+		int domain_j   = j / nx;
+		int internal_j = j % nx;
+		for (int i = 0; i < num_i; i++) {
+			int domain_i   = i / ny;
+			int internal_i = i % ny;
+			int id         = domain_i * d_x + domain_j;
+			os << domains[id]->resid[internal_i * nx + internal_j] << '\n';
 		}
 	}
 }
