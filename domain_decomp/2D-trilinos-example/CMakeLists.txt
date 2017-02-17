@@ -14,6 +14,7 @@ cmake_minimum_required(VERSION 2.8)
 #find_package(Trilinos PATHS $ENV{TRILINOS_PATH}/lib/cmake/Trilinos $ENV{TRILINOS_PATH})
 find_package(Belos PATHS $ENV{TRILINOS_DIR}/lib/cmake/Belos $ENV{TRILINOS_DIR})
 find_package(Tpetra PATHS $ENV{TRILINOS_DIR}/lib/cmake/Tpetra $ENV{TRILINOS_DIR})
+find_package(Zoltan PATHS $ENV{TRILINOS_DIR}/lib/cmake/Zoltan $ENV{TRILINOS_DIR})
 
 # If FIND_PACKAGE successfully found your Trilinos install, it will
 # set the Boolean flag Trilinos_FOUND.  The following IF statement
@@ -107,6 +108,7 @@ link_directories(${Tpetra_TPL_LIBRARY_DIRS})
 #
 add_executable(heat heat.cpp)
 add_library(DomainCollection DomainCollection.cpp)
+add_library(DomainSignatureCollection DomainSignatureCollection.cpp)
 add_library(Domain Domain.cpp)
 add_library(RBMatrix RBMatrix.cpp)
 
@@ -118,6 +120,7 @@ add_library(RBMatrix RBMatrix.cpp)
 #
 target_link_libraries(heat
     DomainCollection
+    DomainSignatureCollection
     RBMatrix
     Domain
   ${Belos_TPL_LIBRARIES}
@@ -152,4 +155,8 @@ target_link_libraries(Domain
   ${Belos_LIBRARIES} 
   ${Tpetra_LIBRARIES} 
   ${MPI_CXX_LIBRARIES} 
+)
+target_link_libraries(DomainSignatureCollection
+  ${Zoltan_TPL_LIBRARIES}
+  ${Zoltan_LIBRARIES} 
 )

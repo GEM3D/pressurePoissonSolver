@@ -1,5 +1,6 @@
 #include "BelosCGIter.hpp"
 #include "BelosOutputManager.hpp"
+#include "DomainSignatureCollection.h"
 #include "FunctionWrapper.h"
 #include "MyTypeDefs.h"
 #include "ZeroSum.h"
@@ -160,6 +161,7 @@ int main(int argc, char *argv[])
 		save_prec_file = args::get(f_p);
 	}
 
+    
 	// the functions that we are using
 	vector<double> xval
 	= {0.07768174089481361, 0.4208838472612919,  0.9473139111796449,  0.5089692183323905,
@@ -245,6 +247,12 @@ int main(int argc, char *argv[])
     valarray<double> times(loop_count);
 	for (int loop = 0; loop < loop_count; loop++) {
 		comm->barrier();
+		// partition domains
+        DomainSignatureCollection dsc;
+		if (comm->getRank() == 0) {
+			dsc = DomainSignatureCollection(num_domains_x, num_domains_y);
+		}
+		dsc.zoltanBalance();
 		steady_clock::time_point domain_start = steady_clock::now();
 
 		int              total_domains = num_domains_x * num_domains_y;

@@ -1,3 +1,5 @@
+#ifndef DOMAINCOLLECTION_H
+#define DOMAINCOLLECTION_H
 #include "Domain.h"
 #include "MyTypeDefs.h"
 #include "RBMatrix.h"
@@ -51,3 +53,4 @@ class DomainCollection
 	Teuchos::RCP<matrix_type> formInvDiag(Teuchos::RCP<map_type> map);
 	Teuchos::RCP<RBMatrix> formRBMatrix(Teuchos::RCP<map_type> map);
 };
+#endif
