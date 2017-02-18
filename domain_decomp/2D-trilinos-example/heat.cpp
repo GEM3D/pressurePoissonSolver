@@ -255,10 +255,7 @@ int main(int argc, char *argv[])
 		dsc.zoltanBalance();
 		steady_clock::time_point domain_start = steady_clock::now();
 
-		int              total_domains = num_domains_x * num_domains_y;
-		DomainCollection dc(total_domains * my_global_rank / num_procs,
-		                    total_domains * (my_global_rank + 1) / num_procs - 1, nx, ny,
-		                    num_domains_x, num_domains_y, h_x, h_y, comm);
+		DomainCollection dc(dsc, nx, ny, num_domains_x, num_domains_y, h_x, h_y, comm);
 
 		if (f_bfs) {
 			if (num_procs > 1) {

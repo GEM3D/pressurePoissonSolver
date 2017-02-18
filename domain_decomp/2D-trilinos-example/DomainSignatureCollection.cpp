@@ -14,10 +14,10 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y){
 				ds.nbr_east = domain_y * d_x + domain_x + 1;
 			}
 			if (domain_y != 0) {
-				ds.nbr_north = (domain_y - 1) * d_x + domain_x;
+				ds.nbr_south = (domain_y - 1) * d_x + domain_x;
 			}
-			if (domain_x != d_x - 1) {
-				ds.nbr_east = domain_y * d_x + domain_x - 1;
+			if (domain_x != 0) {
+				ds.nbr_west = domain_y * d_x + domain_x - 1;
 			}
 			domains[ds.id] = ds;
 		}
@@ -77,7 +77,7 @@ void DomainSignatureCollection::zoltanBalance()
 
 	for (auto &p : domains)
 	{
-		*out << p.first << " ";
+		*out << p.second.id << " ";
 	}
 
 	*out << "\n";

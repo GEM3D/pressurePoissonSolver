@@ -50,8 +50,8 @@ class Iface{
 	}
 };
 
-DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, int d_y, double h_x,
-                                   double h_y, RCP<const Teuchos::Comm<int>> comm)
+DomainCollection::DomainCollection(DomainSignatureCollection dsc, int nx, int ny, int d_x, int d_y,
+                                   double h_x, double h_y, RCP<const Teuchos::Comm<int>> comm)
 {
 	// cerr<< "Low:  " << low << "\n";
 	// cerr<< "High: " << high << "\n";
@@ -62,45 +62,41 @@ DomainCollection::DomainCollection(int low, int high, int nx, int ny, int d_x, i
 	this->h_y          = h_y;
 	this->d_x          = d_x;
 	this->d_y          = d_y;
-	num_domains        = high - low;
 	num_global_domains = d_x * d_y;
-	domains            = map<int, RCP<Domain>>();
-	for (int i = low; i <= high; i++) {
-		int domain_x = i % d_y;
-		int domain_y = i / d_x;
+	for (auto p : dsc.domains) {
+		DomainSignature ds       = p.second;
+		int             i        = ds.id;
+		int             domain_x = i % d_x;
+		int             domain_y = i / d_x;
 
 		// create a domain
 		RCP<Domain> d_ptr = rcp(new Domain(nx, ny, h_x, h_y));
-		Domain &d     = *d_ptr;
+		Domain &    d     = *d_ptr;
 
 		// determine its neighbors
 		// north
 		int ns_start_i       = d_y * (d_x - 1) * ny;
 		int ns_iface_start_i = d_y * (d_x - 1) * 22;
+		d.nbr_north          = ds.nbr_north;
 		if (domain_y != d_y - 1) {
-			int nbr_y        = domain_y + 1;
-			d.nbr_north      = nbr_y * d_x + domain_x;
 			d.global_i_north = (domain_y * d_x + domain_x) * nx + ns_start_i;
 			d.iface_i_north  = (domain_y * d_x + domain_x) * 22 + ns_iface_start_i;
 		}
 		// east
+		d.nbr_east = ds.nbr_east;
 		if (domain_x != d_x - 1) {
-			int nbr_x       = domain_x + 1;
-			d.nbr_east      = domain_y * d_x + nbr_x;
 			d.global_i_east = (domain_x * d_x + domain_y) * ny;
 			d.iface_i_east  = (domain_x * d_x + domain_y) * 22;
 		}
 		// south
+		d.nbr_south = ds.nbr_south;
 		if (domain_y != 0) {
-			int nbr_y        = domain_y - 1;
-			d.nbr_south      = nbr_y * d_x + domain_x;
 			d.global_i_south = ((domain_y - 1) * d_x + domain_x) * nx + ns_start_i;
 			d.iface_i_south  = ((domain_y - 1) * d_x + domain_x) * 22 + ns_iface_start_i;
 		}
 		// west
+		d.nbr_west = ds.nbr_west;
 		if (domain_x != 0) {
-			int nbr_x       = domain_x - 1;
-			d.nbr_west      = domain_y * d_x + nbr_x;
 			d.global_i_west = ((domain_x - 1) * d_x + domain_y) * ny;
 			d.iface_i_west  = ((domain_x - 1) * d_x + domain_y) * 22;
 		}
