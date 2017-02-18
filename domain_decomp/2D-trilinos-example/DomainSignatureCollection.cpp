@@ -35,7 +35,7 @@ void DomainSignatureCollection::zoltanBalance()
 	zz->Set_Param("LB_METHOD", "GRAPH");   /* Zoltan method: "BLOCK" */
 	zz->Set_Param("NUM_GID_ENTRIES", "1"); /* global ID is 1 integer */
 	zz->Set_Param("NUM_LID_ENTRIES", "1"); /* local ID is 1 integer */
-	zz->Set_Param("OBJ_WEIGHT_DIM", "0");  /* we omit object weights */
+	zz->Set_Param("OBJ_WEIGHT_DIM", "1");  /* we omit object weights */
 	zz->Set_Param("AUTO_MIGRATE", "TRUE");  /* we omit object weights */
 
 	// Query functions
@@ -111,6 +111,10 @@ void DomainSignatureCollection::get_object_list(void *data, int sizeGID, int siz
 	for (auto &p : dsc->domains) {
 		globalID[i] = p.first;
 		localID[i]  = p.first;
+		int weight  = 0;
+		if (p.second.nbr_north != -1) weight += 1;
+		if (p.second.nbr_east != -1) weight += 1;
+        obj_wgts[i] = weight;
 		i++;
 	}
 	return;
