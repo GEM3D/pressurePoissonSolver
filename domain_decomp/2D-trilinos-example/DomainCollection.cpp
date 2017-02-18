@@ -339,6 +339,12 @@ void DomainCollection::generateMaps()
 					queue.push_back(d.nbr_south);
 					enqueued.insert(d.nbr_south);
 				}
+				for (int i = 0; i < 22; i++) {
+					iface_global.push_back(d.iface_i_south + i);
+				}
+				for (int i = 0; i < nx; i++) {
+					matrix_global.push_back(d.global_i_south + i);
+				}
 			} catch (const out_of_range &oor) {
 				// do nothing
 			}
@@ -362,6 +368,12 @@ void DomainCollection::generateMaps()
 				if (enqueued.count(d.nbr_west) == 0) {
 					queue.push_back(d.nbr_west);
 					enqueued.insert(d.nbr_west);
+				}
+                for (int i = 0; i < 22; i++) {
+					iface_global.push_back(d.iface_i_west + i);
+				}
+				for (int i = 0; i < ny; i++) {
+					matrix_global.push_back(d.global_i_west + i);
 				}
 			} catch (const out_of_range &oor) {
 				// do nothing
@@ -387,11 +399,11 @@ void DomainCollection::generateMaps()
 		matrix_map           = Teuchos::rcp(new map_type(1, 0, comm));
 		iface_map            = Teuchos::rcp(new map_type(1, 0, comm));
 	} else {
-		collection_map       = Teuchos::rcp(new map_type(-1, &global[0], curr_i, 0, this->comm));
+		collection_map       = Teuchos::rcp(new map_type(-1, &global[0], global.size(), 0, this->comm));
 		collection_iface_map
 		= Teuchos::rcp(new map_type(-1, &c_iface_global[0], c_iface_global.size(), 0, this->comm));
 		matrix_map
-		= Teuchos::rcp(new map_type(-1, &matrix_global[0], curr_matrix_i, 0, this->comm));
+		= Teuchos::rcp(new map_type(-1, &matrix_global[0], matrix_global.size(), 0, this->comm));
 		iface_map
 		= Teuchos::rcp(new map_type(-1, &iface_global[0], iface_global.size(), 0, this->comm));
 	}
