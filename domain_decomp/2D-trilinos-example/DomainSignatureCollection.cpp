@@ -33,6 +33,7 @@ void DomainSignatureCollection::zoltanBalance()
 
 	// parameters
 	zz->Set_Param("LB_METHOD", "GRAPH");   /* Zoltan method: "BLOCK" */
+	zz->Set_Param("LB_APPROACH", "PARTITION");   /* Zoltan method: "BLOCK" */
 	zz->Set_Param("NUM_GID_ENTRIES", "1"); /* global ID is 1 integer */
 	zz->Set_Param("NUM_LID_ENTRIES", "1"); /* local ID is 1 integer */
 	zz->Set_Param("OBJ_WEIGHT_DIM", "1");  /* we omit object weights */
@@ -81,12 +82,22 @@ void DomainSignatureCollection::zoltanBalance()
 	out->setShowProcRank(true);
 	*out << "I have " << domains.size() << " domains: ";
 
+    int prev=-100;
+    bool range = false;
 	for (auto &p : domains)
 	{
-		*out << p.second.id << " ";
+        int curr = p.second.id;
+		if (curr != prev + 1 && !range) {
+			*out << curr << "-";
+            range = true;
+		}else if(curr != prev + 1 && range){
+            *out << prev << " " << curr << "-";
+        }
+		prev = curr;
+        
 	}
 
-	*out << "\n";
+	*out <<prev<< "\n";
 }
 // query functions that respond to requests from Zoltan
 int DomainSignatureCollection::get_number_of_objects(void *data, int *ierr)
