@@ -1,5 +1,6 @@
 #include "DomainSignatureCollection.h"
 #include <iostream>
+#include <Teuchos_FancyOStream.hpp>
 using namespace std;
 DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y){
 	for (int domain_y = 0; domain_y < d_y; domain_y++) {
@@ -18,7 +19,7 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y){
 			if (domain_x != d_x - 1) {
 				ds.nbr_east = domain_y * d_x + domain_x - 1;
 			}
-			domains.push_back(ds);
+			domains[ds.id] = ds;
 		}
 	}
 }
@@ -31,10 +32,14 @@ void DomainSignatureCollection::zoltanBalance()
 	zz->Set_Param("NUM_GID_ENTRIES", "1"); /* global ID is 1 integer */
 	zz->Set_Param("NUM_LID_ENTRIES", "1"); /* local ID is 1 integer */
 	zz->Set_Param("OBJ_WEIGHT_DIM", "0");  /* we omit object weights */
+	zz->Set_Param("AUTO_MIGRATE", "TRUE");  /* we omit object weights */
 
 	// Query functions
 	zz->Set_Num_Obj_Fn(DomainSignatureCollection::get_number_of_objects, this);
 	zz->Set_Obj_List_Fn(DomainSignatureCollection::get_object_list, this);
+	zz->Set_Pack_Obj_Multi_Fn(DomainSignatureCollection::pack_objects, this);
+	zz->Set_Unpack_Obj_Multi_Fn(DomainSignatureCollection::unpack_objects, this);
+	zz->Set_Obj_Size_Multi_Fn(DomainSignatureCollection::object_sizes, this);
 
 	////////////////////////////////////////////////////////////////
 	// Zoltan can now partition the objects in this collection.
@@ -61,12 +66,21 @@ void DomainSignatureCollection::zoltanBalance()
 	                          importLocalIds, importProcs, importToPart, numExport, exportGlobalIds,
 	                          exportLocalIds, exportProcs, exportToPart);
 
-	cerr << "num imports " << numImport << "\n";
 	if (rc != ZOLTAN_OK) {
 		cerr << "zoltan error\n";
 		delete zz;
 		exit(0);
 	}
+	auto out = Teuchos::getFancyOStream(Teuchos::rcpFromRef(std::cout));
+	out->setShowProcRank(true);
+	*out << "I have " << domains.size() << " domains: ";
+
+	for (auto &p : domains)
+	{
+		*out << p.first << " ";
+	}
+
+	*out << "\n";
 }
 // query functions that respond to requests from Zoltan
 int DomainSignatureCollection::get_number_of_objects(void *data, int *ierr)
@@ -74,7 +88,6 @@ int DomainSignatureCollection::get_number_of_objects(void *data, int *ierr)
 	DomainSignatureCollection *dsc = (DomainSignatureCollection *) data;
 	*ierr                          = ZOLTAN_OK;
 
-    cerr << "I have " << dsc->domains.size() << " domains" << "\n";
 	return dsc->domains.size();
 }
 
@@ -89,19 +102,42 @@ void DomainSignatureCollection::get_object_list(void *data, int sizeGID, int siz
 	// Zoltan will assume equally weighted objects.
 
 	int i = 0;
-	for (DomainSignature &ds : dsc->domains) {
-		globalID[i] = ds.id;
-		localID[i]  = ds.id;
+	for (auto &p : dsc->domains) {
+		globalID[i] = p.first;
+		localID[i]  = p.first;
 		i++;
 	}
 	return;
 }
 
-/*static void object_sizes(void *data, int num_gid_entries, int num_lid_entries, int num_ids,
-                         ZOLTAN_ID_PTR global_ids, ZOLTAN_ID_PTR local_ids, int *sizes,
-                         int *ierr)
+void DomainSignatureCollection::object_sizes(void *data, int num_gid_entries, int num_lid_entries,
+                                             int num_ids, ZOLTAN_ID_PTR global_ids,
+                                             ZOLTAN_ID_PTR local_ids, int *sizes, int *ierr)
 {
-    DommainSigCollection *dsc = (DommainSigCollection *) data;
-    *ierr                      = ZOLTAN_OK;
-}*/
-
+	DomainSignatureCollection *dsc = (DomainSignatureCollection *) data;
+	*ierr                          = ZOLTAN_OK;
+	for (int i = 0; i < num_ids; i++) {
+		sizes[i] = sizeof(dsc->domains[global_ids[i]]);
+	}
+}
+void DomainSignatureCollection::pack_objects(void *data, int num_gid_entries, int num_lid_entries,
+                                             int num_ids, ZOLTAN_ID_PTR global_ids,
+                                             ZOLTAN_ID_PTR local_ids, int *dest, int *sizes,
+                                             int *idx, char *buf, int *ierr){
+	DomainSignatureCollection *dsc = (DomainSignatureCollection *) data;
+	*ierr                          = ZOLTAN_OK;
+	for (int i = 0; i < num_ids; i++) {
+		*((DomainSignature*) &buf[idx[i]]) = dsc->domains[global_ids[i]];
+		dsc->domains.erase(global_ids[i]);
+	}
+}
+void DomainSignatureCollection::unpack_objects(void *data, int num_gid_entries, int num_ids,
+                                               ZOLTAN_ID_PTR global_ids, int *sizes, int *idx,
+                                               char *buf, int *ierr)
+{
+	DomainSignatureCollection *dsc = (DomainSignatureCollection *) data;
+	*ierr                          = ZOLTAN_OK;
+	for (int i = 0; i < num_ids; i++) {
+		dsc->domains[global_ids[i]] = *((DomainSignature *) &buf[idx[i]]);
+	}
+}
