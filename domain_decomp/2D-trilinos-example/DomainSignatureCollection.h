@@ -10,6 +10,10 @@ class DomainSignature
 	int nbr_south = -1;
 	int nbr_east  = -1;
 	int nbr_west  = -1;
+	int proc_north = -1;
+	int proc_south = -1;
+	int proc_east  = -1;
+	int proc_west  = -1;
 	friend bool operator<(const DomainSignature &l, const DomainSignature &r)
 	{
 		return l.id < r.id;
@@ -47,5 +51,11 @@ class DomainSignatureCollection
 	static void unpack_objects(void *data, int num_gid_entries, int num_ids,
 	                           ZOLTAN_ID_PTR global_ids, int *sizes, int *idx, char *buf,
 	                           int *ierr);
+	static int numInterfaces(void *data, int num_gid_entries, int num_lid_entries,
+	                          ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id, int *ierr);
+	static void interfaceList(void *data, int num_gid_entries, int num_lid_entries,
+	                          ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id,
+	                          ZOLTAN_ID_PTR nbor_global_id, int *nbor_procs, int wgt_dim,
+	                          float *ewgts, int *ierr);
 };
 #endif
