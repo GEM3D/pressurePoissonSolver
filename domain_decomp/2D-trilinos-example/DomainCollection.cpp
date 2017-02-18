@@ -259,9 +259,10 @@ void DomainCollection::generateMaps()
 	set<int>   visited;
 	set<int>   enqueued;
 	deque<int> queue;
-	int        first = domains.begin()->first;
-	queue.push_back(first);
-	enqueued.insert(first);
+	set<int>   not_visited;
+	for (auto &p : domains) {
+		not_visited.insert(p.first);
+	}
 	vector<int> global;
 	int         curr_i = 0;
 	vector<int> c_iface_global;
@@ -270,124 +271,130 @@ void DomainCollection::generateMaps()
 	int         curr_matrix_i = 0;
 	vector<int> iface_global;
 	global.reserve(num_domains * (2 * nx + 2 * ny));
-	while (!queue.empty()) {
-		int     curr = queue.front();
-		Domain &d    = *domains[curr];
-		queue.pop_front();
-		visited.insert(curr);
-		if (d.nbr_north != -1 && visited.count(d.nbr_north) == 0) {
-			// a new edge that we have not assigned an index to
-			try {
-				Domain &nbr             = *domains.at(d.nbr_north);
-				nbr.local_i_south       = curr_i;
-				nbr.iface_local_i_south = curr_c_i;
-				if (enqueued.count(d.nbr_north) == 0) {
-					queue.push_back(d.nbr_north);
-					enqueued.insert(d.nbr_north);
+	while (!not_visited.empty()) {
+		int first = *not_visited.begin();
+		queue.push_back(first);
+		enqueued.insert(first);
+		while (!queue.empty()) {
+			int     curr = queue.front();
+			Domain &d    = *domains[curr];
+			queue.pop_front();
+			visited.insert(curr);
+            not_visited.erase(curr);
+			if (d.nbr_north != -1 && visited.count(d.nbr_north) == 0) {
+				// a new edge that we have not assigned an index to
+				try {
+					Domain &nbr             = *domains.at(d.nbr_north);
+					nbr.local_i_south       = curr_i;
+					nbr.iface_local_i_south = curr_c_i;
+					if (enqueued.count(d.nbr_north) == 0) {
+						queue.push_back(d.nbr_north);
+						enqueued.insert(d.nbr_north);
+					}
+				} catch (const out_of_range &oor) {
+					// do nothing
 				}
-			} catch (const out_of_range &oor) {
-				// do nothing
-			}
-			d.local_i_north       = curr_i;
-			d.iface_local_i_north = curr_c_i;
-			for (int i = 0; i < 22; i++) {
-				c_iface_global.push_back(d.iface_i_north + i);
-				iface_global.push_back(d.iface_i_north + i);
-				curr_c_i++;
-            }
-			for (int i = 0; i < nx; i++) {
-				global.push_back(d.global_i_north + i);
-				matrix_global.push_back(d.global_i_north + i);
-                curr_matrix_i++;
-			}
-			curr_i += nx;
-		}
-		if (d.nbr_east != -1 && visited.count(d.nbr_east) == 0) {
-			// a new edge that we have not assigned an index to
-			try {
-				Domain &nbr            = *domains.at(d.nbr_east);
-				nbr.local_i_west       = curr_i;
-				nbr.iface_local_i_west = curr_c_i;
-				if (enqueued.count(d.nbr_east) == 0) {
-					queue.push_back(d.nbr_east);
-					enqueued.insert(d.nbr_east);
-				}
-			} catch (const out_of_range &oor) {
-				// do nothing
-			}
-			d.local_i_east       = curr_i;
-			d.iface_local_i_east = curr_c_i;
-			for (int i = 0; i < 22; i++) {
-				c_iface_global.push_back(d.iface_i_east + i);
-				iface_global.push_back(d.iface_i_east + i);
-				curr_c_i++;
-            }
-			for (int i = 0; i < ny; i++) {
-				global.push_back(d.global_i_east + i);
-				matrix_global.push_back(d.global_i_east + i);
-                curr_matrix_i++;
-			}
-			curr_i += ny;
-		}
-		if (d.nbr_south != -1 && visited.count(d.nbr_south) == 0) {
-			// a new edge that we have not assigned an index to
-			try {
-				Domain &nbr             = *domains.at(d.nbr_south);
-				nbr.local_i_north       = curr_i;
-				nbr.iface_local_i_north = curr_c_i;
-				if (enqueued.count(d.nbr_south) == 0) {
-					queue.push_back(d.nbr_south);
-					enqueued.insert(d.nbr_south);
-				}
+				d.local_i_north       = curr_i;
+				d.iface_local_i_north = curr_c_i;
 				for (int i = 0; i < 22; i++) {
-					iface_global.push_back(d.iface_i_south + i);
+					c_iface_global.push_back(d.iface_i_north + i);
+					iface_global.push_back(d.iface_i_north + i);
+					curr_c_i++;
 				}
 				for (int i = 0; i < nx; i++) {
-					matrix_global.push_back(d.global_i_south + i);
+					global.push_back(d.global_i_north + i);
+					matrix_global.push_back(d.global_i_north + i);
+					curr_matrix_i++;
 				}
-			} catch (const out_of_range &oor) {
-				// do nothing
+				curr_i += nx;
 			}
-			d.local_i_south       = curr_i;
-			d.iface_local_i_south = curr_c_i;
-			for (int i = 0; i < 22; i++) {
-				c_iface_global.push_back(d.iface_i_south + i);
-				curr_c_i++;
-            }
-			for (int i = 0; i < nx; i++) {
-				global.push_back(d.global_i_south + i);
-			}
-			curr_i += nx;
-		}
-		if (d.nbr_west != -1 && visited.count(d.nbr_west) == 0) {
-			// a new edge that we have not assigned an index to
-			try {
-				Domain &nbr            = *domains.at(d.nbr_west);
-				nbr.local_i_east       = curr_i;
-				nbr.iface_local_i_east = curr_c_i;
-				if (enqueued.count(d.nbr_west) == 0) {
-					queue.push_back(d.nbr_west);
-					enqueued.insert(d.nbr_west);
+			if (d.nbr_east != -1 && visited.count(d.nbr_east) == 0) {
+				// a new edge that we have not assigned an index to
+				try {
+					Domain &nbr            = *domains.at(d.nbr_east);
+					nbr.local_i_west       = curr_i;
+					nbr.iface_local_i_west = curr_c_i;
+					if (enqueued.count(d.nbr_east) == 0) {
+						queue.push_back(d.nbr_east);
+						enqueued.insert(d.nbr_east);
+					}
+				} catch (const out_of_range &oor) {
+					// do nothing
 				}
-                for (int i = 0; i < 22; i++) {
-					iface_global.push_back(d.iface_i_west + i);
+				d.local_i_east       = curr_i;
+				d.iface_local_i_east = curr_c_i;
+				for (int i = 0; i < 22; i++) {
+					c_iface_global.push_back(d.iface_i_east + i);
+					iface_global.push_back(d.iface_i_east + i);
+					curr_c_i++;
 				}
 				for (int i = 0; i < ny; i++) {
-					matrix_global.push_back(d.global_i_west + i);
+					global.push_back(d.global_i_east + i);
+					matrix_global.push_back(d.global_i_east + i);
+					curr_matrix_i++;
 				}
-			} catch (const out_of_range &oor) {
-				// do nothing
+				curr_i += ny;
 			}
-			d.local_i_west       = curr_i;
-			d.iface_local_i_west = curr_c_i;
-			for (int i = 0; i < 22; i++) {
-				c_iface_global.push_back(d.iface_i_west + i);
-				curr_c_i++;
+			if (d.nbr_south != -1 && visited.count(d.nbr_south) == 0) {
+				// a new edge that we have not assigned an index to
+				try {
+					Domain &nbr             = *domains.at(d.nbr_south);
+					nbr.local_i_north       = curr_i;
+					nbr.iface_local_i_north = curr_c_i;
+					if (enqueued.count(d.nbr_south) == 0) {
+						queue.push_back(d.nbr_south);
+						enqueued.insert(d.nbr_south);
+					}
+					for (int i = 0; i < 22; i++) {
+						iface_global.push_back(d.iface_i_south + i);
+					}
+					for (int i = 0; i < nx; i++) {
+						matrix_global.push_back(d.global_i_south + i);
+					}
+				} catch (const out_of_range &oor) {
+					// do nothing
+				}
+				d.local_i_south       = curr_i;
+				d.iface_local_i_south = curr_c_i;
+				for (int i = 0; i < 22; i++) {
+					c_iface_global.push_back(d.iface_i_south + i);
+					curr_c_i++;
+				}
+				for (int i = 0; i < nx; i++) {
+					global.push_back(d.global_i_south + i);
+				}
+				curr_i += nx;
 			}
-			for (int i = 0; i < ny; i++) {
-				global.push_back(d.global_i_west + i);
+			if (d.nbr_west != -1 && visited.count(d.nbr_west) == 0) {
+				// a new edge that we have not assigned an index to
+				try {
+					Domain &nbr            = *domains.at(d.nbr_west);
+					nbr.local_i_east       = curr_i;
+					nbr.iface_local_i_east = curr_c_i;
+					if (enqueued.count(d.nbr_west) == 0) {
+						queue.push_back(d.nbr_west);
+						enqueued.insert(d.nbr_west);
+					}
+					for (int i = 0; i < 22; i++) {
+						iface_global.push_back(d.iface_i_west + i);
+					}
+					for (int i = 0; i < ny; i++) {
+						matrix_global.push_back(d.global_i_west + i);
+					}
+				} catch (const out_of_range &oor) {
+					// do nothing
+				}
+				d.local_i_west       = curr_i;
+				d.iface_local_i_west = curr_c_i;
+				for (int i = 0; i < 22; i++) {
+					c_iface_global.push_back(d.iface_i_west + i);
+					curr_c_i++;
+				}
+				for (int i = 0; i < ny; i++) {
+					global.push_back(d.global_i_west + i);
+				}
+				curr_i += ny;
 			}
-			curr_i += ny;
 		}
 	}
 	// Now that the global indices have been calculated, we can create a map for the interface
