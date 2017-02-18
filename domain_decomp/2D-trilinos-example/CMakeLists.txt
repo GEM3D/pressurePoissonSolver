@@ -32,6 +32,11 @@ IF(Tpetra_FOUND)
 ELSE()
     MESSAGE(FATAL_ERROR "Could not find Tpetra!\n Is TRILINOS_DIR set?")
 ENDIF()
+IF(Tpetra_FOUND)
+   MESSAGE("Found Zoltan!")
+ELSE()
+    MESSAGE(FATAL_ERROR "Could not find Zoltan!\n Is TRILINOS_DIR set?")
+ENDIF()
 
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
