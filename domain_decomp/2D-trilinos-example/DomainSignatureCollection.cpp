@@ -37,7 +37,7 @@ void DomainSignatureCollection::zoltanBalance()
 	Zoltan *zz = new Zoltan(MPI_COMM_WORLD);
 
 	// parameters
-	zz->Set_Param("LB_METHOD", "HSFC");   /* Zoltan method: "BLOCK" */
+	zz->Set_Param("LB_METHOD", "GRAPH");   /* Zoltan method: "BLOCK" */
 	zz->Set_Param("LB_APPROACH", "PARTITION");   /* Zoltan method: "BLOCK" */
 	zz->Set_Param("NUM_GID_ENTRIES", "1"); /* global ID is 1 integer */
 	zz->Set_Param("NUM_LID_ENTRIES", "1"); /* local ID is 1 integer */

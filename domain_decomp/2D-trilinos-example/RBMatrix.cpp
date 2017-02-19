@@ -16,20 +16,15 @@ RBMatrix::RBMatrix(Teuchos::RCP<map_type> map, int block_size, int num_blocks)
 void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode, double alpha,
                      double beta) const
 {
+    vector_type my_y(range, 1);
 	auto x_view = x.getLocalView<Kokkos::HostSpace>();
-    y.putScalar(beta);
-	auto y_view = y.getLocalView<Kokkos::HostSpace>();
+	y.putScalar(0);
+	my_y.putScalar(0);
+	auto y_view = my_y.getLocalView<Kokkos::HostSpace>();
 	// column loop
 	for (int index = 0; index < num_blocks; index++) {
 		int              start_j = index * block_size;
-		valarray<double> slot(block_size);
 		valarray<double> slot_rev(block_size);
-		for (int i = 0; i < block_size; i++) {
-			slot[i] = x_view(start_j + i, 0);
-		}
-		for (int i = 0; i < block_size; i++) {
-			slot_rev[i] = slot[block_size - 1 - i];
-		}
 		// go down the column
 		for (auto &p : block_cols[index]) {
 			int   start_i    = p.first;
@@ -40,34 +35,56 @@ void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 					block_i = block_size - 1 - iii;
 				}
 				valarray<double> &curr_blk  = *curr_block.block;
-				valarray<double>  blk_slice = curr_blk[slice(block_i * block_size, block_size, 1)];
 
 				int matrix_i = start_i + iii;
 				if (curr_block.flip_j) {
-					y_view(matrix_i, 0) += (slot_rev * blk_slice).sum();
+					for (int i = 0; i < block_size; i++) {
+						y_view(matrix_i, 0)
+						+= x_view(start_j + i,0) * curr_blk[block_i * block_size+block_size-1 - i];
+					}
 				} else {
-					y_view(matrix_i, 0) += (slot * blk_slice).sum();
+					for (int i = 0; i < block_size; i++) {
+						y_view(matrix_i, 0)
+						+= x_view(start_j + i,0) * curr_blk[block_i * block_size + i];
+					}
 				}
 			}
 
 		}
 	}
+	Tpetra::Export<> exporter(range, domain);
+	y.doExport(my_y, exporter, Tpetra::CombineMode::ADD);
 }
 void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_i, bool flip_j)
 {
+	int   local_j = domain->getLocalElement(j);
+	int   local_i = -1;
+	try{
+		local_i = range_map.at(i);
+	} catch (const out_of_range &oor) {
+		// do nothing
+		// cerr << i << " is mapped to " << curr_local_i << "\n";
+		local_i = curr_local_i;
+		for (int x = i; x <i+ block_size; x++) {
+			global_i.push_back(x);
+		}
+        curr_local_i+=block_size;
+		range_map[i] = local_i;
+	}
+
 	Block b(block, flip_i, flip_j);
 
-    int index = j/block_size;
-	if (block_cols[index].count(i) > 0) {
-		Block first_block = block_cols[index][i];
+    int index = local_j/block_size;
+	if (block_cols[index].count(local_i) > 0) {
+		Block first_block = block_cols[index][local_i];
 
 		pair<Block, Block> bpair(first_block, b);
 		pair<Block, Block> bpair_rev(b, first_block);
 
 		if (combos.count(bpair) > 0) {
-			block_cols[index][i] = combos[bpair];
+			block_cols[index][local_i] = combos[bpair];
 		} else if (combos.count(bpair_rev) > 0) {
-			block_cols[index][i] = combos[bpair_rev];
+			block_cols[index][local_i] = combos[bpair_rev];
 		} else {
 			RCP<valarray<double>> blk_ptr = rcp(new valarray<double>(first_block.block->size()));
 			Block                 new_block(blk_ptr, false, false);
@@ -101,13 +118,18 @@ void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_
 					new_blk[i * block_size + j] += second_blk[block_i * block_size + block_j];
 				}
 			}
-			block_cols[index][i] = new_block;
+			block_cols[index][local_i] = new_block;
 			combos[bpair]        = new_block;
 		}
 	} else {
         nz+=block->size();
-		block_cols[index][i] = b;
+		block_cols[index][local_i] = b;
 	}
+}
+
+void RBMatrix::createRangeMap()
+{
+	range = Teuchos::rcp(new map_type(-1, &global_i[0], global_i.size(), 0, domain->getComm()));
 }
 ostream& operator<<(ostream& os, const RBMatrix& A) {
     os << scientific;

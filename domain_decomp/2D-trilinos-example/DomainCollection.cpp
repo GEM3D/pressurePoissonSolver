@@ -1168,6 +1168,7 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map)
 	// cerr << "Num types: " << num_types << "\n";
 	// transpose matrix and return
 	//A->fillComplete();
+    A->createRangeMap();
 	return A;
 
 }

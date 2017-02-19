@@ -38,6 +38,9 @@ class RBMatrix : public Tpetra::Operator<>
     private:
 	Teuchos::RCP<map_type> domain;
 	Teuchos::RCP<map_type> range;
+    std::map<int,int> range_map;
+	int curr_local_i = 0;
+    std::vector<int> global_i;
 	std::vector<std::map<int, Block>> block_cols;
 
 	std::map<std::pair<Block, Block>, Block> combos;
@@ -54,6 +57,7 @@ class RBMatrix : public Tpetra::Operator<>
 	           double beta  = Teuchos::ScalarTraits<double>::zero()) const;
 	void insertBlock(int i, int j, Teuchos::RCP<std::valarray<double>> block, bool flip_i,
 	                 bool flip_j);
+	void                         createRangeMap();
 	Teuchos::RCP<const map_type> getDomainMap() const { return domain; }
 	Teuchos::RCP<const map_type> getRangeMap() const { return range; }
 	friend std::ostream &operator<<(std::ostream &os, const RBMatrix &A);
