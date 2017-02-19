@@ -27,9 +27,11 @@ class DomainSignatureCollection
 	int  numMyObjects=0;
 
 	public:
-    std::map<int,DomainSignature> domains;
+	int d_x;
+	int d_y;
+	std::map<int, DomainSignature> domains;
 	DomainSignatureCollection() {}
-	DomainSignatureCollection(int d_x, int d_y);
+	DomainSignatureCollection(int d_x, int d_y, int rank);
 	/*	void set_num_global_objects(int n) { numGlobalObjects = n; }
 	    int                             get_num_global_objects() { return numGlobalObjects; }
 	    void set_num_my_objects(int n) { numMyObjects = n; }
@@ -40,6 +42,8 @@ class DomainSignatureCollection
 	void zoltanBalance();
 	// query functions that respond to requests from Zoltan
 	static int get_number_of_objects(void *data, int *ierr);
+	static void coord(void *data, int num_gid_entries, int num_lid_entries, ZOLTAN_ID_PTR global_id,
+	                  ZOLTAN_ID_PTR local_id, double *geom_vec, int *ierr);
 	static void get_object_list(void *data, int sizeGID, int sizeLID, ZOLTAN_ID_PTR globalID,
 	                            ZOLTAN_ID_PTR localID, int wgt_dim, float *obj_wgts, int *ierr);
 	static void object_sizes(void *data, int num_gid_entries, int num_lid_entries, int num_ids,
@@ -57,5 +61,6 @@ class DomainSignatureCollection
 	                          ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id,
 	                          ZOLTAN_ID_PTR nbor_global_id, int *nbor_procs, int wgt_dim,
 	                          float *ewgts, int *ierr);
+	static int dimensions(void *data, int *ierr);
 };
 #endif

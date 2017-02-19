@@ -248,11 +248,9 @@ int main(int argc, char *argv[])
 	for (int loop = 0; loop < loop_count; loop++) {
 		comm->barrier();
 		// partition domains
-        DomainSignatureCollection dsc;
-		if (comm->getRank() == 0) {
-			dsc = DomainSignatureCollection(num_domains_x, num_domains_y);
-		}
-		dsc.zoltanBalance();
+		DomainSignatureCollection dsc
+		= DomainSignatureCollection(num_domains_x, num_domains_y, comm->getRank());
+        dsc.zoltanBalance();
 		steady_clock::time_point domain_start = steady_clock::now();
 
 		DomainCollection dc(dsc, nx, ny, num_domains_x, num_domains_y, h_x, h_y, comm);

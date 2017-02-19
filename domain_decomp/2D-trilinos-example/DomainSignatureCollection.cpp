@@ -2,28 +2,33 @@
 #include <iostream>
 #include <Teuchos_FancyOStream.hpp>
 using namespace std;
-DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y){
-	for (int domain_y = 0; domain_y < d_y; domain_y++) {
-		for (int domain_x = 0; domain_x < d_x; domain_x++) {
-			DomainSignature ds;
-			ds.id = domain_y * d_x + domain_x;
-			if (domain_y != d_y - 1) {
-				ds.nbr_north  = (domain_y + 1) * d_x + domain_x;
-				ds.proc_north = 0;
+DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank)
+{
+	this->d_x = d_x;
+	this->d_y = d_y;
+	if (rank == 0) {
+		for (int domain_y = 0; domain_y < d_y; domain_y++) {
+			for (int domain_x = 0; domain_x < d_x; domain_x++) {
+				DomainSignature ds;
+				ds.id = domain_y * d_x + domain_x;
+				if (domain_y != d_y - 1) {
+					ds.nbr_north  = (domain_y + 1) * d_x + domain_x;
+					ds.proc_north = 0;
+				}
+				if (domain_x != d_x - 1) {
+					ds.nbr_east  = domain_y * d_x + domain_x + 1;
+					ds.proc_east = 0;
+				}
+				if (domain_y != 0) {
+					ds.nbr_south  = (domain_y - 1) * d_x + domain_x;
+					ds.proc_south = 0;
+				}
+				if (domain_x != 0) {
+					ds.nbr_west  = domain_y * d_x + domain_x - 1;
+					ds.proc_west = 0;
+				}
+				domains[ds.id] = ds;
 			}
-			if (domain_x != d_x - 1) {
-				ds.nbr_east  = domain_y * d_x + domain_x + 1;
-				ds.proc_east = 0;
-			}
-			if (domain_y != 0) {
-				ds.nbr_south  = (domain_y - 1) * d_x + domain_x;
-				ds.proc_south = 0;
-			}
-			if (domain_x != 0) {
-				ds.nbr_west  = domain_y * d_x + domain_x - 1;
-				ds.proc_west = 0;
-			}
-			domains[ds.id] = ds;
 		}
 	}
 }
@@ -32,11 +37,11 @@ void DomainSignatureCollection::zoltanBalance()
 	Zoltan *zz = new Zoltan(MPI_COMM_WORLD);
 
 	// parameters
-	zz->Set_Param("LB_METHOD", "GRAPH");   /* Zoltan method: "BLOCK" */
+	zz->Set_Param("LB_METHOD", "HSFC");   /* Zoltan method: "BLOCK" */
 	zz->Set_Param("LB_APPROACH", "PARTITION");   /* Zoltan method: "BLOCK" */
 	zz->Set_Param("NUM_GID_ENTRIES", "1"); /* global ID is 1 integer */
 	zz->Set_Param("NUM_LID_ENTRIES", "1"); /* local ID is 1 integer */
-	zz->Set_Param("OBJ_WEIGHT_DIM", "1");  /* we omit object weights */
+	zz->Set_Param("OBJ_WEIGHT_DIM", "0");  /* we omit object weights */
 	zz->Set_Param("AUTO_MIGRATE", "TRUE");  /* we omit object weights */
 
 	// Query functions
@@ -47,6 +52,8 @@ void DomainSignatureCollection::zoltanBalance()
 	zz->Set_Obj_Size_Multi_Fn(DomainSignatureCollection::object_sizes, this);
 	zz->Set_Num_Edges_Fn(DomainSignatureCollection::numInterfaces, this);
 	zz->Set_Edge_List_Fn(DomainSignatureCollection::interfaceList, this);
+	zz->Set_Geom_Fn(DomainSignatureCollection::coord, this);
+	zz->Set_Num_Geom_Fn(DomainSignatureCollection::dimensions, this);
 
 	////////////////////////////////////////////////////////////////
 	// Zoltan can now partition the objects in this collection.
@@ -99,6 +106,22 @@ void DomainSignatureCollection::zoltanBalance()
 
 	*out <<prev<< "\n";
 }
+
+int DomainSignatureCollection::dimensions(void *data, int *ierr)
+{
+	*ierr = ZOLTAN_OK;
+	return 2;
+}
+void DomainSignatureCollection::coord(void *data, int num_gid_entries, int num_lid_entries,
+                                      ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id,
+                                      double *geom_vec, int *ierr){
+	DomainSignatureCollection *dsc = (DomainSignatureCollection *) data;
+	*ierr                          = ZOLTAN_OK;
+
+	auto &ds    = dsc->domains[*global_id];
+	geom_vec[0] = ds.id % dsc->d_y;
+	geom_vec[1] = ds.id % dsc->d_x;
+}
 // query functions that respond to requests from Zoltan
 int DomainSignatureCollection::get_number_of_objects(void *data, int *ierr)
 {
@@ -122,10 +145,12 @@ void DomainSignatureCollection::get_object_list(void *data, int sizeGID, int siz
 	for (auto &p : dsc->domains) {
 		globalID[i] = p.first;
 		localID[i]  = p.first;
-		int weight  = 0;
-		if (p.second.nbr_north != -1) weight += 1;
-		if (p.second.nbr_east != -1) weight += 1;
-        obj_wgts[i] = weight;
+		if (wgt_dim == 1) {
+			int weight = 0;
+			if (p.second.nbr_north != -1) weight += 1;
+			if (p.second.nbr_east != -1) weight += 1;
+			obj_wgts[i] = weight;
+		}
 		i++;
 	}
 	return;
