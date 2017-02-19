@@ -52,6 +52,6 @@ class DomainCollection
 	double                    residual();
 	Teuchos::RCP<matrix_type> formMatrix(Teuchos::RCP<map_type> map, int delete_row = -1);
 	Teuchos::RCP<matrix_type> formInvDiag(Teuchos::RCP<map_type> map);
-	Teuchos::RCP<RBMatrix> formRBMatrix(Teuchos::RCP<map_type> map);
+	Teuchos::RCP<RBMatrix> formRBMatrix(Teuchos::RCP<map_type> map, int delete_row = -1);
 };
 #endif

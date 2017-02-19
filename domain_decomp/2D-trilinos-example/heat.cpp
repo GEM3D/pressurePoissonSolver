@@ -286,6 +286,7 @@ int main(int argc, char *argv[])
 		// Create the gamma and diff vectors
 		RCP<vector_type> gamma = rcp(new vector_type(matrix_map, 1));
 		RCP<vector_type> diff  = rcp(new vector_type(matrix_map, 1));
+		RCP<RBMatrix> RBA;
 
 		if (num_domains_x * num_domains_y != 1) {
 			// do iterative solve
@@ -308,7 +309,7 @@ int main(int argc, char *argv[])
 				comm->barrier();
 				steady_clock::time_point form_start = steady_clock::now();
 
-				RCP<RBMatrix> A = dc.formRBMatrix(matrix_map);
+				RBA = dc.formRBMatrix(matrix_map,del);
 
 				comm->barrier();
 				duration<double> form_time = steady_clock::now() - form_start;
@@ -321,7 +322,7 @@ int main(int argc, char *argv[])
 					steady_clock::time_point write_start = steady_clock::now();
 
 					ofstream out_file(save_matrix_file);
-					out_file << *A;
+					out_file << *RBA;
 					out_file.close();
 
 					comm->barrier();
@@ -329,7 +330,7 @@ int main(int argc, char *argv[])
 					if (my_global_rank == 0)
 						cout << "Time to write matix to file: " << write_time.count() << "\n";
 				}
-				op = A;
+				op = RBA;
 			} else {
 				// Form the matrix
 				comm->barrier();
@@ -363,31 +364,46 @@ int main(int argc, char *argv[])
 			Belos::LinearProblem<double, vector_type, Tpetra::Operator<>> problem(op, gamma, b);
 
 			if (f_prec) {
-				// form preconditioner
-				comm->barrier();
-				steady_clock::time_point prec_start = steady_clock::now();
-
-				RCP<matrix_type> P = dc.formInvDiag(matrix_map);
-				problem.setRightPrec(P);
-
-				comm->barrier();
-				duration<double> prec_time = steady_clock::now() - prec_start;
-
-				if (my_global_rank == 0)
-					cout << "Preconditioner Formation Time: " << prec_time.count() << "\n";
-
-				if (save_prec_file != "") {
+				if (f_rbmatrix) {
 					comm->barrier();
-					steady_clock::time_point write_start = steady_clock::now();
+					steady_clock::time_point prec_start = steady_clock::now();
 
-					Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_prec_file, P,
-					                                                           "", "");
+					RCP<RBMatrix> P = RBA->invBlockDiag();
+					problem.setRightPrec(P);
 
 					comm->barrier();
-					duration<double> write_time = steady_clock::now() - write_start;
+					duration<double> prec_time = steady_clock::now() - prec_start;
+
 					if (my_global_rank == 0)
-						cout << "Time to write preconditioner to file: " << write_time.count()
-						     << "\n";
+						cout << "Preconditioner Formation Time: " << prec_time.count() << "\n";
+
+				} else {
+					// form preconditioner
+					comm->barrier();
+					steady_clock::time_point prec_start = steady_clock::now();
+
+					RCP<matrix_type> P = dc.formInvDiag(matrix_map);
+					problem.setRightPrec(P);
+
+					comm->barrier();
+					duration<double> prec_time = steady_clock::now() - prec_start;
+
+					if (my_global_rank == 0)
+						cout << "Preconditioner Formation Time: " << prec_time.count() << "\n";
+
+					if (save_prec_file != "") {
+						comm->barrier();
+						steady_clock::time_point write_start = steady_clock::now();
+
+						Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_prec_file,
+						                                                           P, "", "");
+
+						comm->barrier();
+						duration<double> write_time = steady_clock::now() - write_start;
+						if (my_global_rank == 0)
+							cout << "Time to write preconditioner to file: " << write_time.count()
+							     << "\n";
+					}
 				}
 			}
 

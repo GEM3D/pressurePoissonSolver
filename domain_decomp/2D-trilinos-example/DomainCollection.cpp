@@ -1014,10 +1014,8 @@ RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map)
 	A->fillComplete();
 	return A;
 }
-RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map)
+RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 {
-	int              size = max(nx, ny);
-	RCP<RBMatrix>    A    = rcp(new RBMatrix(map, size, (d_x - 1) * d_y + d_x * (d_y - 1)));
 	// create iface objects
 	set<Iface> ifaces;
 	auto       iface_view = iface_info->getLocalView<Kokkos::HostSpace>();
@@ -1059,6 +1057,8 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map)
 		ifaces.insert(right);
 	}
 
+	int              size = max(nx, ny);
+	RCP<RBMatrix>    A         = rcp(new RBMatrix(map, size, ifaces.size()));
 	int num_types = 0;
 	while (!ifaces.empty()) {
 		num_types++;
@@ -1168,7 +1168,8 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map)
 	// cerr << "Num types: " << num_types << "\n";
 	// transpose matrix and return
 	//A->fillComplete();
-    A->createRangeMap();
+	A->skip_index = delete_row;
+	A->createRangeMap();
 	return A;
 
 }

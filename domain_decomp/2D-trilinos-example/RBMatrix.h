@@ -39,8 +39,10 @@ class RBMatrix : public Tpetra::Operator<>
 	Teuchos::RCP<map_type> domain;
 	Teuchos::RCP<map_type> range;
     std::map<int,int> range_map;
-	int curr_local_i = 0;
-    std::vector<int> global_i;
+	int              curr_local_i = 0;
+	int              local_skip_j = -1;
+	int              local_skip_i = -1;
+	std::vector<int> global_i;
 	std::vector<std::map<int, Block>> block_cols;
 
 	std::map<std::pair<Block, Block>, Block> combos;
@@ -50,6 +52,7 @@ class RBMatrix : public Tpetra::Operator<>
     int nz = 0;
 
 	public:
+	int              skip_index   = -1;
 	RBMatrix(Teuchos::RCP<map_type> map, int block_size, int num_blocks);
 
 	void apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode = Teuchos::NO_TRANS,
@@ -60,6 +63,7 @@ class RBMatrix : public Tpetra::Operator<>
 	void                         createRangeMap();
 	Teuchos::RCP<const map_type> getDomainMap() const { return domain; }
 	Teuchos::RCP<const map_type> getRangeMap() const { return range; }
+    Teuchos::RCP<RBMatrix> invBlockDiag();
 	friend std::ostream &operator<<(std::ostream &os, const RBMatrix &A);
 };
 #endif

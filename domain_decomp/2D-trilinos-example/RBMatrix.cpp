@@ -1,5 +1,12 @@
 #include "RBMatrix.h"
 
+extern "C" {
+// LU decomoposition of a general matrix
+void dgetrf_(int *M, int *N, double *A, int *lda, int *IPIV, int *INFO);
+
+// generate inverse of a matrix given its LU decomposition
+void dgetri_(int *N, double *A, int *lda, int *IPIV, double *WORK, int *lwork, int *INFO);
+}
 using namespace std;
 using Teuchos::RCP;
 using Teuchos::rcp;
@@ -30,22 +37,27 @@ void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 			int   start_i    = p.first;
 			Block curr_block = p.second;
 			for (int iii = 0; iii < block_size; iii++) {
-				int block_i = iii;
-				if (curr_block.flip_i) {
-					block_i = block_size - 1 - iii;
-				}
-				valarray<double> &curr_blk  = *curr_block.block;
-
 				int matrix_i = start_i + iii;
-				if (curr_block.flip_j) {
-					for (int i = 0; i < block_size; i++) {
-						y_view(matrix_i, 0)
-						+= x_view(start_j + i,0) * curr_blk[block_i * block_size+block_size-1 - i];
-					}
+				if (matrix_i == local_skip_i&&local_skip_j>-1) {
+					y_view(matrix_i, 0) += x_view(local_skip_j, 0);
 				} else {
-					for (int i = 0; i < block_size; i++) {
-						y_view(matrix_i, 0)
-						+= x_view(start_j + i,0) * curr_blk[block_i * block_size + i];
+					int block_i = iii;
+					if (curr_block.flip_i) {
+						block_i = block_size - 1 - iii;
+					}
+					valarray<double> &curr_blk = *curr_block.block;
+
+					if (curr_block.flip_j) {
+						for (int i = 0; i < block_size; i++) {
+							y_view(matrix_i, 0)
+							+= x_view(start_j + i, 0)
+							   * curr_blk[block_i * block_size + block_size - 1 - i];
+						}
+					} else {
+						for (int i = 0; i < block_size; i++) {
+							y_view(matrix_i, 0)
+							+= x_view(start_j + i, 0) * curr_blk[block_i * block_size + i];
+						}
 					}
 				}
 			}
@@ -130,6 +142,49 @@ void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_
 void RBMatrix::createRangeMap()
 {
 	range = Teuchos::rcp(new map_type(-1, &global_i[0], global_i.size(), 0, domain->getComm()));
+	if (skip_index != -1) {
+		local_skip_i = range->getLocalElement(skip_index);
+		local_skip_j = domain->getLocalElement(skip_index);
+	}
+}
+RCP<RBMatrix> RBMatrix::invBlockDiag(){
+	RCP<RBMatrix>    Inv    = rcp(new RBMatrix(domain, block_size, num_blocks));
+	map<double *, RCP<valarray<double>>> computed;
+	for (int index = 0; index < num_blocks; index++) {
+		int              start_j  = index * block_size;
+		int              global_j = domain->getGlobalElement(start_j);
+		// go down the column
+		for (auto &p : block_cols[index]) {
+			int   start_i    = p.first;
+			int   global_i   = range->getGlobalElement(start_i);
+			if (global_j == global_i) {
+				RCP<valarray<double>> blk_inv_ptr;
+				Block                 curr_block = p.second;
+				try {
+					blk_inv_ptr = computed.at(&(*curr_block.block)[0]);
+				} catch (const out_of_range &oor) {
+					// invert this block
+					blk_inv_ptr               = rcp(new valarray<double>(*curr_block.block));
+					valarray<double> &blk_inv = *blk_inv_ptr;
+
+					// compute inverse of block
+					valarray<int>    ipiv(block_size + 1);
+					int              lwork = block_size * block_size;
+					valarray<double> work(lwork);
+					int              info;
+					dgetrf_(&block_size, &block_size, &blk_inv[0], &block_size, &ipiv[0], &info);
+					dgetri_(&block_size, &blk_inv[0], &block_size, &ipiv[0], &work[0], &lwork,
+					        &info);
+
+					// insert the block
+					computed[&(*curr_block.block)[0]] = blk_inv_ptr;
+				}
+				Inv->insertBlock(global_i, global_j, blk_inv_ptr, false, false);
+			}
+		}
+	}
+	Inv->createRangeMap();
+	return Inv;
 }
 ostream& operator<<(ostream& os, const RBMatrix& A) {
     os << scientific;
