@@ -85,7 +85,7 @@ void DomainSignatureCollection::zoltanBalance()
 		delete zz;
 		exit(0);
 	}
-	auto out = Teuchos::getFancyOStream(Teuchos::rcpFromRef(std::cout));
+	auto out = Teuchos::getFancyOStream(Teuchos::rcpFromRef(std::cerr));
 	out->setShowProcRank(true);
 	*out << "I have " << domains.size() << " domains: ";
 
