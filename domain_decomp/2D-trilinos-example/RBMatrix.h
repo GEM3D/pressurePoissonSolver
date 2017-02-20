@@ -36,9 +36,10 @@ class Block{
 class RBMatrix : public Tpetra::Operator<>
 {
     private:
-	Teuchos::RCP<map_type> domain;
-	Teuchos::RCP<map_type> range;
-    std::map<int,int> range_map;
+	Teuchos::RCP<map_type>         domain;
+	Teuchos::RCP<map_type>         range;
+	Teuchos::RCP<Tpetra::Export<>> exporter;
+	std::map<int, int> range_map;
 	int              curr_local_i = 0;
 	int              local_skip_j = -1;
 	int              local_skip_i = -1;

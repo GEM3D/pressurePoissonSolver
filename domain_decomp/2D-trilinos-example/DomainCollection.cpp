@@ -1057,9 +1057,9 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 		ifaces.insert(right);
 	}
 
-	int              size = max(nx, ny);
-	RCP<RBMatrix>    A         = rcp(new RBMatrix(map, size, ifaces.size()));
-	int num_types = 0;
+	int           size      = max(nx, ny);
+	RCP<RBMatrix> A         = rcp(new RBMatrix(map, size, ifaces.size() / 2));
+	int           num_types = 0;
 	while (!ifaces.empty()) {
 		num_types++;
 		// the first in the set is the type of interface that we are going to solve for

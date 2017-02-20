@@ -19,6 +19,14 @@ RBMatrix::RBMatrix(Teuchos::RCP<map_type> map, int block_size, int num_blocks)
 	this->block_size = block_size;
 
 	block_cols = vector<std::map<int, Block>>(num_blocks);
+	for (int x = 0; x < num_blocks; x++) {
+		int i = domain->getGlobalElement(curr_local_i);
+		range_map[i] = curr_local_i;
+		for (int x = i; x < i + block_size; x++) {
+			global_i.push_back(x);
+		}
+		curr_local_i += block_size;
+	}
 }
 void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode, double alpha,
                      double beta) const
@@ -38,7 +46,7 @@ void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 			Block curr_block = p.second;
 			for (int iii = 0; iii < block_size; iii++) {
 				int matrix_i = start_i + iii;
-				if (matrix_i == local_skip_i&&local_skip_j>-1) {
+				if (matrix_i == local_skip_i && local_skip_i != -1 && local_skip_j != -1) {
 					y_view(matrix_i, 0) += x_view(local_skip_j, 0);
 				} else {
 					int block_i = iii;
@@ -61,11 +69,9 @@ void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 					}
 				}
 			}
-
 		}
 	}
-	Tpetra::Export<> exporter(range, domain);
-	y.doExport(my_y, exporter, Tpetra::CombineMode::ADD);
+	y.doExport(my_y, *exporter, Tpetra::CombineMode::ADD);
 }
 void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_i, bool flip_j)
 {
@@ -146,6 +152,7 @@ void RBMatrix::createRangeMap()
 		local_skip_i = range->getLocalElement(skip_index);
 		local_skip_j = domain->getLocalElement(skip_index);
 	}
+	exporter = rcp(new Tpetra::Export<>(range, domain));
 }
 RCP<RBMatrix> RBMatrix::invBlockDiag(){
 	RCP<RBMatrix>    Inv    = rcp(new RBMatrix(domain, block_size, num_blocks));
@@ -160,12 +167,18 @@ RCP<RBMatrix> RBMatrix::invBlockDiag(){
 			if (global_j == global_i) {
 				RCP<valarray<double>> blk_inv_ptr;
 				Block                 curr_block = p.second;
-				try {
-					blk_inv_ptr = computed.at(&(*curr_block.block)[0]);
-				} catch (const out_of_range &oor) {
-					// invert this block
+				if (local_skip_i != -1 && local_skip_i <= start_i
+				    && start_i < local_skip_i + block_size) {
+					// modify the row of this block and invert
 					blk_inv_ptr               = rcp(new valarray<double>(*curr_block.block));
 					valarray<double> &blk_inv = *blk_inv_ptr;
+
+					// modify the row
+					int block_i = local_skip_i % block_size;
+					for (int j = 0; j < block_size; j++) {
+						blk_inv[block_i * block_size + j] = 0;
+					}
+					blk_inv[block_i * block_size + block_i] = 1;
 
 					// compute inverse of block
 					valarray<int>    ipiv(block_size + 1);
@@ -175,9 +188,27 @@ RCP<RBMatrix> RBMatrix::invBlockDiag(){
 					dgetrf_(&block_size, &block_size, &blk_inv[0], &block_size, &ipiv[0], &info);
 					dgetri_(&block_size, &blk_inv[0], &block_size, &ipiv[0], &work[0], &lwork,
 					        &info);
+				} else {
+					try {
+						blk_inv_ptr = computed.at(&(*curr_block.block)[0]);
+					} catch (const out_of_range &oor) {
+						// invert this block
+						blk_inv_ptr               = rcp(new valarray<double>(*curr_block.block));
+						valarray<double> &blk_inv = *blk_inv_ptr;
 
-					// insert the block
-					computed[&(*curr_block.block)[0]] = blk_inv_ptr;
+						// compute inverse of block
+						valarray<int>    ipiv(block_size + 1);
+						int              lwork = block_size * block_size;
+						valarray<double> work(lwork);
+						int              info;
+						dgetrf_(&block_size, &block_size, &blk_inv[0], &block_size, &ipiv[0],
+						        &info);
+						dgetri_(&block_size, &blk_inv[0], &block_size, &ipiv[0], &work[0], &lwork,
+						        &info);
+
+						// insert the block
+						computed[&(*curr_block.block)[0]] = blk_inv_ptr;
+					}
 				}
 				Inv->insertBlock(global_i, global_j, blk_inv_ptr, false, false);
 			}
