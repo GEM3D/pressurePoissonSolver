@@ -382,7 +382,7 @@ int main(int argc, char *argv[])
 					comm->barrier();
 					steady_clock::time_point prec_start = steady_clock::now();
 
-					RCP<matrix_type> P = dc.formInvDiag(matrix_map);
+					RCP<matrix_type> P = dc.formInvDiag(matrix_map,del);
 					problem.setRightPrec(P);
 
 					comm->barrier();

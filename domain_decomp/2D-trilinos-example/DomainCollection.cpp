@@ -839,7 +839,7 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map, int delete_row)
 	A->fillComplete();
 	return A;
 }
-RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map)
+RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map, int del_row)
 {
 	int              size = max(nx, ny);
 	RCP<matrix_type> A    = rcp(new matrix_type(map, size * 6));
@@ -896,15 +896,19 @@ RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map)
 		Iface curr_type_right = curr_pair.second;
 		// todo.insert(curr_type_left);
 		todo.insert(curr_type_right);
-        set<pair<Iface,Iface>> to_be_deleted;
-		for (auto iter = ifaces.begin(); iter != ifaces.end(); iter++) {
-			if (*iter == curr_pair) {
-				todo.insert(iter->second);
-				to_be_deleted.insert(*iter);
+		bool contains_del_row = (del_row != -1 && curr_type_right.i_south <= del_row
+		                         && del_row < curr_type_right.i_south + curr_type_right.l_south);
+		if (!contains_del_row) {
+			set<pair<Iface, Iface>> to_be_deleted;
+			for (auto iter = ifaces.begin(); iter != ifaces.end(); iter++) {
+				if (*iter == curr_pair) {
+					todo.insert(iter->second);
+					to_be_deleted.insert(*iter);
+				}
 			}
-		}
-		for (auto i : to_be_deleted) {
-			ifaces.erase(i);
+			for (auto i : to_be_deleted) {
+				ifaces.erase(i);
+			}
 		}
 
 		// create domain representing curr_type_left
@@ -983,6 +987,13 @@ RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map)
 		}
 
 		//south_block *= 2;
+		int internal_i = del_row % nx;
+		if(contains_del_row){
+            for(int x = 0;x<nx;x++){
+				south_block[internal_i * nx + x] =0;
+			}
+			south_block[internal_i * nx + internal_i] = -1;
+		}
 
         //compute inverse of block
         valarray<int> ipiv(nx+1);
