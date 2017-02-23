@@ -68,6 +68,8 @@ int main(int argc, char *argv[])
 	                                "the file to write the residual to", {"residual"});
 	args::ValueFlag<string> f_r(parser, "rhs filename", "the file to write the rhs vector to",
 	                            {'r'});
+	args::ValueFlag<string> f_g(parser, "gamma filename", "the file to write the gamma vector to",
+	                            {'g'});
 	args::ValueFlag<string> f_p(parser, "preconditioner filename",
 	                            "the file to write the preconditioner to", {'p'});
 	args::ValueFlag<double> f_t(
@@ -154,6 +156,10 @@ int main(int argc, char *argv[])
 	string save_rhs_file = "";
 	if (f_r) {
 		save_rhs_file = args::get(f_r);
+	}
+	string save_gamma_file = "";
+	if (f_g) {
+		save_gamma_file = args::get(f_g);
 	}
 
 	string save_prec_file = "";
@@ -250,7 +256,9 @@ int main(int argc, char *argv[])
 		// partition domains
 		DomainSignatureCollection dsc
 		= DomainSignatureCollection(num_domains_x, num_domains_y, comm->getRank());
-        dsc.zoltanBalance();
+		if (num_procs > 1) {
+			dsc.zoltanBalance();
+		}
 		steady_clock::time_point domain_start = steady_clock::now();
 
 		DomainCollection dc(dsc, nx, ny, num_domains_x, num_domains_y, h_x, h_y, comm);
@@ -507,6 +515,10 @@ int main(int argc, char *argv[])
 			ofstream out_file(save_residual_file);
 			dc.outputResidual(out_file);
 			out_file.close();
+		}
+		if (save_gamma_file != "") {
+			Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_gamma_file, gamma, "",
+			                                                          "");
 		}
 	}
 
