@@ -66,6 +66,8 @@ int main(int argc, char *argv[])
 	                            {'s'});
 	args::ValueFlag<string> f_resid(parser, "residual filename",
 	                                "the file to write the residual to", {"residual"});
+	args::ValueFlag<string> f_error(parser, "error filename",
+	                                "the file to write the error to", {"error"});
 	args::ValueFlag<string> f_r(parser, "rhs filename", "the file to write the rhs vector to",
 	                            {'r'});
 	args::ValueFlag<string> f_g(parser, "gamma filename", "the file to write the gamma vector to",
@@ -152,6 +154,10 @@ int main(int argc, char *argv[])
 	string save_residual_file = "";
 	if (f_resid) {
 		save_residual_file = args::get(f_resid);
+	}
+	string save_error_file = "";
+	if (f_error) {
+		save_error_file = args::get(f_error);
 	}
 	string save_rhs_file = "";
 	if (f_r) {
@@ -514,6 +520,11 @@ int main(int argc, char *argv[])
 		if (save_residual_file != "") {
 			ofstream out_file(save_residual_file);
 			dc.outputResidual(out_file);
+			out_file.close();
+		}
+		if (save_error_file != "") {
+			ofstream out_file(save_error_file);
+			dc.outputError(out_file);
 			out_file.close();
 		}
 		if (save_gamma_file != "") {

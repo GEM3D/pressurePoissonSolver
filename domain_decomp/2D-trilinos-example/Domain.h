@@ -16,6 +16,7 @@ class Domain
 	std::valarray<double>  exact;
 	std::valarray<double>  tmp;
 	std::valarray<double>  denom;
+	std::valarray<double>  error;
 	int                    nx;
 	int                    ny;
 	double                 h_x;

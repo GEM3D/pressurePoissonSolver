@@ -371,9 +371,14 @@ void Domain::solveWithInterface(const vector_type &gamma, vector_type &diff)
 		}
 	}
 }
-double Domain::diffNorm() { return std::sqrt(std::pow(exact - u, 2).sum()); }
+double Domain::diffNorm()
+{
+	error = exact - u;
+	return std::sqrt(std::pow(exact - u, 2).sum());
+}
 double Domain::diffNorm(double uavg, double eavg)
 {
+	error = exact - u - eavg + uavg;
 	return std::sqrt(std::pow(exact - u - eavg + uavg, 2).sum());
 }
 double Domain::uSum() { return u.sum(); }

@@ -1221,3 +1221,21 @@ void DomainCollection::outputResidual(std::ostream &os)
 		}
 	}
 }
+void DomainCollection::outputError(std::ostream &os)
+{
+	int num_i = ny * d_y;
+	int num_j = nx * d_x;
+	os << "%%MatrixMarket matrix array real general\n";
+	os << num_i << ' ' << num_j << '\n';
+	os.precision(15);
+	for (int j = 0; j < num_j; j++) {
+		int domain_j   = j / nx;
+		int internal_j = j % nx;
+		for (int i = 0; i < num_i; i++) {
+			int domain_i   = i / ny;
+			int internal_i = i % ny;
+			int id         = domain_i * d_x + domain_j;
+			os << domains[id]->error[internal_i * nx + internal_j] << '\n';
+		}
+	}
+}
