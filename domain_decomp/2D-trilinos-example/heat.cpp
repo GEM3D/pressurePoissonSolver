@@ -175,88 +175,35 @@ int main(int argc, char *argv[])
 
     
 	// the functions that we are using
-	vector<double> xval
-	= {0.07768174089481361, 0.4208838472612919,  0.9473139111796449,  0.5089692183323905,
-	   0.9570464247595821,  0.15905126169737582, 0.11849894156700524, 0.40999270280625555,
-	   0.255893751363913,   0.4596839214805539,  0.48802004339584437, 0.13220719550284032,
-	   0.15010376352950006, 0.6220357288995026,  0.5745530849579297,  0.19647252248155644,
-	   0.22117387776294362, 0.20684448971820446, 0.24214199341522935, 0.7996623718773789};
-
-	vector<double> yval
-	= {0.2626206022801887,  0.5901019591033256, 0.22507728085248468, 0.6589237056448219,
-	   0.16792176055765118, 0.7467770932376991, 0.586093747878745,   0.20084730007838192,
-	   0.2305544870010452,  0.6032035084811954, 0.7616342948448442,  0.07395053135567398,
-	   0.3145108689728848,  0.7994789501256063, 0.31702627032281594, 0.9410740272588111,
-	   0.4335486185679469,  0.8896958913102787, 0.8237038487836723,  0.5312785837478274};
-
-	vector<double> alpha = {
-	57.12450253383478, 99.4615147296493,  55.26433103539979, 92.3500405527951,  87.67509863441407,
-	76.12508998928006, 73.05691678209054, 84.58106997693446, 77.51740813583851, 89.11178685086824,
-	79.61010770157222, 77.8956019831367,  76.6795489632914,  71.36011508633008, 99.5339946457969,
-	59.75741874591391, 77.37272321552643, 91.75611892120241, 85.7168895671343,  68.55489734818805};
-
 	function<double(double, double)> ffun;
 	function<double(double, double)> gfun;
 	function<double(double, double)> nfunx;
 	function<double(double, double)> nfuny;
 
 	if (f_gauss) {
-		ffun = [xval, yval, alpha](double x, double y) {
-			double retval = 0;
-			for (int i = 0; i < 20; i++) {
-				double xv = xval[i];
-				double yv = yval[i];
-				double a  = alpha[i];
-				double r2 = (xv - x) * (xv - x) + (yv - y) * (yv - y);
-				retval += 4 * a * (a * r2 - 1) * exp(-a * r2);
-			}
-			return retval;
+		gfun = [](double x, double y) { return exp(cos(10 * M_PI * x)) - exp(cos(11 * M_PI * y)); };
+		ffun = [](double x, double y) {
+			return 100 * M_PI * M_PI * (pow(sin(10 * M_PI * x), 2) - cos(10 * M_PI * x))
+			       * exp(cos(10 * M_PI * x))
+			       + 121 * M_PI * M_PI * (cos(11 * M_PI * y) - pow(sin(11 * M_PI * y), 2))
+			         * exp(cos(11 * M_PI * y));
+		};
+		nfunx = [](double x, double y) {
+			return -10 * M_PI * sin(10 * M_PI * x) * exp(cos(10 * M_PI * x));
 		};
 
-		gfun = [xval, yval, alpha](double x, double y) {
-			double retval = 0;
-			for (int i = 0; i < 20; i++) {
-				double xv = xval[i];
-				double yv = yval[i];
-				double a  = alpha[i];
-				double r2 = (xv - x) * (xv - x) + (yv - y) * (yv - y);
-				retval += exp(-a * r2);
-			}
-			return retval;
-		};
-
-		nfunx = [xval, yval, alpha](double x, double y) {
-			double retval = 0;
-			for (int i = 0; i < 20; i++) {
-				double xv = xval[i];
-				double yv = yval[i];
-				double a  = alpha[i];
-				double r2 = (xv - x) * (xv - x) + (yv - y) * (yv - y);
-				retval += 2 * a * (xv - x) * exp(-a * r2);
-			}
-			return retval;
-		};
-
-		nfuny = [xval, yval, alpha](double x, double y) {
-			double retval = 0;
-			for (int i = 0; i < 20; i++) {
-				double xv = xval[i];
-				double yv = yval[i];
-				double a  = alpha[i];
-				double r2 = (xv - x) * (xv - x) + (yv - y) * (yv - y);
-				retval += 2 * a * (yv - y) * exp(-a * r2);
-			}
-			return retval;
+		nfuny = [](double x, double y) {
+			return 11 * M_PI * sin(11 * M_PI * y) * exp(cos(11 * M_PI * y));
 		};
 	} else {
 		ffun
 		= [](double x, double y) { return -5 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y); };
-		gfun = [](double x, double y) { return sin(M_PI * x) * cos(2 * M_PI * y); };
+		gfun  = [](double x, double y) { return sin(M_PI * x) * cos(2 * M_PI * y); };
 		nfunx = [](double x, double y) { return M_PI * cos(M_PI * x) * cos(2 * M_PI * y); };
 		nfuny = [](double x, double y) { return -2 * M_PI * sin(M_PI * x) * sin(2 * M_PI * y); };
 	}
 
-    valarray<double> times(loop_count);
+	valarray<double> times(loop_count);
 	for (int loop = 0; loop < loop_count; loop++) {
 		comm->barrier();
 		// partition domains
