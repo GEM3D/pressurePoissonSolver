@@ -3,6 +3,8 @@
 extern "C" {
 // LU decomoposition of a general matrix
 void dgetrf_(int *M, int *N, double *A, int *lda, int *IPIV, int *INFO);
+void dgetrs_(char *TRANS, int *N, int *NRHS, double *A, int *lda, int *IPIV, double *B, int *LDB,
+             int *INFO);
 
 // generate inverse of a matrix given its LU decomposition
 void dgetri_(int *N, double *A, int *lda, int *IPIV, double *WORK, int *lwork, int *INFO);
@@ -233,25 +235,24 @@ void RBMatrix::DGETRF(blk_ptr A, blk_ptr L, blk_ptr U, piv_ptr P)
 	U = rcp(new valarray<double>(*L));
 	for (int i = 0; i < block_size; i++) {
 		for (int j = i; j < block_size; j++) {
-            (*L)[i*block_size+j] = 0;
+            (*L)[i+block_size*j] = 0;
 		}
-		(*L)[i * block_size + i] = 1;
+		(*L)[i + block_size * i] = 1;
 	}
 	for (int i = 0; i < block_size; i++) {
 		for (int j = 0; j < i; j++) {
-            (*U)[i*block_size+j] = 0;
+            (*U)[i+block_size*j] = 0;
 		}
 	}
 }
 
 void RBMatrix::DGESSM(blk_ptr A, blk_ptr L, piv_ptr P, blk_ptr U){
-	U         = rcp(new valarray<double>(block_size*block_size));
-    // P*A
-	for (int i = 0; i < block_size; i++) {
-		int swp = (*P)[i];
-		(*U)[slice(i * block_size, block_size, 1)] = (*A)[slice(swp * block_size, block_size, 1)];
-	}
+	U         = rcp(new valarray<double>(*A));
     // L^-1*P*A
+    char trans = 'N';
+	int              info;
+	dgetrs_(&trans, &block_size, &block_size, &(*L)[0], &block_size, &(*P)[0], &(*U)[0],
+	        &block_size, &info);
 }
 void RBMatrix::DTSTRF(blk_ptr U, blk_ptr A, piv_ptr P){}
 void RBMatrix::DSSSSM(blk_ptr U, blk_ptr A, blk_ptr L, piv_ptr P){}
