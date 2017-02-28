@@ -1138,10 +1138,10 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 			d.solve();
 			// fill the blocks
 
-			north_block[slice(i, nx, nx)] = d.u[slice(nx * (ny - 1), nx, 1)];
-			east_block[slice(i, ny, ny)]  = d.u[slice((nx - 1), ny, nx)];
-			south_block[slice(i, nx, nx)] = d.u[slice(0, nx, 1)];
-			west_block[slice(i, ny, ny)]  = d.u[slice(0, ny, nx)];
+			north_block[slice(i*nx, nx, 1)] = d.u[slice(nx * (ny - 1), nx, 1)];
+			east_block[slice(i*nx, ny, 1)]  = d.u[slice((nx - 1), ny, nx)];
+			south_block[slice(i*nx, nx, 1)] = d.u[slice(0, nx, 1)];
+			west_block[slice(i*nx, ny, 1)]  = d.u[slice(0, ny, nx)];
 			south_block[i * nx + i] -= 1;
 			d.boundary_south[i] = 0;
 		}

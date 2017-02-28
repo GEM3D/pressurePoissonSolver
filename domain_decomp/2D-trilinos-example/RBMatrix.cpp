@@ -59,12 +59,12 @@ void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 						for (int i = 0; i < block_size; i++) {
 							y_view(matrix_i, 0)
 							+= x_view(start_j + i, 0)
-							   * curr_blk[block_i * block_size + block_size - 1 - i];
+							   * curr_blk[block_i + block_size * (block_size - 1 - i)];
 						}
 					} else {
 						for (int i = 0; i < block_size; i++) {
 							y_view(matrix_i, 0)
-							+= x_view(start_j + i, 0) * curr_blk[block_i * block_size + i];
+							+= x_view(start_j + i, 0) * curr_blk[block_i + block_size * i];
 						}
 					}
 				}
@@ -120,7 +120,7 @@ void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_
 					if (first_block.flip_j) {
 						block_j = block_size - j - 1;
 					}
-					new_blk[i * block_size + j] = first_blk[block_i * block_size + block_j];
+					new_blk[i + block_size * j] = first_blk[block_i + block_size * block_j];
 				}
 			}
 			for (int i = 0; i < block_size; i++) {
@@ -133,7 +133,7 @@ void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_
 					if (b.flip_j) {
 						block_j = block_size - j - 1;
 					}
-					new_blk[i * block_size + j] += second_blk[block_i * block_size + block_j];
+					new_blk[i + block_size * j] += second_blk[block_i + block_size * block_j];
 				}
 			}
 			block_cols[index][local_i] = new_block;
@@ -216,6 +216,51 @@ RCP<RBMatrix> RBMatrix::invBlockDiag(){
 	}
 	Inv->createRangeMap();
 	return Inv;
+}
+typedef RCP<valarray<double>> blk_ptr;
+typedef RCP<valarray<int>> piv_ptr;
+
+void RBMatrix::DGETRF(blk_ptr A, blk_ptr L, blk_ptr U, piv_ptr P)
+{
+	// compute inverse of block
+	P         = rcp(new valarray<int>(block_size + 1));
+	int lwork = block_size * block_size;
+
+	valarray<double> work(lwork);
+	int              info;
+	L = rcp(new valarray<double>(*A));
+	dgetrf_(&block_size, &block_size, &(*A)[0], &block_size, &(*P)[0], &info);
+	U = rcp(new valarray<double>(*L));
+	for (int i = 0; i < block_size; i++) {
+		for (int j = i; j < block_size; j++) {
+            (*L)[i*block_size+j] = 0;
+		}
+		(*L)[i * block_size + i] = 1;
+	}
+	for (int i = 0; i < block_size; i++) {
+		for (int j = 0; j < i; j++) {
+            (*U)[i*block_size+j] = 0;
+		}
+	}
+}
+
+void RBMatrix::DGESSM(blk_ptr A, blk_ptr L, piv_ptr P, blk_ptr U){
+	U         = rcp(new valarray<double>(block_size*block_size));
+    // P*A
+	for (int i = 0; i < block_size; i++) {
+		int swp = (*P)[i];
+		(*U)[slice(i * block_size, block_size, 1)] = (*A)[slice(swp * block_size, block_size, 1)];
+	}
+    // L^-1*P*A
+}
+void RBMatrix::DTSTRF(blk_ptr U, blk_ptr A, piv_ptr P){}
+void RBMatrix::DSSSSM(blk_ptr U, blk_ptr A, blk_ptr L, piv_ptr P){}
+RCP<RBMatrix> RBMatrix::lu(){
+	RCP<RBMatrix> LU = rcp(new RBMatrix(domain, block_size, num_blocks));
+    for(int k = 0;k<num_blocks;k++){
+
+    }
+    return LU;
 }
 ostream& operator<<(ostream& os, const RBMatrix& A) {
     os << scientific;

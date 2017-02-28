@@ -64,7 +64,16 @@ class RBMatrix : public Tpetra::Operator<>
 	void                         createRangeMap();
 	Teuchos::RCP<const map_type> getDomainMap() const { return domain; }
 	Teuchos::RCP<const map_type> getRangeMap() const { return range; }
-    Teuchos::RCP<RBMatrix> invBlockDiag();
+	Teuchos::RCP<RBMatrix>       invBlockDiag();
+	Teuchos::RCP<RBMatrix>       lu();
+	void DGETRF(Teuchos::RCP<std::valarray<double>> A, Teuchos::RCP<std::valarray<double>> L,
+	            Teuchos::RCP<std::valarray<double>> U, Teuchos::RCP<std::valarray<int>> P);
+	void DGESSM(Teuchos::RCP<std::valarray<double>> A, Teuchos::RCP<std::valarray<double>> L,
+	            Teuchos::RCP<std::valarray<int>> P, Teuchos::RCP<std::valarray<double>> U);
+	void DTSTRF(Teuchos::RCP<std::valarray<double>> U, Teuchos::RCP<std::valarray<double>> A,
+	            Teuchos::RCP<std::valarray<int>> P);
+	void DSSSSM(Teuchos::RCP<std::valarray<double>> U, Teuchos::RCP<std::valarray<double>> A,
+	            Teuchos::RCP<std::valarray<double>> L, Teuchos::RCP<std::valarray<int>> P);
 	friend std::ostream &operator<<(std::ostream &os, const RBMatrix &A);
 };
 #endif
