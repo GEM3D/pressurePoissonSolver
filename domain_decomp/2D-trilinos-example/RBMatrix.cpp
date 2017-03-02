@@ -1,6 +1,8 @@
 #include "RBMatrix.h"
 
+
 extern "C" {
+
 // LU decomoposition of a general matrix
 void dgetrf_(int *M, int *N, double *A, int *lda, int *IPIV, int *INFO);
 void dgetrs_(char *TRANS, int *N, int *NRHS, double *A, int *lda, int *IPIV, double *B, int *LDB,
@@ -14,6 +16,7 @@ void dgetri_(int *N, double *A, int *lda, int *IPIV, double *WORK, int *lwork, i
 using namespace std;
 using Teuchos::RCP;
 using Teuchos::rcp;
+typedef RCP<valarray<double>> blk_ptr;
 RBMatrix::RBMatrix(Teuchos::RCP<map_type> map, int block_size, int num_blocks)
 {
 	domain = map;
@@ -31,6 +34,41 @@ RBMatrix::RBMatrix(Teuchos::RCP<map_type> map, int block_size, int num_blocks)
 		}
 		curr_local_i += block_size;
 	}
+}
+void LUSolver::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode, double alpha,
+                     double beta) const
+{
+	auto x_view = x.getLocalView<Kokkos::HostSpace>();
+	auto y_view = y.getLocalView<Kokkos::HostSpace>();
+	int  block_size = L->getBlockSize();
+	//L solve
+	for (int j = 0; j < L->getNumBlocks(); j++) {
+		// do lower triangular block
+		blk_ptr Lkk = L->getBlock(j * block_size, j * block_size);
+        int x_i = x.getMap()->getLocalElement(j*block_size);
+
+		for (int block_i = 0; block_i < block_size; block_i++) {
+			for (int block_j = block_i - 1; block_j >= 0; block_j--) {
+				x_view(x_i + block_i, 0)
+				-= x_view(x_i + block_j, 0) * (*Lkk)[block_i + block_size * block_j];
+			}
+		}
+
+		// do rest of blocks
+		for (int i = j+1; i < L->getNumBlocks(); i++) {
+        int x_i2 = x.getMap()->getLocalElement(i*block_size);
+		    blk_ptr Lik = L->getBlock(i * block_size, j * block_size);
+			if (!Lik.is_null()) {
+				for (int block_j = 0; block_j < block_size; block_j++) {
+					for (int block_i = 0; block_i < block_size; block_i++) {
+						x_view(x_i2 + block_i, 0)
+						-= x_view(x_i + block_j, 0) * (*Lik)[block_i + block_size * block_j];
+					}
+				}
+			}
+		}
+	}
+    y.update(1,x,0);
 }
 void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode, double alpha,
                      double beta) const
@@ -221,7 +259,6 @@ RCP<RBMatrix> RBMatrix::invBlockDiag(){
 	Inv->createRangeMap();
 	return Inv;
 }
-typedef RCP<valarray<double>> blk_ptr;
 typedef RCP<valarray<int>> piv_ptr;
 
 void RBMatrix::DGETRF(blk_ptr &A, blk_ptr &L, blk_ptr &U, piv_ptr &P)
@@ -311,10 +348,21 @@ blk_ptr RBMatrix::blkCopy(Block in)
 	}
 	return C;
 }
+blk_ptr RBMatrix::getBlock(int i, int j){
+	blk_ptr C;
+	try{
+		int local_i = range_map.at(i);
+        C = block_cols[j/block_size].at(local_i).block;
+	} catch (const out_of_range &oor) {
+		// do nothing
+    }
+    return C;
+}
 void RBMatrix::lu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
 {
 	L = rcp(new RBMatrix(domain, block_size, num_blocks));
 	U = rcp(new RBMatrix(domain, block_size, num_blocks));
+    map<tuple<Block,Block>,blk_ptr> mm_comp;
 	for (int k = 0; k < num_blocks; k++) {
 		int range_k = range->getLocalElement(k * block_size);
 
@@ -356,7 +404,8 @@ void RBMatrix::lu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
 					auto Lik_block = L->block_cols[k].find(range_i);
 					if (Lik_block != L->block_cols[k].end()) {
 						blk_ptr Lik   = Lik_block->second.block;
-						blk_ptr C     = rcp(new valarray<double>(block_size * block_size));
+						blk_ptr C;
+						C             = rcp(new valarray<double>(block_size * block_size));
 						char    trans = 'N';
 						double  one   = -1;
 						double  zero  = 0;
