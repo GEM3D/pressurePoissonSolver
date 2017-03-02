@@ -61,19 +61,22 @@ class RBMatrix : public Tpetra::Operator<>
 	           double beta  = Teuchos::ScalarTraits<double>::zero()) const;
 	void insertBlock(int i, int j, Teuchos::RCP<std::valarray<double>> block, bool flip_i,
 	                 bool flip_j);
-	void                         createRangeMap();
-	Teuchos::RCP<const map_type> getDomainMap() const { return domain; }
-	Teuchos::RCP<const map_type> getRangeMap() const { return range; }
-	Teuchos::RCP<RBMatrix>       invBlockDiag();
-	Teuchos::RCP<RBMatrix>       lu();
-	void DGETRF(Teuchos::RCP<std::valarray<double>> A, Teuchos::RCP<std::valarray<double>> L,
+	void                                createRangeMap();
+	Teuchos::RCP<const map_type>        getDomainMap() const { return domain; }
+	Teuchos::RCP<const map_type>        getRangeMap() const { return range; }
+	Teuchos::RCP<RBMatrix>              invBlockDiag();
+	void lu(Teuchos::RCP<RBMatrix> &L, Teuchos::RCP<RBMatrix> &U);
+	Teuchos::RCP<std::valarray<double>> blkCopy(Block in);
+	void DGETRF(Teuchos::RCP<std::valarray<double>> &A, Teuchos::RCP<std::valarray<double>> &L,
+	            Teuchos::RCP<std::valarray<double>> &U, Teuchos::RCP<std::valarray<int>> &P);
+	void DGESSM(Teuchos::RCP<std::valarray<double>> &A, Teuchos::RCP<std::valarray<double>> &L,
+	            Teuchos::RCP<std::valarray<double>> &U, Teuchos::RCP<std::valarray<int>> &P);
+	void LSolve(Teuchos::RCP<std::valarray<double>> &A, Teuchos::RCP<std::valarray<double>> &L,
+	            Teuchos::RCP<std::valarray<double>> &U, Teuchos::RCP<std::valarray<int>> &P);
+	void DTSTRF(Teuchos::RCP<std::valarray<double>> A, Teuchos::RCP<std::valarray<double>> L,
 	            Teuchos::RCP<std::valarray<double>> U, Teuchos::RCP<std::valarray<int>> P);
-	void DGESSM(Teuchos::RCP<std::valarray<double>> A, Teuchos::RCP<std::valarray<double>> L,
-	            Teuchos::RCP<std::valarray<int>> P, Teuchos::RCP<std::valarray<double>> U);
-	void DTSTRF(Teuchos::RCP<std::valarray<double>> U, Teuchos::RCP<std::valarray<double>> A,
-	            Teuchos::RCP<std::valarray<int>> P);
-	void DSSSSM(Teuchos::RCP<std::valarray<double>> U, Teuchos::RCP<std::valarray<double>> A,
-	            Teuchos::RCP<std::valarray<double>> L, Teuchos::RCP<std::valarray<int>> P);
+	void DSSSSM(Teuchos::RCP<std::valarray<double>> A, Teuchos::RCP<std::valarray<double>> L,
+	            Teuchos::RCP<std::valarray<double>> U, Teuchos::RCP<std::valarray<int>> P);
 	friend std::ostream &operator<<(std::ostream &os, const RBMatrix &A);
 };
 #endif

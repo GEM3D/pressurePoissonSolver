@@ -89,6 +89,7 @@ int main(int argc, char *argv[])
 	args::Flag f_bicg(parser, "gmres", "use BiCGStab for iterative solver", {"bicg"});
 	args::Flag f_nozero(parser, "nozero", "don't make the average of vector zero in CG solver",
 	                    {"nozero"});
+	args::Flag f_lu(parser, "lu", "use LU decomposition", {"lu"});
 
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;
@@ -265,7 +266,7 @@ int main(int argc, char *argv[])
 			if (f_wrapper) {
 				// Create a function wrapper
 				op = rcp(new FuncWrap(b, &dc));
-			} else if (f_rbmatrix) {
+			} else if (f_rbmatrix || f_lu) {
 				// Form the matrix
 				comm->barrier();
 				steady_clock::time_point form_start = steady_clock::now();
@@ -368,36 +369,57 @@ int main(int argc, char *argv[])
 				}
 			}
 
-			problem.setProblem();
+			if (f_lu) {
+				comm->barrier();
+				steady_clock::time_point lu_start = steady_clock::now();
 
-			comm->barrier();
-			steady_clock::time_point iter_start = steady_clock::now();
-			// Set the parameters
-			Teuchos::ParameterList belosList;
-			belosList.set("Block Size", 1);
-			belosList.set("Maximum Iterations", 5000);
-			belosList.set("Convergence Tolerance", tol);
-			int verbosity = Belos::Errors + Belos::StatusTestDetails + Belos::Warnings
-			                + Belos::TimingDetails + Belos::Debug;
-			belosList.set("Verbosity", verbosity);
+				RCP<RBMatrix> L, U;
+				RBA->lu(L,U);
 
-			// Create solver and solve
-			RCP<Belos::SolverManager<double, vector_type, Tpetra::Operator<>>> solver;
-			if (f_gmres) {
-				solver = rcp(new Belos::BlockGmresSolMgr<double, vector_type, Tpetra::Operator<>>(
-				rcp(&problem, false), rcp(&belosList, false)));
-			} else if (f_bicg) {
-				solver = rcp(new Belos::BiCGStabSolMgr<double, vector_type, Tpetra::Operator<>>(
-				rcp(&problem, false), rcp(&belosList, false)));
+				comm->barrier();
+				duration<double> lu_time = steady_clock::now() - lu_start;
+				if (my_global_rank == 0) std::cout << "LU Time: " << lu_time.count() << "\n";
+
+				ofstream out_file("L.mm");
+				out_file << *L;
+				out_file.close();
+				out_file = ofstream("U.mm");
+				out_file << *U;
+				out_file.close();
+
 			} else {
-				solver = rcp(new Belos::BlockCGSolMgr<double, vector_type, Tpetra::Operator<>>(
-				rcp(&problem, false), rcp(&belosList, false)));
-			}
-			solver->solve();
+				problem.setProblem();
 
-			comm->barrier();
-			duration<double> iter_time = steady_clock::now() - iter_start;
-			if (my_global_rank == 0) std::cout << "CG Time: " << iter_time.count() << "\n";
+				comm->barrier();
+				steady_clock::time_point iter_start = steady_clock::now();
+				// Set the parameters
+				Teuchos::ParameterList belosList;
+				belosList.set("Block Size", 1);
+				belosList.set("Maximum Iterations", 5000);
+				belosList.set("Convergence Tolerance", tol);
+				int verbosity = Belos::Errors + Belos::StatusTestDetails + Belos::Warnings
+				                + Belos::TimingDetails + Belos::Debug;
+				belosList.set("Verbosity", verbosity);
+
+				// Create solver and solve
+				RCP<Belos::SolverManager<double, vector_type, Tpetra::Operator<>>> solver;
+				if (f_gmres) {
+					solver
+					= rcp(new Belos::BlockGmresSolMgr<double, vector_type, Tpetra::Operator<>>(
+					rcp(&problem, false), rcp(&belosList, false)));
+				} else if (f_bicg) {
+					solver = rcp(new Belos::BiCGStabSolMgr<double, vector_type, Tpetra::Operator<>>(
+					rcp(&problem, false), rcp(&belosList, false)));
+				} else {
+					solver = rcp(new Belos::BlockCGSolMgr<double, vector_type, Tpetra::Operator<>>(
+					rcp(&problem, false), rcp(&belosList, false)));
+				}
+				solver->solve();
+
+				comm->barrier();
+				duration<double> iter_time = steady_clock::now() - iter_start;
+				if (my_global_rank == 0) std::cout << "CG Time: " << iter_time.count() << "\n";
+			}
 		}
 
 		// Do one last solve
