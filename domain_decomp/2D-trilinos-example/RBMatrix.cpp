@@ -260,11 +260,23 @@ void RBMatrix::DGESSM(blk_ptr &A, blk_ptr &L, blk_ptr &U, piv_ptr &P)
 void RBMatrix::LSolve(blk_ptr &A, blk_ptr &L, blk_ptr &U, piv_ptr &P)
 {
 	L = rcp(new valarray<double>(*A));
+	valarray<double> TMP(*A);
+	for (int j = 0; j < block_size; j++) {
+		for (int i = 0; i < block_size; i++) {
+			TMP[j + block_size * i] = (*A)[i + block_size * j];
+		}
+	}
 	// L^-1*P*A
 	char trans = 'T';
 	int  info;
-	dgetrs_(&trans, &block_size, &block_size, &(*L)[0], &block_size, &(*P)[0], &(*U)[0],
+	dgetrs_(&trans, &block_size, &block_size, &(*U)[0], &block_size, &(*P)[0], &TMP[0],
 	        &block_size, &info);
+
+	for (int j = 0; j < block_size; j++) {
+		for (int i = 0; i < block_size; i++) {
+			(*L)[j + block_size * i] = TMP[i + block_size * j];
+		}
+	}
 }
 void RBMatrix::DTSTRF(blk_ptr A, blk_ptr L, blk_ptr U, piv_ptr P)
 {
@@ -335,7 +347,7 @@ void RBMatrix::lu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
 		}
         //update rest of matrix
 		for (int j = k + 1; j < num_blocks; j++) {
-			int  range_k   = U->range_map[j * block_size];
+			int  range_k   = U->range_map[k * block_size];
 			auto Ukj_block = U->block_cols[j].find(range_k);
 			if (Ukj_block != U->block_cols[j].end()) {
 				blk_ptr Ukj = Ukj_block->second.block;
