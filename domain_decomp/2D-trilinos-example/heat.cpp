@@ -382,12 +382,12 @@ int main(int argc, char *argv[])
 				duration<double> lu_time = steady_clock::now() - lu_start;
 				if (my_global_rank == 0) std::cout << "LU Time: " << lu_time.count() << "\n";
 
-				 ofstream out_file("L.mm");
-				 out_file << *L;
-				 out_file.close();
-				 out_file = ofstream("U.mm");
-				 out_file << *U;
-				 out_file.close();
+				// ofstream out_file("L.mm");
+				// out_file << *L;
+				// out_file.close();
+				// out_file = ofstream("U.mm");
+				// out_file << *U;
+				// out_file.close();
 
 			} else {
 				problem.setProblem();

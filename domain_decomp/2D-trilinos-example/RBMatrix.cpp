@@ -55,9 +55,9 @@ void LUSolver::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 		}
 
 		// do rest of blocks
-		for (int i = j+1; i < L->getNumBlocks(); i++) {
-        int x_i2 = x.getMap()->getLocalElement(i*block_size);
-		    blk_ptr Lik = L->getBlock(i * block_size, j * block_size);
+		for (int i = j + 1; i < L->getNumBlocks(); i++) {
+			int     x_i2 = x.getMap()->getLocalElement(i * block_size);
+			blk_ptr Lik  = L->getBlock(i * block_size, j * block_size);
 			if (!Lik.is_null()) {
 				for (int block_j = 0; block_j < block_size; block_j++) {
 					for (int block_i = 0; block_i < block_size; block_i++) {
@@ -68,6 +68,36 @@ void LUSolver::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 			}
 		}
 	}
+	// U solve
+	for (int j = U->getNumBlocks() - 1; j >= 0; j--) {
+		// do lower triangular block
+		blk_ptr Ukk = U->getBlock(j * block_size, j * block_size);
+		int     x_i = x.getMap()->getLocalElement(j * block_size);
+
+		for (int block_i = block_size - 1; block_i >= 0; block_i--) {
+			for (int block_j = block_size - 1; block_j > block_i; block_j--) {
+				x_view(x_i + block_i, 0)
+				-= x_view(x_i + block_j, 0) * (*Ukk)[block_i + block_size * block_j];
+			}
+			// dvide by diagonal
+			x_view(x_i + block_i, 0) /= (*Ukk)[block_i + block_size * block_i];
+		}
+
+		// do rest of blocks
+		for (int i = j - 1; i >= 0; i--) {
+			int     x_i2 = x.getMap()->getLocalElement(i * block_size);
+			blk_ptr Uik  = U->getBlock(i * block_size, j * block_size);
+			if (!Uik.is_null()) {
+				for (int block_j = 0; block_j < block_size; block_j++) {
+					for (int block_i = 0; block_i < block_size; block_i++) {
+						x_view(x_i2 + block_i, 0)
+						-= x_view(x_i + block_j, 0) * (*Uik)[block_i + block_size * block_j];
+					}
+				}
+			}
+		}
+	}
+
     y.update(1,x,0);
 }
 void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode, double alpha,
