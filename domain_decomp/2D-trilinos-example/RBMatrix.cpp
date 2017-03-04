@@ -92,13 +92,15 @@ void LUSolver::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 					for (int block_i = 0; block_i < block_size; block_i++) {
 						x_view(x_i2 + block_i, 0)
 						-= x_view(x_i + block_j, 0) * (*Uik)[block_i + block_size * block_j];
+						//cerr << x_view(x_i2 + block_i, 0) << endl;
 					}
 				}
 			}
 		}
 	}
+	//cerr << "hello\n";
 
-    y.update(1,x,0);
+	y.update(1,x,0);
 }
 void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode, double alpha,
                      double beta) const
@@ -382,7 +384,7 @@ blk_ptr RBMatrix::getBlock(int i, int j){
 	blk_ptr C;
 	try{
 		int local_i = range_map.at(i);
-        C = block_cols[j/block_size].at(local_i).block;
+        C = block_cols.at(j/block_size).at(local_i).block;
 	} catch (const out_of_range &oor) {
 		// do nothing
     }
@@ -434,6 +436,65 @@ void RBMatrix::lu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
 					auto Lik_block = L->block_cols[k].find(range_i);
 					if (Lik_block != L->block_cols[k].end()) {
 						blk_ptr Lik   = Lik_block->second.block;
+						blk_ptr C;
+						C             = rcp(new valarray<double>(block_size * block_size));
+						char    trans = 'N';
+						double  one   = -1;
+						double  zero  = 0;
+						dgemm_(&trans, &trans, &block_size, &block_size, &block_size, &one,
+						       &(*Lik)[0], &block_size, &(*Ukj)[0], &block_size, &zero, &(*C)[0],
+						       &block_size);
+						insertBlock(i * block_size, j * block_size, C, false, false);
+					}
+				}
+			}
+		}
+	}
+}
+void RBMatrix::ilu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
+{
+	L = rcp(new RBMatrix(domain, block_size, num_blocks));
+	U = rcp(new RBMatrix(domain, block_size, num_blocks));
+    map<tuple<Block,Block>,blk_ptr> mm_comp;
+	for (int k = 0; k < num_blocks; k++) {
+		int range_k = range->getLocalElement(k * block_size);
+
+		blk_ptr Akk = blkCopy(block_cols[k][range_k]);
+		blk_ptr Lkk, Ukk;
+		piv_ptr Pkk;
+		DGETRF(Akk, Lkk, Ukk, Pkk);
+		L->insertBlock(k * block_size, k * block_size, Lkk, false, false);
+		U->insertBlock(k * block_size, k * block_size, Ukk, false, false);
+		// get row of U's
+		for (int j = k + 1; j < num_blocks; j++) {
+			auto Akj_block = block_cols[j].find(range_k);
+			if (Akj_block != block_cols[j].end()) {
+				blk_ptr Ukj;
+				blk_ptr Akj = blkCopy(Akj_block->second);
+				DGESSM(Akj, Lkk, Ukj, Pkk);
+				U->insertBlock(k * block_size, j * block_size, Ukj, false, false);
+			}
+		}
+		// get Column of L's
+		for (int i = k + 1; i < num_blocks; i++) {
+			int  range_i   = range->getLocalElement(i * block_size);
+			auto Aik_block = block_cols[k].find(range_i);
+			if (Aik_block != block_cols[k].end()) {
+				blk_ptr Lik;
+				blk_ptr Aik = blkCopy(Aik_block->second);
+				LSolve(Aik, Lik, Ukk, Pkk);
+				L->insertBlock(i * block_size, k * block_size, Lik, false, false);
+			}
+		}
+        //update rest of matrix
+		for (int j = k + 1; j < num_blocks; j++) {
+			int  range_k   = U->range_map[k * block_size];
+			blk_ptr Ukj       = U->getBlock(range_k, j * block_size);
+			if (!Ukj.is_null()){
+				for (int i = k + 1; i < num_blocks; i++) {
+					int     range_i = L->range_map[i * block_size];
+					blk_ptr Lik     = L->getBlock(i * block_size, range_i);
+					if (!Lik.is_null() && getBlock(i * block_size, j * block_size).is_null()) {
 						blk_ptr C;
 						C             = rcp(new valarray<double>(block_size * block_size));
 						char    trans = 'N';

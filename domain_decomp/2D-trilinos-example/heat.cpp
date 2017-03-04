@@ -90,6 +90,7 @@ int main(int argc, char *argv[])
 	args::Flag f_nozero(parser, "nozero", "don't make the average of vector zero in CG solver",
 	                    {"nozero"});
 	args::Flag f_lu(parser, "lu", "use LU decomposition", {"lu"});
+	args::Flag f_ilu(parser, "ilu", "use incomplete LU preconditioner", {"ilu"});
 
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;
@@ -325,13 +326,16 @@ int main(int argc, char *argv[])
 			// Create linear problem for the Belos solver
 			Belos::LinearProblem<double, vector_type, Tpetra::Operator<>> problem(op, gamma, b);
 
-			if (f_prec) {
-				if (f_rbmatrix) {
+			if (f_prec||f_ilu) {
+				if (f_ilu) {
 					comm->barrier();
 					steady_clock::time_point prec_start = steady_clock::now();
 
-					RCP<RBMatrix> P = RBA->invBlockDiag();
-					problem.setRightPrec(P);
+					RCP<RBMatrix> L, U;
+					RBMatrix      Copy = *RBA;
+					Copy.ilu(L, U);
+					RCP<LUSolver> solver = rcp(new LUSolver(L, U));
+					problem.setLeftPrec(solver);
 
 					comm->barrier();
 					duration<double> prec_time = steady_clock::now() - prec_start;
@@ -339,32 +343,54 @@ int main(int argc, char *argv[])
 					if (my_global_rank == 0)
 						cout << "Preconditioner Formation Time: " << prec_time.count() << "\n";
 
+					// ofstream out_file("L.mm");
+					// out_file << *L;
+					// out_file.close();
+					// out_file = ofstream("U.mm");
+					// out_file << *U;
+					// out_file.close();
 				} else {
-					// form preconditioner
-					comm->barrier();
-					steady_clock::time_point prec_start = steady_clock::now();
-
-					RCP<matrix_type> P = dc.formInvDiag(matrix_map,del);
-					problem.setRightPrec(P);
-
-					comm->barrier();
-					duration<double> prec_time = steady_clock::now() - prec_start;
-
-					if (my_global_rank == 0)
-						cout << "Preconditioner Formation Time: " << prec_time.count() << "\n";
-
-					if (save_prec_file != "") {
+					if (f_rbmatrix) {
 						comm->barrier();
-						steady_clock::time_point write_start = steady_clock::now();
+						steady_clock::time_point prec_start = steady_clock::now();
 
-						Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_prec_file,
-						                                                           P, "", "");
+						RCP<RBMatrix> P = RBA->invBlockDiag();
+						problem.setRightPrec(P);
 
 						comm->barrier();
-						duration<double> write_time = steady_clock::now() - write_start;
+						duration<double> prec_time = steady_clock::now() - prec_start;
+
 						if (my_global_rank == 0)
-							cout << "Time to write preconditioner to file: " << write_time.count()
-							     << "\n";
+							cout << "Preconditioner Formation Time: " << prec_time.count() << "\n";
+
+					} else {
+						// form preconditioner
+						comm->barrier();
+						steady_clock::time_point prec_start = steady_clock::now();
+
+						RCP<matrix_type> P = dc.formInvDiag(matrix_map, del);
+						problem.setRightPrec(P);
+
+						comm->barrier();
+						duration<double> prec_time = steady_clock::now() - prec_start;
+
+						if (my_global_rank == 0)
+							cout << "Preconditioner Formation Time: " << prec_time.count() << "\n";
+
+						if (save_prec_file != "") {
+							comm->barrier();
+							steady_clock::time_point write_start = steady_clock::now();
+
+							Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(
+							save_prec_file, P, "", "");
+
+							comm->barrier();
+							duration<double> write_time = steady_clock::now() - write_start;
+							if (my_global_rank == 0)
+								cout
+								<< "Time to write preconditioner to file: " << write_time.count()
+								<< "\n";
+						}
 					}
 				}
 			}
