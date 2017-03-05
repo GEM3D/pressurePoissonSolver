@@ -14,6 +14,10 @@ class DomainSignature
 	int proc_south = -1;
 	int proc_east  = -1;
 	int proc_west  = -1;
+	int global_i_north = -1;
+	int global_i_south = -1;
+	int global_i_east  = -1;
+	int global_i_west  = -1;
 	friend bool operator<(const DomainSignature &l, const DomainSignature &r)
 	{
 		return l.id < r.id;
@@ -40,6 +44,7 @@ class DomainSignatureCollection
 	    int *                       get_my_global_ids() { return myGlobalIDs; }
 	    */
 	void zoltanBalance();
+    void indexDomainsBFS();
 	// query functions that respond to requests from Zoltan
 	static int get_number_of_objects(void *data, int *ierr);
 	static void coord(void *data, int num_gid_entries, int num_lid_entries, ZOLTAN_ID_PTR global_id,
