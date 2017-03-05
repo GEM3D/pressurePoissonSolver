@@ -2,9 +2,8 @@
 #define DOMAINSIGNATURECOLLECTION_H
 #include <zoltan_cpp.h>
 #include <map>
-class DomainSignature
+struct DomainSignature
 {
-    public:
 	int id;
 	int nbr_north = -1;
 	int nbr_south = -1;

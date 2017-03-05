@@ -1,5 +1,5 @@
 #include "Domain.h"
-Domain::Domain(int nx, int ny, double h_x, double h_y)
+Domain::Domain(DomainSignature ds, int nx, int ny, double h_x, double h_y)
 {
 	this->nx  = nx;
 	this->ny  = ny;
@@ -17,6 +17,28 @@ Domain::Domain(int nx, int ny, double h_x, double h_y)
 	boundary_south = std::valarray<double>(nx);
 	boundary_east  = std::valarray<double>(ny);
 	boundary_west  = std::valarray<double>(ny);
+
+	if (ds.global_i_north != -1) {
+		global_i_north = ds.global_i_north * nx;
+		iface_i_north  = ds.global_i_north * 22;
+	}
+	if (ds.global_i_east != -1) {
+		global_i_east = ds.global_i_east * nx;
+		iface_i_east  = ds.global_i_east * 22;
+	}
+	if (ds.global_i_south != -1) {
+		global_i_south = ds.global_i_south * nx;
+		iface_i_south  = ds.global_i_south * 22;
+	}
+	if (ds.global_i_west != -1) {
+		global_i_west = ds.global_i_west * nx;
+		iface_i_west  = ds.global_i_west * 22;
+	}
+
+	nbr_north = ds.nbr_north;
+	nbr_east  = ds.nbr_east;
+	nbr_south = ds.nbr_south;
+	nbr_west  = ds.nbr_west;
 }
 
 Domain::~Domain()

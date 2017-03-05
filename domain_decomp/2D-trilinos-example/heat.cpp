@@ -84,7 +84,6 @@ int main(int argc, char *argv[])
 	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
 	args::Flag f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
 	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {'n', "neumann"});
-	args::Flag f_bfs(parser, "bfs", "index using BFS", {"bfs"});
 	args::Flag f_gmres(parser, "gmres", "use GMRES for iterative solver", {"gmres"});
 	args::Flag f_bicg(parser, "gmres", "use BiCGStab for iterative solver", {"bicg"});
 	args::Flag f_nozero(parser, "nozero", "don't make the average of vector zero in CG solver",
@@ -217,14 +216,6 @@ int main(int argc, char *argv[])
 		steady_clock::time_point domain_start = steady_clock::now();
 
 		DomainCollection dc(dsc, nx, ny, num_domains_x, num_domains_y, h_x, h_y, comm);
-
-		if (f_bfs) {
-			if (num_procs > 1) {
-				std::cerr << "BFS indexing currently only works with a single thread.\n";
-				return 1;
-			}
-			dc.indexBFS();
-		}
 
 		ZeroSum zs;
 		if (f_neumann) {

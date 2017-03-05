@@ -39,7 +39,6 @@ class DomainCollection
     void outputSolution(std::ostream &out);
     void outputResidual(std::ostream &out);
     void outputError(std::ostream &out);
-    void indexBFS();
 	void solveWithInterface(const vector_type &gamma, vector_type &diff);
 	void                      generateMaps();
 	void                      distributeIfaceInfo();

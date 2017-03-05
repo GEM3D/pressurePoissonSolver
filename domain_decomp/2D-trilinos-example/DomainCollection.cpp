@@ -66,41 +66,10 @@ DomainCollection::DomainCollection(DomainSignatureCollection dsc, int nx, int ny
 	for (auto p : dsc.domains) {
 		DomainSignature ds       = p.second;
 		int             i        = ds.id;
-		int             domain_x = i % d_x;
-		int             domain_y = i / d_x;
 
 		// create a domain
-		RCP<Domain> d_ptr = rcp(new Domain(nx, ny, h_x, h_y));
-		Domain &    d     = *d_ptr;
-
-		// determine its neighbors
-		// north
-		int ns_start_i       = d_y * (d_x - 1) * ny;
-		int ns_iface_start_i = d_y * (d_x - 1) * 22;
-		d.nbr_north          = ds.nbr_north;
-		if (domain_y != d_y - 1) {
-			d.global_i_north = (domain_y * d_x + domain_x) * nx + ns_start_i;
-			d.iface_i_north  = (domain_y * d_x + domain_x) * 22 + ns_iface_start_i;
-		}
-		// east
-		d.nbr_east = ds.nbr_east;
-		if (domain_x != d_x - 1) {
-			d.global_i_east = (domain_x * d_x + domain_y) * ny;
-			d.iface_i_east  = (domain_x * d_x + domain_y) * 22;
-		}
-		// south
-		d.nbr_south = ds.nbr_south;
-		if (domain_y != 0) {
-			d.global_i_south = ((domain_y - 1) * d_x + domain_x) * nx + ns_start_i;
-			d.iface_i_south  = ((domain_y - 1) * d_x + domain_x) * 22 + ns_iface_start_i;
-		}
-		// west
-		d.nbr_west = ds.nbr_west;
-		if (domain_x != 0) {
-			d.global_i_west = ((domain_x - 1) * d_x + domain_y) * ny;
-			d.iface_i_west  = ((domain_x - 1) * d_x + domain_y) * 22;
-		}
-		domains[i] = d_ptr;
+		RCP<Domain> d_ptr = rcp(new Domain(ds, nx, ny, h_x, h_y));
+		domains[i]        = d_ptr;
 	}
 }
 
@@ -193,67 +162,6 @@ void DomainCollection::initDirichlet(function<double(double, double)> ffun,
 	generateMaps();
 	distributeIfaceInfo();
 }
-
-void DomainCollection::indexBFS(){
-	set<int>   visited;
-	set<int>   enqueued;
-	deque<int> queue;
-	int        first = domains.begin()->first;
-	queue.push_back(first);
-	enqueued.insert(first);
-	int         curr_i = 0;
-	while (!queue.empty()) {
-		int     curr = queue.front();
-		Domain &d    = *domains[curr];
-		queue.pop_front();
-		visited.insert(curr);
-		if (d.nbr_north != -1 && visited.count(d.nbr_north) == 0) {
-			// a new edge that we have not assigned an index to
-			Domain &nbr        = *domains.at(d.nbr_north);
-			d.global_i_north   = curr_i;
-			nbr.global_i_south = curr_i;
-			if (enqueued.count(d.nbr_north) == 0) {
-				queue.push_back(d.nbr_north);
-				enqueued.insert(d.nbr_north);
-			}
-			curr_i += nx;
-		}
-		if (d.nbr_east != -1 && visited.count(d.nbr_east) == 0) {
-			// a new edge that we have not assigned an index to
-			Domain &nbr        = *domains.at(d.nbr_east);
-			d.global_i_east   = curr_i;
-			nbr.global_i_west = curr_i;
-			if (enqueued.count(d.nbr_east) == 0) {
-				queue.push_back(d.nbr_east);
-				enqueued.insert(d.nbr_east);
-			}
-			curr_i += ny;
-		}
-		if (d.nbr_south != -1 && visited.count(d.nbr_south) == 0) {
-			// a new edge that we have not assigned an index to
-			Domain &nbr        = *domains.at(d.nbr_south);
-			d.global_i_south   = curr_i;
-			nbr.global_i_north = curr_i;
-			if (enqueued.count(d.nbr_south) == 0) {
-				queue.push_back(d.nbr_south);
-				enqueued.insert(d.nbr_south);
-			}
-			curr_i += nx;
-		}
-		if (d.nbr_west != -1 && visited.count(d.nbr_west) == 0) {
-			// a new edge that we have not assigned an index to
-			Domain &nbr        = *domains.at(d.nbr_west);
-			d.global_i_west   = curr_i;
-			nbr.global_i_east = curr_i;
-			if (enqueued.count(d.nbr_west) == 0) {
-				queue.push_back(d.nbr_west);
-				enqueued.insert(d.nbr_west);
-			}
-			curr_i += ny;
-		}
-	}
-}
-
 void DomainCollection::generateMaps()
 {
 	set<int>   visited;
@@ -720,27 +628,29 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map, int delete_row)
 		}
 
 		// create domain representing curr_type
-		Domain d(nx, ny, h_x, h_y);
+		DomainSignature ds;
 		if (curr_type.t_north == NEUMANN) {
-			d.nbr_north = -1;
+			ds.nbr_north = -1;
 		} else {
-			d.nbr_north = 1;
+			ds.nbr_north = 1;
 		}
 		if (curr_type.t_east == NEUMANN) {
-			d.nbr_east = -1;
+			ds.nbr_east = -1;
 		} else {
-			d.nbr_east = 1;
+			ds.nbr_east = 1;
 		}
 		if (curr_type.t_south == NEUMANN) {
-			d.nbr_south = -1;
+			ds.nbr_south = -1;
 		} else {
-			d.nbr_south = 1;
+			ds.nbr_south = 1;
 		}
 		if (curr_type.t_west == NEUMANN) {
-			d.nbr_west = -1;
+			ds.nbr_west = -1;
 		} else {
-			d.nbr_west = 1;
+			ds.nbr_west = 1;
 		}
+		Domain d(ds, nx, ny, h_x, h_y);
+
 		d.boundary_north = valarray<double>(nx);
 		d.boundary_south = valarray<double>(nx);
 		d.boundary_east  = valarray<double>(ny);
@@ -912,55 +822,55 @@ RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map, int del_row)
 		}
 
 		// create domain representing curr_type_left
-		Domain d_left(nx, ny, h_x, h_y);
+		DomainSignature ds;
 		if (curr_type_left.t_north == NEUMANN) {
-			d_left.nbr_north = -1;
+			ds.nbr_north = -1;
 		} else {
-			d_left.nbr_north = 1;
+			ds.nbr_north = 1;
 		}
 		if (curr_type_left.t_east == NEUMANN) {
-			d_left.nbr_east = -1;
+			ds.nbr_east = -1;
 		} else {
-			d_left.nbr_east = 1;
+			ds.nbr_east = 1;
 		}
 		if (curr_type_left.t_south == NEUMANN) {
-			d_left.nbr_south = -1;
+			ds.nbr_south = -1;
 		} else {
-			d_left.nbr_south = 1;
+			ds.nbr_south = 1;
 		}
 		if (curr_type_left.t_west == NEUMANN) {
-			d_left.nbr_west = -1;
+			ds.nbr_west = -1;
 		} else {
-			d_left.nbr_west = 1;
+			ds.nbr_west = 1;
 		}
+		Domain d_left(ds, nx, ny, h_x, h_y);
 		d_left.boundary_north = valarray<double>(nx);
 		d_left.boundary_south = valarray<double>(nx);
 		d_left.boundary_east  = valarray<double>(ny);
 		d_left.boundary_west  = valarray<double>(ny);
 		d_left.planNeumann();
 
-        // create domain representing curr_type_right
-		Domain d_right(nx, ny, h_x, h_y);
 		if (curr_type_right.t_north == NEUMANN) {
-			d_right.nbr_north = -1;
+			ds.nbr_north = -1;
 		} else {
-			d_right.nbr_north = 1;
+			ds.nbr_north = 1;
 		}
 		if (curr_type_right.t_east == NEUMANN) {
-			d_right.nbr_east = -1;
+			ds.nbr_east = -1;
 		} else {
-			d_right.nbr_east = 1;
+			ds.nbr_east = 1;
 		}
 		if (curr_type_right.t_south == NEUMANN) {
-			d_right.nbr_south = -1;
+			ds.nbr_south = -1;
 		} else {
-			d_right.nbr_south = 1;
+			ds.nbr_south = 1;
 		}
 		if (curr_type_right.t_west == NEUMANN) {
-			d_right.nbr_west = -1;
+			ds.nbr_west = -1;
 		} else {
-			d_right.nbr_west = 1;
+			ds.nbr_west = 1;
 		}
+		Domain d_right(ds, nx, ny, h_x, h_y);
 		d_right.boundary_north = valarray<double>(nx);
 		d_right.boundary_south = valarray<double>(nx);
 		d_right.boundary_east  = valarray<double>(ny);
@@ -1093,27 +1003,28 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 		}
 
 		// create domain representing curr_type
-		Domain d(nx, ny, h_x, h_y);
+		DomainSignature ds;
 		if (curr_type.t_north == NEUMANN) {
-			d.nbr_north = -1;
+			ds.nbr_north = -1;
 		} else {
-			d.nbr_north = 1;
+			ds.nbr_north = 1;
 		}
 		if (curr_type.t_east == NEUMANN) {
-			d.nbr_east = -1;
+			ds.nbr_east = -1;
 		} else {
-			d.nbr_east = 1;
+			ds.nbr_east = 1;
 		}
 		if (curr_type.t_south == NEUMANN) {
-			d.nbr_south = -1;
+			ds.nbr_south = -1;
 		} else {
-			d.nbr_south = 1;
+			ds.nbr_south = 1;
 		}
 		if (curr_type.t_west == NEUMANN) {
-			d.nbr_west = -1;
+			ds.nbr_west = -1;
 		} else {
-			d.nbr_west = 1;
+			ds.nbr_west = 1;
 		}
+		Domain d(ds, nx, ny, h_x, h_y);
 		d.boundary_north = valarray<double>(nx);
 		d.boundary_south = valarray<double>(nx);
 		d.boundary_east  = valarray<double>(ny);

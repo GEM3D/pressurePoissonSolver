@@ -44,7 +44,7 @@ void DomainSignatureCollection::indexDomainsBFS()
 	int curr_i = 0;
 	while (!queue.empty()) {
 		int              curr = queue.front();
-		DomainSignature &d    = domains[curr];
+		DomainSignature &d    = domains.at(curr);
 		queue.pop_front();
 		visited.insert(curr);
 		if (d.nbr_north != -1 && visited.count(d.nbr_north) == 0) {

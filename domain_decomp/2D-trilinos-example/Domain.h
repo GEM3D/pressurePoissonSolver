@@ -1,6 +1,7 @@
 #ifndef DOMAIN_H
 #define DOMAIN_H
 #include "MyTypeDefs.h"
+#include "DomainSignatureCollection.h"
 #include <Teuchos_RCP.hpp>
 #include <Tpetra_Import_decl.hpp>
 #include <cmath>
@@ -51,7 +52,7 @@ class Domain
 	bool                   neumann = false;
 
 	Domain() {}
-	Domain(int nx, int ny, double h_x, double h_y);
+	Domain(DomainSignature ds, int nx, int ny, double h_x, double h_y);
 	~Domain();
 
 	void planDirichlet();
