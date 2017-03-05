@@ -4,8 +4,8 @@
 using namespace std;
 DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank)
 {
-	this->d_x = d_x;
-	this->d_y = d_y;
+	num_global_domains    = d_x * d_y;
+	num_global_interfaces = (d_x - 1) * d_y + d_x * (d_y - 1);
 	if (rank == 0) {
 		for (int domain_y = 0; domain_y < d_y; domain_y++) {
 			for (int domain_x = 0; domain_x < d_x; domain_x++) {
@@ -31,9 +31,9 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank)
 			}
 		}
 	}
-    indexDomainsBFS();
+    indexInterfacesBFS();
 }
-void DomainSignatureCollection::indexDomainsBFS()
+void DomainSignatureCollection::indexInterfacesBFS()
 {
 	set<int>   visited;
 	set<int>   enqueued;
@@ -113,8 +113,8 @@ void DomainSignatureCollection::zoltanBalance()
 	zz->Set_Obj_Size_Multi_Fn(DomainSignatureCollection::object_sizes, this);
 	zz->Set_Num_Edges_Fn(DomainSignatureCollection::numInterfaces, this);
 	zz->Set_Edge_List_Fn(DomainSignatureCollection::interfaceList, this);
-	zz->Set_Geom_Fn(DomainSignatureCollection::coord, this);
-	zz->Set_Num_Geom_Fn(DomainSignatureCollection::dimensions, this);
+	//zz->Set_Geom_Fn(DomainSignatureCollection::coord, this);
+	//zz->Set_Num_Geom_Fn(DomainSignatureCollection::dimensions, this);
 
 	////////////////////////////////////////////////////////////////
 	// Zoltan can now partition the objects in this collection.
@@ -168,12 +168,12 @@ void DomainSignatureCollection::zoltanBalance()
 	*out <<prev<< "\n";
 }
 
-int DomainSignatureCollection::dimensions(void *data, int *ierr)
+/*int DomainSignatureCollection::dimensions(void *data, int *ierr)
 {
 	*ierr = ZOLTAN_OK;
 	return 2;
-}
-void DomainSignatureCollection::coord(void *data, int num_gid_entries, int num_lid_entries,
+}*/
+/*void DomainSignatureCollection::coord(void *data, int num_gid_entries, int num_lid_entries,
                                       ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id,
                                       double *geom_vec, int *ierr){
 	DomainSignatureCollection *dsc = (DomainSignatureCollection *) data;
@@ -182,7 +182,7 @@ void DomainSignatureCollection::coord(void *data, int num_gid_entries, int num_l
 	auto &ds    = dsc->domains[*global_id];
 	geom_vec[0] = ds.id % dsc->d_y;
 	geom_vec[1] = ds.id % dsc->d_x;
-}
+}*/
 // query functions that respond to requests from Zoltan
 int DomainSignatureCollection::get_number_of_objects(void *data, int *ierr)
 {
