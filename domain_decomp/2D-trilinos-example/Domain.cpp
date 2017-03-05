@@ -18,27 +18,14 @@ Domain::Domain(DomainSignature ds, int nx, int ny, double h_x, double h_y)
 	boundary_east  = std::valarray<double>(ny);
 	boundary_west  = std::valarray<double>(ny);
 
-	if (ds.global_i_north != -1) {
-		global_i_north = ds.global_i_north * nx;
-		iface_i_north  = ds.global_i_north * 22;
-	}
-	if (ds.global_i_east != -1) {
-		global_i_east = ds.global_i_east * nx;
-		iface_i_east  = ds.global_i_east * 22;
-	}
-	if (ds.global_i_south != -1) {
-		global_i_south = ds.global_i_south * nx;
-		iface_i_south  = ds.global_i_south * 22;
-	}
-	if (ds.global_i_west != -1) {
-		global_i_west = ds.global_i_west * nx;
-		iface_i_west  = ds.global_i_west * 22;
+	for (int q = 0; q < 8; q++) {
+		if (ds.nbr[q] != -1) {
+			global_i[q] = ds.global_i[q] * nx;
+			iface_i[q]  = ds.global_i[q] * 22;
+		}
 	}
 
-	nbr_north = ds.nbr_north;
-	nbr_east  = ds.nbr_east;
-	nbr_south = ds.nbr_south;
-	nbr_west  = ds.nbr_west;
+	nbr = ds.nbr;
 
 	x_start  = ds.x_start;
 	y_start  = ds.y_start;
@@ -80,23 +67,23 @@ void Domain::planNeumann()
 	fftw_r2r_kind x_transform_inv = FFTW_RODFT01;
 	fftw_r2r_kind y_transform     = FFTW_RODFT10;
 	fftw_r2r_kind y_transform_inv = FFTW_RODFT01;
-	if (nbr_east == -1 && nbr_west == -1) {
+	if (nbr[2] == -1 && nbr[6] == -1) {
 		x_transform     = FFTW_REDFT10;
 		x_transform_inv = FFTW_REDFT01;
-	} else if (nbr_west == -1) {
+	} else if (nbr[6] == -1) {
 		x_transform     = FFTW_REDFT11;
 		x_transform_inv = FFTW_REDFT11;
-	} else if (nbr_east == -1) {
+	} else if (nbr[2] == -1) {
 		x_transform     = FFTW_RODFT11;
 		x_transform_inv = FFTW_RODFT11;
 	}
-	if (nbr_north == -1 && nbr_south == -1) {
+	if (nbr[0] == -1 && nbr[4] == -1) {
 		y_transform     = FFTW_REDFT10;
 		y_transform_inv = FFTW_REDFT01;
-	} else if (nbr_south == -1) {
+	} else if (nbr[4] == -1) {
 		y_transform     = FFTW_REDFT11;
 		y_transform_inv = FFTW_REDFT11;
-	} else if (nbr_north == -1) {
+	} else if (nbr[0] == -1) {
 		y_transform     = FFTW_RODFT11;
 		y_transform_inv = FFTW_RODFT11;
 	}
@@ -106,12 +93,12 @@ void Domain::planNeumann()
 	= fftw_plan_r2r_2d(ny, nx, &tmp[0], &u[0], y_transform_inv, x_transform_inv, FFTW_MEASURE);
 
 	// create denom vector
-	if (nbr_north == -1 && nbr_south == -1) {
+	if (nbr[0] == -1 && nbr[4] == -1) {
 		for (int yi = 0; yi < nx; yi++) {
 			denom[std::slice(yi * ny, nx, 1)]
 			= -4 / (h_x * h_x) * std::pow(std::sin(yi * M_PI / (2 * nx)), 2);
 		}
-	} else if (nbr_south == -1 || nbr_north == -1) {
+	} else if (nbr[4] == -1 || nbr[0] == -1) {
 		for (int yi = 0; yi < nx; yi++) {
 			denom[std::slice(yi * ny, nx, 1)]
 			= -4 / (h_x * h_x) * std::pow(std::sin((yi + 0.5) * M_PI / (2 * nx)), 2);
@@ -126,12 +113,12 @@ void Domain::planNeumann()
 	std::valarray<double> ones(ny);
 	ones = 1;
 
-	if (nbr_east == -1 && nbr_west == -1) {
+	if (nbr[2] == -1 && nbr[6] == -1) {
 		for (int xi = 0; xi < ny; xi++) {
 			denom[std::slice(xi, ny, nx)]
 			-= 4 / (h_y * h_y) * std::pow(std::sin(xi * M_PI / (2 * ny)), 2) * ones;
 		}
-	} else if (nbr_west == -1 || nbr_east == -1) {
+	} else if (nbr[6] == -1 || nbr[2] == -1) {
 		for (int xi = 0; xi < ny; xi++) {
 			denom[std::slice(xi, ny, nx)]
 			-= 4 / (h_y * h_y) * std::pow(std::sin((xi + 0.5) * M_PI / (2 * ny)), 2) * ones;
@@ -147,22 +134,22 @@ void Domain::planNeumann()
 void Domain::solve()
 {
 	f_copy = f;
-	if (nbr_north == -1 && neumann) {
+	if (nbr[0] == -1 && neumann) {
 		f_copy[std::slice(nx * (ny - 1), nx, 1)] -= 1 / h_y * boundary_north;
 	} else {
 		f_copy[std::slice(nx * (ny - 1), nx, 1)] -= 2 / (h_y * h_y) * boundary_north;
 	}
-	if (nbr_east == -1 && neumann) {
+	if (nbr[2] == -1 && neumann) {
 		f_copy[std::slice((nx - 1), ny, nx)] -= 1 / h_x * boundary_east;
 	} else {
 		f_copy[std::slice((nx - 1), ny, nx)] -= 2 / (h_x * h_x) * boundary_east;
 	}
-	if (nbr_south == -1 && neumann) {
+	if (nbr[4] == -1 && neumann) {
 		f_copy[std::slice(0, nx, 1)] += 1 / h_y * boundary_south;
 	} else {
 		f_copy[std::slice(0, nx, 1)] -= 2 / (h_y * h_y) * boundary_south;
 	}
-	if (nbr_west == -1 && neumann) {
+	if (nbr[6] == -1 && neumann) {
 		f_copy[std::slice(0, ny, nx)] += 1 / h_x * boundary_west;
 	} else {
 		f_copy[std::slice(0, ny, nx)] -= 2 / (h_x * h_x) * boundary_west;
@@ -172,7 +159,7 @@ void Domain::solve()
 
 	tmp /= denom;
 
-	if (neumann && nbr_north == -1 && nbr_east == -1 && nbr_south == -1 && nbr_west == -1) {
+	if (neumann && nbr[0] == -1 && nbr[2] == -1 && nbr[4] == -1 && nbr[6] == -1) {
 		tmp[0] = 0;
 	}
 
@@ -184,29 +171,29 @@ void Domain::solve()
 void Domain::putGhostCells(vector_type &ghost)
 {
 	auto ghost_view = ghost.getLocalView<Kokkos::HostSpace>();
-	if (nbr_north != -1) {
-		int curr_i = local_i_north;
+	if (nbr[0] != -1) {
+		int curr_i = local_i[0];
 		for (int i = 0; i < nx; i++) {
 			ghost_view(curr_i, 1) = u[nx * (ny - 1) + i];
 			curr_i++;
 		}
 	}
-	if (nbr_east != -1) {
-		int curr_i = local_i_east;
+	if (nbr[2] != -1) {
+		int curr_i = local_i[2];
 		for (int i = 0; i < ny; i++) {
 			ghost_view(curr_i, 1) = u[(i + 1) * nx - 1];
 			curr_i++;
 		}
 	}
-	if (nbr_south != -1) {
-		int curr_i = local_i_south;
+	if (nbr[4] != -1) {
+		int curr_i = local_i[4];
 		for (int i = 0; i < nx; i++) {
 			ghost_view(curr_i, 0) = u[i];
 			curr_i++;
 		}
 	}
-	if (nbr_west != -1) {
-		int curr_i = local_i_west;
+	if (nbr[6] != -1) {
+		int curr_i = local_i[6];
 		for (int i = 0; i < ny; i++) {
 			ghost_view(curr_i, 0) = u[i * nx];
 			curr_i++;
@@ -217,29 +204,29 @@ void Domain::putGhostCells(vector_type &ghost)
 double Domain::residual(vector_type &ghost)
 {
 	auto ghost_view = ghost.getLocalView<Kokkos::HostSpace>();
-	if (nbr_north != -1) {
-		int curr_i = local_i_north;
+	if (nbr[0] != -1) {
+		int curr_i = local_i[0];
 		for (int i = 0; i < nx; i++) {
 			boundary_north[i] = ghost_view(curr_i, 0);
 			curr_i++;
 		}
 	}
-	if (nbr_east != -1) {
-		int curr_i = local_i_east;
+	if (nbr[2] != -1) {
+		int curr_i = local_i[2];
 		for (int i = 0; i < ny; i++) {
 			boundary_east[i] = ghost_view(curr_i, 0);
 			curr_i++;
 		}
 	}
-	if (nbr_south != -1) {
-		int curr_i = local_i_south;
+	if (nbr[4] != -1) {
+		int curr_i = local_i[4];
 		for (int i = 0; i < nx; i++) {
 			boundary_south[i] = ghost_view(curr_i, 1);
 			curr_i++;
 		}
 	}
-	if (nbr_west != -1) {
-		int curr_i = local_i_west;
+	if (nbr[6] != -1) {
+		int curr_i = local_i[6];
 		for (int i = 0; i < ny; i++) {
 			boundary_west[i] = ghost_view(curr_i, 1);
 			curr_i++;
@@ -254,9 +241,9 @@ double Domain::residual(vector_type &ghost)
 		west   = boundary_west[j];
 		center = u[j * nx];
 		east   = u[j * nx + 1];
-		if (neumann && nbr_west == -1) {
+		if (neumann && nbr[6] == -1) {
 			f_comp[j * nx] = (-h_x * west - center + east) / (h_x * h_x);
-		} else if (nbr_west == -1) {
+		} else if (nbr[6] == -1) {
 			f_comp[j * nx] = (2 * west - 3 * center + east) / (h_x * h_x);
 		} else {
 			f_comp[j * nx] = (west - 2 * center + east) / (h_x * h_x);
@@ -277,9 +264,9 @@ double Domain::residual(vector_type &ghost)
 		west   = u[j * nx + nx - 2];
 		center = u[j * nx + nx - 1];
 		east   = boundary_east[j];
-		if (neumann && nbr_east == -1) {
+		if (neumann && nbr[2] == -1) {
 			f_comp[j * nx + nx - 1] = (west - center + h_x * east) / (h_x * h_x);
-		} else if (nbr_east == -1) {
+		} else if (nbr[2] == -1) {
 			f_comp[j * nx + nx - 1] = (west - 3 * center + 2 * east) / (h_x * h_x);
 		} else {
 			f_comp[j * nx + nx - 1] = (west - 2 * center + east) / (h_x * h_x);
@@ -290,9 +277,9 @@ double Domain::residual(vector_type &ghost)
 		south  = boundary_south[i];
 		center = u[i];
 		north  = u[nx + i];
-		if (neumann && nbr_south == -1) {
+		if (neumann && nbr[4] == -1) {
 			f_comp[i] += (-h_y * south - center + north) / (h_y * h_y);
-		} else if (nbr_south == -1) {
+		} else if (nbr[4] == -1) {
 			f_comp[i] += (2 * south - 3 * center + north) / (h_y * h_y);
 		} else {
 			f_comp[i] += (south - 2 * center + north) / (h_y * h_y);
@@ -313,9 +300,9 @@ double Domain::residual(vector_type &ghost)
 		south  = u[(ny - 2) * nx + i];
 		center = u[(ny - 1) * nx + i];
 		north  = boundary_north[i];
-		if (neumann && nbr_north == -1) {
+		if (neumann && nbr[0] == -1) {
 			f_comp[(ny - 1) * nx + i] += (south - center + h_y * north) / (h_y * h_y);
-		} else if (nbr_north == -1) {
+		} else if (nbr[0] == -1) {
 			f_comp[(ny - 1) * nx + i] += (south - 3 * center + 2 * north) / (h_y * h_y);
 		} else {
 			f_comp[(ny - 1) * nx + i] += (south - 2 * center + north) / (h_y * h_y);
@@ -329,33 +316,33 @@ void Domain::solveWithInterface(const vector_type &gamma, vector_type &diff)
 {
 	auto gamma_view = gamma.getLocalView<Kokkos::HostSpace>();
 	auto diff_view  = diff.getLocalView<Kokkos::HostSpace>();
-	if (nbr_north != -1) {
+	if (nbr[0] != -1) {
 		boundary_north = std::valarray<double>(nx);
-		int curr_i     = local_i_north;
+		int curr_i     = local_i[0];
 		for (int i = 0; i < nx; i++) {
 			boundary_north[i] = gamma_view(curr_i, 0);
 			curr_i++;
 		}
 	}
-	if (nbr_east != -1) {
+	if (nbr[2] != -1) {
 		boundary_east = std::valarray<double>(ny);
-		int curr_i    = local_i_east;
+		int curr_i    = local_i[2];
 		for (int i = 0; i < ny; i++) {
 			boundary_east[i] = gamma_view(curr_i, 0);
 			curr_i++;
 		}
 	}
-	if (nbr_south != -1) {
+	if (nbr[4] != -1) {
 		boundary_south = std::valarray<double>(nx);
-		int curr_i     = local_i_south;
+		int curr_i     = local_i[4];
 		for (int i = 0; i < nx; i++) {
 			boundary_south[i] = gamma_view(curr_i, 0);
 			curr_i++;
 		}
 	}
-	if (nbr_west != -1) {
+	if (nbr[6] != -1) {
 		boundary_west = std::valarray<double>(ny);
-		int curr_i    = local_i_west;
+		int curr_i    = local_i[6];
 		for (int i = 0; i < ny; i++) {
 			boundary_west[i] = gamma_view(curr_i, 0);
 			curr_i++;
@@ -369,29 +356,29 @@ void Domain::solveWithInterface(const vector_type &gamma, vector_type &diff)
 	// local_vector.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
 	// if(has_east)std::cout <<"LOCAL zero\n";
 	// local_vector.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
-	if (nbr_north != -1) {
-		int curr_i = local_i_north;
+	if (nbr[0] != -1) {
+		int curr_i = local_i[0];
 		for (int i = 0; i < nx; i++) {
 			diff_view(curr_i, 0) += u[nx * (ny - 1) + i];
 			curr_i++;
 		}
 	}
-	if (nbr_east != -1) {
-		int curr_i = local_i_east;
+	if (nbr[2] != -1) {
+		int curr_i = local_i[2];
 		for (int i = 0; i < ny; i++) {
 			diff_view(curr_i, 0) += u[(i + 1) * nx - 1];
 			curr_i++;
 		}
 	}
-	if (nbr_south != -1) {
-		int curr_i = local_i_south;
+	if (nbr[4] != -1) {
+		int curr_i = local_i[4];
 		for (int i = 0; i < nx; i++) {
 			diff_view(curr_i, 0) += u[i];
 			curr_i++;
 		}
 	}
-	if (nbr_west != -1) {
-		int curr_i = local_i_west;
+	if (nbr[6] != -1) {
+		int curr_i = local_i[6];
 		for (int i = 0; i < ny; i++) {
 			diff_view(curr_i, 0) += u[i * nx];
 			curr_i++;

@@ -1,6 +1,7 @@
 #ifndef DOMAINSIGNATURECOLLECTION_H
 #define DOMAINSIGNATURECOLLECTION_H
 #include <map>
+#include <array>
 #include <zoltan_cpp.h>
 /**
  * @brief A structure that represents a domain and its relation to other domains.
@@ -10,65 +11,10 @@ struct DomainSignature {
 	 * @brief The domain's own id
 	 */
 	int id;
-	/**
-	 * @brief The id of the neighbor to it's north.
-	 * It should be set to -1 if there is no neighbor.
-	 */
-	int nbr_north = -1;
-	/**
-	 * @brief The id of the neighbor to it's south.
-	 * It should be set to -1 if there is no neighbor.
-	 */
-	int nbr_south = -1;
-	/**
-	 * @brief The id of the neighbor to it's east.
-	 * It should be set to -1 if there is no neighbor.
-	 */
-	int nbr_east = -1;
-	/**
-	 * @brief The id of the neighbor to it's west.
-	 * It should be set to -1 if there is no neighbor.
-	 */
-	int nbr_west = -1;
-	/**
-	 * @brief The processor id that it's neighbor to the north resides on.
-	 * It should be set to -1 if there is no neighbor.
-	 */
-	int proc_north = -1;
-	/**
-	 * @brief The processor id that it's neighbor to the south resides on.
-	 * It should be set to -1 if there is no neighbor.
-	 */
-	int proc_south = -1;
-	/**
-	 * @brief The processor id that it's neighbor to the east resides on.
-	 * It should be set to -1 if there is no neighbor.
-	 */
-	int proc_east = -1;
-	/**
-	 * @brief The processor id that it's neighbor to the west resides on.
-	 * It should be set to -1 if there is no neighbor.
-	 */
-	int proc_west = -1;
-	/**
-	 * @brief The northern interface's index in the interface array.
-	 * It should be set to -1 if there is no neighbor.
-	 */
-	int global_i_north = -1;
-	/**
-	 * @brief The southern interface's index in the interface array.
-	 * It should be set to -1 if there is no neighbor.
-	 */
-	int global_i_south = -1;
-	/**
-	 * @brief The eastern interface's index in the interface array.
-	 * It should be set to -1 if there is no neighbor.
-	 */
-	int global_i_east = -1;
-	/**
-	 * @brief The western interface's index in the interface array.
-	 * It should be set to -1 if there is no neighbor.
-	 */
+
+	std::array<int, 8> nbr      = {-1, -1, -1, -1, -1, -1, -1, -1};
+	std::array<int, 8> proc     = {-1, -1, -1, -1, -1, -1, -1, -1};
+	std::array<int, 8> global_i = {-1, -1, -1, -1, -1, -1, -1, -1};
 	int global_i_west = -1;
 	/**
 	 * @brief The lower left x coordinate of domain

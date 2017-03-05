@@ -90,19 +90,19 @@ void DomainCollection::initNeumann(function<double(double, double)> ffun,
 				f[yi * n + xi]     = ffun(x, y);
 				exact[yi * n + xi] = efun(x, y);
 				// west
-				if (d.nbr_west == -1) {
+				if (d.nbr[6] == -1) {
 					d.boundary_west[yi] = nfunx(0.0, y);
 				}
 				// east
-				if (d.nbr_east == -1) {
+				if (d.nbr[2] == -1) {
 					d.boundary_east[yi] = nfunx(1.0, y);
 				}
 				// south
-				if (d.nbr_south == -1) {
+				if (d.nbr[4] == -1) {
 					d.boundary_south[xi] = nfuny(x, 0.0);
 				}
 				// north
-				if (d.nbr_north == -1) {
+				if (d.nbr[0] == -1) {
 					d.boundary_north[xi] = nfuny(x, 1.0);
 				}
 			}
@@ -131,16 +131,16 @@ void DomainCollection::initDirichlet(function<double(double, double)> ffun,
 				double y           = d.y_start + h_y / 2.0 + d.y_length * yi / n;
 				f[yi * n + xi]     = ffun(x, y);
 				exact[yi * n + xi] = gfun(x, y);
-				if (d.nbr_west == -1) {
+				if (d.nbr[6] == -1) {
 					d.boundary_west[yi] = gfun(0.0, y);
 				}
-				if (d.nbr_east == -1) {
+				if (d.nbr[2] == -1) {
 					d.boundary_east[yi] = gfun(1.0, y);
 				}
-				if (d.nbr_south == -1) {
+				if (d.nbr[4] == -1) {
 					d.boundary_south[xi] = gfun(x, 0.0);
 				}
-				if (d.nbr_north == -1) {
+				if (d.nbr[0] == -1) {
 					d.boundary_north[xi] = gfun(x, 1.0);
 				}
 			}
@@ -178,119 +178,38 @@ void DomainCollection::generateMaps()
 			queue.pop_front();
 			visited.insert(curr);
             not_visited.erase(curr);
-			if (d.nbr_north != -1 && visited.count(d.nbr_north) == 0) {
-				// a new edge that we have not assigned an index to
-				try {
-					Domain &nbr             = *domains.at(d.nbr_north);
-					nbr.local_i_south       = curr_i;
-					nbr.iface_local_i_south = curr_c_i;
-					if (enqueued.count(d.nbr_north) == 0) {
-						queue.push_back(d.nbr_north);
-						enqueued.insert(d.nbr_north);
+			for (int q = 0; q < 8; q++) {
+				if (d.nbr[q] != -1 && visited.count(d.nbr[q]) == 0) {
+					// a new edge that we have not assigned an index to
+					try {
+						Domain &nbr   = *domains.at(d.nbr[q]);
+						int     nbr_q = -1;
+						do {
+							nbr_q++;
+						} while (nbr.nbr[nbr_q] != curr);
+						nbr.local_i[nbr_q]       = curr_i;
+						nbr.iface_local_i[nbr_q] = curr_c_i;
+						if (enqueued.count(d.nbr[q]) == 0) {
+							queue.push_back(d.nbr[q]);
+							enqueued.insert(d.nbr[q]);
+						}
+					} catch (const out_of_range &oor) {
+						// do nothing
 					}
-				} catch (const out_of_range &oor) {
-					// do nothing
-				}
-				d.local_i_north       = curr_i;
-				d.iface_local_i_north = curr_c_i;
-				for (int i = 0; i < 22; i++) {
-					c_iface_global.push_back(d.iface_i_north + i);
-					iface_global.push_back(d.iface_i_north + i);
-					curr_c_i++;
-				}
-				for (int i = 0; i < n; i++) {
-					global.push_back(d.global_i_north + i);
-					matrix_global.push_back(d.global_i_north + i);
-					curr_matrix_i++;
-				}
-				curr_i += n;
-			}
-			if (d.nbr_east != -1 && visited.count(d.nbr_east) == 0) {
-				// a new edge that we have not assigned an index to
-				try {
-					Domain &nbr            = *domains.at(d.nbr_east);
-					nbr.local_i_west       = curr_i;
-					nbr.iface_local_i_west = curr_c_i;
-					if (enqueued.count(d.nbr_east) == 0) {
-						queue.push_back(d.nbr_east);
-						enqueued.insert(d.nbr_east);
-					}
-				} catch (const out_of_range &oor) {
-					// do nothing
-				}
-				d.local_i_east       = curr_i;
-				d.iface_local_i_east = curr_c_i;
-				for (int i = 0; i < 22; i++) {
-					c_iface_global.push_back(d.iface_i_east + i);
-					iface_global.push_back(d.iface_i_east + i);
-					curr_c_i++;
-				}
-				for (int i = 0; i < n; i++) {
-					global.push_back(d.global_i_east + i);
-					matrix_global.push_back(d.global_i_east + i);
-					curr_matrix_i++;
-				}
-				curr_i += n;
-			}
-			if (d.nbr_south != -1 && visited.count(d.nbr_south) == 0) {
-				// a new edge that we have not assigned an index to
-				try {
-					Domain &nbr             = *domains.at(d.nbr_south);
-					nbr.local_i_north       = curr_i;
-					nbr.iface_local_i_north = curr_c_i;
-					if (enqueued.count(d.nbr_south) == 0) {
-						queue.push_back(d.nbr_south);
-						enqueued.insert(d.nbr_south);
-					}
+					d.local_i[q]       = curr_i;
+					d.iface_local_i[q] = curr_c_i;
 					for (int i = 0; i < 22; i++) {
-						iface_global.push_back(d.iface_i_south + i);
+						c_iface_global.push_back(d.iface_i[q] + i);
+						iface_global.push_back(d.iface_i[q] + i);
+						curr_c_i++;
 					}
 					for (int i = 0; i < n; i++) {
-						matrix_global.push_back(d.global_i_south + i);
+						global.push_back(d.global_i[q] + i);
+						matrix_global.push_back(d.global_i[q] + i);
+						curr_matrix_i++;
 					}
-				} catch (const out_of_range &oor) {
-					// do nothing
+					curr_i += n;
 				}
-				d.local_i_south       = curr_i;
-				d.iface_local_i_south = curr_c_i;
-				for (int i = 0; i < 22; i++) {
-					c_iface_global.push_back(d.iface_i_south + i);
-					curr_c_i++;
-				}
-				for (int i = 0; i < n; i++) {
-					global.push_back(d.global_i_south + i);
-				}
-				curr_i += n;
-			}
-			if (d.nbr_west != -1 && visited.count(d.nbr_west) == 0) {
-				// a new edge that we have not assigned an index to
-				try {
-					Domain &nbr            = *domains.at(d.nbr_west);
-					nbr.local_i_east       = curr_i;
-					nbr.iface_local_i_east = curr_c_i;
-					if (enqueued.count(d.nbr_west) == 0) {
-						queue.push_back(d.nbr_west);
-						enqueued.insert(d.nbr_west);
-					}
-					for (int i = 0; i < 22; i++) {
-						iface_global.push_back(d.iface_i_west + i);
-					}
-					for (int i = 0; i < n; i++) {
-						matrix_global.push_back(d.global_i_west + i);
-					}
-				} catch (const out_of_range &oor) {
-					// do nothing
-				}
-				d.local_i_west       = curr_i;
-				d.iface_local_i_west = curr_c_i;
-				for (int i = 0; i < 22; i++) {
-					c_iface_global.push_back(d.iface_i_west + i);
-					curr_c_i++;
-				}
-				for (int i = 0; i < n; i++) {
-					global.push_back(d.global_i_west + i);
-				}
-				curr_i += n;
 			}
 		}
 	}
@@ -319,122 +238,122 @@ void DomainCollection::distributeIfaceInfo(){
 	auto             dist_view = dist.getLocalView<Kokkos::HostSpace>();
 	for (auto &p : domains) {
 		Domain &d2 = *p.second;
-		if (d2.nbr_north != -1) {
-			//dist_view(d2.iface_local_i_north, 0)      = d2.global_i_north;
-			//dist_view(d2.iface_local_i_north + 1, 0)  = 0;
-			//dist_view(d2.iface_local_i_north + 2, 0)  = n;
-			dist_view(d2.iface_local_i_north + 12, 0) = d2.global_i_east;
-			if (d2.neumann && d2.nbr_east == -1) {
-				dist_view(d2.iface_local_i_north + 13, 0) = NEUMANN;
+		if (d2.nbr[0] != -1) {
+			//dist_view(d2.iface_local_i[0], 0)      = d2.global_i[0];
+			//dist_view(d2.iface_local_i[0] + 1, 0)  = 0;
+			//dist_view(d2.iface_local_i[0] + 2, 0)  = n;
+			dist_view(d2.iface_local_i[0] + 12, 0) = d2.global_i[2];
+			if (d2.neumann && d2.nbr[2] == -1) {
+				dist_view(d2.iface_local_i[0] + 13, 0) = NEUMANN;
 			} else {
-				dist_view(d2.iface_local_i_north + 13, 0) = DIRICHLET;
+				dist_view(d2.iface_local_i[0] + 13, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_north + 14, 0) = n;
-			dist_view(d2.iface_local_i_north + 15, 0) = d2.global_i_south;
-			if (d2.neumann && d2.nbr_south == -1) {
-				dist_view(d2.iface_local_i_north + 16, 0) = NEUMANN;
+			dist_view(d2.iface_local_i[0] + 14, 0) = n;
+			dist_view(d2.iface_local_i[0] + 15, 0) = d2.global_i[4];
+			if (d2.neumann && d2.nbr[4] == -1) {
+				dist_view(d2.iface_local_i[0] + 16, 0) = NEUMANN;
 			} else {
-				dist_view(d2.iface_local_i_north + 16, 0) = DIRICHLET;
+				dist_view(d2.iface_local_i[0] + 16, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_north + 17, 0) = n;
-			dist_view(d2.iface_local_i_north + 18, 0) = d2.global_i_west;
-			if (d2.neumann && d2.nbr_west == -1) {
-				dist_view(d2.iface_local_i_north + 19, 0) = NEUMANN;
+			dist_view(d2.iface_local_i[0] + 17, 0) = n;
+			dist_view(d2.iface_local_i[0] + 18, 0) = d2.global_i[6];
+			if (d2.neumann && d2.nbr[6] == -1) {
+				dist_view(d2.iface_local_i[0] + 19, 0) = NEUMANN;
 			} else {
-				dist_view(d2.iface_local_i_north + 19, 0) = DIRICHLET;
+				dist_view(d2.iface_local_i[0] + 19, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_north + 20, 0) = n;
-			dist_view(d2.iface_local_i_north + 21, 0) = X_AXIS;
+			dist_view(d2.iface_local_i[0] + 20, 0) = n;
+			dist_view(d2.iface_local_i[0] + 21, 0) = X_AXIS;
 		}
-		if (d2.nbr_east != -1) {
-			//dist_view(d2.iface_local_i_east, 0)      = d2.global_i_east;
-			//dist_view(d2.iface_local_i_east + 1, 0)  = 0;
-			//dist_view(d2.iface_local_i_east + 2, 0)  = n;
-			dist_view(d2.iface_local_i_east + 12, 0) = d2.global_i_south;
-			if (d2.neumann && d2.nbr_south == -1) {
-				dist_view(d2.iface_local_i_east + 13, 0) = NEUMANN;
+		if (d2.nbr[2] != -1) {
+			//dist_view(d2.iface_local_i[2], 0)      = d2.global_i[2];
+			//dist_view(d2.iface_local_i[2] + 1, 0)  = 0;
+			//dist_view(d2.iface_local_i[2] + 2, 0)  = n;
+			dist_view(d2.iface_local_i[2] + 12, 0) = d2.global_i[4];
+			if (d2.neumann && d2.nbr[4] == -1) {
+				dist_view(d2.iface_local_i[2] + 13, 0) = NEUMANN;
 			} else {
-				dist_view(d2.iface_local_i_east + 13, 0) = DIRICHLET;
+				dist_view(d2.iface_local_i[2] + 13, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_east + 14, 0) = n;
-			dist_view(d2.iface_local_i_east + 15, 0) = d2.global_i_west;
-			if (d2.neumann && d2.nbr_west == -1) {
-				dist_view(d2.iface_local_i_east + 16, 0) = NEUMANN;
+			dist_view(d2.iface_local_i[2] + 14, 0) = n;
+			dist_view(d2.iface_local_i[2] + 15, 0) = d2.global_i[6];
+			if (d2.neumann && d2.nbr[6] == -1) {
+				dist_view(d2.iface_local_i[2] + 16, 0) = NEUMANN;
 			} else {
-				dist_view(d2.iface_local_i_east + 16, 0) = DIRICHLET;
+				dist_view(d2.iface_local_i[2] + 16, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_east + 17, 0) = n;
-			dist_view(d2.iface_local_i_east + 18, 0) = d2.global_i_north;
-			if (d2.neumann && d2.nbr_north == -1) {
-				dist_view(d2.iface_local_i_east + 19, 0) = NEUMANN;
+			dist_view(d2.iface_local_i[2] + 17, 0) = n;
+			dist_view(d2.iface_local_i[2] + 18, 0) = d2.global_i[0];
+			if (d2.neumann && d2.nbr[0] == -1) {
+				dist_view(d2.iface_local_i[2] + 19, 0) = NEUMANN;
 			} else {
-				dist_view(d2.iface_local_i_east + 19, 0) = DIRICHLET;
+				dist_view(d2.iface_local_i[2] + 19, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_east + 20, 0) = n;
-			dist_view(d2.iface_local_i_east + 21, 0) = Y_AXIS;
+			dist_view(d2.iface_local_i[2] + 20, 0) = n;
+			dist_view(d2.iface_local_i[2] + 21, 0) = Y_AXIS;
 		}
-		if (d2.nbr_south != -1) {
-			dist_view(d2.iface_local_i_south, 0)      = d2.global_i_south;
-			dist_view(d2.iface_local_i_south + 1, 0)  = 0;
-			if (d2.neumann && d2.nbr_south == -1) {
-				dist_view(d2.iface_local_i_south + 1, 0) = NEUMANN;
+		if (d2.nbr[4] != -1) {
+			dist_view(d2.iface_local_i[4], 0)      = d2.global_i[4];
+			dist_view(d2.iface_local_i[4] + 1, 0)  = 0;
+			if (d2.neumann && d2.nbr[4] == -1) {
+				dist_view(d2.iface_local_i[4] + 1, 0) = NEUMANN;
 			} else {
-				dist_view(d2.iface_local_i_south + 1, 0) = DIRICHLET;
+				dist_view(d2.iface_local_i[4] + 1, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_south + 2, 0)  = n;
-			dist_view(d2.iface_local_i_south + 3, 0)  = d2.global_i_west;
-			if (d2.neumann && d2.nbr_west == -1) {
-				dist_view(d2.iface_local_i_south + 4, 0) = NEUMANN;
+			dist_view(d2.iface_local_i[4] + 2, 0)  = n;
+			dist_view(d2.iface_local_i[4] + 3, 0)  = d2.global_i[6];
+			if (d2.neumann && d2.nbr[6] == -1) {
+				dist_view(d2.iface_local_i[4] + 4, 0) = NEUMANN;
 			} else {
-				dist_view(d2.iface_local_i_south + 4, 0) = DIRICHLET;
+				dist_view(d2.iface_local_i[4] + 4, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_south + 5, 0)  = n;
-			dist_view(d2.iface_local_i_south + 6, 0)  = d2.global_i_north;
-			if (d2.neumann && d2.nbr_north == -1) {
-				dist_view(d2.iface_local_i_south + 7, 0) = NEUMANN;
+			dist_view(d2.iface_local_i[4] + 5, 0)  = n;
+			dist_view(d2.iface_local_i[4] + 6, 0)  = d2.global_i[0];
+			if (d2.neumann && d2.nbr[0] == -1) {
+				dist_view(d2.iface_local_i[4] + 7, 0) = NEUMANN;
 			} else {
-				dist_view(d2.iface_local_i_south + 7, 0) = DIRICHLET;
+				dist_view(d2.iface_local_i[4] + 7, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_south + 8, 0)  = n;
-			dist_view(d2.iface_local_i_south + 9, 0)  = d2.global_i_east;
-			if (d2.neumann && d2.nbr_east == -1) {
-				dist_view(d2.iface_local_i_south + 10, 0) = NEUMANN;
+			dist_view(d2.iface_local_i[4] + 8, 0)  = n;
+			dist_view(d2.iface_local_i[4] + 9, 0)  = d2.global_i[2];
+			if (d2.neumann && d2.nbr[2] == -1) {
+				dist_view(d2.iface_local_i[4] + 10, 0) = NEUMANN;
 			} else {
-				dist_view(d2.iface_local_i_south + 10, 0) = DIRICHLET;
+				dist_view(d2.iface_local_i[4] + 10, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_south + 11, 0) = n;
-			//dist_view(d2.iface_local_i_south + 21, 0) = X_AXIS;
+			dist_view(d2.iface_local_i[4] + 11, 0) = n;
+			//dist_view(d2.iface_local_i[4] + 21, 0) = X_AXIS;
 		}
-		if (d2.nbr_west != -1) {
-			dist_view(d2.iface_local_i_west, 0)      = d2.global_i_west;
-			if (d2.neumann && d2.nbr_west == -1) {
-				dist_view(d2.iface_local_i_west + 1, 0) = NEUMANN;
+		if (d2.nbr[6] != -1) {
+			dist_view(d2.iface_local_i[6], 0)      = d2.global_i[6];
+			if (d2.neumann && d2.nbr[6] == -1) {
+				dist_view(d2.iface_local_i[6] + 1, 0) = NEUMANN;
 			} else {
-				dist_view(d2.iface_local_i_west + 1, 0) = DIRICHLET;
+				dist_view(d2.iface_local_i[6] + 1, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_west + 2, 0) = n;
-			dist_view(d2.iface_local_i_west + 3, 0) = d2.global_i_north;
-			if (d2.neumann && d2.nbr_north == -1) {
-				dist_view(d2.iface_local_i_west + 4, 0) = NEUMANN;
+			dist_view(d2.iface_local_i[6] + 2, 0) = n;
+			dist_view(d2.iface_local_i[6] + 3, 0) = d2.global_i[0];
+			if (d2.neumann && d2.nbr[0] == -1) {
+				dist_view(d2.iface_local_i[6] + 4, 0) = NEUMANN;
 			} else {
-				dist_view(d2.iface_local_i_west + 4, 0) = DIRICHLET;
+				dist_view(d2.iface_local_i[6] + 4, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_west + 5, 0) = n;
-			dist_view(d2.iface_local_i_west + 6, 0) = d2.global_i_east;
-			if (d2.neumann && d2.nbr_east == -1) {
-				dist_view(d2.iface_local_i_west + 7, 0) = NEUMANN;
+			dist_view(d2.iface_local_i[6] + 5, 0) = n;
+			dist_view(d2.iface_local_i[6] + 6, 0) = d2.global_i[2];
+			if (d2.neumann && d2.nbr[2] == -1) {
+				dist_view(d2.iface_local_i[6] + 7, 0) = NEUMANN;
 			} else {
-				dist_view(d2.iface_local_i_west + 7, 0) = DIRICHLET;
+				dist_view(d2.iface_local_i[6] + 7, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_west + 8, 0) = n;
-			dist_view(d2.iface_local_i_west + 9, 0) = d2.global_i_south;
-			if (d2.neumann && d2.nbr_south == -1) {
-				dist_view(d2.iface_local_i_west + 10, 0) = NEUMANN;
+			dist_view(d2.iface_local_i[6] + 8, 0) = n;
+			dist_view(d2.iface_local_i[6] + 9, 0) = d2.global_i[4];
+			if (d2.neumann && d2.nbr[4] == -1) {
+				dist_view(d2.iface_local_i[6] + 10, 0) = NEUMANN;
 			} else {
-				dist_view(d2.iface_local_i_west + 10, 0) = DIRICHLET;
+				dist_view(d2.iface_local_i[6] + 10, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_west + 11, 0) = n;
-			// dist_view(d2.iface_local_i_west + 21, 0) = Y_AXIS;
+			dist_view(d2.iface_local_i[6] + 11, 0) = n;
+			// dist_view(d2.iface_local_i[6] + 21, 0) = Y_AXIS;
 		}
 	}
 	Tpetra::Export<> exporter(collection_iface_map, iface_map);
@@ -619,24 +538,24 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map, int delete_row)
 		// create domain representing curr_type
 		DomainSignature ds;
 		if (curr_type.t_north == NEUMANN) {
-			ds.nbr_north = -1;
+			ds.nbr[0] = -1;
 		} else {
-			ds.nbr_north = 1;
+			ds.nbr[0] = 1;
 		}
 		if (curr_type.t_east == NEUMANN) {
-			ds.nbr_east = -1;
+			ds.nbr[2] = -1;
 		} else {
-			ds.nbr_east = 1;
+			ds.nbr[2] = 1;
 		}
 		if (curr_type.t_south == NEUMANN) {
-			ds.nbr_south = -1;
+			ds.nbr[4] = -1;
 		} else {
-			ds.nbr_south = 1;
+			ds.nbr[4] = 1;
 		}
 		if (curr_type.t_west == NEUMANN) {
-			ds.nbr_west = -1;
+			ds.nbr[6] = -1;
 		} else {
-			ds.nbr_west = 1;
+			ds.nbr[6] = 1;
 		}
 		Domain d(ds, n, n, h_x, h_y);
 
@@ -813,24 +732,24 @@ RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map, int del_row)
 		// create domain representing curr_type_left
 		DomainSignature ds;
 		if (curr_type_left.t_north == NEUMANN) {
-			ds.nbr_north = -1;
+			ds.nbr[0] = -1;
 		} else {
-			ds.nbr_north = 1;
+			ds.nbr[0] = 1;
 		}
 		if (curr_type_left.t_east == NEUMANN) {
-			ds.nbr_east = -1;
+			ds.nbr[2] = -1;
 		} else {
-			ds.nbr_east = 1;
+			ds.nbr[2] = 1;
 		}
 		if (curr_type_left.t_south == NEUMANN) {
-			ds.nbr_south = -1;
+			ds.nbr[4] = -1;
 		} else {
-			ds.nbr_south = 1;
+			ds.nbr[4] = 1;
 		}
 		if (curr_type_left.t_west == NEUMANN) {
-			ds.nbr_west = -1;
+			ds.nbr[6] = -1;
 		} else {
-			ds.nbr_west = 1;
+			ds.nbr[6] = 1;
 		}
 		Domain d_left(ds, n, n, h_x, h_y);
 		d_left.boundary_north = valarray<double>(n);
@@ -840,24 +759,24 @@ RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map, int del_row)
 		d_left.planNeumann();
 
 		if (curr_type_right.t_north == NEUMANN) {
-			ds.nbr_north = -1;
+			ds.nbr[0] = -1;
 		} else {
-			ds.nbr_north = 1;
+			ds.nbr[0] = 1;
 		}
 		if (curr_type_right.t_east == NEUMANN) {
-			ds.nbr_east = -1;
+			ds.nbr[2] = -1;
 		} else {
-			ds.nbr_east = 1;
+			ds.nbr[2] = 1;
 		}
 		if (curr_type_right.t_south == NEUMANN) {
-			ds.nbr_south = -1;
+			ds.nbr[4] = -1;
 		} else {
-			ds.nbr_south = 1;
+			ds.nbr[4] = 1;
 		}
 		if (curr_type_right.t_west == NEUMANN) {
-			ds.nbr_west = -1;
+			ds.nbr[6] = -1;
 		} else {
-			ds.nbr_west = 1;
+			ds.nbr[6] = 1;
 		}
 		Domain d_right(ds, n, n, h_x, h_y);
 		d_right.boundary_north = valarray<double>(n);
@@ -994,24 +913,24 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 		// create domain representing curr_type
 		DomainSignature ds;
 		if (curr_type.t_north == NEUMANN) {
-			ds.nbr_north = -1;
+			ds.nbr[0] = -1;
 		} else {
-			ds.nbr_north = 1;
+			ds.nbr[0] = 1;
 		}
 		if (curr_type.t_east == NEUMANN) {
-			ds.nbr_east = -1;
+			ds.nbr[2] = -1;
 		} else {
-			ds.nbr_east = 1;
+			ds.nbr[2] = 1;
 		}
 		if (curr_type.t_south == NEUMANN) {
-			ds.nbr_south = -1;
+			ds.nbr[4] = -1;
 		} else {
-			ds.nbr_south = 1;
+			ds.nbr[4] = 1;
 		}
 		if (curr_type.t_west == NEUMANN) {
-			ds.nbr_west = -1;
+			ds.nbr[6] = -1;
 		} else {
-			ds.nbr_west = 1;
+			ds.nbr[6] = 1;
 		}
 		Domain d(ds, n, n, h_x, h_y);
 		d.boundary_north = valarray<double>(n);

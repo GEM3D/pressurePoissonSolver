@@ -7,6 +7,7 @@
 #include <cmath>
 #include <fftw3.h>
 #include <valarray>
+#include <array>
 class Domain
 {
 	public:
@@ -26,26 +27,11 @@ class Domain
 	std::valarray<double>  boundary_south;
 	std::valarray<double>  boundary_east;
 	std::valarray<double>  boundary_west;
-	int                    nbr_north           = -1;
-	int                    nbr_east            = -1;
-	int                    nbr_south           = -1;
-	int                    nbr_west            = -1;
-	int                    local_i_north       = -1;
-	int                    local_i_east        = -1;
-	int                    local_i_south       = -1;
-	int                    local_i_west        = -1;
-	int                    global_i_north      = -1;
-	int                    global_i_east       = -1;
-	int                    global_i_south      = -1;
-	int                    global_i_west       = -1;
-	int                    iface_i_north       = -1;
-	int                    iface_i_east        = -1;
-	int                    iface_i_south       = -1;
-	int                    iface_i_west        = -1;
-	int                    iface_local_i_north = -1;
-	int                    iface_local_i_east  = -1;
-	int                    iface_local_i_south = -1;
-	int                    iface_local_i_west  = -1;
+	std::array<int, 8> nbr           = {-1, -1, -1, -1, -1, -1, -1, -1};
+	std::array<int, 8> local_i       = {-1, -1, -1, -1, -1, -1, -1, -1};
+	std::array<int, 8> global_i      = {-1, -1, -1, -1, -1, -1, -1, -1};
+	std::array<int, 8> iface_i       = {-1, -1, -1, -1, -1, -1, -1, -1};
+	std::array<int, 8> iface_local_i = {-1, -1, -1, -1, -1, -1, -1, -1};
 	Teuchos::RCP<map_type> domain_map;
 	fftw_plan              plan1;
 	fftw_plan              plan2;
@@ -55,7 +41,7 @@ class Domain
 	double                 x_length = 0;
 	double                 y_length = 0;
 
-	Domain() {}
+	Domain() = default;
 	Domain(DomainSignature ds, int nx, int ny, double h_x, double h_y);
 	~Domain();
 

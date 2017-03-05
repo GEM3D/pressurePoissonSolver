@@ -12,20 +12,20 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank)
 				DomainSignature ds;
 				ds.id = domain_y * d_x + domain_x;
 				if (domain_y != d_y - 1) {
-					ds.nbr_north  = (domain_y + 1) * d_x + domain_x;
-					ds.proc_north = 0;
+					ds.nbr[0]  = (domain_y + 1) * d_x + domain_x;
+					ds.proc[0] = 0;
 				}
 				if (domain_x != d_x - 1) {
-					ds.nbr_east  = domain_y * d_x + domain_x + 1;
-					ds.proc_east = 0;
+					ds.nbr[2]  = domain_y * d_x + domain_x + 1;
+					ds.proc[2] = 0;
 				}
 				if (domain_y != 0) {
-					ds.nbr_south  = (domain_y - 1) * d_x + domain_x;
-					ds.proc_south = 0;
+					ds.nbr[4]  = (domain_y - 1) * d_x + domain_x;
+					ds.proc[4] = 0;
 				}
 				if (domain_x != 0) {
-					ds.nbr_west  = domain_y * d_x + domain_x - 1;
-					ds.proc_west = 0;
+					ds.nbr[6]  = domain_y * d_x + domain_x - 1;
+					ds.proc[6] = 0;
 				}
 				ds.x_length    = 1.0 / d_x;
 				ds.y_length    = 1.0 / d_y;
@@ -51,49 +51,25 @@ void DomainSignatureCollection::indexInterfacesBFS()
 		DomainSignature &d    = domains.at(curr);
 		queue.pop_front();
 		visited.insert(curr);
-		if (d.nbr_north != -1 && visited.count(d.nbr_north) == 0) {
-			// a new edge that we have not assigned an index to
-			DomainSignature &nbr = domains.at(d.nbr_north);
-			d.global_i_north     = curr_i;
-			nbr.global_i_south   = curr_i;
-			if (enqueued.count(d.nbr_north) == 0) {
-				queue.push_back(d.nbr_north);
-				enqueued.insert(d.nbr_north);
+		for (int q = 0; q < 8; q++) {
+			if (d.nbr[q] != -1 && visited.count(d.nbr[q]) == 0) {
+				// a new edge that we have not assigned an index to
+				DomainSignature &nbr   = domains.at(d.nbr[q]);
+				int              nbr_q = -1;
+				for (int i = 0; i < 8; i++) {
+					if (nbr.nbr[i] == d.id) {
+						nbr_q = i;
+					}
+				}
+
+				d.global_i[q]       = curr_i;
+				nbr.global_i[nbr_q] = curr_i;
+				if (enqueued.count(d.nbr[q]) == 0) {
+					queue.push_back(d.nbr[q]);
+					enqueued.insert(d.nbr[q]);
+				}
+				curr_i++;
 			}
-			curr_i++;
-		}
-		if (d.nbr_east != -1 && visited.count(d.nbr_east) == 0) {
-			// a new edge that we have not assigned an index to
-			DomainSignature &nbr = domains.at(d.nbr_east);
-			d.global_i_east      = curr_i;
-			nbr.global_i_west    = curr_i;
-			if (enqueued.count(d.nbr_east) == 0) {
-				queue.push_back(d.nbr_east);
-				enqueued.insert(d.nbr_east);
-			}
-			curr_i++;
-		}
-		if (d.nbr_south != -1 && visited.count(d.nbr_south) == 0) {
-			// a new edge that we have not assigned an index to
-			DomainSignature &nbr = domains.at(d.nbr_south);
-			d.global_i_south     = curr_i;
-			nbr.global_i_north   = curr_i;
-			if (enqueued.count(d.nbr_south) == 0) {
-				queue.push_back(d.nbr_south);
-				enqueued.insert(d.nbr_south);
-			}
-			curr_i++;
-		}
-		if (d.nbr_west != -1 && visited.count(d.nbr_west) == 0) {
-			// a new edge that we have not assigned an index to
-			DomainSignature &nbr = domains.at(d.nbr_west);
-			d.global_i_west      = curr_i;
-			nbr.global_i_east    = curr_i;
-			if (enqueued.count(d.nbr_west) == 0) {
-				queue.push_back(d.nbr_west);
-				enqueued.insert(d.nbr_west);
-			}
-			curr_i++;
 		}
 	}
 }
@@ -210,12 +186,6 @@ void DomainSignatureCollection::get_object_list(void *data, int sizeGID, int siz
 	for (auto &p : dsc->domains) {
 		globalID[i] = p.first;
 		localID[i]  = p.first;
-		if (wgt_dim == 1) {
-			int weight = 0;
-			if (p.second.nbr_north != -1) weight += 1;
-			if (p.second.nbr_east != -1) weight += 1;
-			obj_wgts[i] = weight;
-		}
 		i++;
 	}
 	return;
@@ -240,21 +210,11 @@ void DomainSignatureCollection::pack_objects(void *data, int num_gid_entries, in
 	*ierr                          = ZOLTAN_OK;
 	for (int i = 0; i < num_ids; i++) {
 		auto &ds = dsc->domains[global_ids[i]];
-		if (ds.nbr_north != -1) {
-			auto &nbr          = dsc->domains[ds.nbr_north];
-			nbr.proc_south= dest[i];
-		}
-		if (ds.nbr_east != -1) {
-			auto &nbr         = dsc->domains[ds.nbr_east];
-			nbr.proc_west= dest[i];
-		}
-		if (ds.nbr_south != -1) {
-			auto &nbr          = dsc->domains[ds.nbr_south];
-			nbr.proc_north= dest[i];
-		}
-		if (ds.nbr_west != -1) {
-			auto &nbr         = dsc->domains[ds.nbr_west];
-			nbr.proc_east= dest[i];
+		for (int q = 0; q < 8; q++) {
+			if (ds.nbr[q] != -1) {
+				auto &nbr   = dsc->domains[ds.nbr[q]];
+				nbr.proc[q] = dest[i];
+			}
 		}
 	}
 	for (int i = 0; i < num_ids; i++) {
@@ -273,17 +233,17 @@ void DomainSignatureCollection::unpack_objects(void *data, int num_gid_entries, 
 	}
 }
 int DomainSignatureCollection::numInterfaces(void *data, int num_gid_entries, int num_lid_entries,
-                                              ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id,
-                                              int *ierr){
+                                             ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id,
+                                             int *ierr)
+{
 	DomainSignatureCollection *dsc = (DomainSignatureCollection *) data;
 	*ierr                          = ZOLTAN_OK;
 	auto &ds                       = dsc->domains[*global_id];
-    int num_iface=0;
-	if (ds.nbr_north != -1) num_iface++;
-	if (ds.nbr_east != -1) num_iface++;
-	if (ds.nbr_south != -1) num_iface++;
-	if (ds.nbr_west != -1) num_iface++;
-    return num_iface;
+	int   num_iface                = 0;
+	for (int q = 0; q < 8; q++) {
+		if (ds.nbr[q] != -1) num_iface++;
+	}
+	return num_iface;
 }
 void DomainSignatureCollection::interfaceList(void *data, int num_gid_entries, int num_lid_entries,
                                               ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id,
@@ -293,25 +253,12 @@ void DomainSignatureCollection::interfaceList(void *data, int num_gid_entries, i
 	DomainSignatureCollection *dsc = (DomainSignatureCollection *) data;
 	*ierr                          = ZOLTAN_OK;
 	auto &ds                       = dsc->domains[*global_id];
-    int i=0;
-	if (ds.nbr_north != -1){
-        nbor_global_id[i] = ds.nbr_north;
-        nbor_procs[i] = ds.proc_north;
-        i++;
-    }
-	if (ds.nbr_east != -1){
-        nbor_global_id[i] = ds.nbr_east;
-        nbor_procs[i] = ds.proc_east;
-        i++;
-    }
-	if (ds.nbr_south != -1){
-        nbor_global_id[i] = ds.nbr_south;
-        nbor_procs[i] = ds.proc_south;
-        i++;
-    }
-	if (ds.nbr_west != -1){
-        nbor_global_id[i] = ds.nbr_west;
-        nbor_procs[i] = ds.proc_west;
-        i++;
-    }
+	int   i                        = 0;
+	for (int q = 0; q < 8; q++) {
+		if (ds.nbr[q] != -1) {
+			nbor_global_id[i] = ds.nbr[q];
+			nbor_procs[i]     = ds.proc[q];
+			i++;
+		}
+	}
 }
