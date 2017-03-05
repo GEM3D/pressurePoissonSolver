@@ -14,8 +14,9 @@ void dgetri_(int *N, double *A, int *lda, int *IPIV, double *WORK, int *lwork, i
 enum axis_enum { X_AXIS, Y_AXIS };
 enum bc_enum { DIRICHLET, NEUMANN };
 
-class Iface{
-    public:
+class Iface
+{
+	public:
 	bool        right;
 	int         axis;
 	int         i_south;
@@ -32,7 +33,7 @@ class Iface{
 	int         t_east;
 	friend bool operator<(const Iface &l, const Iface &r)
 	{
-		return std::tie(l.i_south, l.right) < std::tie(r.i_south,r.right);
+		return std::tie(l.i_south, l.right) < std::tie(r.i_south, r.right);
 	}
 	friend bool operator==(const Iface &l, const Iface &r)
 	{
@@ -50,25 +51,22 @@ class Iface{
 	}
 };
 
-DomainCollection::DomainCollection(DomainSignatureCollection dsc, int nx, int ny, int d_x, int d_y,
-                                   double h_x, double h_y, RCP<const Teuchos::Comm<int>> comm)
+DomainCollection::DomainCollection(DomainSignatureCollection dsc, int n, double h_x, double h_y,
+                                   RCP<const Teuchos::Comm<int>> comm)
 {
 	// cerr<< "Low:  " << low << "\n";
 	// cerr<< "High: " << high << "\n";
 	this->comm         = comm;
-	this->nx           = nx;
-	this->ny           = ny;
+	this->n           = n;
 	this->h_x          = h_x;
 	this->h_y          = h_y;
-	this->d_x          = d_x;
-	this->d_y          = d_y;
-	num_global_domains = d_x * d_y;
+	num_global_domains = dsc.num_global_domains;
 	for (auto p : dsc.domains) {
 		DomainSignature ds       = p.second;
 		int             i        = ds.id;
 
 		// create a domain
-		RCP<Domain> d_ptr = rcp(new Domain(ds, nx, ny, h_x, h_y));
+		RCP<Domain> d_ptr = rcp(new Domain(ds, n, n, h_x, h_y));
 		domains[i]        = d_ptr;
 	}
 }
@@ -80,36 +78,31 @@ void DomainCollection::initNeumann(function<double(double, double)> ffun,
 {
 	for (auto &p : domains) {
 		Domain &d        = *p.second;
-		int     i        = p.first;
-		int     domain_x = i % d_y;
-		int     domain_y = i / d_x;
 
 		// Generate RHS vector
 		std::valarray<double> &f     = d.f;
 		std::valarray<double> &exact = d.exact;
 
-		for (int yi = 0; yi < ny; yi++) {
-			for (int xi = 0; xi < nx; xi++) {
-				int    index_x      = domain_x * nx + xi;
-				int    index_y      = domain_y * ny + yi;
-				double x            = h_x / 2.0 + 1.0 * index_x / (nx * d_x);
-				double y            = h_y / 2.0 + 1.0 * index_y / (ny * d_y);
-				f[yi * nx + xi]     = ffun(x, y);
-				exact[yi * nx + xi] = efun(x, y);
-                //west
-				if (index_x == 0) {
+		for (int yi = 0; yi < n; yi++) {
+			for (int xi = 0; xi < n; xi++) {
+				double x           = d.x_start + h_x / 2.0 + d.x_length * xi / n;
+				double y           = d.y_start + h_y / 2.0 + d.y_length * yi / n;
+				f[yi * n + xi]     = ffun(x, y);
+				exact[yi * n + xi] = efun(x, y);
+				// west
+				if (d.nbr_west == -1) {
 					d.boundary_west[yi] = nfunx(0.0, y);
 				}
-                //east
-				if (index_x == d_x * nx - 1) {
+				// east
+				if (d.nbr_east == -1) {
 					d.boundary_east[yi] = nfunx(1.0, y);
 				}
-                //south
-				if (index_y == 0) {
+				// south
+				if (d.nbr_south == -1) {
 					d.boundary_south[xi] = nfuny(x, 0.0);
 				}
-                //north
-				if (index_y == d_y * ny - 1) {
+				// north
+				if (d.nbr_north == -1) {
 					d.boundary_north[xi] = nfuny(x, 1.0);
 				}
 			}
@@ -127,31 +120,27 @@ void DomainCollection::initDirichlet(function<double(double, double)> ffun,
 {
 	for (auto &p : domains) {
 		Domain &d        = *p.second;
-		int     i        = p.first;
-		int     domain_x = i % d_y;
-		int     domain_y = i / d_x;
+
 		// Generate RHS vector
 		std::valarray<double> &f     = d.f;
 		std::valarray<double> &exact = d.exact;
 		// Use local indices to access the entries of f_data.
-		for (int yi = 0; yi < ny; yi++) {
-			for (int xi = 0; xi < nx; xi++) {
-				int    index_x      = domain_x * nx + xi;
-				int    index_y      = domain_y * ny + yi;
-				double x            = h_x / 2.0 + 1.0 * index_x / (nx * d_x);
-				double y            = h_y / 2.0 + 1.0 * index_y / (ny * d_y);
-				f[yi * nx + xi]     = ffun(x, y);
-				exact[yi * nx + xi] = gfun(x, y);
-				if (index_x == 0) {
+		for (int yi = 0; yi < n; yi++) {
+			for (int xi = 0; xi < n; xi++) {
+				double x           = d.x_start + h_x / 2.0 + d.x_length * xi / n;
+				double y           = d.y_start + h_y / 2.0 + d.y_length * yi / n;
+				f[yi * n + xi]     = ffun(x, y);
+				exact[yi * n + xi] = gfun(x, y);
+				if (d.nbr_west == -1) {
 					d.boundary_west[yi] = gfun(0.0, y);
 				}
-				if (index_x == d_x * nx - 1) {
+				if (d.nbr_east == -1) {
 					d.boundary_east[yi] = gfun(1.0, y);
 				}
-				if (index_y == 0) {
+				if (d.nbr_south == -1) {
 					d.boundary_south[xi] = gfun(x, 0.0);
 				}
-				if (index_y == d_y * ny - 1) {
+				if (d.nbr_north == -1) {
 					d.boundary_north[xi] = gfun(x, 1.0);
 				}
 			}
@@ -178,7 +167,7 @@ void DomainCollection::generateMaps()
 	vector<int> matrix_global;
 	int         curr_matrix_i = 0;
 	vector<int> iface_global;
-	global.reserve(num_domains * (2 * nx + 2 * ny));
+	global.reserve(domains.size() * (2 * n + 2 * n));
 	while (!not_visited.empty()) {
 		int first = *not_visited.begin();
 		queue.push_back(first);
@@ -209,12 +198,12 @@ void DomainCollection::generateMaps()
 					iface_global.push_back(d.iface_i_north + i);
 					curr_c_i++;
 				}
-				for (int i = 0; i < nx; i++) {
+				for (int i = 0; i < n; i++) {
 					global.push_back(d.global_i_north + i);
 					matrix_global.push_back(d.global_i_north + i);
 					curr_matrix_i++;
 				}
-				curr_i += nx;
+				curr_i += n;
 			}
 			if (d.nbr_east != -1 && visited.count(d.nbr_east) == 0) {
 				// a new edge that we have not assigned an index to
@@ -236,12 +225,12 @@ void DomainCollection::generateMaps()
 					iface_global.push_back(d.iface_i_east + i);
 					curr_c_i++;
 				}
-				for (int i = 0; i < ny; i++) {
+				for (int i = 0; i < n; i++) {
 					global.push_back(d.global_i_east + i);
 					matrix_global.push_back(d.global_i_east + i);
 					curr_matrix_i++;
 				}
-				curr_i += ny;
+				curr_i += n;
 			}
 			if (d.nbr_south != -1 && visited.count(d.nbr_south) == 0) {
 				// a new edge that we have not assigned an index to
@@ -256,7 +245,7 @@ void DomainCollection::generateMaps()
 					for (int i = 0; i < 22; i++) {
 						iface_global.push_back(d.iface_i_south + i);
 					}
-					for (int i = 0; i < nx; i++) {
+					for (int i = 0; i < n; i++) {
 						matrix_global.push_back(d.global_i_south + i);
 					}
 				} catch (const out_of_range &oor) {
@@ -268,10 +257,10 @@ void DomainCollection::generateMaps()
 					c_iface_global.push_back(d.iface_i_south + i);
 					curr_c_i++;
 				}
-				for (int i = 0; i < nx; i++) {
+				for (int i = 0; i < n; i++) {
 					global.push_back(d.global_i_south + i);
 				}
-				curr_i += nx;
+				curr_i += n;
 			}
 			if (d.nbr_west != -1 && visited.count(d.nbr_west) == 0) {
 				// a new edge that we have not assigned an index to
@@ -286,7 +275,7 @@ void DomainCollection::generateMaps()
 					for (int i = 0; i < 22; i++) {
 						iface_global.push_back(d.iface_i_west + i);
 					}
-					for (int i = 0; i < ny; i++) {
+					for (int i = 0; i < n; i++) {
 						matrix_global.push_back(d.global_i_west + i);
 					}
 				} catch (const out_of_range &oor) {
@@ -298,10 +287,10 @@ void DomainCollection::generateMaps()
 					c_iface_global.push_back(d.iface_i_west + i);
 					curr_c_i++;
 				}
-				for (int i = 0; i < ny; i++) {
+				for (int i = 0; i < n; i++) {
 					global.push_back(d.global_i_west + i);
 				}
-				curr_i += ny;
+				curr_i += n;
 			}
 		}
 	}
@@ -333,55 +322,55 @@ void DomainCollection::distributeIfaceInfo(){
 		if (d2.nbr_north != -1) {
 			//dist_view(d2.iface_local_i_north, 0)      = d2.global_i_north;
 			//dist_view(d2.iface_local_i_north + 1, 0)  = 0;
-			//dist_view(d2.iface_local_i_north + 2, 0)  = nx;
+			//dist_view(d2.iface_local_i_north + 2, 0)  = n;
 			dist_view(d2.iface_local_i_north + 12, 0) = d2.global_i_east;
 			if (d2.neumann && d2.nbr_east == -1) {
 				dist_view(d2.iface_local_i_north + 13, 0) = NEUMANN;
 			} else {
 				dist_view(d2.iface_local_i_north + 13, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_north + 14, 0) = ny;
+			dist_view(d2.iface_local_i_north + 14, 0) = n;
 			dist_view(d2.iface_local_i_north + 15, 0) = d2.global_i_south;
 			if (d2.neumann && d2.nbr_south == -1) {
 				dist_view(d2.iface_local_i_north + 16, 0) = NEUMANN;
 			} else {
 				dist_view(d2.iface_local_i_north + 16, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_north + 17, 0) = nx;
+			dist_view(d2.iface_local_i_north + 17, 0) = n;
 			dist_view(d2.iface_local_i_north + 18, 0) = d2.global_i_west;
 			if (d2.neumann && d2.nbr_west == -1) {
 				dist_view(d2.iface_local_i_north + 19, 0) = NEUMANN;
 			} else {
 				dist_view(d2.iface_local_i_north + 19, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_north + 20, 0) = ny;
+			dist_view(d2.iface_local_i_north + 20, 0) = n;
 			dist_view(d2.iface_local_i_north + 21, 0) = X_AXIS;
 		}
 		if (d2.nbr_east != -1) {
 			//dist_view(d2.iface_local_i_east, 0)      = d2.global_i_east;
 			//dist_view(d2.iface_local_i_east + 1, 0)  = 0;
-			//dist_view(d2.iface_local_i_east + 2, 0)  = ny;
+			//dist_view(d2.iface_local_i_east + 2, 0)  = n;
 			dist_view(d2.iface_local_i_east + 12, 0) = d2.global_i_south;
 			if (d2.neumann && d2.nbr_south == -1) {
 				dist_view(d2.iface_local_i_east + 13, 0) = NEUMANN;
 			} else {
 				dist_view(d2.iface_local_i_east + 13, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_east + 14, 0) = nx;
+			dist_view(d2.iface_local_i_east + 14, 0) = n;
 			dist_view(d2.iface_local_i_east + 15, 0) = d2.global_i_west;
 			if (d2.neumann && d2.nbr_west == -1) {
 				dist_view(d2.iface_local_i_east + 16, 0) = NEUMANN;
 			} else {
 				dist_view(d2.iface_local_i_east + 16, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_east + 17, 0) = ny;
+			dist_view(d2.iface_local_i_east + 17, 0) = n;
 			dist_view(d2.iface_local_i_east + 18, 0) = d2.global_i_north;
 			if (d2.neumann && d2.nbr_north == -1) {
 				dist_view(d2.iface_local_i_east + 19, 0) = NEUMANN;
 			} else {
 				dist_view(d2.iface_local_i_east + 19, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_east + 20, 0) = nx;
+			dist_view(d2.iface_local_i_east + 20, 0) = n;
 			dist_view(d2.iface_local_i_east + 21, 0) = Y_AXIS;
 		}
 		if (d2.nbr_south != -1) {
@@ -392,28 +381,28 @@ void DomainCollection::distributeIfaceInfo(){
 			} else {
 				dist_view(d2.iface_local_i_south + 1, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_south + 2, 0)  = nx;
+			dist_view(d2.iface_local_i_south + 2, 0)  = n;
 			dist_view(d2.iface_local_i_south + 3, 0)  = d2.global_i_west;
 			if (d2.neumann && d2.nbr_west == -1) {
 				dist_view(d2.iface_local_i_south + 4, 0) = NEUMANN;
 			} else {
 				dist_view(d2.iface_local_i_south + 4, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_south + 5, 0)  = ny;
+			dist_view(d2.iface_local_i_south + 5, 0)  = n;
 			dist_view(d2.iface_local_i_south + 6, 0)  = d2.global_i_north;
 			if (d2.neumann && d2.nbr_north == -1) {
 				dist_view(d2.iface_local_i_south + 7, 0) = NEUMANN;
 			} else {
 				dist_view(d2.iface_local_i_south + 7, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_south + 8, 0)  = nx;
+			dist_view(d2.iface_local_i_south + 8, 0)  = n;
 			dist_view(d2.iface_local_i_south + 9, 0)  = d2.global_i_east;
 			if (d2.neumann && d2.nbr_east == -1) {
 				dist_view(d2.iface_local_i_south + 10, 0) = NEUMANN;
 			} else {
 				dist_view(d2.iface_local_i_south + 10, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_south + 11, 0) = ny;
+			dist_view(d2.iface_local_i_south + 11, 0) = n;
 			//dist_view(d2.iface_local_i_south + 21, 0) = X_AXIS;
 		}
 		if (d2.nbr_west != -1) {
@@ -423,28 +412,28 @@ void DomainCollection::distributeIfaceInfo(){
 			} else {
 				dist_view(d2.iface_local_i_west + 1, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_west + 2, 0) = ny;
+			dist_view(d2.iface_local_i_west + 2, 0) = n;
 			dist_view(d2.iface_local_i_west + 3, 0) = d2.global_i_north;
 			if (d2.neumann && d2.nbr_north == -1) {
 				dist_view(d2.iface_local_i_west + 4, 0) = NEUMANN;
 			} else {
 				dist_view(d2.iface_local_i_west + 4, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_west + 5, 0) = nx;
+			dist_view(d2.iface_local_i_west + 5, 0) = n;
 			dist_view(d2.iface_local_i_west + 6, 0) = d2.global_i_east;
 			if (d2.neumann && d2.nbr_east == -1) {
 				dist_view(d2.iface_local_i_west + 7, 0) = NEUMANN;
 			} else {
 				dist_view(d2.iface_local_i_west + 7, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_west + 8, 0) = ny;
+			dist_view(d2.iface_local_i_west + 8, 0) = n;
 			dist_view(d2.iface_local_i_west + 9, 0) = d2.global_i_south;
 			if (d2.neumann && d2.nbr_south == -1) {
 				dist_view(d2.iface_local_i_west + 10, 0) = NEUMANN;
 			} else {
 				dist_view(d2.iface_local_i_west + 10, 0) = DIRICHLET;
 			}
-			dist_view(d2.iface_local_i_west + 11, 0) = nx;
+			dist_view(d2.iface_local_i_west + 11, 0) = n;
 			// dist_view(d2.iface_local_i_west + 21, 0) = Y_AXIS;
 		}
 	}
@@ -562,7 +551,7 @@ double DomainCollection::residual()
 }
 RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map, int delete_row)
 {
-	int              size = max(nx, ny);
+	int              size = max(n, n);
 	RCP<matrix_type> A    = rcp(new matrix_type(map, size * 6));
     // create iface objects
 	set<Iface> ifaces;
@@ -649,29 +638,29 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map, int delete_row)
 		} else {
 			ds.nbr_west = 1;
 		}
-		Domain d(ds, nx, ny, h_x, h_y);
+		Domain d(ds, n, n, h_x, h_y);
 
-		d.boundary_north = valarray<double>(nx);
-		d.boundary_south = valarray<double>(nx);
-		d.boundary_east  = valarray<double>(ny);
-		d.boundary_west  = valarray<double>(ny);
+		d.boundary_north = valarray<double>(n);
+		d.boundary_south = valarray<double>(n);
+		d.boundary_east  = valarray<double>(n);
+		d.boundary_west  = valarray<double>(n);
 		d.planNeumann();
 
 		// solve over south interface, and save results
-		valarray<double> north_block(nx * ny);
-		valarray<double> east_block(nx * ny);
-		valarray<double> south_block(nx * ny);
-		valarray<double> west_block(nx * ny);
-		for (int i = 0; i < nx; i++) {
+		valarray<double> north_block(n * n);
+		valarray<double> east_block(n * n);
+		valarray<double> south_block(n * n);
+		valarray<double> west_block(n * n);
+		for (int i = 0; i < n; i++) {
 			d.boundary_south[i] = 1;
 			d.solve();
 			// fill the blocks
 
-			north_block[slice(i * nx, nx, 1)] = d.u[slice(nx * (ny - 1), nx, 1)];
-			east_block[slice(i * nx, ny, 1)]  = d.u[slice((nx - 1), ny, nx)];
-			south_block[slice(i * nx, nx, 1)] = d.u[slice(0, nx, 1)];
-			west_block[slice(i * nx, ny, 1)]  = d.u[slice(0, ny, nx)];
-			south_block[i * nx + i] -= 1;
+			north_block[slice(i * n, n, 1)] = d.u[slice(n * (n - 1), n, 1)];
+			east_block[slice(i * n, n, 1)]  = d.u[slice((n - 1), n, n)];
+			south_block[slice(i * n, n, 1)] = d.u[slice(0, n, 1)];
+			west_block[slice(i * n, n, 1)]  = d.u[slice(0, n, n)];
+			south_block[i * n + i] -= 1;
 			d.boundary_south[i] = 0;
 		}
 
@@ -691,20 +680,20 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map, int delete_row)
 
 				vector<double> row;
 				vector<int>    global;
-				row.reserve(nx * 2 + ny * 2);
-				global.reserve(nx * 3 + ny * 4);
+				row.reserve(n * 2 + n * 2);
+				global.reserve(n * 3 + n * 4);
 				for (int y = 0; y < iface.l_south; y++) {
 					int block_j = y;
 					if (reverse_x) {
 						block_j = iface.l_south - 1 - y;
 					}
-					row.push_back(-south_block[block_i * nx + block_j]);
+					row.push_back(-south_block[block_i * n + block_j]);
 					global.push_back(iface.i_south + y);
 				}
 				if (iface.i_west != -1) {
 					for (int y = 0; y < iface.l_south; y++) {
 						int block_j = y;
-						row.push_back(-west_block[block_i * nx + block_j]);
+						row.push_back(-west_block[block_i * n + block_j]);
 						if (iface.right) {
 							global.push_back(iface.i_west + y);
 						} else {
@@ -718,14 +707,14 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map, int delete_row)
 						if (reverse_x) {
 							block_j = iface.l_south - 1 - y;
 						}
-						row.push_back(-north_block[block_i * nx + block_j]);
+						row.push_back(-north_block[block_i * n + block_j]);
 						global.push_back(iface.i_north + y);
 					}
 				}
 				if (iface.i_east != -1) {
 					for (int y = 0; y < iface.l_south; y++) {
 						int block_j = y;
-						row.push_back(-east_block[block_i * nx + block_j]);
+						row.push_back(-east_block[block_i * n + block_j]);
 						if (iface.right) {
 							global.push_back(iface.i_east + y);
 						} else {
@@ -751,7 +740,7 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map, int delete_row)
 }
 RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map, int del_row)
 {
-	int              size = max(nx, ny);
+	int              size = max(n, n);
 	RCP<matrix_type> A    = rcp(new matrix_type(map, size * 6));
     // create iface objects
 	set<pair<Iface,Iface>> ifaces;
@@ -843,11 +832,11 @@ RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map, int del_row)
 		} else {
 			ds.nbr_west = 1;
 		}
-		Domain d_left(ds, nx, ny, h_x, h_y);
-		d_left.boundary_north = valarray<double>(nx);
-		d_left.boundary_south = valarray<double>(nx);
-		d_left.boundary_east  = valarray<double>(ny);
-		d_left.boundary_west  = valarray<double>(ny);
+		Domain d_left(ds, n, n, h_x, h_y);
+		d_left.boundary_north = valarray<double>(n);
+		d_left.boundary_south = valarray<double>(n);
+		d_left.boundary_east  = valarray<double>(n);
+		d_left.boundary_west  = valarray<double>(n);
 		d_left.planNeumann();
 
 		if (curr_type_right.t_north == NEUMANN) {
@@ -870,48 +859,48 @@ RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map, int del_row)
 		} else {
 			ds.nbr_west = 1;
 		}
-		Domain d_right(ds, nx, ny, h_x, h_y);
-		d_right.boundary_north = valarray<double>(nx);
-		d_right.boundary_south = valarray<double>(nx);
-		d_right.boundary_east  = valarray<double>(ny);
-		d_right.boundary_west  = valarray<double>(ny);
+		Domain d_right(ds, n, n, h_x, h_y);
+		d_right.boundary_north = valarray<double>(n);
+		d_right.boundary_south = valarray<double>(n);
+		d_right.boundary_east  = valarray<double>(n);
+		d_right.boundary_west  = valarray<double>(n);
 		d_right.planNeumann();
 
 		// solve over south interface, and save results
-		valarray<double> south_block(nx * ny);
-		for (int i = 0; i < nx; i++) {
+		valarray<double> south_block(n * n);
+		for (int i = 0; i < n; i++) {
 			d_right.boundary_south[i] = 1;
-            d_left.boundary_south[nx-1-i] =1;
+            d_left.boundary_south[n-1-i] =1;
 			d_right.solve();
 			d_left.solve();
 
 			// fill the blocks
-			south_block[slice(i * nx, nx, 1)] = d_right.u[slice(0, nx, 1)];
-			for (int j = 0; j < nx; j++) {
-				south_block[i * nx + j] += d_left.u[nx - 1 - j];
+			south_block[slice(i * n, n, 1)] = d_right.u[slice(0, n, 1)];
+			for (int j = 0; j < n; j++) {
+				south_block[i * n + j] += d_left.u[n - 1 - j];
 			}
-			south_block[i * nx + i] -= 2;
+			south_block[i * n + i] -= 2;
 
 			d_right.boundary_south[i] = 0;
-            d_left.boundary_south[nx-1-i] =0;
+            d_left.boundary_south[n-1-i] =0;
 		}
 
 		//south_block *= 2;
-		int internal_i = del_row % nx;
+		int internal_i = del_row % n;
 		if(contains_del_row){
-            for(int x = 0;x<nx;x++){
-				south_block[internal_i * nx + x] =0;
+            for(int x = 0;x<n;x++){
+				south_block[internal_i * n + x] =0;
 			}
-			south_block[internal_i * nx + internal_i] = -1;
+			south_block[internal_i * n + internal_i] = -1;
 		}
 
         //compute inverse of block
-        valarray<int> ipiv(nx+1);
-        int lwork = nx*nx;
+        valarray<int> ipiv(n+1);
+        int lwork = n*n;
         valarray<double> work(lwork);
         int info;
-		dgetrf_(&nx, &nx, &south_block[0], &nx, &ipiv[0], &info);
-		dgetri_(&nx, &south_block[0], &nx, &ipiv[0], &work[0], &lwork, &info);
+		dgetrf_(&n, &n, &south_block[0], &n, &ipiv[0], &info);
+		dgetri_(&n, &south_block[0], &n, &ipiv[0], &work[0], &lwork, &info);
 
 		// now insert these results into the matrix for each interface
 		for(Iface iface: todo){
@@ -919,10 +908,10 @@ RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map, int del_row)
 				int j = iface.i_south + x;
 				vector<double> row;
 				vector<int>    global;
-				row.reserve(nx * 2 + ny * 2);
-				global.reserve(nx * 3 + ny * 4);
+				row.reserve(n * 2 + n * 2);
+				global.reserve(n * 3 + n * 4);
 				for (int y = 0; y < iface.l_south; y++) {
-					row.push_back(-south_block[x * nx + y]);
+					row.push_back(-south_block[x * n + y]);
 					global.push_back(iface.i_south + y);
 				}
 				// insert row for domain
@@ -978,7 +967,7 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 		ifaces.insert(right);
 	}
 
-	int           size      = max(nx, ny);
+	int           size      = max(n, n);
 	RCP<RBMatrix> A         = rcp(new RBMatrix(map, size, ifaces.size() / 2));
 	int           num_types = 0;
 	while (!ifaces.empty()) {
@@ -1024,36 +1013,36 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 		} else {
 			ds.nbr_west = 1;
 		}
-		Domain d(ds, nx, ny, h_x, h_y);
-		d.boundary_north = valarray<double>(nx);
-		d.boundary_south = valarray<double>(nx);
-		d.boundary_east  = valarray<double>(ny);
-		d.boundary_west  = valarray<double>(ny);
+		Domain d(ds, n, n, h_x, h_y);
+		d.boundary_north = valarray<double>(n);
+		d.boundary_south = valarray<double>(n);
+		d.boundary_east  = valarray<double>(n);
+		d.boundary_west  = valarray<double>(n);
 		d.planNeumann();
 
 		// solve over south interface, and save results
-		RCP<valarray<double>> north_block_ptr = rcp(new valarray<double>(nx * ny));
+		RCP<valarray<double>> north_block_ptr = rcp(new valarray<double>(n * n));
 		valarray<double> &    north_block     = *north_block_ptr;
 
-		RCP<valarray<double>> east_block_ptr = rcp(new valarray<double>(nx * ny));
+		RCP<valarray<double>> east_block_ptr = rcp(new valarray<double>(n * n));
 		valarray<double> &    east_block     = *east_block_ptr;
 
-		RCP<valarray<double>> south_block_ptr = rcp(new valarray<double>(nx * ny));
+		RCP<valarray<double>> south_block_ptr = rcp(new valarray<double>(n * n));
 		valarray<double> &    south_block     = *south_block_ptr;
 
-		RCP<valarray<double>> west_block_ptr = rcp(new valarray<double>(nx * ny));
+		RCP<valarray<double>> west_block_ptr = rcp(new valarray<double>(n * n));
 		valarray<double> &    west_block     = *west_block_ptr;
 
-		for (int i = 0; i < nx; i++) {
+		for (int i = 0; i < n; i++) {
 			d.boundary_south[i] = 1;
 			d.solve();
 			// fill the blocks
 
-			north_block[slice(i*nx, nx, 1)] = d.u[slice(nx * (ny - 1), nx, 1)];
-			east_block[slice(i*nx, ny, 1)]  = d.u[slice((nx - 1), ny, nx)];
-			south_block[slice(i*nx, nx, 1)] = d.u[slice(0, nx, 1)];
-			west_block[slice(i*nx, ny, 1)]  = d.u[slice(0, ny, nx)];
-			south_block[i * nx + i] -= 1;
+			north_block[slice(i*n, n, 1)] = d.u[slice(n * (n - 1), n, 1)];
+			east_block[slice(i*n, n, 1)]  = d.u[slice((n - 1), n, n)];
+			south_block[slice(i*n, n, 1)] = d.u[slice(0, n, 1)];
+			west_block[slice(i*n, n, 1)]  = d.u[slice(0, n, n)];
+			south_block[i * n + i] -= 1;
 			d.boundary_south[i] = 0;
 		}
 
@@ -1098,55 +1087,58 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 
 void DomainCollection::outputSolution(std::ostream &os)
 {
-	int num_i = ny * d_y;
-	int num_j = nx * d_x;
+	int num_i = n * sqrt(num_global_domains);
+	int num_j = n * sqrt(num_global_domains);
+	int d_x = sqrt(num_global_domains);
 	os << "%%MatrixMarket matrix array real general\n";
 	os << num_i << ' ' << num_j << '\n';
 	os.precision(15);
 	for (int j = 0; j < num_j; j++) {
-		int domain_j   = j / nx;
-		int internal_j = j % nx;
+		int domain_j   = j / n;
+		int internal_j = j % n;
 		for (int i = 0; i < num_i; i++) {
-			int domain_i   = i / ny;
-			int internal_i = i % ny;
+			int domain_i   = i / n;
+			int internal_i = i % n;
 			int id         = domain_i * d_x + domain_j;
-			os << domains[id]->u[internal_i * nx + internal_j] << '\n';
+			os << domains[id]->u[internal_i * n + internal_j] << '\n';
 		}
 	}
 }
 void DomainCollection::outputResidual(std::ostream &os)
 {
-	int num_i = ny * d_y;
-	int num_j = nx * d_x;
+	int num_i = n * sqrt(num_global_domains);
+	int num_j = n * sqrt(num_global_domains);
+	int d_x = sqrt(num_global_domains);
 	os << "%%MatrixMarket matrix array real general\n";
 	os << num_i << ' ' << num_j << '\n';
 	os.precision(15);
 	for (int j = 0; j < num_j; j++) {
-		int domain_j   = j / nx;
-		int internal_j = j % nx;
+		int domain_j   = j / n;
+		int internal_j = j % n;
 		for (int i = 0; i < num_i; i++) {
-			int domain_i   = i / ny;
-			int internal_i = i % ny;
+			int domain_i   = i / n;
+			int internal_i = i % n;
 			int id         = domain_i * d_x + domain_j;
-			os << domains[id]->resid[internal_i * nx + internal_j] << '\n';
+			os << domains[id]->resid[internal_i * n + internal_j] << '\n';
 		}
 	}
 }
 void DomainCollection::outputError(std::ostream &os)
 {
-	int num_i = ny * d_y;
-	int num_j = nx * d_x;
+	int num_i = n * sqrt(num_global_domains);
+	int num_j = n * sqrt(num_global_domains);
+	int d_x = sqrt(num_global_domains);
 	os << "%%MatrixMarket matrix array real general\n";
 	os << num_i << ' ' << num_j << '\n';
 	os.precision(15);
 	for (int j = 0; j < num_j; j++) {
-		int domain_j   = j / nx;
-		int internal_j = j % nx;
+		int domain_j   = j / n;
+		int internal_j = j % n;
 		for (int i = 0; i < num_i; i++) {
-			int domain_i   = i / ny;
-			int internal_i = i % ny;
+			int domain_i   = i / n;
+			int internal_i = i % n;
 			int id         = domain_i * d_x + domain_j;
-			os << domains[id]->error[internal_i * nx + internal_j] << '\n';
+			os << domains[id]->error[internal_i * n + internal_j] << '\n';
 		}
 	}
 }

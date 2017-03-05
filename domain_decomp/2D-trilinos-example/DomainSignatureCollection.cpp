@@ -27,6 +27,10 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank)
 					ds.nbr_west  = domain_y * d_x + domain_x - 1;
 					ds.proc_west = 0;
 				}
+				ds.x_length    = 1.0 / d_x;
+				ds.y_length    = 1.0 / d_y;
+				ds.x_start     = 1.0 * domain_x / d_x;
+				ds.y_start     = 1.0 * domain_y / d_y;
 				domains[ds.id] = ds;
 			}
 		}

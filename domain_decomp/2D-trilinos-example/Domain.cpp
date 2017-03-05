@@ -39,6 +39,11 @@ Domain::Domain(DomainSignature ds, int nx, int ny, double h_x, double h_y)
 	nbr_east  = ds.nbr_east;
 	nbr_south = ds.nbr_south;
 	nbr_west  = ds.nbr_west;
+
+	x_start  = ds.x_start;
+	y_start  = ds.y_start;
+	x_length = ds.x_length;
+	y_length = ds.y_length;
 }
 
 Domain::~Domain()

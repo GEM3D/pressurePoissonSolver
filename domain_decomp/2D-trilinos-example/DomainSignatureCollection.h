@@ -6,60 +6,60 @@
  * @brief A structure that represents a domain and its relation to other domains.
  */
 struct DomainSignature {
-    /**
-     * @brief The domain's own id
-     */
-	int         id;
-    /**
-     * @brief The id of the neighbor to it's north.
-     * It should be set to -1 if there is no neighbor.
-     */
-	int         nbr_north      = -1;
-    /**
-     * @brief The id of the neighbor to it's south.
-     * It should be set to -1 if there is no neighbor.
-     */
-	int         nbr_south      = -1;
-    /**
-     * @brief The id of the neighbor to it's east.
-     * It should be set to -1 if there is no neighbor.
-     */
-	int         nbr_east       = -1;
-    /**
-     * @brief The id of the neighbor to it's west.
-     * It should be set to -1 if there is no neighbor.
-     */
-	int         nbr_west       = -1;
-    /**
-     * @brief The processor id that it's neighbor to the north resides on.
-     * It should be set to -1 if there is no neighbor.
-     */
-	int         proc_north     = -1;
-    /**
-     * @brief The processor id that it's neighbor to the south resides on.
-     * It should be set to -1 if there is no neighbor.
-     */
-	int         proc_south     = -1;
-    /**
-     * @brief The processor id that it's neighbor to the east resides on.
-     * It should be set to -1 if there is no neighbor.
-     */
-	int         proc_east      = -1;
-    /**
-     * @brief The processor id that it's neighbor to the west resides on.
-     * It should be set to -1 if there is no neighbor.
-     */
-	int         proc_west      = -1;
-    /**
-     * @brief The northern interface's index in the interface array.
-     * It should be set to -1 if there is no neighbor.
-     */
-	int         global_i_north = -1;
-    /**
-     * @brief The southern interface's index in the interface array.
-     * It should be set to -1 if there is no neighbor.
-     */
-	int         global_i_south = -1;
+	/**
+	 * @brief The domain's own id
+	 */
+	int id;
+	/**
+	 * @brief The id of the neighbor to it's north.
+	 * It should be set to -1 if there is no neighbor.
+	 */
+	int nbr_north = -1;
+	/**
+	 * @brief The id of the neighbor to it's south.
+	 * It should be set to -1 if there is no neighbor.
+	 */
+	int nbr_south = -1;
+	/**
+	 * @brief The id of the neighbor to it's east.
+	 * It should be set to -1 if there is no neighbor.
+	 */
+	int nbr_east = -1;
+	/**
+	 * @brief The id of the neighbor to it's west.
+	 * It should be set to -1 if there is no neighbor.
+	 */
+	int nbr_west = -1;
+	/**
+	 * @brief The processor id that it's neighbor to the north resides on.
+	 * It should be set to -1 if there is no neighbor.
+	 */
+	int proc_north = -1;
+	/**
+	 * @brief The processor id that it's neighbor to the south resides on.
+	 * It should be set to -1 if there is no neighbor.
+	 */
+	int proc_south = -1;
+	/**
+	 * @brief The processor id that it's neighbor to the east resides on.
+	 * It should be set to -1 if there is no neighbor.
+	 */
+	int proc_east = -1;
+	/**
+	 * @brief The processor id that it's neighbor to the west resides on.
+	 * It should be set to -1 if there is no neighbor.
+	 */
+	int proc_west = -1;
+	/**
+	 * @brief The northern interface's index in the interface array.
+	 * It should be set to -1 if there is no neighbor.
+	 */
+	int global_i_north = -1;
+	/**
+	 * @brief The southern interface's index in the interface array.
+	 * It should be set to -1 if there is no neighbor.
+	 */
+	int global_i_south = -1;
 	/**
 	 * @brief The eastern interface's index in the interface array.
 	 * It should be set to -1 if there is no neighbor.
@@ -70,6 +70,22 @@ struct DomainSignature {
 	 * It should be set to -1 if there is no neighbor.
 	 */
 	int global_i_west = -1;
+	/**
+	 * @brief The lower left x coordinate of domain
+	 */
+	double x_start = 0;
+	/**
+	 * @brief The lower left y coordinate of domain
+	 */
+	double y_start = 0;
+	/**
+	 * @brief length of domain in x direction
+	 */
+	double x_length = 0;
+	/**
+	 * @brief length of odmain in y direction
+	 */
+	double y_length = 0;
 
 	friend bool operator<(const DomainSignature &l, const DomainSignature &r)
 	{

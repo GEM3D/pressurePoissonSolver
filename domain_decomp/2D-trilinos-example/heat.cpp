@@ -215,7 +215,7 @@ int main(int argc, char *argv[])
 		}
 		steady_clock::time_point domain_start = steady_clock::now();
 
-		DomainCollection dc(dsc, nx, ny, num_domains_x, num_domains_y, h_x, h_y, comm);
+		DomainCollection dc(dsc, nx, h_x, h_y, comm);
 
 		ZeroSum zs;
 		if (f_neumann) {

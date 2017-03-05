@@ -50,6 +50,10 @@ class Domain
 	fftw_plan              plan1;
 	fftw_plan              plan2;
 	bool                   neumann = false;
+	double                 x_start  = 0;
+	double                 y_start  = 0;
+	double                 x_length = 0;
+	double                 y_length = 0;
 
 	Domain() {}
 	Domain(DomainSignature ds, int nx, int ny, double h_x, double h_y);
