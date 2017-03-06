@@ -80,7 +80,6 @@ int main(int argc, char *argv[])
 	parser, "row", "pin gamma value to zero (by modifying that row of the schur compliment matrix)",
 	{'z'});
 	args::Flag f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
-	args::Flag f_rbmatrix(parser, "wrapper", "use a repetative block sparse matrix", {"rbmatrix"});
 	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
 	args::Flag f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
 	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {'n', "neumann"});
@@ -258,7 +257,7 @@ int main(int argc, char *argv[])
 			if (f_wrapper) {
 				// Create a function wrapper
 				op = rcp(new FuncWrap(b, &dc));
-			} else if (f_rbmatrix || f_lu) {
+			} else { // if (f_rbmatrix || f_lu) {
 				// Form the matrix
 				comm->barrier();
 				steady_clock::time_point form_start = steady_clock::now();
@@ -285,39 +284,39 @@ int main(int argc, char *argv[])
 						cout << "Time to write matix to file: " << write_time.count() << "\n";
 				}
 				op = RBA;
-			} else {
-				// Form the matrix
-				comm->barrier();
-				steady_clock::time_point form_start = steady_clock::now();
+			} /* else {
+			     // Form the matrix
+			     comm->barrier();
+			     steady_clock::time_point form_start = steady_clock::now();
 
-				RCP<matrix_type> A = dc.formMatrix(matrix_map, del);
+			     RCP<matrix_type> A = dc.formMatrix(matrix_map, del);
 
-				comm->barrier();
-				duration<double> form_time = steady_clock::now() - form_start;
+			     comm->barrier();
+			     duration<double> form_time = steady_clock::now() - form_start;
 
-				if (my_global_rank == 0)
-					cout << "Matrix Formation Time: " << form_time.count() << "\n";
+			     if (my_global_rank == 0)
+			         cout << "Matrix Formation Time: " << form_time.count() << "\n";
 
-				if (save_matrix_file != "") {
-					comm->barrier();
-					steady_clock::time_point write_start = steady_clock::now();
+			     if (save_matrix_file != "") {
+			         comm->barrier();
+			         steady_clock::time_point write_start = steady_clock::now();
 
-					Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A,
-					                                                           "", "");
+			         Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A,
+			                                                                    "", "");
 
-					comm->barrier();
-					duration<double> write_time = steady_clock::now() - write_start;
-					if (my_global_rank == 0)
-						cout << "Time to write matix to file: " << write_time.count() << "\n";
-				}
+			         comm->barrier();
+			         duration<double> write_time = steady_clock::now() - write_start;
+			         if (my_global_rank == 0)
+			             cout << "Time to write matix to file: " << write_time.count() << "\n";
+			     }
 
-				op = A;
-			}
+			     op = A;
+			 }*/
 
 			// Create linear problem for the Belos solver
 			Belos::LinearProblem<double, vector_type, Tpetra::Operator<>> problem(op, gamma, b);
 
-			if (f_prec||f_ilu) {
+			if (f_prec || f_ilu) {
 				if (f_ilu) {
 					comm->barrier();
 					steady_clock::time_point prec_start = steady_clock::now();
@@ -341,48 +340,51 @@ int main(int argc, char *argv[])
 					// out_file << *U;
 					// out_file.close();
 				} else {
-					if (f_rbmatrix) {
-						comm->barrier();
-						steady_clock::time_point prec_start = steady_clock::now();
+					//			if (f_rbmatrix) {
+					comm->barrier();
+					steady_clock::time_point prec_start = steady_clock::now();
 
-						RCP<RBMatrix> P = RBA->invBlockDiag();
-						problem.setRightPrec(P);
+					RCP<RBMatrix> P = RBA->invBlockDiag();
+					problem.setRightPrec(P);
 
-						comm->barrier();
-						duration<double> prec_time = steady_clock::now() - prec_start;
+					comm->barrier();
+					duration<double> prec_time = steady_clock::now() - prec_start;
 
-						if (my_global_rank == 0)
-							cout << "Preconditioner Formation Time: " << prec_time.count() << "\n";
+					if (my_global_rank == 0)
+						cout << "Preconditioner Formation Time: " << prec_time.count() << "\n";
 
-					} else {
-						// form preconditioner
-						comm->barrier();
-						steady_clock::time_point prec_start = steady_clock::now();
+					/*			} else {
+					                // form preconditioner
+					                comm->barrier();
+					                steady_clock::time_point prec_start = steady_clock::now();
 
-						RCP<matrix_type> P = dc.formInvDiag(matrix_map, del);
-						problem.setRightPrec(P);
+					                RCP<matrix_type> P = dc.formInvDiag(matrix_map, del);
+					                problem.setRightPrec(P);
 
-						comm->barrier();
-						duration<double> prec_time = steady_clock::now() - prec_start;
+					                comm->barrier();
+					                duration<double> prec_time = steady_clock::now() - prec_start;
 
-						if (my_global_rank == 0)
-							cout << "Preconditioner Formation Time: " << prec_time.count() << "\n";
+					                if (my_global_rank == 0)
+					                    cout << "Preconditioner Formation Time: " <<
+					   prec_time.count() << "\n";
 
-						if (save_prec_file != "") {
-							comm->barrier();
-							steady_clock::time_point write_start = steady_clock::now();
+					                if (save_prec_file != "") {
+					                    comm->barrier();
+					                    steady_clock::time_point write_start = steady_clock::now();
 
-							Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(
-							save_prec_file, P, "", "");
+					                    Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(
+					                    save_prec_file, P, "", "");
 
-							comm->barrier();
-							duration<double> write_time = steady_clock::now() - write_start;
-							if (my_global_rank == 0)
-								cout
-								<< "Time to write preconditioner to file: " << write_time.count()
-								<< "\n";
-						}
-					}
+					                    comm->barrier();
+					                    duration<double> write_time = steady_clock::now() -
+					   write_start;
+					                    if (my_global_rank == 0)
+					                        cout
+					                        << "Time to write preconditioner to file: " <<
+					   write_time.count()
+					                        << "\n";
+					                }
+					            }*/
 				}
 			}
 

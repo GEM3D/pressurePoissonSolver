@@ -1,5 +1,6 @@
 #include "DomainCollection.h"
 #include <tuple>
+#include <array>
 using Teuchos::RCP;
 using Teuchos::rcp;
 using namespace std;
@@ -12,43 +13,30 @@ void dgetri_(int *N, double *A, int *lda, int *IPIV, double *WORK, int *lwork, i
 }
 
 enum axis_enum { X_AXIS, Y_AXIS };
-enum bc_enum { DIRICHLET, NEUMANN };
+enum bc_enum { DIRICHLET, NEUMANN, REFINED };
 
 class Iface
 {
 	public:
 	bool        right;
 	int         axis;
-	int         i_south;
-	int         l_south;
-	int         t_south;
-	int         i_west;
-	int         l_west;
-	int         t_west;
-	int         i_north;
-	int         l_north;
-	int         t_north;
-	int         i_east;
-	int         l_east;
-	int         t_east;
+    array<int,8> global_i;
+    array<int,4> types;
 	friend bool operator<(const Iface &l, const Iface &r)
 	{
-		return std::tie(l.i_south, l.right) < std::tie(r.i_south, r.right);
+		return std::tie(l.global_i[0], l.right) < std::tie(r.global_i[0], r.right);
 	}
 	friend bool operator==(const Iface &l, const Iface &r)
 	{
-		return std::tie(l.l_south, l.t_south, l.l_west, l.t_west, l.l_north, l.t_north, l.l_east,
-		                l.t_east)
-		       == std::tie(r.l_south, r.t_south, r.l_west, r.t_west, r.l_north, r.t_north, r.l_east,
-		                   r.t_east);
+		return l.types == r.types;
 	}
-	friend bool operator!=(const Iface &l, const Iface &r)
+	/*friend bool operator!=(const Iface &l, const Iface &r)
 	{
 		return std::tie(l.l_south, l.t_south, l.l_east, l.t_east, l.l_north, l.t_north, l.l_west,
 		                l.t_west)
 		       == std::tie(r.l_south, r.t_south, r.l_west, r.t_west, r.l_north, r.t_north, r.l_east,
 		                   r.t_east);
-	}
+	}*/
 };
 
 DomainCollection::DomainCollection(DomainSignatureCollection dsc, int n, double h_x, double h_y,
@@ -473,7 +461,7 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map, int delete_row)
 	int              size = max(n, n);
 	RCP<matrix_type> A    = rcp(new matrix_type(map, size * 6));
     // create iface objects
-	set<Iface> ifaces;
+	/*set<Iface> ifaces;
 	auto       iface_view = iface_info->getLocalView<Kokkos::HostSpace>();
 	for (size_t i = 0; i < iface_view.dimension(0); i += 22) {
 		Iface right;
@@ -655,12 +643,14 @@ RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map, int delete_row)
 	// cerr << "Num types: " << num_types << "\n";
 	// transpose matrix and return
 	A->fillComplete();
+    */
 	return A;
 }
 RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map, int del_row)
 {
 	int              size = max(n, n);
 	RCP<matrix_type> A    = rcp(new matrix_type(map, size * 6));
+    /*
     // create iface objects
 	set<pair<Iface,Iface>> ifaces;
 	auto       iface_view = iface_info->getLocalView<Kokkos::HostSpace>();
@@ -668,37 +658,26 @@ RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map, int del_row)
 		Iface right;
 		Iface left;
 
-		right.right   = true;
-		right.axis    = iface_view(i + 21, 0);
-		right.i_south = iface_view(i, 0);
-		right.t_south = iface_view(i + 1, 0);
-		right.l_south = iface_view(i + 2, 0);
-		right.i_west  = iface_view(i + 3, 0);
-		right.t_west  = iface_view(i + 4, 0);
-		right.l_west  = iface_view(i + 5, 0);
-		right.i_north = iface_view(i + 6, 0);
-		right.t_north = iface_view(i + 7, 0);
-		right.l_north = iface_view(i + 8, 0);
-		right.i_east  = iface_view(i + 9, 0);
-		right.t_east  = iface_view(i + 10, 0);
-		right.l_east  = iface_view(i + 11, 0);
+		right.right       = true;
+		right.axis        = iface_view(i + 21, 0);
+		right.global_i[0] = iface_view(i, 0);
+		right.types[0]    = iface_view(i, 1);
+
+		for (int q = 1; q < 4; q++) {
+			right.global_i[q * 2] = iface_view(i + q * 3, 0);
+			right.types[q]        = iface_view(i + q * 3 + 1, 0);
+		}
 
 		left.right   = false;
 		left.axis    = iface_view(i + 21, 0);
-		left.i_south = iface_view(i, 0);
-		left.t_south = iface_view(i + 1, 0);
-		left.l_south = iface_view(i + 2, 0);
-		left.i_west  = iface_view(i + 12, 0);
-		left.t_west  = iface_view(i + 13, 0);
-		left.l_west  = iface_view(i + 14, 0);
-		left.i_north = iface_view(i + 15, 0);
-		left.t_north = iface_view(i + 16, 0);
-		left.l_north = iface_view(i + 17, 0);
-		left.i_east  = iface_view(i + 18, 0);
-		left.t_east  = iface_view(i + 19, 0);
-		left.l_east  = iface_view(i + 20, 0);
-        
-        pair<Iface,Iface> p;
+		left.global_i[0] = iface_view(i, 0);
+		left.types[0]    = iface_view(i, 1);
+		for (int q = 1; q < 4; q++) {
+			left.global_i[q * 2] = iface_view(i + 9 + q * 3, 0);
+			left.types[q]        = iface_view(i + 9 + q * 3 + 1, 0);
+		}
+
+		pair<Iface,Iface> p;
         p.first = left;
         p.second = right;
 		ifaces.insert(p);
@@ -841,6 +820,7 @@ RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map, int del_row)
 
 	// transpose matrix and return
 	A->fillComplete();
+    */
 	return A;
 }
 RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
@@ -852,35 +832,24 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 		Iface right;
 		Iface left;
 
-		right.right   = true;
-		right.axis    = iface_view(i + 21, 0);
-		right.i_south = iface_view(i, 0);
-		right.t_south = iface_view(i + 1, 0);
-		right.l_south = iface_view(i + 2, 0);
-		right.i_west  = iface_view(i + 3, 0);
-		right.t_west  = iface_view(i + 4, 0);
-		right.l_west  = iface_view(i + 5, 0);
-		right.i_north = iface_view(i + 6, 0);
-		right.t_north = iface_view(i + 7, 0);
-		right.l_north = iface_view(i + 8, 0);
-		right.i_east  = iface_view(i + 9, 0);
-		right.t_east  = iface_view(i + 10, 0);
-		right.l_east  = iface_view(i + 11, 0);
+		right.right       = true;
+		right.axis        = iface_view(i + 21, 0);
+		right.global_i[0] = iface_view(i, 0);
+		right.types[0]    = iface_view(i, 1);
 
-		left.right   = false;
-		left.axis    = iface_view(i + 21, 0);
-		left.i_south = iface_view(i, 0);
-		left.t_south = iface_view(i + 1, 0);
-		left.l_south = iface_view(i + 2, 0);
-		left.i_west  = iface_view(i + 12, 0);
-		left.t_west  = iface_view(i + 13, 0);
-		left.l_west  = iface_view(i + 14, 0);
-		left.i_north = iface_view(i + 15, 0);
-		left.t_north = iface_view(i + 16, 0);
-		left.l_north = iface_view(i + 17, 0);
-		left.i_east  = iface_view(i + 18, 0);
-		left.t_east  = iface_view(i + 19, 0);
-		left.l_east  = iface_view(i + 20, 0);
+		for (int q = 1; q < 4; q++) {
+			right.global_i[q * 2] = iface_view(i + q * 3, 0);
+			right.types[q]        = iface_view(i + q * 3 + 1, 0);
+		}
+
+		left.right       = false;
+		left.axis        = iface_view(i + 21, 0);
+		left.global_i[0] = iface_view(i, 0);
+		left.types[0]    = iface_view(i, 1);
+		for (int q = 1; q < 4; q++) {
+			left.global_i[q * 2] = iface_view(i + 9 + q * 3, 0);
+			left.types[q]        = iface_view(i + 9 + q * 3 + 1, 0);
+		}
 
 		ifaces.insert(left);
 		ifaces.insert(right);
@@ -912,25 +881,12 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 
 		// create domain representing curr_type
 		DomainSignature ds;
-		if (curr_type.t_north == NEUMANN) {
-			ds.nbr[0] = -1;
-		} else {
-			ds.nbr[0] = 1;
-		}
-		if (curr_type.t_east == NEUMANN) {
-			ds.nbr[2] = -1;
-		} else {
-			ds.nbr[2] = 1;
-		}
-		if (curr_type.t_south == NEUMANN) {
-			ds.nbr[4] = -1;
-		} else {
-			ds.nbr[4] = 1;
-		}
-		if (curr_type.t_west == NEUMANN) {
-			ds.nbr[6] = -1;
-		} else {
-			ds.nbr[6] = 1;
+        for(int q=0;q<4;q++){
+			if (curr_type.types[q] == NEUMANN) {
+				ds.nbr[(q * 2 + 4) % 8] = -1;
+			} else {
+				ds.nbr[(q * 2 + 4) % 8] = 1;
+			}
 		}
 		Domain d(ds, n, n, h_x, h_y);
 		d.boundary_north = valarray<double>(n);
@@ -975,21 +931,21 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 			= (iface.axis == X_AXIS && !iface.right) || (iface.axis == Y_AXIS && iface.right);
 			bool reverse_y = !iface.right;
 
-			int j = iface.i_south;
-			int i = iface.i_south;
+			int j = iface.global_i[0];
+			int i = iface.global_i[0];
 
 			A->insertBlock(i, j, south_block_ptr, reverse_x, reverse_x);
 
-			if (iface.i_west != -1) {
-				i = iface.i_west;
+			if (iface.global_i[2] != -1) {
+				i = iface.global_i[2];
 				A->insertBlock(i, j, west_block_ptr, reverse_y, reverse_x);
 			}
-			if (iface.i_north != -1) {
-				i = iface.i_north;
+			if (iface.global_i[4] != -1) {
+				i = iface.global_i[4];
 				A->insertBlock(i, j, north_block_ptr, reverse_x, reverse_x);
 			}
-			if (iface.i_east != -1) {
-				i = iface.i_east;
+			if (iface.global_i[6] != -1) {
+				i = iface.global_i[6];
 				A->insertBlock(i, j, east_block_ptr, reverse_y, reverse_x);
 			}
 		}
