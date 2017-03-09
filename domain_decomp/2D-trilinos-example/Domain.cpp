@@ -1,22 +1,34 @@
 #include "Domain.h"
+using namespace std;
 Domain::Domain(DomainSignature ds, int nx, int ny, double h_x, double h_y)
 {
 	this->nx  = nx;
 	this->ny  = ny;
-	this->h_x = h_x;
-	this->h_y = h_y;
+	this->h_x = h_x / ds.refine_level;
+	this->h_y = h_y / ds.refine_level;
 
-	f      = std::valarray<double>(nx * ny);
-	f_copy = std::valarray<double>(nx * ny);
-	exact  = std::valarray<double>(nx * ny);
-	tmp    = std::valarray<double>(nx * ny);
-	u      = std::valarray<double>(nx * ny);
-	denom  = std::valarray<double>(nx * ny);
+	cerr << "I am Domain: " << ds.id << "\n";
+	cerr << "I start at: " << ds.x_start << ", " << ds.y_start << "\n";
+	cerr << "North: " << ds.nbr[0] << ", " << ds.nbr[1] << "\n";
+	cerr << "Idx:   " << ds.global_i[0] << ", " << ds.global_i[1] << "\n";
+	cerr << "East:  " << ds.nbr[2] << ", " << ds.nbr[3] << "\n";
+	cerr << "Idx:   " << ds.global_i[2] << ", " << ds.global_i[3] << "\n";
+	cerr << "South: " << ds.nbr[4] << ", " << ds.nbr[5] << "\n";
+	cerr << "Idx:   " << ds.global_i[4] << ", " << ds.global_i[5] << "\n";
+	cerr << "West:  " << ds.nbr[6] << ", " << ds.nbr[7] << "\n";
+	cerr << "Idx:   " << ds.global_i[6] << ", " << ds.global_i[7] << "\n";
+	cerr << "\n";
+	f      = valarray<double>(nx * ny);
+	f_copy = valarray<double>(nx * ny);
+	exact  = valarray<double>(nx * ny);
+	tmp    = valarray<double>(nx * ny);
+	u      = valarray<double>(nx * ny);
+	denom  = valarray<double>(nx * ny);
 
-	boundary_north = std::valarray<double>(nx);
-	boundary_south = std::valarray<double>(nx);
-	boundary_east  = std::valarray<double>(ny);
-	boundary_west  = std::valarray<double>(ny);
+	boundary_north = valarray<double>(nx);
+	boundary_south = valarray<double>(nx);
+	boundary_east  = valarray<double>(ny);
+	boundary_west  = valarray<double>(ny);
 
 	for (int q = 0; q < 8; q++) {
 		if (ds.nbr[q] != -1) {
@@ -48,15 +60,15 @@ void Domain::planDirichlet()
 	// create denom vector
 
 	for (int yi = 0; yi < nx; yi++) {
-		denom[std::slice(yi * ny, nx, 1)]
-		= -4 / (h_x * h_x) * std::pow(std::sin((yi + 1) * M_PI / (2 * nx)), 2);
+		denom[slice(yi * ny, nx, 1)]
+		= -4 / (h_x * h_x) * pow(sin((yi + 1) * M_PI / (2 * nx)), 2);
 	}
 
-	std::valarray<double> ones(ny);
+	valarray<double> ones(ny);
 	ones = 1;
 	for (int xi = 0; xi < ny; xi++) {
-		denom[std::slice(xi, ny, nx)]
-		-= 4 / (h_y * h_y) * std::pow(std::sin((xi + 1) * M_PI / (2 * ny)), 2) * ones;
+		denom[slice(xi, ny, nx)]
+		-= 4 / (h_y * h_y) * pow(sin((xi + 1) * M_PI / (2 * ny)), 2) * ones;
 	}
 }
 
@@ -95,38 +107,38 @@ void Domain::planNeumann()
 	// create denom vector
 	if (nbr[0] == -1 && nbr[4] == -1) {
 		for (int yi = 0; yi < nx; yi++) {
-			denom[std::slice(yi * ny, nx, 1)]
-			= -4 / (h_x * h_x) * std::pow(std::sin(yi * M_PI / (2 * nx)), 2);
+			denom[slice(yi * ny, nx, 1)]
+			= -4 / (h_x * h_x) * pow(sin(yi * M_PI / (2 * nx)), 2);
 		}
 	} else if (nbr[4] == -1 || nbr[0] == -1) {
 		for (int yi = 0; yi < nx; yi++) {
-			denom[std::slice(yi * ny, nx, 1)]
-			= -4 / (h_x * h_x) * std::pow(std::sin((yi + 0.5) * M_PI / (2 * nx)), 2);
+			denom[slice(yi * ny, nx, 1)]
+			= -4 / (h_x * h_x) * pow(sin((yi + 0.5) * M_PI / (2 * nx)), 2);
 		}
 	} else {
 		for (int yi = 0; yi < nx; yi++) {
-			denom[std::slice(yi * ny, nx, 1)]
-			= -4 / (h_x * h_x) * std::pow(std::sin((yi + 1) * M_PI / (2 * nx)), 2);
+			denom[slice(yi * ny, nx, 1)]
+			= -4 / (h_x * h_x) * pow(sin((yi + 1) * M_PI / (2 * nx)), 2);
 		}
 	}
 
-	std::valarray<double> ones(ny);
+	valarray<double> ones(ny);
 	ones = 1;
 
 	if (nbr[2] == -1 && nbr[6] == -1) {
 		for (int xi = 0; xi < ny; xi++) {
-			denom[std::slice(xi, ny, nx)]
-			-= 4 / (h_y * h_y) * std::pow(std::sin(xi * M_PI / (2 * ny)), 2) * ones;
+			denom[slice(xi, ny, nx)]
+			-= 4 / (h_y * h_y) * pow(sin(xi * M_PI / (2 * ny)), 2) * ones;
 		}
 	} else if (nbr[6] == -1 || nbr[2] == -1) {
 		for (int xi = 0; xi < ny; xi++) {
-			denom[std::slice(xi, ny, nx)]
-			-= 4 / (h_y * h_y) * std::pow(std::sin((xi + 0.5) * M_PI / (2 * ny)), 2) * ones;
+			denom[slice(xi, ny, nx)]
+			-= 4 / (h_y * h_y) * pow(sin((xi + 0.5) * M_PI / (2 * ny)), 2) * ones;
 		}
 	} else {
 		for (int xi = 0; xi < ny; xi++) {
-			denom[std::slice(xi, ny, nx)]
-			-= 4 / (h_y * h_y) * std::pow(std::sin((xi + 1) * M_PI / (2 * ny)), 2) * ones;
+			denom[slice(xi, ny, nx)]
+			-= 4 / (h_y * h_y) * pow(sin((xi + 1) * M_PI / (2 * ny)), 2) * ones;
 		}
 	}
 }
@@ -135,24 +147,24 @@ void Domain::solve()
 {
 	f_copy = f;
 	if (nbr[0] == -1 && neumann) {
-		f_copy[std::slice(nx * (ny - 1), nx, 1)] -= 1 / h_y * boundary_north;
+		f_copy[slice(nx * (ny - 1), nx, 1)] -= 1 / h_y * boundary_north;
 	} else {
-		f_copy[std::slice(nx * (ny - 1), nx, 1)] -= 2 / (h_y * h_y) * boundary_north;
+		f_copy[slice(nx * (ny - 1), nx, 1)] -= 2 / (h_y * h_y) * boundary_north;
 	}
 	if (nbr[2] == -1 && neumann) {
-		f_copy[std::slice((nx - 1), ny, nx)] -= 1 / h_x * boundary_east;
+		f_copy[slice((nx - 1), ny, nx)] -= 1 / h_x * boundary_east;
 	} else {
-		f_copy[std::slice((nx - 1), ny, nx)] -= 2 / (h_x * h_x) * boundary_east;
+		f_copy[slice((nx - 1), ny, nx)] -= 2 / (h_x * h_x) * boundary_east;
 	}
 	if (nbr[4] == -1 && neumann) {
-		f_copy[std::slice(0, nx, 1)] += 1 / h_y * boundary_south;
+		f_copy[slice(0, nx, 1)] += 1 / h_y * boundary_south;
 	} else {
-		f_copy[std::slice(0, nx, 1)] -= 2 / (h_y * h_y) * boundary_south;
+		f_copy[slice(0, nx, 1)] -= 2 / (h_y * h_y) * boundary_south;
 	}
 	if (nbr[6] == -1 && neumann) {
-		f_copy[std::slice(0, ny, nx)] += 1 / h_x * boundary_west;
+		f_copy[slice(0, ny, nx)] += 1 / h_x * boundary_west;
 	} else {
-		f_copy[std::slice(0, ny, nx)] -= 2 / (h_x * h_x) * boundary_west;
+		f_copy[slice(0, ny, nx)] -= 2 / (h_x * h_x) * boundary_west;
 	}
 
 	fftw_execute(plan1);
@@ -233,7 +245,7 @@ double Domain::residual(vector_type &ghost)
 		}
 	}
 
-	std::valarray<double> f_comp = std::valarray<double>(nx * ny);
+	valarray<double> f_comp = valarray<double>(nx * ny);
 	// integrate in x directon
 	double center, north, east, south, west;
 	// west
@@ -316,32 +328,50 @@ void Domain::solveWithInterface(const vector_type &gamma, vector_type &diff)
 {
 	auto gamma_view = gamma.getLocalView<Kokkos::HostSpace>();
 	auto diff_view  = diff.getLocalView<Kokkos::HostSpace>();
-	if (nbr[0] != -1) {
-		boundary_north = std::valarray<double>(nx);
+	if (hasNbrNorth()) {
+		boundary_north = valarray<double>(nx);
 		int curr_i     = local_i[0];
 		for (int i = 0; i < nx; i++) {
 			boundary_north[i] = gamma_view(curr_i, 0);
 			curr_i++;
 		}
 	}
-	if (nbr[2] != -1) {
-		boundary_east = std::valarray<double>(ny);
-		int curr_i    = local_i[2];
-		for (int i = 0; i < ny; i++) {
-			boundary_east[i] = gamma_view(curr_i, 0);
-			curr_i++;
+	if (hasNbrEast()) {
+		if (isRefinedEast()) {
+			boundary_east = valarray<double>(ny);
+			boundary_east_refined_right = valarray<double>(ny);
+			int curr_i    = local_i[3];
+			for (int i = 0; i < ny; i++) {
+				boundary_east[i / 2] = gamma_view(curr_i, 0) / 2.0;
+				boundary_east_refined_right[i] = gamma_view(curr_i, 0);
+				curr_i++;
+			}
+			curr_i = local_i[2];
+			boundary_east_refined_left = valarray<double>(ny);
+			for (int i = 0; i < ny; i++) {
+				boundary_east[i / 2 + nx / 2] = gamma_view(curr_i, 0) / 2.0;
+				boundary_east_refined_left[i] = gamma_view(curr_i, 0);
+				curr_i++;
+			}
+		} else {
+			boundary_east = valarray<double>(ny);
+			int curr_i    = local_i[2];
+			for (int i = 0; i < ny; i++) {
+				boundary_east[i] = gamma_view(curr_i, 0);
+				curr_i++;
+			}
 		}
 	}
-	if (nbr[4] != -1) {
-		boundary_south = std::valarray<double>(nx);
+	if (hasNbrSouth()) {
+		boundary_south = valarray<double>(nx);
 		int curr_i     = local_i[4];
 		for (int i = 0; i < nx; i++) {
 			boundary_south[i] = gamma_view(curr_i, 0);
 			curr_i++;
 		}
 	}
-	if (nbr[6] != -1) {
-		boundary_west = std::valarray<double>(ny);
+	if (hasNbrWest()) {
+		boundary_west = valarray<double>(ny);
 		int curr_i    = local_i[6];
 		for (int i = 0; i < ny; i++) {
 			boundary_west[i] = gamma_view(curr_i, 0);
@@ -352,32 +382,49 @@ void Domain::solveWithInterface(const vector_type &gamma, vector_type &diff)
 	// solve
 	solve();
 
-	// if(has_east)std::cout <<"LOCAL Before\n";
+	// if(has_east)cout <<"LOCAL Before\n";
 	// local_vector.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
-	// if(has_east)std::cout <<"LOCAL zero\n";
+	// if(has_east)cout <<"LOCAL zero\n";
 	// local_vector.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
-	if (nbr[0] != -1) {
+	if (hasNbrNorth()) {
 		int curr_i = local_i[0];
 		for (int i = 0; i < nx; i++) {
 			diff_view(curr_i, 0) += u[nx * (ny - 1) + i];
 			curr_i++;
 		}
 	}
-	if (nbr[2] != -1) {
-		int curr_i = local_i[2];
-		for (int i = 0; i < ny; i++) {
-			diff_view(curr_i, 0) += u[(i + 1) * nx - 1];
-			curr_i++;
+
+	if (hasNbrEast()) {
+		if (isRefinedEast()) {
+			valarray<double> diff   = getDiffEastRefinedLeft();
+			int              curr_i = local_i[2];
+			for (int i = 0; i < ny; i++) {
+				diff_view(curr_i, 0) += diff[i];
+				curr_i++;
+			}
+			diff   = getDiffEastRefinedRight();
+			curr_i = local_i[3];
+			for (int i = 0; i < ny; i++) {
+				diff_view(curr_i, 0) += diff[i];
+				curr_i++;
+			}
+
+		} else {
+			int curr_i = local_i[2];
+			for (int i = 0; i < ny; i++) {
+				diff_view(curr_i, 0) += u[(i + 1) * nx - 1];
+				curr_i++;
+			}
 		}
 	}
-	if (nbr[4] != -1) {
+	if (hasNbrSouth()) {
 		int curr_i = local_i[4];
 		for (int i = 0; i < nx; i++) {
 			diff_view(curr_i, 0) += u[i];
 			curr_i++;
 		}
 	}
-	if (nbr[6] != -1) {
+	if (hasNbrWest()) {
 		int curr_i = local_i[6];
 		for (int i = 0; i < ny; i++) {
 			diff_view(curr_i, 0) += u[i * nx];
@@ -388,15 +435,107 @@ void Domain::solveWithInterface(const vector_type &gamma, vector_type &diff)
 double Domain::diffNorm()
 {
 	error = exact - u;
-	return std::sqrt(std::pow(exact - u, 2).sum());
+	return sqrt(pow(exact - u, 2).sum());
 }
 double Domain::diffNorm(double uavg, double eavg)
 {
 	error = exact - u - eavg + uavg;
-	return std::sqrt(std::pow(exact - u - eavg + uavg, 2).sum());
+	return sqrt(pow(exact - u - eavg + uavg, 2).sum());
 }
 double Domain::uSum() { return u.sum(); }
-double Domain::exactNorm() { return std::sqrt((exact * exact).sum()); }
-double Domain::fNorm() { return std::sqrt((f * f).sum()); }
-double Domain::exactNorm(double eavg) { return std::sqrt(std::pow(exact - eavg, 2).sum()); }
+double Domain::exactNorm() { return sqrt((exact * exact).sum()); }
+double Domain::fNorm() { return sqrt((f * f).sum()); }
+double Domain::exactNorm(double eavg) { return sqrt(pow(exact - eavg, 2).sum()); }
 double                          Domain::exactSum() { return exact.sum(); }
+valarray<double>                Domain::getDiffNorth()
+{
+	return boundary_north - valarray<double>(u[slice(nx * (nx - 1), nx, 1)]);
+}
+valarray<double> Domain::getDiffNorthRefinedLeft()
+{
+	return boundary_north - valarray<double>(u[slice(nx * (nx - 1), nx, 1)]);
+}
+valarray<double> Domain::getDiffNorthRefinedRight()
+{
+	return boundary_north - valarray<double>(u[slice(nx * (nx - 1), nx, 1)]);
+}
+valarray<double> Domain::getDiffEast()
+{
+	return boundary_east - valarray<double>(u[slice((nx - 1), nx, nx)]);
+}
+valarray<double> Domain::getDiffEastRefinedLeft()
+{
+	valarray<double> retval(nx);
+	valarray<double> east = u[slice(nx-1,nx,nx)];
+	retval[nx - 1] = (east[nx - 1] + boundary_north[0]) / 2;
+	int nleft      = (nx - 1) / 2-1;
+	int nright     = (nx - 1) / 2 + (nx - 1) % 2;
+	retval[slice(nx - 2 * nright, nright, 2)]
+	= 1.0 / 4.0 * valarray<double>(east[slice(nx - 2 - nright, nright, 1)]);
+	+3.0 / 4.0 * valarray<double>(east[slice(nx - 1 - nright, nright, 1)]);
+	retval[slice(nx - 1 - 2 * nleft, nleft, 2)]
+	= 3.0 / 4.0 * valarray<double>(east[slice(nx - 2 - nleft, nleft, 1)])
+	  + 1.0 / 4.0 * valarray<double>(east[slice(nx - 1 - nleft, nleft, 1)]);
+	retval = 1.0 / 3.0 * (boundary_east_refined_left - retval);
+	return retval;
+}
+valarray<double> Domain::getDiffEastRefinedRight()
+{
+	valarray<double> retval(nx);
+	valarray<double> east = u[slice(nx - 1, nx, nx)];
+	retval[0]             = (boundary_south[0] + east[0]) / 2;
+	int nleft             = (nx - 1) / 2;
+	int nright            = (nx - 1) / 2 + (nx - 1) % 2;
+	retval[slice(1, nright, 2)] = 3.0 / 4.0 * valarray<double>(east[slice(0, nright, 1)])
+	                              + 1.0 / 4.0 * valarray<double>(east[slice(1, nright, 1)]);
+	retval[slice(2, nleft, 2)] = 1.0 / 4.0 * valarray<double>(east[slice(0, nleft, 1)])
+	                             + 3.0 / 4.0 * valarray<double>(east[slice(1, nleft, 1)]);
+	retval = 1.0 / 3.0 * (boundary_east_refined_right - retval);
+	return retval;
+}
+valarray<double> Domain::getDiffSouth()
+{
+	return boundary_south - valarray<double>(u[slice(0, nx, 1)]);
+}
+valarray<double> Domain::getDiffSouthRefinedLeft()
+{
+	valarray<double> retval(nx);
+    /*
+	retval[0]  = (boundary_west[0] + u[0]) / 2;
+	int nleft  = (nx - 1) / 2 + (nx - 1) % 2;
+	int nright = (nx - 1) / 2;
+	retval[slice(1, nleft, 2)]
+	= 3.0 / 4.0 * u[slice(0, nleft, 1)] + 1.0 / 4.0 * u[slice(1, nleft, 1)];
+	retval[slice(2, nright, 2)]
+	= 1.0 / 4.0 * u[slice(0, nright, 1)] + 3.0 / 4.0 * u[slice(1, nright, 1)];
+	retval = 1.0 / 3.0 * retval;
+    */
+	return retval;
+}
+valarray<double> Domain::getDiffSouthRefinedRight()
+{
+	valarray<double> retval(nx);
+    /*
+	retval[nx-1] = (u[nx-1] + boundary_east[0]) / 2;
+	int nleft  = (nx - 1) / 2;
+	int nright = (nx - 1) / 2 + (nx - 1) % 2;
+	retval[slice(nx-2*nright, nright, 2)]
+	= 1.0 / 4.0 * u[slice(nx-2-nright, nright, 1)] + 3.0 / 4.0 * u[slice(nx-1-nright, nright, 1)];
+	retval[slice(nx-1-2*nleft, nleft, 2)]
+	= 3.0 / 4.0 * u[slice(nx-2-nleft, nleft, 1)] + 1.0 / 4.0 * u[slice(nx-1-nleft, nleft, 1)];
+	retval = 1.0 / 3.0 * retval;
+    */
+	return retval;
+}
+valarray<double> Domain::getDiffWest()
+{
+	return boundary_west - valarray<double>(u[slice(0, nx, nx)]);
+}
+valarray<double> Domain::getDiffWestRefinedLeft()
+{
+	return boundary_west - valarray<double>(u[slice(0, nx, nx)]);
+}
+valarray<double> Domain::getDiffWestRefinedRight()
+{
+	return boundary_west - valarray<double>(u[slice(0, nx, nx)]);
+}

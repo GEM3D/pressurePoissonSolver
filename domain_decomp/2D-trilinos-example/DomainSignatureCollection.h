@@ -12,6 +12,8 @@ struct DomainSignature {
 	 */
 	int id;
 
+    int refine_level;
+
 	std::array<int, 8> nbr      = {-1, -1, -1, -1, -1, -1, -1, -1};
 	std::array<int, 8> proc     = {-1, -1, -1, -1, -1, -1, -1, -1};
 	std::array<int, 8> global_i = {-1, -1, -1, -1, -1, -1, -1, -1};
@@ -74,7 +76,8 @@ class DomainSignatureCollection
 	 * @param rank the rank of the MPI process.
 	 */
 	DomainSignatureCollection(int d_x, int d_y, int rank);
-    /**
+	DomainSignatureCollection(int d_x, int d_y, int rank, bool amr);
+	/**
      * @brief Balance the domains over processors using Zoltan
      */
 	void zoltanBalance();

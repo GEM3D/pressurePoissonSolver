@@ -139,6 +139,43 @@ void DomainCollection::initDirichlet(function<double(double, double)> ffun,
 	generateMaps();
 	distributeIfaceInfo();
 }
+void DomainCollection::initDirichletRefined(function<double(double, double)> ffun,
+                                     function<double(double, double)> gfun)
+{
+	amr = true;
+	for (auto &p : domains) {
+		Domain &d = *p.second;
+
+		// Generate RHS vector
+		std::valarray<double> &f     = d.f;
+		std::valarray<double> &exact = d.exact;
+		// Use local indices to access the entries of f_data.
+		for (int yi = 0; yi < n; yi++) {
+			for (int xi = 0; xi < n; xi++) {
+				double x           = d.x_start + d.h_x / 2.0 + d.x_length * xi / n;
+				double y           = d.y_start + d.h_y / 2.0 + d.y_length * yi / n;
+				f[yi * n + xi]     = ffun(x, y);
+				exact[yi * n + xi] = gfun(x, y);
+				if (d.nbr[6] == -1) {
+					d.boundary_west[yi] = gfun(0.0, y);
+				}
+				if (d.nbr[2] == -1) {
+					d.boundary_east[yi] = gfun(2.0, y);
+				}
+				if (d.nbr[4] == -1) {
+					d.boundary_south[xi] = gfun(x, 0.0);
+				}
+				if (d.nbr[0] == -1) {
+					d.boundary_north[xi] = gfun(x, 1.0);
+				}
+			}
+		}
+		d.planDirichlet();
+	}
+	// create map for domains
+	generateMaps();
+	//distributeIfaceInfo();
+}
 void DomainCollection::generateMaps()
 {
 	set<int>   visited;
@@ -835,7 +872,7 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 		right.right       = true;
 		right.axis        = iface_view(i + 21, 0);
 		right.global_i[0] = iface_view(i, 0);
-		right.types[0]    = iface_view(i, 1);
+		right.types[0]    = iface_view(i+1, 1);
 
 		for (int q = 1; q < 4; q++) {
 			right.global_i[q * 2] = iface_view(i + q * 3, 0);
@@ -845,7 +882,7 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 		left.right       = false;
 		left.axis        = iface_view(i + 21, 0);
 		left.global_i[0] = iface_view(i, 0);
-		left.types[0]    = iface_view(i, 1);
+		left.types[0]    = iface_view(i+1, 1);
 		for (int q = 1; q < 4; q++) {
 			left.global_i[q * 2] = iface_view(i + 9 + q * 3, 0);
 			left.types[q]        = iface_view(i + 9 + q * 3 + 1, 0);
@@ -913,18 +950,13 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 			d.solve();
 			// fill the blocks
 
-			north_block[slice(i*n, n, 1)] = d.u[slice(n * (n - 1), n, 1)];
-			east_block[slice(i*n, n, 1)]  = d.u[slice((n - 1), n, n)];
-			south_block[slice(i*n, n, 1)] = d.u[slice(0, n, 1)];
-			west_block[slice(i*n, n, 1)]  = d.u[slice(0, n, n)];
-			south_block[i * n + i] -= 1;
+			north_block[slice(i*n, n, 1)] = d.getDiffNorth();
+			east_block[slice(i*n, n, 1)]  = d.getDiffEast();
+			south_block[slice(i*n, n, 1)] = d.getDiffSouth();
+			west_block[slice(i*n, n, 1)]  = d.getDiffWest();
 			d.boundary_south[i] = 0;
 		}
 
-		north_block = -north_block;
-		south_block = -south_block;
-		east_block = -east_block;
-		west_block = -west_block;
 		//now insert these results into the matrix for each interface
 		for (Iface iface : todo) {
 			bool reverse_x
@@ -962,9 +994,9 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 
 void DomainCollection::outputSolution(std::ostream &os)
 {
-	int num_i = n * sqrt(num_global_domains);
-	int num_j = n * sqrt(num_global_domains);
-	int d_x = sqrt(num_global_domains);
+	int num_i = n * sqrt(num_global_domains/5);
+	int num_j = n * sqrt(num_global_domains/5);
+	int d_x = sqrt(num_global_domains/5);
 	os << "%%MatrixMarket matrix array real general\n";
 	os << num_i << ' ' << num_j << '\n';
 	os.precision(15);
@@ -975,6 +1007,25 @@ void DomainCollection::outputSolution(std::ostream &os)
 			int domain_i   = i / n;
 			int internal_i = i % n;
 			int id         = domain_i * d_x + domain_j;
+			os << domains[id]->u[internal_i * n + internal_j] << '\n';
+		}
+	}
+}
+void DomainCollection::outputSolutionRefined(std::ostream &os)
+{
+	int num_i = 2 * n * sqrt(num_global_domains / 5);
+	int num_j = 2 * n * sqrt(num_global_domains / 5);
+	int d_x   = 2 * sqrt(num_global_domains / 5);
+	os << "%%MatrixMarket matrix array real general\n";
+	os << num_i << ' ' << num_j << '\n';
+	os.precision(15);
+	for (int j = 0; j < num_j; j++) {
+		int domain_j   = j / n;
+		int internal_j = j % n;
+		for (int i = 0; i < num_i; i++) {
+			int domain_i   = i / n;
+			int internal_i = i % n;
+			int id         = d_x * d_x / 4 + domain_i * d_x + domain_j;
 			os << domains[id]->u[internal_i * n + internal_j] << '\n';
 		}
 	}

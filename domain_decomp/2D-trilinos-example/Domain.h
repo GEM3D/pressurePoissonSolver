@@ -26,6 +26,8 @@ class Domain
 	std::valarray<double>  boundary_north;
 	std::valarray<double>  boundary_south;
 	std::valarray<double>  boundary_east;
+	std::valarray<double>  boundary_east_refined_left;
+	std::valarray<double>  boundary_east_refined_right;
 	std::valarray<double>  boundary_west;
 	std::array<int, 8> nbr           = {-1, -1, -1, -1, -1, -1, -1, -1};
 	std::array<int, 8> local_i       = {-1, -1, -1, -1, -1, -1, -1, -1};
@@ -58,5 +60,27 @@ class Domain
 	double fNorm();
 	double exactNorm(double eavg);
 	double exactSum();
+
+    std::valarray<double> getDiffNorth();
+    std::valarray<double> getDiffNorthRefinedLeft();
+    std::valarray<double> getDiffNorthRefinedRight();
+    std::valarray<double> getDiffEast();
+    std::valarray<double> getDiffEastRefinedLeft();
+    std::valarray<double> getDiffEastRefinedRight();
+    std::valarray<double> getDiffSouth();
+    std::valarray<double> getDiffSouthRefinedLeft();
+    std::valarray<double> getDiffSouthRefinedRight();
+    std::valarray<double> getDiffWest();
+    std::valarray<double> getDiffWestRefinedLeft();
+	std::valarray<double> getDiffWestRefinedRight();
+
+	inline bool isRefinedNorth() { return nbr[1] != -1; }
+	inline bool isRefinedEast() { return nbr[3] != -1; }
+	inline bool isRefinedSouth() { return nbr[5] != -1; }
+	inline bool isRefinedWest() { return nbr[7] != -1; }
+	inline bool hasNbrNorth() { return nbr[0] != -1; }
+	inline bool hasNbrEast() { return nbr[2] != -1; }
+	inline bool hasNbrSouth() { return nbr[4] != -1; }
+	inline bool hasNbrWest() { return nbr[6] != -1; }
 };
 #endif

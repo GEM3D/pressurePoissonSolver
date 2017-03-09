@@ -5,12 +5,13 @@ using namespace std;
 DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank)
 {
 	num_global_domains    = d_x * d_y;
-	num_global_interfaces = (d_x - 1) * d_y + d_x * (d_y - 1);
+	num_global_interfaces = 0;
 	if (rank == 0) {
 		for (int domain_y = 0; domain_y < d_y; domain_y++) {
 			for (int domain_x = 0; domain_x < d_x; domain_x++) {
 				DomainSignature ds;
 				ds.id = domain_y * d_x + domain_x;
+                ds.refine_level=1;
 				if (domain_y != d_y - 1) {
 					ds.nbr[0]  = (domain_y + 1) * d_x + domain_x;
 					ds.proc[0] = 0;
@@ -37,6 +38,81 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank)
 	}
     indexInterfacesBFS();
 }
+DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank,bool amr)
+{
+	num_global_domains    = d_x * d_y*5;
+	num_global_interfaces = 0;
+	if (rank == 0) {
+		for (int domain_y = 0; domain_y < d_y; domain_y++) {
+			for (int domain_x = 0; domain_x < d_x; domain_x++) {
+				DomainSignature ds;
+				ds.id = domain_y * d_x + domain_x;
+                ds.refine_level=1;
+				if (domain_y != d_y - 1) {
+					ds.nbr[0]  = (domain_y + 1) * d_x + domain_x;
+					ds.proc[0] = 0;
+				}
+				if (domain_x != d_x - 1) {
+					ds.nbr[2]  = domain_y * d_x + domain_x + 1;
+					ds.proc[2] = 0;
+				}
+				if (domain_y != 0) {
+					ds.nbr[4]  = (domain_y - 1) * d_x + domain_x;
+					ds.proc[4] = 0;
+				}
+				if (domain_x != 0) {
+					ds.nbr[6]  = domain_y * d_x + domain_x - 1;
+					ds.proc[6] = 0;
+				}
+				ds.x_length    = 1.0 / d_x;
+				ds.y_length    = 1.0 / d_y;
+				ds.x_start     = 1.0 * domain_x / d_x;
+				ds.y_start     = 1.0 * domain_y / d_y;
+				domains[ds.id] = ds;
+			}
+		}
+		// create refined grid
+		for (int domain_y = 0; domain_y < d_y * 2; domain_y++) {
+			for (int domain_x = 0; domain_x < d_x * 2; domain_x++) {
+				DomainSignature ds;
+				ds.id           = domain_y * d_x * 2 + domain_x + d_x * d_y;
+				ds.refine_level = 2;
+				if (domain_y != 2*d_y - 1) {
+					ds.nbr[0]  = d_x * d_y + 2 * (domain_y + 1) * d_x + domain_x;
+					ds.proc[0] = 0;
+				}
+				if (domain_x != 2*d_x - 1) {
+					ds.nbr[2]  = d_x * d_y + 2 * domain_y * d_x + domain_x + 1;
+					ds.proc[2] = 0;
+				}
+				if (domain_y != 0) {
+					ds.nbr[4]  = d_x * d_y + 2 * (domain_y - 1) * d_x + domain_x;
+					ds.proc[4] = 0;
+				}
+				if (domain_x != 0) {
+					ds.nbr[6]  = d_x * d_y + 2 * domain_y * d_x + domain_x - 1;
+					ds.proc[6] = 0;
+				}
+				ds.x_length    = 1.0 / (2 * d_x);
+				ds.y_length    = 1.0 / (2 * d_y);
+				ds.x_start     = 1.0 + 1.0 * domain_x / (2 * d_x);
+				ds.y_start     = 1.0 * domain_y / (2 * d_y);
+				domains[ds.id] = ds;
+			}
+		}
+        //stitch together grids
+        for(int i=0;i<d_y;i++){
+			DomainSignature &left     = domains[i * d_x + d_x - 1];
+			DomainSignature &low_nbr  = domains[d_y * d_x + 2*i * d_x * 2];
+			DomainSignature &high_nbr = domains[d_y * d_x + (2 * i + 1) * d_x * 2];
+			left.nbr[2]               = high_nbr.id;
+			left.nbr[3]               = low_nbr.id;
+			low_nbr.nbr[6]            = left.id;
+			high_nbr.nbr[6]           = left.id;
+		}
+	}
+    indexInterfacesBFS();
+}
 void DomainSignatureCollection::indexInterfacesBFS()
 {
 	set<int>   visited;
@@ -47,6 +123,7 @@ void DomainSignatureCollection::indexInterfacesBFS()
 	enqueued.insert(first);
 	int curr_i = 0;
 	while (!queue.empty()) {
+        num_global_interfaces++;
 		int              curr = queue.front();
 		DomainSignature &d    = domains.at(curr);
 		queue.pop_front();

@@ -30,7 +30,9 @@ class DomainCollection
 	 * i.e. n means nxn cells in each domain.
 	 */
 	int                                    n;
-    /**
+
+	bool amr = false;
+	/**
      * @brief Spacing of coarsest grid in x direction
      */
 	double                                 h_x;
@@ -105,7 +107,10 @@ class DomainCollection
 	void initDirichlet(std::function<double(double, double)> ffun,
 	                   std::function<double(double, double)> gfun);
 
-    /**
+	void initDirichletRefined(std::function<double(double, double)> ffun,
+	                          std::function<double(double, double)> gfun);
+
+	/**
      * @brief Initialize domains using Neumann boundary conditions
      *
      * @param ffun the function we are solving for
@@ -124,6 +129,7 @@ class DomainCollection
      * @param out the stream to output to
      */
     void outputSolution(std::ostream &out);
+    void outputSolutionRefined(std::ostream &out);
 
     /**
      * @brief output residual in MatrixMarket format

@@ -58,6 +58,7 @@ int main(int argc, char *argv[])
 	args::Positional<int> d_y(parser, "d_y", "number of domains in the y direction");
 	args::Positional<int> n_x(parser, "n_x", "number of cells in the x direction, in each domain");
 	args::Positional<int> n_y(parser, "n_y", "number of cells in the y direction, in each domain");
+	args::Flag f_amr(parser, "amr", "use a refined mesh", {"amr"});
 	args::ValueFlag<int>  f_l(parser, "n", "run the program n times and print out the average",
 	                         {'l'});
 	args::ValueFlag<string> f_m(parser, "matrix filename", "the file to write the matrix to",
@@ -207,8 +208,12 @@ int main(int argc, char *argv[])
 	for (int loop = 0; loop < loop_count; loop++) {
 		comm->barrier();
 		// partition domains
-		DomainSignatureCollection dsc
-		= DomainSignatureCollection(num_domains_x, num_domains_y, comm->getRank());
+		DomainSignatureCollection dsc;
+		if (f_amr) {
+			dsc = DomainSignatureCollection(num_domains_x, num_domains_y, comm->getRank(), true);
+		} else {
+			dsc = DomainSignatureCollection(num_domains_x, num_domains_y, comm->getRank());
+		}
 		if (num_procs > 1) {
 			dsc.zoltanBalance();
 		}
@@ -223,7 +228,11 @@ int main(int argc, char *argv[])
 			}
 			dc.initNeumann(ffun, gfun, nfunx, nfuny);
 		} else {
-			dc.initDirichlet(ffun, gfun);
+			if (f_amr) {
+				dc.initDirichletRefined(ffun, gfun);
+			} else {
+				dc.initDirichlet(ffun, gfun);
+			}
 		}
 
 		comm->barrier();
@@ -241,7 +250,7 @@ int main(int argc, char *argv[])
 		RCP<vector_type> diff  = rcp(new vector_type(matrix_map, 1));
 		RCP<RBMatrix> RBA;
 
-		if (num_domains_x * num_domains_y != 1) {
+		if (f_amr || num_domains_x * num_domains_y != 1) {
 			// do iterative solve
 
 			// Get the b vector
@@ -323,7 +332,7 @@ int main(int argc, char *argv[])
 
 					RCP<RBMatrix> L, U;
 					RBMatrix      Copy = *RBA;
-					Copy.ilu(L, U);
+					Copy.ilu2(L, U);
 					RCP<LUSolver> solver = rcp(new LUSolver(L, U));
 					problem.setLeftPrec(solver);
 
@@ -506,6 +515,11 @@ int main(int argc, char *argv[])
 			ofstream out_file(save_solution_file);
 			dc.outputSolution(out_file);
 			out_file.close();
+            if(f_amr){
+			ofstream out_file(save_solution_file+".amr");
+			dc.outputSolutionRefined(out_file);
+			out_file.close();
+            }
 		}
 		if (save_residual_file != "") {
 			ofstream out_file(save_residual_file);
