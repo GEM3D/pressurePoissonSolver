@@ -413,7 +413,7 @@ void DomainCollection::solveWithInterface(const vector_type &gamma, vector_type 
 	// diff.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
 	// if(has_east)std::cout <<"GAMMA\n";
 	// gamma.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
-	diff.update(-2, gamma, 1);
+	//diff.update(-2, gamma, 1);
 }
 double DomainCollection::diffNorm()
 {
@@ -1051,9 +1051,9 @@ void DomainCollection::outputResidual(std::ostream &os)
 }
 void DomainCollection::outputError(std::ostream &os)
 {
-	int num_i = n * sqrt(num_global_domains);
-	int num_j = n * sqrt(num_global_domains);
-	int d_x = sqrt(num_global_domains);
+	int num_i = n * sqrt(num_global_domains / 5);
+	int num_j = n * sqrt(num_global_domains / 5);
+	int d_x   = sqrt(num_global_domains / 5);
 	os << "%%MatrixMarket matrix array real general\n";
 	os << num_i << ' ' << num_j << '\n';
 	os.precision(15);
@@ -1064,6 +1064,25 @@ void DomainCollection::outputError(std::ostream &os)
 			int domain_i   = i / n;
 			int internal_i = i % n;
 			int id         = domain_i * d_x + domain_j;
+			os << domains[id]->error[internal_i * n + internal_j] << '\n';
+		}
+	}
+}
+void DomainCollection::outputErrorRefined(std::ostream &os)
+{
+	int num_i = 2 * n * sqrt(num_global_domains / 5);
+	int num_j = 2 * n * sqrt(num_global_domains / 5);
+	int d_x   = 2 * sqrt(num_global_domains / 5);
+	os << "%%MatrixMarket matrix array real general\n";
+	os << num_i << ' ' << num_j << '\n';
+	os.precision(15);
+	for (int j = 0; j < num_j; j++) {
+		int domain_j   = j / n;
+		int internal_j = j % n;
+		for (int i = 0; i < num_i; i++) {
+			int domain_i   = i / n;
+			int internal_i = i % n;
+			int id         = d_x * d_x / 4 + domain_i * d_x + domain_j;
 			os << domains[id]->error[internal_i * n + internal_j] << '\n';
 		}
 	}

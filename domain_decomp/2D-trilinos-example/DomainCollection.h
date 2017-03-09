@@ -144,6 +144,7 @@ class DomainCollection
      * @param out the stream to output to
      */
     void outputError(std::ostream &out);
+    void outputErrorRefined(std::ostream &out);
 
     /**
      * @brief Solve with a given set of interface values

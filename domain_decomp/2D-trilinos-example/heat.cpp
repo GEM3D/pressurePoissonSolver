@@ -198,10 +198,10 @@ int main(int argc, char *argv[])
 		};
 	} else {
 		ffun
-		= [](double x, double y) { return -5 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y); };
-		gfun  = [](double x, double y) { return sin(M_PI * x) * cos(2 * M_PI * y); };
-		nfunx = [](double x, double y) { return M_PI * cos(M_PI * x) * cos(2 * M_PI * y); };
-		nfuny = [](double x, double y) { return -2 * M_PI * sin(M_PI * x) * sin(2 * M_PI * y); };
+		= [](double x, double y) { return -5 * M_PI * M_PI * sin(M_PI * y) * cos(2 * M_PI * x); };
+		gfun  = [](double x, double y) { return sin(M_PI * y) * cos(2 * M_PI * x); };
+		nfunx = [](double x, double y) { return M_PI * cos(M_PI * y) * cos(2 * M_PI * x); };
+		nfuny = [](double x, double y) { return -2 * M_PI * sin(M_PI * y) * sin(2 * M_PI * x); };
 	}
 
 	valarray<double> times(loop_count);
@@ -515,11 +515,11 @@ int main(int argc, char *argv[])
 			ofstream out_file(save_solution_file);
 			dc.outputSolution(out_file);
 			out_file.close();
-            if(f_amr){
-			ofstream out_file(save_solution_file+".amr");
-			dc.outputSolutionRefined(out_file);
-			out_file.close();
-            }
+			if (f_amr) {
+				ofstream out_file(save_solution_file + ".amr");
+				dc.outputSolutionRefined(out_file);
+				out_file.close();
+			}
 		}
 		if (save_residual_file != "") {
 			ofstream out_file(save_residual_file);
@@ -530,6 +530,11 @@ int main(int argc, char *argv[])
 			ofstream out_file(save_error_file);
 			dc.outputError(out_file);
 			out_file.close();
+			if (f_amr) {
+				ofstream out_file(save_error_file + ".amr");
+				dc.outputErrorRefined(out_file);
+				out_file.close();
+			}
 		}
 		if (save_gamma_file != "") {
 			Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_gamma_file, gamma, "",
