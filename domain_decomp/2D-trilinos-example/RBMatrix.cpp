@@ -401,6 +401,7 @@ void RBMatrix::lu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
 		blk_ptr Akk = blkCopy(block_cols[k][range_k]);
 		blk_ptr Lkk, Ukk;
 		piv_ptr Pkk;
+        // do lu on diagonal block
 		DGETRF(Akk, Lkk, Ukk, Pkk);
 		L->insertBlock(k * block_size, k * block_size, Lkk, false, false);
 		U->insertBlock(k * block_size, k * block_size, Ukk, false, false);
@@ -486,6 +487,7 @@ void RBMatrix::ilu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
 				L->insertBlock(i * block_size, k * block_size, Lik, false, false);
 			}
 		}
+        /*
         //update rest of matrix
 		for (int j = k + 1; j < num_blocks; j++) {
 			int  range_k   = U->range_map[k * block_size];
@@ -506,6 +508,146 @@ void RBMatrix::ilu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
 						insertBlock(i * block_size, j * block_size, C, false, false);
 					}
 				}
+			}
+		}
+        */
+	}
+}
+void RBMatrix::ilu2(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
+{
+	L = rcp(new RBMatrix(domain, block_size, num_blocks));
+	U = rcp(new RBMatrix(domain, block_size, num_blocks));
+    map<tuple<Block,Block>,blk_ptr> mm_comp;
+	for (int k = 0; k < num_blocks; k++) {
+		int range_k = range->getLocalElement(k * block_size);
+
+		blk_ptr Akk = blkCopy(block_cols[k][range_k]);
+		blk_ptr Lkk, Ukk;
+		piv_ptr Pkk;
+		DGETRF(Akk, Lkk, Ukk, Pkk);
+		L->insertBlock(k * block_size, k * block_size, Lkk, false, false);
+		U->insertBlock(k * block_size, k * block_size, Ukk, false, false);
+		// get row of U's
+		for (int j = k + 1; j < num_blocks; j++) {
+			auto Akj_block = block_cols[j].find(range_k);
+			if (Akj_block != block_cols[j].end()) {
+				blk_ptr Ukj;
+				blk_ptr Akj = blkCopy(Akj_block->second);
+				DGESSM(Akj, Lkk, Ukj, Pkk);
+				U->insertBlock(k * block_size, j * block_size, Ukj, false, false);
+			}
+		}
+		// get Column of L's
+		for (int i = k + 1; i < num_blocks; i++) {
+			int  range_i   = range->getLocalElement(i * block_size);
+			auto Aik_block = block_cols[k].find(range_i);
+			if (Aik_block != block_cols[k].end()) {
+				blk_ptr Lik;
+				blk_ptr Aik = blkCopy(Aik_block->second);
+				LSolve(Aik, Lik, Ukk, Pkk);
+				L->insertBlock(i * block_size, k * block_size, Lik, false, false);
+			}
+		}
+        //update rest of matrix
+		for (int j = k + 1; j < num_blocks; j++) {
+			blk_ptr Ukj       = U->getBlock(k * block_size, j * block_size);
+			if (!Ukj.is_null()){
+				for (int i = k + 1; i < num_blocks; i++) {
+					blk_ptr Lik = L->getBlock(i * block_size, k * block_size);
+					if (!Lik.is_null() && !getBlock(i * block_size, j * block_size).is_null()) {
+						blk_ptr C;
+						C             = rcp(new valarray<double>(block_size * block_size));
+						char    trans = 'N';
+						double  one   = -1;
+						double  zero  = 0;
+						dgemm_(&trans, &trans, &block_size, &block_size, &block_size, &one,
+						       &(*Lik)[0], &block_size, &(*Ukj)[0], &block_size, &zero, &(*C)[0],
+						       &block_size);
+						insertBlock(i * block_size, j * block_size, C, false, false);
+					}
+				}
+			}
+		}
+	}
+}
+void RBMatrix::ilu3(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
+{
+	L = rcp(new RBMatrix(domain, block_size, num_blocks));
+	U = rcp(new RBMatrix(domain, block_size, num_blocks));
+	RBMatrix F(domain, block_size, num_blocks);
+    map<tuple<Block,Block>,blk_ptr> mm_comp;
+	piv_ptr Pkk;
+	for (int k = 0; k < num_blocks; k++) {
+		int range_k = range->getLocalElement(k * block_size);
+
+		blk_ptr Akk = blkCopy(block_cols[k][range_k]);
+		blk_ptr Lkk, Ukk;
+		DGETRF(Akk, Lkk, Ukk, Pkk);
+		L->insertBlock(k * block_size, k * block_size, Lkk, false, false);
+		U->insertBlock(k * block_size, k * block_size, Ukk, false, false);
+		// get row of U's
+		for (int j = k + 1; j < num_blocks; j++) {
+			auto Akj_block = block_cols[j].find(range_k);
+			if (Akj_block != block_cols[j].end()) {
+				blk_ptr Ukj;
+				blk_ptr Akj = blkCopy(Akj_block->second);
+				DGESSM(Akj, Lkk, Ukj, Pkk);
+				U->insertBlock(k * block_size, j * block_size, Ukj, false, false);
+			}
+		}
+		// get Column of L's
+		for (int i = k + 1; i < num_blocks; i++) {
+			int  range_i   = range->getLocalElement(i * block_size);
+			auto Aik_block = block_cols[k].find(range_i);
+			if (Aik_block != block_cols[k].end()) {
+				blk_ptr Lik;
+				blk_ptr Aik = blkCopy(Aik_block->second);
+				LSolve(Aik, Lik, Ukk, Pkk);
+				L->insertBlock(i * block_size, k * block_size, Lik, false, false);
+			}
+		}
+        //update rest of matrix
+		for (int j = k + 1; j < num_blocks; j++) {
+			blk_ptr Ukj       = U->getBlock(k*block_size, j * block_size);
+			if (!Ukj.is_null()){
+				for (int i = k + 1; i < num_blocks; i++) {
+					blk_ptr Lik     = L->getBlock(i * block_size, k*block_size);
+					if (!Lik.is_null() && getBlock(i * block_size, j * block_size).is_null()) {
+						blk_ptr C;
+						C             = rcp(new valarray<double>(block_size * block_size));
+						char    trans = 'N';
+						double  one   = -1;
+						double  zero  = 0;
+						dgemm_(&trans, &trans, &block_size, &block_size, &block_size, &one,
+						       &(*Lik)[0], &block_size, &(*Ukj)[0], &block_size, &zero, &(*C)[0],
+						       &block_size);
+						F.insertBlock(i * block_size, j * block_size, C, false, false);
+					}
+				}
+			}
+		}
+	}
+	for (int k = 0; k < num_blocks; k++) {
+
+		blk_ptr Lkk, Ukk;
+		Lkk = L->getBlock(k * block_size, k * block_size);
+		Ukk = U->getBlock(k * block_size, k * block_size);
+		// get row of U's
+		for (int j = k + 1; j < num_blocks; j++) {
+			blk_ptr Ukj;
+			blk_ptr Akj = F.getBlock(k * block_size, j * block_size);
+			if (!Akj.is_null()) {
+				DGESSM(Akj, Lkk, Ukj, Pkk);
+				U->insertBlock(k * block_size, j * block_size, Ukj, false, false);
+			}
+		}
+		// get Column of L's
+		for (int i = k + 1; i < num_blocks; i++) {
+			blk_ptr Lik;
+			blk_ptr Aik = F.getBlock(i * block_size, k * block_size);
+			if (!Aik.is_null()) {
+				LSolve(Aik, Lik, Ukk, Pkk);
+				L->insertBlock(i * block_size, k * block_size, Lik, false, false);
 			}
 		}
 	}

@@ -1,16 +1,18 @@
 #ifndef DOMAIN_H
 #define DOMAIN_H
-#include "MyTypeDefs.h"
 #include "DomainSignatureCollection.h"
+#include "MyTypeDefs.h"
 #include <Teuchos_RCP.hpp>
 #include <Tpetra_Import_decl.hpp>
+#include <array>
 #include <cmath>
 #include <fftw3.h>
 #include <valarray>
-#include <array>
+enum class Dir { north, east, south, west };
 class Domain
 {
 	public:
+	DomainSignature        ds;
 	std::valarray<double>  f;
 	std::valarray<double>  f_copy;
 	std::valarray<double>  resid;
@@ -61,17 +63,18 @@ class Domain
 	double exactNorm(double eavg);
 	double exactSum();
 
-    std::valarray<double> getDiffNorth();
-    std::valarray<double> getDiffNorthRefinedLeft();
-    std::valarray<double> getDiffNorthRefinedRight();
-    std::valarray<double> getDiffEast();
-    std::valarray<double> getDiffEastRefinedLeft();
-    std::valarray<double> getDiffEastRefinedRight();
-    std::valarray<double> getDiffSouth();
-    std::valarray<double> getDiffSouthRefinedLeft();
-    std::valarray<double> getDiffSouthRefinedRight();
-    std::valarray<double> getDiffWest();
-    std::valarray<double> getDiffWestRefinedLeft();
+	bool hasRefinedNbr(Dir dir);
+	std::valarray<double> getDiffNorth();
+	std::valarray<double> getDiffNorthRefinedLeft();
+	std::valarray<double> getDiffNorthRefinedRight();
+	std::valarray<double> getDiffEast();
+	std::valarray<double> getDiffEastRefinedLeft();
+	std::valarray<double> getDiffEastRefinedRight();
+	std::valarray<double> getDiffSouth();
+	std::valarray<double> getDiffSouthRefinedLeft();
+	std::valarray<double> getDiffSouthRefinedRight();
+	std::valarray<double> getDiffWest();
+	std::valarray<double> getDiffWestRefinedLeft();
 	std::valarray<double> getDiffWestRefinedRight();
 
 	inline bool isRefinedNorth() { return nbr[1] != -1; }

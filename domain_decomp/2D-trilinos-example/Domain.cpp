@@ -43,6 +43,8 @@ Domain::Domain(DomainSignature ds, int nx, int ny, double h_x, double h_y)
 	y_start  = ds.y_start;
 	x_length = ds.x_length;
 	y_length = ds.y_length;
+
+	this->ds = ds;
 }
 
 Domain::~Domain()
@@ -60,8 +62,7 @@ void Domain::planDirichlet()
 	// create denom vector
 
 	for (int yi = 0; yi < nx; yi++) {
-		denom[slice(yi * ny, nx, 1)]
-		= -4 / (h_x * h_x) * pow(sin((yi + 1) * M_PI / (2 * nx)), 2);
+		denom[slice(yi * ny, nx, 1)] = -4 / (h_x * h_x) * pow(sin((yi + 1) * M_PI / (2 * nx)), 2);
 	}
 
 	valarray<double> ones(ny);
@@ -387,8 +388,8 @@ void Domain::solveWithInterface(const vector_type &gamma, vector_type &diff)
 	// if(has_east)cout <<"LOCAL zero\n";
 	// local_vector.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
 	if (hasNbrNorth()) {
-		int curr_i = local_i[0];
-			valarray<double> diff   = getDiffNorth();
+		int              curr_i = local_i[0];
+		valarray<double> diff   = getDiffNorth();
 		for (int i = 0; i < nx; i++) {
 			diff_view(curr_i, 0) += diff[i];
 			curr_i++;
@@ -397,22 +398,21 @@ void Domain::solveWithInterface(const vector_type &gamma, vector_type &diff)
 
 	if (hasNbrEast()) {
 		if (isRefinedEast()) {
-			valarray<double> diff   = getDiffEastRefinedLeft();
+			valarray<double> diff   = 2.0 / 3.0 * getDiffEastRefinedLeft();
 			int              curr_i = local_i[2];
 			for (int i = 0; i < ny; i++) {
 				diff_view(curr_i, 0) += diff[i];
 				curr_i++;
 			}
-			diff   = getDiffEastRefinedRight();
+			diff   = 2.0 / 3.0 * getDiffEastRefinedRight();
 			curr_i = local_i[3];
 			for (int i = 0; i < ny; i++) {
 				diff_view(curr_i, 0) += diff[i];
 				curr_i++;
 			}
 
-            
 		} else {
-			int curr_i = local_i[2];
+			int              curr_i = local_i[2];
 			valarray<double> diff   = getDiffEast();
 			for (int i = 0; i < ny; i++) {
 				diff_view(curr_i, 0) += diff[i];
@@ -429,8 +429,11 @@ void Domain::solveWithInterface(const vector_type &gamma, vector_type &diff)
 		}
 	}
 	if (hasNbrWest()) {
-		int curr_i = local_i[6];
+		int              curr_i = local_i[6];
 		valarray<double> diff   = getDiffWest();
+		if (hasRefinedNbr(Dir::west)) {
+			diff *= 4.0 / 3.0;
+		}
 		for (int i = 0; i < ny; i++) {
 			diff_view(curr_i, 0) += diff[i];
 			curr_i++;
@@ -471,41 +474,43 @@ valarray<double> Domain::getDiffEast()
 valarray<double> Domain::getDiffEastRefinedLeft()
 {
 	valarray<double> retval(nx);
-	valarray<double> east = u[slice(nx-1,nx,nx)];
-    int grid_i=nx-1;
-    bool left = true;
-	retval[nx - 1] = (east[nx - 1] + boundary_north[0]) / 2;
+	valarray<double> east   = u[slice(nx - 1, nx, nx)];
+	int              grid_i = nx - 1;
+	bool             left   = true;
+	// retval[nx - 1] = (east[nx - 1] + boundary_north[0]) / 2;
+	retval[nx - 1] = east[nx - 1];
 	for (int i = nx - 2; i >= 0; i--) {
 		if (left) {
-			retval[i] = (east[grid_i] + east[grid_i - 1]) / 2.0;
+			retval[i] = (3 * east[grid_i] + east[grid_i - 1]) / 4.0;
 			left      = false;
 		} else {
-			retval[i] = (east[grid_i] + east[grid_i - 1]) / 2.0;
+			retval[i] = (east[grid_i] + 3 * east[grid_i - 1]) / 4.0;
 			left      = true;
 			grid_i--;
 		}
 	}
-	retval = 1.0 / 2.0 * (boundary_east_refined_left - retval);
+	retval = boundary_east_refined_left - retval;
 	return retval;
 }
 valarray<double> Domain::getDiffEastRefinedRight()
 {
 	valarray<double> retval(nx);
-	valarray<double> east = u[slice(nx - 1, nx, nx)];
+	valarray<double> east   = u[slice(nx - 1, nx, nx)];
 	int              grid_i = 0;
 	bool             left   = false;
-	retval[0]               = (boundary_south[0] + east[0]) / 2;
+	// retval[0]               = (boundary_south[0] + east[0]) / 2;
+	retval[0] = east[0];
 	for (int i = 1; i < nx; i++) {
 		if (left) {
-			retval[i] = (east[grid_i] + east[grid_i + 1]) / 2.0;
+			retval[i] = (east[grid_i] + 3 * east[grid_i + 1]) / 4.0;
 			left      = false;
 			grid_i++;
 		} else {
-			retval[i] = (east[grid_i] + east[grid_i + 1]) / 2.0;
+			retval[i] = (3 * east[grid_i] + east[grid_i + 1]) / 4.0;
 			left      = true;
 		}
 	}
-	retval = 1.0 / 2.0 * (boundary_east_refined_right - retval);
+	retval = boundary_east_refined_right - retval;
 	return retval;
 }
 valarray<double> Domain::getDiffSouth()
@@ -514,7 +519,6 @@ valarray<double> Domain::getDiffSouth()
 }
 valarray<double> Domain::getDiffSouthRefinedLeft()
 {
-
 	valarray<double> retval(nx);
 	/*
 	retval[0]  = (boundary_west[0] + u[0]) / 2;
@@ -525,13 +529,13 @@ valarray<double> Domain::getDiffSouthRefinedLeft()
 	retval[slice(2, nright, 2)]
 	= 1.0 / 4.0 * u[slice(0, nright, 1)] + 3.0 / 4.0 * u[slice(1, nright, 1)];
 	retval = 1.0 / 3.0 * retval;
-    */
+	*/
 	return retval;
 }
 valarray<double> Domain::getDiffSouthRefinedRight()
 {
 	valarray<double> retval(nx);
-    /*
+	/*
 	retval[nx-1] = (u[nx-1] + boundary_east[0]) / 2;
 	int nleft  = (nx - 1) / 2;
 	int nright = (nx - 1) / 2 + (nx - 1) % 2;
@@ -540,7 +544,7 @@ valarray<double> Domain::getDiffSouthRefinedRight()
 	retval[slice(nx-1-2*nleft, nleft, 2)]
 	= 3.0 / 4.0 * u[slice(nx-2-nleft, nleft, 1)] + 1.0 / 4.0 * u[slice(nx-1-nleft, nleft, 1)];
 	retval = 1.0 / 3.0 * retval;
-    */
+	*/
 	return retval;
 }
 valarray<double> Domain::getDiffWest()
@@ -554,4 +558,23 @@ valarray<double> Domain::getDiffWestRefinedLeft()
 valarray<double> Domain::getDiffWestRefinedRight()
 {
 	return boundary_west - valarray<double>(u[slice(0, nx, nx)]);
+}
+
+bool Domain::hasRefinedNbr(Dir dir)
+{
+	bool retval;
+	switch (dir) {
+		case Dir::north:
+			retval = ds.nbr_refined[0];
+			break;
+		case Dir::east:
+			retval = ds.nbr_refined[1];
+			break;
+		case Dir::south:
+			retval = ds.nbr_refined[2];
+			break;
+		case Dir::west:
+			retval = ds.nbr_refined[3];
+	}
+	return retval;
 }

@@ -67,6 +67,8 @@ class RBMatrix : public Tpetra::Operator<>
 	Teuchos::RCP<RBMatrix>              invBlockDiag();
 	void lu(Teuchos::RCP<RBMatrix> &L, Teuchos::RCP<RBMatrix> &U);
 	void ilu(Teuchos::RCP<RBMatrix> &L, Teuchos::RCP<RBMatrix> &U);
+	void ilu2(Teuchos::RCP<RBMatrix> &L, Teuchos::RCP<RBMatrix> &U);
+	void ilu3(Teuchos::RCP<RBMatrix> &L, Teuchos::RCP<RBMatrix> &U);
 	Teuchos::RCP<std::valarray<double>> blkCopy(Block in);
 	Teuchos::RCP<std::valarray<double>> getBlock(int i,int j);
 	int  getNumBlocks() { return num_blocks; }

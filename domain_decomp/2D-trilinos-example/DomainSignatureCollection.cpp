@@ -108,7 +108,9 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank,
 			left.nbr[2]               = high_nbr.id;
 			left.nbr[3]               = low_nbr.id;
 			low_nbr.nbr[6]            = left.id;
+			low_nbr.nbr_refined[3]    = true;
 			high_nbr.nbr[6]           = left.id;
+			high_nbr.nbr_refined[3]   = true;
 		}
 	}
     indexInterfacesBFS();
