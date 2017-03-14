@@ -137,6 +137,7 @@ class DomainCollection
      * @param out the stream to output to
      */
     void outputResidual(std::ostream &out);
+    void outputResidualRefined(std::ostream &out);
 
     /**
      * @brief output error in MatrixMarket format

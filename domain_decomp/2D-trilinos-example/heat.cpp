@@ -525,6 +525,11 @@ int main(int argc, char *argv[])
 			ofstream out_file(save_residual_file);
 			dc.outputResidual(out_file);
 			out_file.close();
+			if (f_amr) {
+				ofstream out_file(save_residual_file + ".amr");
+				dc.outputResidualRefined(out_file);
+				out_file.close();
+			}
 		}
 		if (save_error_file != "") {
 			ofstream out_file(save_error_file);

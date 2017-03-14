@@ -994,9 +994,16 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 
 void DomainCollection::outputSolution(std::ostream &os)
 {
-	int num_i = n * sqrt(num_global_domains/5);
-	int num_j = n * sqrt(num_global_domains/5);
-	int d_x = sqrt(num_global_domains/5);
+	int num_i, num_j, d_x;
+	if (amr) {
+		num_i = n * sqrt(num_global_domains / 5);
+		num_j = n * sqrt(num_global_domains / 5);
+		d_x   = sqrt(num_global_domains / 5);
+	} else {
+		num_i = n * sqrt(num_global_domains);
+		num_j = n * sqrt(num_global_domains);
+		d_x   = sqrt(num_global_domains);
+	}
 	os << "%%MatrixMarket matrix array real general\n";
 	os << num_i << ' ' << num_j << '\n';
 	os.precision(15);
@@ -1032,9 +1039,16 @@ void DomainCollection::outputSolutionRefined(std::ostream &os)
 }
 void DomainCollection::outputResidual(std::ostream &os)
 {
-	int num_i = n * sqrt(num_global_domains);
-	int num_j = n * sqrt(num_global_domains);
-	int d_x = sqrt(num_global_domains);
+	int num_i, num_j, d_x;
+	if (amr) {
+		num_i = n * sqrt(num_global_domains / 5);
+		num_j = n * sqrt(num_global_domains / 5);
+		d_x   = sqrt(num_global_domains / 5);
+	} else {
+		num_i = n * sqrt(num_global_domains);
+		num_j = n * sqrt(num_global_domains);
+		d_x   = sqrt(num_global_domains);
+	}
 	os << "%%MatrixMarket matrix array real general\n";
 	os << num_i << ' ' << num_j << '\n';
 	os.precision(15);
@@ -1049,11 +1063,37 @@ void DomainCollection::outputResidual(std::ostream &os)
 		}
 	}
 }
+void DomainCollection::outputResidualRefined(std::ostream &os)
+{
+	int num_i = 2 * n * sqrt(num_global_domains / 5);
+	int num_j = 2 * n * sqrt(num_global_domains / 5);
+	int d_x   = 2 * sqrt(num_global_domains / 5);
+	os << "%%MatrixMarket matrix array real general\n";
+	os << num_i << ' ' << num_j << '\n';
+	os.precision(15);
+	for (int j = 0; j < num_j; j++) {
+		int domain_j   = j / n;
+		int internal_j = j % n;
+		for (int i = 0; i < num_i; i++) {
+			int domain_i   = i / n;
+			int internal_i = i % n;
+			int id         = d_x * d_x / 4 + domain_i * d_x + domain_j;
+			os << domains[id]->resid[internal_i * n + internal_j] << '\n';
+		}
+	}
+}
 void DomainCollection::outputError(std::ostream &os)
 {
-	int num_i = n * sqrt(num_global_domains / 5);
-	int num_j = n * sqrt(num_global_domains / 5);
-	int d_x   = sqrt(num_global_domains / 5);
+	int num_i, num_j, d_x;
+	if (amr) {
+		num_i = n * sqrt(num_global_domains / 5);
+		num_j = n * sqrt(num_global_domains / 5);
+		d_x   = sqrt(num_global_domains / 5);
+	} else {
+		num_i = n * sqrt(num_global_domains);
+		num_j = n * sqrt(num_global_domains);
+		d_x   = sqrt(num_global_domains);
+	}
 	os << "%%MatrixMarket matrix array real general\n";
 	os << num_i << ' ' << num_j << '\n';
 	os.precision(15);
@@ -1066,7 +1106,7 @@ void DomainCollection::outputError(std::ostream &os)
 			int id         = domain_i * d_x + domain_j;
 			os << domains[id]->error[internal_i * n + internal_j] << '\n';
 		}
-	}
+		}
 }
 void DomainCollection::outputErrorRefined(std::ostream &os)
 {
