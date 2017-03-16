@@ -3,7 +3,7 @@
  *
  * The problem to be solved is the poisson equation where u =
  *sin(pi*x)*sin(pi*y)
- * f = -2pi^2*sin(2*pi*x)*(2*pi*y) with dirchlet boundary conditions
+ * f = -2pi^2*sin(2*pi*x)*(2*pi*y) with Neumann boundary conditions
  *
  * Compile with: make ExactIJNeumann
  * Execute with: mpirun -np 4 ExactIJNeumann -nx 100 -ny 100 -NX 2 -solver 0 -vis
@@ -35,6 +35,7 @@ int main(int argc, char *argv[]) {
   int ilower[2], iupper[2];
   int nparts = 1;
   int part = 0;
+  int frequency;
 
   double hx, hy;
 
@@ -61,8 +62,9 @@ int main(int argc, char *argv[]) {
   nx = 100;
   ny = 100;
   Nx = 1;
-  solver_id = 0;
-  vis = 0;
+  solver_id = 1;
+  vis = 1;
+  frequency = 0;
   // printf("defaults set\n");
    
   // Parse command line
@@ -90,6 +92,9 @@ int main(int argc, char *argv[]) {
       arg_index++;
       vis = 1;
       // printf("print solution\n");
+    } else if (strcmp(argv[arg_index], "-frequency") == 1) {
+      arg_index++;
+      frequency = 1;
     } else {
       arg_index++;
       // printf("plus plus\n");
@@ -312,6 +317,9 @@ int main(int argc, char *argv[]) {
   x_values = calloc(nvalues, sizeof(double));
   exactsolution = calloc(nvalues, sizeof(double));
   // printf("RHS calculation begin\n");
+  
+if (frequency == 0){
+
     for (j = 0; j < ny; j++) {
          double y =  (ilower[1] + j + .5) * hy;
     for (i = 0; i < nx; i++) {
@@ -322,6 +330,22 @@ int main(int argc, char *argv[]) {
       x_values[i + j * nx] = 0.0;
     }
   }
+}
+
+else {
+	for (j = 0; j < ny; j++){
+		double y = (ilower[1] + j + .5) * hy;
+	for (i = 0; i < nx; i++){
+		double x = (ilower[0] + i + .5) * hx;
+		rhs_values[i +j * nx] = -100*PI2*sin(10*M_PI*x)*sin(10*M_PI*x)*exp(cos(10*M_PI*x))+100*PI2*exp(cos(10*M_PI*x))*cos(10*M_PI*x)
+					-121*PI2*exp(cos(11*M_PI*y))*cos(11*M_PI*y)+121*PI2*sin(11*M_PI*y)*sin(11*M_PI*y)*exp(cos(11*pi*y));
+		exactsolution[i + j *nx] = exp(cos(10*M_PI*x))-exp(cos(11*pi*y));
+		x_values[i + j *nx] = 0.0;
+	}
+	}
+     }
+
+
   // printf("RHS calculation ended\n");
   HYPRE_SStructVectorSetBoxValues(b, part, ilower, iupper, var, rhs_values);
   HYPRE_SStructVectorSetBoxValues(x, part, ilower, iupper, var, x_values);
@@ -361,7 +385,7 @@ int main(int argc, char *argv[]) {
     HYPRE_BoomerAMGSetRelaxType(solver, 3);
     HYPRE_BoomerAMGSetNumSweeps(solver, 2);
     HYPRE_BoomerAMGSetMaxLevels(solver, 20);
-    HYPRE_BoomerAMGSetTol(solver, 1.0e-12);
+    HYPRE_BoomerAMGSetTol(solver, 1.0e-10);
     HYPRE_BoomerAMGSetMaxIter(solver, 20);
 
         //HYPRE_BoomerAMGSetStrongThreshold(solver,.25);
@@ -404,7 +428,7 @@ int main(int argc, char *argv[]) {
 
 	//Set PCG solver parameters
 	HYPRE_ParCSRPCGCreate(MPI_COMM_WORLD, &pcgsolver);
-	HYPRE_ParCSRPCGSetTol(pcgsolver, 1.0e-12);
+	HYPRE_ParCSRPCGSetTol(pcgsolver, 1.0e-10);
 	HYPRE_ParCSRPCGSetMaxIter(pcgsolver, 500);
 	HYPRE_ParCSRPCGSetTwoNorm(pcgsolver, 1);
 	HYPRE_ParCSRPCGSetLogging(pcgsolver, 3);
@@ -451,7 +475,7 @@ int main(int argc, char *argv[]) {
 	//Set GMRES solver parameters
 	HYPRE_ParCSRGMRESCreate(MPI_COMM_WORLD, &gmres_solver);
 	HYPRE_GMRESSetMaxIter(gmres_solver, 1000);
-	//HYPRE_GMRESSetAbsoluteTol(gmres_solver, 1.0e-12);
+	//HYPRE_GMRESSetAbsoluteTol(gmres_solver, 1.0e-10);
 	HYPRE_GMRESSetTol(gmres_solver, 1e-12);
 	HYPRE_GMRESSetPrintLevel(gmres_solver, 0);
 	HYPRE_GMRESSetLogging(gmres_solver, 0);
