@@ -6,9 +6,11 @@ F77       = mpif77
 CXX       = mpicxx
 F90       = mpif90
 
-LAPACK_DIR = ${GEM3D_HYPRE}/src/lapack
-HYPRE_DIR = ${GEM3D_HYPRE}/src/hypre
+#LAPACK_DIR = ${GEM3D_HYPRE}/src/lapack
+#HYPRE_DIR = ${GEM3D_HYPRE}/src/hypre
 
+HYPRE_DIR = /cm/shared/apps/hypre/gcc/64/2.10.1/
+LAPACK_DIR = /cm/shared/apps/lapack/gcc/64/3.5.0/lib/cmaike/lapack-3.4.2/
 
 ########################################################################
 # Compiling and linking options
@@ -275,6 +277,10 @@ americagreat: americagreat.o
 	$(CC) -o $@ $^ $(LFLAGS)
 
 two_parts_ss: two_parts_ss.o
+	$(CC) -o $@ $^ $(LFLAGS)
+
+
+halo_ss: halo_ss.o
 	$(CC) -o $@ $^ $(LFLAGS)
 
 
