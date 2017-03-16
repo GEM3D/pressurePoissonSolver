@@ -183,81 +183,56 @@ void Domain::solve()
 
 void Domain::putGhostCells(vector_type &ghost)
 {
-	auto ghost_view = ghost.getLocalView<Kokkos::HostSpace>();
-	if (nbr[0] != -1) {
-		int curr_i = local_i[0];
-		for (int i = 0; i < nx; i++) {
-			ghost_view(curr_i, 1) = u[nx * (ny - 1) + i];
-			curr_i++;
-		}
+	auto left_ptr  = ghost.getVectorNonConst(0);
+	auto right_ptr = ghost.getVectorNonConst(1);
+	if (hasNbr(Side::north)) {
+		fillDiffVector(Side::north, *right_ptr, false);
 	}
-	if (nbr[2] != -1) {
-		int curr_i = local_i[2];
-		for (int i = 0; i < ny; i++) {
-			ghost_view(curr_i, 1) = u[(i + 1) * nx - 1];
-			curr_i++;
-		}
+	if (hasNbr(Side::east)) {
+		fillDiffVector(Side::east, *right_ptr, false);
 	}
-	if (nbr[4] != -1) {
-		int curr_i = local_i[4];
-		for (int i = 0; i < nx; i++) {
-			ghost_view(curr_i, 0) = u[i];
-			curr_i++;
-		}
+	if (hasNbr(Side::south)) {
+		fillDiffVector(Side::south, *left_ptr, false);
 	}
-	if (nbr[6] != -1) {
-		int curr_i = local_i[6];
-		for (int i = 0; i < ny; i++) {
-			ghost_view(curr_i, 0) = u[i * nx];
-			curr_i++;
-		}
+	if (hasNbr(Side::west)) {
+		fillDiffVector(Side::west, *left_ptr, false);
 	}
 }
 
 double Domain::residual(vector_type &ghost)
 {
-	auto ghost_view = ghost.getLocalView<Kokkos::HostSpace>();
-	if (nbr[0] != -1) {
-		int curr_i = local_i[0];
-		for (int i = 0; i < nx; i++) {
-			boundary_north[i] = ghost_view(curr_i, 0);
-			curr_i++;
-		}
+	auto left_ptr  = ghost.getVectorNonConst(0);
+	auto right_ptr = ghost.getVectorNonConst(1);
+
+	if (hasNbr(Side::north)) {
+		fillBoundary(Side::north, *left_ptr);
 	}
-	if (nbr[2] != -1) {
-		int curr_i = local_i[2];
-		for (int i = 0; i < ny; i++) {
-			boundary_east[i] = ghost_view(curr_i, 0);
-			curr_i++;
-		}
+	if (hasNbr(Side::east)) {
+		fillBoundary(Side::east, *left_ptr);
 	}
-	if (nbr[4] != -1) {
-		int curr_i = local_i[4];
-		for (int i = 0; i < nx; i++) {
-			boundary_south[i] = ghost_view(curr_i, 1);
-			curr_i++;
-		}
+	if (hasNbr(Side::south)) {
+		fillBoundary(Side::south, *right_ptr);
 	}
-	if (nbr[6] != -1) {
-		int curr_i = local_i[6];
-		for (int i = 0; i < ny; i++) {
-			boundary_west[i] = ghost_view(curr_i, 1);
-			curr_i++;
-		}
+	if (hasNbr(Side::west)) {
+		fillBoundary(Side::west, *right_ptr);
 	}
 
 	valarray<double> f_comp = valarray<double>(nx * ny);
-	// integrate in x directon
+	// integrate in x secton
 	double center, north, east, south, west;
 	// west
 	for (int j = 0; j < ny; j++) {
 		west   = boundary_west[j];
 		center = u[j * nx];
 		east   = u[j * nx + 1];
-		if (neumann && nbr[6] == -1) {
+		if (neumann && !hasNbr(Side::west)) {
 			f_comp[j * nx] = (-h_x * west - center + east) / (h_x * h_x);
-		} else if (nbr[6] == -1) {
+		} else if (!hasNbr(Side::west)) {
 			f_comp[j * nx] = (2 * west - 3 * center + east) / (h_x * h_x);
+		} else if (hasFineNbr(Side::west)) {
+			f_comp[j * nx] = (1.0 / 3.0 * west - 4.0 / 3.0 * center + east) / (h_x * h_x);
+		} else if (hasCoarseNbr(Side::west)) {
+			f_comp[j * nx] = (2.0 / 3.0 * west - 5.0 / 3.0 * center + east) / (h_x * h_x);
 		} else {
 			f_comp[j * nx] = (west - 2 * center + east) / (h_x * h_x);
 		}
@@ -277,10 +252,15 @@ double Domain::residual(vector_type &ghost)
 		west   = u[j * nx + nx - 2];
 		center = u[j * nx + nx - 1];
 		east   = boundary_east[j];
-		if (neumann && nbr[2] == -1) {
+		if (neumann && !hasNbr(Side::east)) {
 			f_comp[j * nx + nx - 1] = (west - center + h_x * east) / (h_x * h_x);
-		} else if (nbr[2] == -1) {
+		} else if (!hasNbr(Side::east)) {
 			f_comp[j * nx + nx - 1] = (west - 3 * center + 2 * east) / (h_x * h_x);
+		} else if (hasFineNbr(Side::east)) {
+			f_comp[j * nx + nx - 1] = (west - 7.0 / 3.0 * center + 4.0 / 3.0 * east) / (h_x * h_x);
+			cerr << f_comp[j * nx + nx - 1] << endl;
+		} else if (hasCoarseNbr(Side::east)) {
+			f_comp[j * nx + nx - 1] = (west - 4.0 / 3.0 * center + 1.0 / 3.0 * east) / (h_x * h_x);
 		} else {
 			f_comp[j * nx + nx - 1] = (west - 2 * center + east) / (h_x * h_x);
 		}
@@ -327,117 +307,36 @@ double Domain::residual(vector_type &ghost)
 
 void Domain::solveWithInterface(const vector_type &gamma, vector_type &diff)
 {
-	auto gamma_view = gamma.getLocalView<Kokkos::HostSpace>();
-	auto diff_view  = diff.getLocalView<Kokkos::HostSpace>();
+	auto vec_ptr  = gamma.getVector(0);
+	auto diff_ptr = diff.getVectorNonConst(0);
+
 	if (hasNbrNorth()) {
-		boundary_north = valarray<double>(nx);
-		int curr_i     = local_i[0];
-		for (int i = 0; i < nx; i++) {
-			boundary_north[i] = gamma_view(curr_i, 0);
-			curr_i++;
-		}
+		fillBoundary(Side::north, *vec_ptr);
 	}
 	if (hasNbrEast()) {
-		if (isRefinedEast()) {
-			boundary_east = valarray<double>(ny);
-			boundary_east_refined_right = valarray<double>(ny);
-			int curr_i    = local_i[3];
-			for (int i = 0; i < ny; i++) {
-				boundary_east[i / 2] += gamma_view(curr_i, 0) / 2.0;
-				boundary_east_refined_right[i] = gamma_view(curr_i, 0);
-				curr_i++;
-			}
-			curr_i = local_i[2];
-			boundary_east_refined_left = valarray<double>(ny);
-			for (int i = 0; i < ny; i++) {
-				boundary_east[(i+nx) / 2 ] += gamma_view(curr_i, 0) / 2.0;
-				boundary_east_refined_left[i] = gamma_view(curr_i, 0);
-				curr_i++;
-			}
-		} else {
-			boundary_east = valarray<double>(ny);
-			int curr_i    = local_i[2];
-			for (int i = 0; i < ny; i++) {
-				boundary_east[i] = gamma_view(curr_i, 0);
-				curr_i++;
-			}
-		}
+		fillBoundary(Side::east, *vec_ptr);
 	}
 	if (hasNbrSouth()) {
-		boundary_south = valarray<double>(nx);
-		int curr_i     = local_i[4];
-		for (int i = 0; i < nx; i++) {
-			boundary_south[i] = gamma_view(curr_i, 0);
-			curr_i++;
-		}
+		fillBoundary(Side::south, *vec_ptr);
 	}
 	if (hasNbrWest()) {
-		boundary_west = valarray<double>(ny);
-		int curr_i    = local_i[6];
-		for (int i = 0; i < ny; i++) {
-			boundary_west[i] = gamma_view(curr_i, 0);
-			curr_i++;
-		}
+		fillBoundary(Side::west, *vec_ptr);
 	}
 
 	// solve
 	solve();
 
-	// if(has_east)cout <<"LOCAL Before\n";
-	// local_vector.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
-	// if(has_east)cout <<"LOCAL zero\n";
-	// local_vector.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
 	if (hasNbrNorth()) {
-		int              curr_i = local_i[0];
-		valarray<double> diff   = getDiffNorth();
-		for (int i = 0; i < nx; i++) {
-			diff_view(curr_i, 0) += diff[i];
-			curr_i++;
-		}
+		fillDiffVector(Side::north, *diff_ptr);
 	}
-
 	if (hasNbrEast()) {
-		if (isRefinedEast()) {
-			valarray<double> diff   = 2.0 / 3.0 * getDiffEastRefinedLeft();
-			int              curr_i = local_i[2];
-			for (int i = 0; i < ny; i++) {
-				diff_view(curr_i, 0) += diff[i];
-				curr_i++;
-			}
-			diff   = 2.0 / 3.0 * getDiffEastRefinedRight();
-			curr_i = local_i[3];
-			for (int i = 0; i < ny; i++) {
-				diff_view(curr_i, 0) += diff[i];
-				curr_i++;
-			}
-
-		} else {
-			int              curr_i = local_i[2];
-			valarray<double> diff   = getDiffEast();
-			for (int i = 0; i < ny; i++) {
-				diff_view(curr_i, 0) += diff[i];
-				curr_i++;
-			}
-		}
+		fillDiffVector(Side::east, *diff_ptr);
 	}
 	if (hasNbrSouth()) {
-		int              curr_i = local_i[4];
-		valarray<double> diff   = getDiffSouth();
-		for (int i = 0; i < nx; i++) {
-			diff_view(curr_i, 0) += diff[i];
-			curr_i++;
-		}
+		fillDiffVector(Side::south, *diff_ptr);
 	}
 	if (hasNbrWest()) {
-		int              curr_i = local_i[6];
-		valarray<double> diff   = getDiffWest();
-		if (hasRefinedNbr(Dir::west)) {
-			diff *= 4.0 / 3.0;
-		}
-		for (int i = 0; i < ny; i++) {
-			diff_view(curr_i, 0) += diff[i];
-			curr_i++;
-		}
+		fillDiffVector(Side::west, *diff_ptr);
 	}
 }
 double Domain::diffNorm()
@@ -560,21 +459,221 @@ valarray<double> Domain::getDiffWestRefinedRight()
 	return boundary_west - valarray<double>(u[slice(0, nx, nx)]);
 }
 
-bool Domain::hasRefinedNbr(Dir dir)
+bool Domain::hasCoarseNbr(Side s)
 {
 	bool retval;
-	switch (dir) {
-		case Dir::north:
+	switch (s) {
+		case Side::north:
 			retval = ds.nbr_refined[0];
 			break;
-		case Dir::east:
+		case Side::east:
 			retval = ds.nbr_refined[1];
 			break;
-		case Dir::south:
+		case Side::south:
 			retval = ds.nbr_refined[2];
 			break;
-		case Dir::west:
+		case Side::west:
 			retval = ds.nbr_refined[3];
 	}
 	return retval;
+}
+valarray<double> Domain::getStencil(Side s)
+{
+	valarray<double> retval(nx);
+	bool             nbr_left;
+	bool             nbr_right;
+	double           val_left;
+	double           val_right;
+	switch (s) {
+		case Side::north:
+			retval    = u[slice(nx * (nx - 1), nx, 1)];
+			nbr_left  = hasNbr(Side::west);
+			val_left  = boundary_west[nx - 1];
+			nbr_right = hasNbr(Side::east);
+			val_right = boundary_east[nx - 1];
+			break;
+		case Side::east:
+			retval    = u[slice(nx - 1, nx, nx)];
+			nbr_left  = hasNbr(Side::south);
+			val_left  = boundary_south[nx - 1];
+			nbr_right = hasNbr(Side::north);
+			val_right = boundary_north[nx - 1];
+			break;
+		case Side::south:
+			retval    = u[slice(0, nx, 1)];
+			nbr_left  = hasNbr(Side::west);
+			val_left  = boundary_west[0];
+			nbr_right = hasNbr(Side::east);
+			val_right = boundary_east[0];
+			break;
+		case Side::west:
+			retval    = u[slice(0, nx, nx)];
+			nbr_left  = hasNbr(Side::south);
+			val_left  = boundary_south[0];
+			nbr_right = hasNbr(Side::north);
+			val_right = boundary_north[0];
+	}
+	if (hasFineNbr(s)) {
+		valarray<double> refined(2 * nx);
+
+		int  grid_i = 0;
+		bool right  = false;
+
+		if (!nbr_left) {
+			refined[0] = (val_left + retval[0]) / 2.0;
+		} else {
+			refined[0] = retval[0] - (retval[0] - retval[1]) / 2.0;
+		}
+		// refined[0] = retval[0];
+		for (int i = 1; i < 2 * nx - 1; i++) {
+			if (right) {
+				refined[i] = (retval[grid_i] + 3 * retval[grid_i + 1]) / 4.0;
+				// refined[i] = retval[grid_i + 1];
+				right = false;
+				grid_i++;
+			} else {
+				refined[i] = (3 * retval[grid_i] + retval[grid_i + 1]) / 4.0;
+				// refined[i] = retval[grid_i];
+				right = true;
+			}
+		}
+		if (!nbr_right) {
+			refined[2 * nx - 1] = (val_right + retval[nx - 1]) / 2.0;
+		} else {
+			refined[2 * nx - 1] = retval[nx - 1] - (retval[nx - 1] - retval[nx - 2]) / 2.0;
+		}
+		// refined[2 * nx - 1] = retval[nx - 1];
+
+		retval = refined;
+	}
+	return retval;
+}
+
+void Domain::fillBoundary(Side s, const single_vector_type &gamma)
+{
+	if (hasFineNbr(s)) {
+		int curr_i_left;
+		int curr_i_right;
+		valarray<double> *boundary_ptr;
+		switch (s) {
+			case Side::north:
+				curr_i_left  = global_i[0];
+				curr_i_right = global_i[1];
+				boundary_ptr = &boundary_north;
+				break;
+			case Side::east:
+				curr_i_left  = global_i[3];
+				curr_i_right = global_i[2];
+				boundary_ptr = &boundary_east;
+				break;
+			case Side::south:
+				curr_i_left  = global_i[5];
+				curr_i_right = global_i[4];
+				boundary_ptr = &boundary_south;
+				break;
+			case Side::west:
+				curr_i_left  = global_i[6];
+				curr_i_right = global_i[7];
+				boundary_ptr = &boundary_west;
+		}
+		valarray<double> &boundary   = *boundary_ptr;
+		auto              gamma_view = gamma.getLocalView<Kokkos::HostSpace>();
+		boundary                     = 0;
+		for (int i = 0; i < nx; i++) {
+			boundary[i / 2] += gamma_view(curr_i_left, 0);
+			curr_i_left++;
+		}
+		for (int i = nx; i < 2 * nx; i++) {
+			boundary[i / 2] += gamma_view(curr_i_right, 0);
+			curr_i_right++;
+		}
+		boundary /= 2.0;
+	} else {
+		int curr_i;
+		valarray<double> *boundary_ptr;
+		switch (s) {
+			case Side::north:
+				curr_i       = global_i[0];
+				boundary_ptr = &boundary_north;
+				break;
+			case Side::east:
+				curr_i       = global_i[2];
+				boundary_ptr = &boundary_east;
+				break;
+			case Side::south:
+				curr_i       = global_i[4];
+				boundary_ptr = &boundary_south;
+				break;
+			case Side::west:
+				curr_i       = global_i[6];
+				boundary_ptr = &boundary_west;
+		}
+		valarray<double> &boundary   = *boundary_ptr;
+		auto              gamma_view = gamma.getLocalView<Kokkos::HostSpace>();
+		for (int i = 0; i < nx; i++) {
+			boundary[i] = gamma_view(curr_i, 0);
+			curr_i++;
+		}
+	}
+}
+void Domain::fillDiffVector(Side s, single_vector_type &diff, bool weight)
+{
+	valarray<double> stencil = getStencil(s);
+	if (weight) {
+		if (hasFineNbr(s)) {
+			stencil *= 2.0 * 1.0 / 3.0;
+		}
+		if (hasCoarseNbr(s)) {
+			stencil *= 2.0 * 2.0 / 3.0;
+		}
+	}
+	auto diff_view = diff.getLocalView<Kokkos::HostSpace>();
+	if (hasFineNbr(s)) {
+		int curr_i_left;
+		int curr_i_right;
+		switch (s) {
+			case Side::north:
+				curr_i_left  = global_i[0];
+				curr_i_right = global_i[1];
+				break;
+			case Side::east:
+				curr_i_left  = global_i[3];
+				curr_i_right = global_i[2];
+				break;
+			case Side::south:
+				curr_i_left  = global_i[5];
+				curr_i_right = global_i[4];
+				break;
+			case Side::west:
+				curr_i_left  = global_i[6];
+				curr_i_right = global_i[7];
+		}
+		for (int i = 0; i < nx; i++) {
+			diff_view(curr_i_left, 0) += stencil[i];
+			curr_i_left++;
+		}
+		for (int i = nx; i < 2 * nx; i++) {
+			diff_view(curr_i_right, 0) += stencil[i];
+			curr_i_right++;
+		}
+	} else {
+		int curr_i;
+		switch (s) {
+			case Side::north:
+				curr_i = global_i[0];
+				break;
+			case Side::east:
+				curr_i = global_i[2];
+				break;
+			case Side::south:
+				curr_i = global_i[4];
+				break;
+			case Side::west:
+				curr_i = global_i[6];
+		}
+		for (int i = 0; i < nx; i++) {
+			diff_view(curr_i, 0) += stencil[i];
+			curr_i++;
+		}
+	}
 }

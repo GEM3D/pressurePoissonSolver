@@ -8,7 +8,7 @@
 #include <cmath>
 #include <fftw3.h>
 #include <valarray>
-enum class Dir { north, east, south, west };
+enum class Side { north, east, south, west };
 class Domain
 {
 	public:
@@ -63,7 +63,12 @@ class Domain
 	double exactNorm(double eavg);
 	double exactSum();
 
-	bool hasRefinedNbr(Dir dir);
+	bool hasCoarseNbr(Side s);
+
+	std::valarray<double> getStencil(Side s);
+	void fillBoundary(Side s, const single_vector_type &gamma);
+	void fillDiffVector(Side s, single_vector_type &diff, bool weight = true);
+
 	std::valarray<double> getDiffNorth();
 	std::valarray<double> getDiffNorthRefinedLeft();
 	std::valarray<double> getDiffNorthRefinedRight();
@@ -77,13 +82,49 @@ class Domain
 	std::valarray<double> getDiffWestRefinedLeft();
 	std::valarray<double> getDiffWestRefinedRight();
 
-	inline bool isRefinedNorth() { return nbr[1] != -1; }
-	inline bool isRefinedEast() { return nbr[3] != -1; }
-	inline bool isRefinedSouth() { return nbr[5] != -1; }
-	inline bool isRefinedWest() { return nbr[7] != -1; }
+	inline bool hasFineNbrNorth() { return nbr[1] != -1; }
+	inline bool hasFineNbrEast() { return nbr[3] != -1; }
+	inline bool hasFineNbrSouth() { return nbr[5] != -1; }
+	inline bool hasFineNbrWest() { return nbr[7] != -1; }
 	inline bool hasNbrNorth() { return nbr[0] != -1; }
 	inline bool hasNbrEast() { return nbr[2] != -1; }
 	inline bool hasNbrSouth() { return nbr[4] != -1; }
 	inline bool hasNbrWest() { return nbr[6] != -1; }
+	inline bool hasNbr(Side s)
+	{
+		bool retval;
+		switch (s) {
+			case Side::north:
+				retval = nbr[0] != -1;
+				break;
+			case Side::east:
+				retval = nbr[2] != -1;
+				break;
+			case Side::south:
+				retval = nbr[4] != -1;
+				break;
+			case Side::west:
+				retval = nbr[6] != -1;
+		}
+		return retval;
+	}
+	inline bool hasFineNbr(Side s)
+	{
+		bool retval;
+		switch (s) {
+			case Side::north:
+				retval = nbr[1] != -1;
+				break;
+			case Side::east:
+				retval = nbr[3] != -1;
+				break;
+			case Side::south:
+				retval = nbr[5] != -1;
+				break;
+			case Side::west:
+				retval = nbr[7] != -1;
+		}
+		return retval;
+	}
 };
 #endif

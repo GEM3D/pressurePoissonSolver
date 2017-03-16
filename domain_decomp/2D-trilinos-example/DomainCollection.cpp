@@ -115,21 +115,21 @@ void DomainCollection::initDirichlet(function<double(double, double)> ffun,
 		// Use local indices to access the entries of f_data.
 		for (int yi = 0; yi < n; yi++) {
 			for (int xi = 0; xi < n; xi++) {
-				double x           = d.x_start + h_x / 2.0 + d.x_length * xi / n;
-				double y           = d.y_start + h_y / 2.0 + d.y_length * yi / n;
+				double x           = d.x_start + d.h_x / 2.0 + d.x_length * xi / n;
+				double y           = d.y_start + d.h_y / 2.0 + d.y_length * yi / n;
 				f[yi * n + xi]     = ffun(x, y);
 				exact[yi * n + xi] = gfun(x, y);
-				if (d.nbr[6] == -1) {
-					d.boundary_west[yi] = gfun(0.0, y);
+				if (!d.hasNbr(Side::north)) {
+					d.boundary_north[xi] = gfun(x, 1.0);
 				}
-				if (d.nbr[2] == -1) {
-					d.boundary_east[yi] = gfun(1.0, y);
+				if (!d.hasNbr(Side::east)) {
+					d.boundary_east[yi] = gfun(2.0, y);
 				}
-				if (d.nbr[4] == -1) {
+				if (!d.hasNbr(Side::south)) {
 					d.boundary_south[xi] = gfun(x, 0.0);
 				}
-				if (d.nbr[0] == -1) {
-					d.boundary_north[xi] = gfun(x, 1.0);
+				if (!d.hasNbr(Side::west)) {
+					d.boundary_west[yi] = gfun(0.0, y);
 				}
 			}
 		}
@@ -156,17 +156,17 @@ void DomainCollection::initDirichletRefined(function<double(double, double)> ffu
 				double y           = d.y_start + d.h_y / 2.0 + d.y_length * yi / n;
 				f[yi * n + xi]     = ffun(x, y);
 				exact[yi * n + xi] = gfun(x, y);
-				if (d.nbr[6] == -1) {
-					d.boundary_west[yi] = gfun(0.0, y);
+				if (!d.hasNbr(Side::north)) {
+					d.boundary_north[xi] = gfun(x, 1.0);
 				}
-				if (d.nbr[2] == -1) {
+				if (!d.hasNbr(Side::east)) {
 					d.boundary_east[yi] = gfun(2.0, y);
 				}
-				if (d.nbr[4] == -1) {
+				if (!d.hasNbr(Side::south)) {
 					d.boundary_south[xi] = gfun(x, 0.0);
 				}
-				if (d.nbr[0] == -1) {
-					d.boundary_north[xi] = gfun(x, 1.0);
+				if (!d.hasNbr(Side::west)) {
+					d.boundary_west[yi] = gfun(0.0, y);
 				}
 			}
 		}
@@ -413,7 +413,7 @@ void DomainCollection::solveWithInterface(const vector_type &gamma, vector_type 
 	// diff.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
 	// if(has_east)std::cout <<"GAMMA\n";
 	// gamma.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
-	//diff.update(-2, gamma, 1);
+	diff.update(-2, gamma, 1);
 }
 double DomainCollection::diffNorm()
 {
