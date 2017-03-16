@@ -8,7 +8,9 @@ Domain::Domain(DomainSignature ds, int nx, int ny, double h_x, double h_y)
 	this->h_y = h_y / ds.refine_level;
 
 	cerr << "I am Domain: " << ds.id << "\n";
-	cerr << "I start at: " << ds.x_start << ", " << ds.y_start << "\n";
+	cerr << "h:           " << this->h_x << endl;
+	cerr << "I start at:  " << ds.x_start << ", " << ds.y_start << "\n";
+	cerr << "Length:     " << ds.x_length << ", " << ds.y_length << "\n";
 	cerr << "North: " << ds.nbr[0] << ", " << ds.nbr[1] << "\n";
 	cerr << "Idx:   " << ds.global_i[0] << ", " << ds.global_i[1] << "\n";
 	cerr << "East:  " << ds.nbr[2] << ", " << ds.nbr[3] << "\n";
@@ -70,7 +72,8 @@ void Domain::planDirichlet()
 	for (int xi = 0; xi < ny; xi++) {
 		denom[slice(xi, ny, nx)]
 		-= 4 / (h_y * h_y) * pow(sin((xi + 1) * M_PI / (2 * ny)), 2) * ones;
-	}
+	};
+
 }
 
 void Domain::planNeumann()
@@ -194,6 +197,7 @@ void Domain::putGhostCells(vector_type &ghost)
 	if (hasNbr(Side::south)) {
 		fillDiffVector(Side::south, *left_ptr, false);
 	}
+;
 	if (hasNbr(Side::west)) {
 		fillDiffVector(Side::west, *left_ptr, false);
 	}
@@ -201,8 +205,8 @@ void Domain::putGhostCells(vector_type &ghost)
 
 double Domain::residual(vector_type &ghost)
 {
-	auto left_ptr  = ghost.getVectorNonConst(0);
-	auto right_ptr = ghost.getVectorNonConst(1);
+	auto left_ptr  = ghost.getVector(0);
+	auto right_ptr = ghost.getVector(1);
 
 	if (hasNbr(Side::north)) {
 		fillBoundary(Side::north, *left_ptr);
@@ -230,7 +234,8 @@ double Domain::residual(vector_type &ghost)
 		} else if (!hasNbr(Side::west)) {
 			f_comp[j * nx] = (2 * west - 3 * center + east) / (h_x * h_x);
 		} else if (hasFineNbr(Side::west)) {
-			f_comp[j * nx] = (1.0 / 3.0 * west - 4.0 / 3.0 * center + east) / (h_x * h_x);
+			// TODO
+			// f_comp[j * nx] = (1.0 / 3.0 * west - 4.0 / 3.0 * center + east) / (h_x * h_x);
 		} else if (hasCoarseNbr(Side::west)) {
 			f_comp[j * nx] = (2.0 / 3.0 * west - 5.0 / 3.0 * center + east) / (h_x * h_x);
 		} else {
@@ -258,9 +263,10 @@ double Domain::residual(vector_type &ghost)
 			f_comp[j * nx + nx - 1] = (west - 3 * center + 2 * east) / (h_x * h_x);
 		} else if (hasFineNbr(Side::east)) {
 			f_comp[j * nx + nx - 1] = (west - 7.0 / 3.0 * center + 4.0 / 3.0 * east) / (h_x * h_x);
-			cerr << f_comp[j * nx + nx - 1] << endl;
 		} else if (hasCoarseNbr(Side::east)) {
-			f_comp[j * nx + nx - 1] = (west - 4.0 / 3.0 * center + 1.0 / 3.0 * east) / (h_x * h_x);
+			// TODO
+			// f_comp[j * nx + nx - 1] = (west - 4.0 / 3.0 * center + 1.0 / 3.0 * east) / (h_x *
+			// h_x);
 		} else {
 			f_comp[j * nx + nx - 1] = (west - 2 * center + east) / (h_x * h_x);
 		}
@@ -270,9 +276,9 @@ double Domain::residual(vector_type &ghost)
 		south  = boundary_south[i];
 		center = u[i];
 		north  = u[nx + i];
-		if (neumann && nbr[4] == -1) {
+		if (neumann && !hasNbr(Side::south)) {
 			f_comp[i] += (-h_y * south - center + north) / (h_y * h_y);
-		} else if (nbr[4] == -1) {
+		} else if (!hasNbr(Side::south)) {
 			f_comp[i] += (2 * south - 3 * center + north) / (h_y * h_y);
 		} else {
 			f_comp[i] += (south - 2 * center + north) / (h_y * h_y);
@@ -293,9 +299,9 @@ double Domain::residual(vector_type &ghost)
 		south  = u[(ny - 2) * nx + i];
 		center = u[(ny - 1) * nx + i];
 		north  = boundary_north[i];
-		if (neumann && nbr[0] == -1) {
+		if (neumann && !hasNbr(Side::north)) {
 			f_comp[(ny - 1) * nx + i] += (south - center + h_y * north) / (h_y * h_y);
-		} else if (nbr[0] == -1) {
+		} else if (!hasNbr(Side::north)) {
 			f_comp[(ny - 1) * nx + i] += (south - 3 * center + 2 * north) / (h_y * h_y);
 		} else {
 			f_comp[(ny - 1) * nx + i] += (south - 2 * center + north) / (h_y * h_y);
@@ -310,32 +316,32 @@ void Domain::solveWithInterface(const vector_type &gamma, vector_type &diff)
 	auto vec_ptr  = gamma.getVector(0);
 	auto diff_ptr = diff.getVectorNonConst(0);
 
-	if (hasNbrNorth()) {
+	if (hasNbr(Side::north)) {
 		fillBoundary(Side::north, *vec_ptr);
 	}
-	if (hasNbrEast()) {
+	if (hasNbr(Side::east)) {
 		fillBoundary(Side::east, *vec_ptr);
 	}
-	if (hasNbrSouth()) {
+	if (hasNbr(Side::south)) {
 		fillBoundary(Side::south, *vec_ptr);
 	}
-	if (hasNbrWest()) {
+	if (hasNbr(Side::west)) {
 		fillBoundary(Side::west, *vec_ptr);
 	}
 
 	// solve
 	solve();
 
-	if (hasNbrNorth()) {
+	if (hasNbr(Side::north)) {
 		fillDiffVector(Side::north, *diff_ptr);
 	}
-	if (hasNbrEast()) {
+	if (hasNbr(Side::east)) {
 		fillDiffVector(Side::east, *diff_ptr);
 	}
-	if (hasNbrSouth()) {
+	if (hasNbr(Side::south)) {
 		fillDiffVector(Side::south, *diff_ptr);
 	}
-	if (hasNbrWest()) {
+	if (hasNbr(Side::west)) {
 		fillDiffVector(Side::west, *diff_ptr);
 	}
 }
@@ -354,129 +360,6 @@ double Domain::exactNorm() { return sqrt((exact * exact).sum()); }
 double Domain::fNorm() { return sqrt((f * f).sum()); }
 double Domain::exactNorm(double eavg) { return sqrt(pow(exact - eavg, 2).sum()); }
 double                          Domain::exactSum() { return exact.sum(); }
-valarray<double>                Domain::getDiffNorth()
-{
-	return boundary_north - valarray<double>(u[slice(nx * (nx - 1), nx, 1)]);
-}
-valarray<double> Domain::getDiffNorthRefinedLeft()
-{
-	return boundary_north - valarray<double>(u[slice(nx * (nx - 1), nx, 1)]);
-}
-valarray<double> Domain::getDiffNorthRefinedRight()
-{
-	return boundary_north - valarray<double>(u[slice(nx * (nx - 1), nx, 1)]);
-}
-valarray<double> Domain::getDiffEast()
-{
-	return boundary_east - valarray<double>(u[slice((nx - 1), nx, nx)]);
-}
-valarray<double> Domain::getDiffEastRefinedLeft()
-{
-	valarray<double> retval(nx);
-	valarray<double> east   = u[slice(nx - 1, nx, nx)];
-	int              grid_i = nx - 1;
-	bool             left   = true;
-	// retval[nx - 1] = (east[nx - 1] + boundary_north[0]) / 2;
-	retval[nx - 1] = east[nx - 1];
-	for (int i = nx - 2; i >= 0; i--) {
-		if (left) {
-			retval[i] = (3 * east[grid_i] + east[grid_i - 1]) / 4.0;
-			left      = false;
-		} else {
-			retval[i] = (east[grid_i] + 3 * east[grid_i - 1]) / 4.0;
-			left      = true;
-			grid_i--;
-		}
-	}
-	retval = boundary_east_refined_left - retval;
-	return retval;
-}
-valarray<double> Domain::getDiffEastRefinedRight()
-{
-	valarray<double> retval(nx);
-	valarray<double> east   = u[slice(nx - 1, nx, nx)];
-	int              grid_i = 0;
-	bool             left   = false;
-	// retval[0]               = (boundary_south[0] + east[0]) / 2;
-	retval[0] = east[0];
-	for (int i = 1; i < nx; i++) {
-		if (left) {
-			retval[i] = (east[grid_i] + 3 * east[grid_i + 1]) / 4.0;
-			left      = false;
-			grid_i++;
-		} else {
-			retval[i] = (3 * east[grid_i] + east[grid_i + 1]) / 4.0;
-			left      = true;
-		}
-	}
-	retval = boundary_east_refined_right - retval;
-	return retval;
-}
-valarray<double> Domain::getDiffSouth()
-{
-	return boundary_south - valarray<double>(u[slice(0, nx, 1)]);
-}
-valarray<double> Domain::getDiffSouthRefinedLeft()
-{
-	valarray<double> retval(nx);
-	/*
-	retval[0]  = (boundary_west[0] + u[0]) / 2;
-	int nleft  = (nx - 1) / 2 + (nx - 1) % 2;
-	int nright = (nx - 1) / 2;
-	retval[slice(1, nleft, 2)]
-	= 3.0 / 4.0 * u[slice(0, nleft, 1)] + 1.0 / 4.0 * u[slice(1, nleft, 1)];
-	retval[slice(2, nright, 2)]
-	= 1.0 / 4.0 * u[slice(0, nright, 1)] + 3.0 / 4.0 * u[slice(1, nright, 1)];
-	retval = 1.0 / 3.0 * retval;
-	*/
-	return retval;
-}
-valarray<double> Domain::getDiffSouthRefinedRight()
-{
-	valarray<double> retval(nx);
-	/*
-	retval[nx-1] = (u[nx-1] + boundary_east[0]) / 2;
-	int nleft  = (nx - 1) / 2;
-	int nright = (nx - 1) / 2 + (nx - 1) % 2;
-	retval[slice(nx-2*nright, nright, 2)]
-	= 1.0 / 4.0 * u[slice(nx-2-nright, nright, 1)] + 3.0 / 4.0 * u[slice(nx-1-nright, nright, 1)];
-	retval[slice(nx-1-2*nleft, nleft, 2)]
-	= 3.0 / 4.0 * u[slice(nx-2-nleft, nleft, 1)] + 1.0 / 4.0 * u[slice(nx-1-nleft, nleft, 1)];
-	retval = 1.0 / 3.0 * retval;
-	*/
-	return retval;
-}
-valarray<double> Domain::getDiffWest()
-{
-	return boundary_west - valarray<double>(u[slice(0, nx, nx)]);
-}
-valarray<double> Domain::getDiffWestRefinedLeft()
-{
-	return boundary_west - valarray<double>(u[slice(0, nx, nx)]);
-}
-valarray<double> Domain::getDiffWestRefinedRight()
-{
-	return boundary_west - valarray<double>(u[slice(0, nx, nx)]);
-}
-
-bool Domain::hasCoarseNbr(Side s)
-{
-	bool retval;
-	switch (s) {
-		case Side::north:
-			retval = ds.nbr_refined[0];
-			break;
-		case Side::east:
-			retval = ds.nbr_refined[1];
-			break;
-		case Side::south:
-			retval = ds.nbr_refined[2];
-			break;
-		case Side::west:
-			retval = ds.nbr_refined[3];
-	}
-	return retval;
-}
 valarray<double> Domain::getStencil(Side s)
 {
 	valarray<double> retval(nx);
@@ -524,17 +407,14 @@ valarray<double> Domain::getStencil(Side s)
 		} else {
 			refined[0] = retval[0] - (retval[0] - retval[1]) / 2.0;
 		}
-		// refined[0] = retval[0];
 		for (int i = 1; i < 2 * nx - 1; i++) {
 			if (right) {
 				refined[i] = (retval[grid_i] + 3 * retval[grid_i + 1]) / 4.0;
-				// refined[i] = retval[grid_i + 1];
-				right = false;
+				right      = false;
 				grid_i++;
 			} else {
 				refined[i] = (3 * retval[grid_i] + retval[grid_i + 1]) / 4.0;
-				// refined[i] = retval[grid_i];
-				right = true;
+				right      = true;
 			}
 		}
 		if (!nbr_right) {
@@ -542,7 +422,6 @@ valarray<double> Domain::getStencil(Side s)
 		} else {
 			refined[2 * nx - 1] = retval[nx - 1] - (retval[nx - 1] - retval[nx - 2]) / 2.0;
 		}
-		// refined[2 * nx - 1] = retval[nx - 1];
 
 		retval = refined;
 	}
@@ -552,8 +431,8 @@ valarray<double> Domain::getStencil(Side s)
 void Domain::fillBoundary(Side s, const single_vector_type &gamma)
 {
 	if (hasFineNbr(s)) {
-		int curr_i_left;
-		int curr_i_right;
+		int               curr_i_left;
+		int               curr_i_right;
 		valarray<double> *boundary_ptr;
 		switch (s) {
 			case Side::north:
@@ -589,7 +468,7 @@ void Domain::fillBoundary(Side s, const single_vector_type &gamma)
 		}
 		boundary /= 2.0;
 	} else {
-		int curr_i;
+		int               curr_i;
 		valarray<double> *boundary_ptr;
 		switch (s) {
 			case Side::north:

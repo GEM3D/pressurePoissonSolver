@@ -950,14 +950,15 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 			d.solve();
 			// fill the blocks
 
-			north_block[slice(i*n, n, 1)] = d.getDiffNorth();
-			east_block[slice(i*n, n, 1)]  = d.getDiffEast();
-			south_block[slice(i*n, n, 1)] = d.getDiffSouth();
-			west_block[slice(i*n, n, 1)]  = d.getDiffWest();
+			north_block[slice(i * n, n, 1)] = -d.getStencil(Side::north);
+			east_block[slice(i * n, n, 1)]  = -d.getStencil(Side::east);
+			south_block[slice(i * n, n, 1)] = -d.getStencil(Side::south);
+			west_block[slice(i * n, n, 1)]  = -d.getStencil(Side::west);
+			south_block[i * n + n] += 1;
 			d.boundary_south[i] = 0;
 		}
 
-		//now insert these results into the matrix for each interface
+		// now insert these results into the matrix for each interface
 		for (Iface iface : todo) {
 			bool reverse_x
 			= (iface.axis == X_AXIS && !iface.right) || (iface.axis == Y_AXIS && iface.right);

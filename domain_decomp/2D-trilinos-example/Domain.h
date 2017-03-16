@@ -63,33 +63,28 @@ class Domain
 	double exactNorm(double eavg);
 	double exactSum();
 
-	bool hasCoarseNbr(Side s);
-
 	std::valarray<double> getStencil(Side s);
 	void fillBoundary(Side s, const single_vector_type &gamma);
 	void fillDiffVector(Side s, single_vector_type &diff, bool weight = true);
 
-	std::valarray<double> getDiffNorth();
-	std::valarray<double> getDiffNorthRefinedLeft();
-	std::valarray<double> getDiffNorthRefinedRight();
-	std::valarray<double> getDiffEast();
-	std::valarray<double> getDiffEastRefinedLeft();
-	std::valarray<double> getDiffEastRefinedRight();
-	std::valarray<double> getDiffSouth();
-	std::valarray<double> getDiffSouthRefinedLeft();
-	std::valarray<double> getDiffSouthRefinedRight();
-	std::valarray<double> getDiffWest();
-	std::valarray<double> getDiffWestRefinedLeft();
-	std::valarray<double> getDiffWestRefinedRight();
-
-	inline bool hasFineNbrNorth() { return nbr[1] != -1; }
-	inline bool hasFineNbrEast() { return nbr[3] != -1; }
-	inline bool hasFineNbrSouth() { return nbr[5] != -1; }
-	inline bool hasFineNbrWest() { return nbr[7] != -1; }
-	inline bool hasNbrNorth() { return nbr[0] != -1; }
-	inline bool hasNbrEast() { return nbr[2] != -1; }
-	inline bool hasNbrSouth() { return nbr[4] != -1; }
-	inline bool hasNbrWest() { return nbr[6] != -1; }
+	inline bool hasCoarseNbr(Side s)
+	{
+		bool retval;
+		switch (s) {
+			case Side::north:
+				retval = ds.nbr_refined[0];
+				break;
+			case Side::east:
+				retval = ds.nbr_refined[1];
+				break;
+			case Side::south:
+				retval = ds.nbr_refined[2];
+				break;
+			case Side::west:
+				retval = ds.nbr_refined[3];
+		}
+		return retval;
+	}
 	inline bool hasNbr(Side s)
 	{
 		bool retval;
