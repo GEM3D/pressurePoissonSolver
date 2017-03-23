@@ -119,6 +119,9 @@ int main(int argc, char *argv[])
 	int    nx            = args::get(n_x);
 	int    ny            = args::get(n_y);
 	int    total_cells   = nx * num_domains_x * ny * num_domains_y;
+	if (f_amr) {
+		total_cells *= 5;
+	}
 	double h_x           = 1.0 / (nx * num_domains_x);
 	double h_y           = 1.0 / (ny * num_domains_y);
 
@@ -200,8 +203,8 @@ int main(int argc, char *argv[])
 		ffun
 		= [](double x, double y) { return -5 * M_PI * M_PI * sin(M_PI * y) * cos(2 * M_PI * x); };
 		gfun  = [](double x, double y) { return sin(M_PI * y) * cos(2 * M_PI * x); };
-		nfunx = [](double x, double y) { return M_PI * cos(M_PI * y) * cos(2 * M_PI * x); };
-		nfuny = [](double x, double y) { return -2 * M_PI * sin(M_PI * y) * sin(2 * M_PI * x); };
+		nfunx = [](double x, double y) { return -2 * M_PI * sin(M_PI * y) * sin(2 * M_PI * x); };
+		nfuny = [](double x, double y) { return M_PI * cos(M_PI * y) * cos(2 * M_PI * x); };
 	}
 
 	valarray<double> times(loop_count);
@@ -226,7 +229,7 @@ int main(int argc, char *argv[])
 			if (!f_nozero) {
 				zs.setTrue();
 			}
-			dc.initNeumann(ffun, gfun, nfunx, nfuny);
+			dc.initNeumann(ffun, gfun, nfunx, nfuny, f_amr);
 		} else {
 			if (f_amr) {
 				dc.initDirichletRefined(ffun, gfun);

@@ -121,9 +121,9 @@ class DomainCollection
 	void initNeumann(std::function<double(double, double)> ffun,
 	                 std::function<double(double, double)> efun,
 	                 std::function<double(double, double)> nfunx,
-	                 std::function<double(double, double)> nfuny);
+	                 std::function<double(double, double)> nfuny, bool amr);
 
-    /**
+	/**
      * @brief output solution in MatrixMarket format
      *
      * @param out the stream to output to

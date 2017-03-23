@@ -84,23 +84,23 @@ void Domain::planNeumann()
 	fftw_r2r_kind x_transform_inv = FFTW_RODFT01;
 	fftw_r2r_kind y_transform     = FFTW_RODFT10;
 	fftw_r2r_kind y_transform_inv = FFTW_RODFT01;
-	if (nbr[2] == -1 && nbr[6] == -1) {
+	if (!hasNbr(Side::east) && !hasNbr(Side::west)) {
 		x_transform     = FFTW_REDFT10;
 		x_transform_inv = FFTW_REDFT01;
-	} else if (nbr[6] == -1) {
+	} else if (!hasNbr(Side::west)) {
 		x_transform     = FFTW_REDFT11;
 		x_transform_inv = FFTW_REDFT11;
-	} else if (nbr[2] == -1) {
+	} else if (!hasNbr(Side::east)) {
 		x_transform     = FFTW_RODFT11;
 		x_transform_inv = FFTW_RODFT11;
 	}
-	if (nbr[0] == -1 && nbr[4] == -1) {
+	if (!hasNbr(Side::north) && !hasNbr(Side::south)) {
 		y_transform     = FFTW_REDFT10;
 		y_transform_inv = FFTW_REDFT01;
-	} else if (nbr[4] == -1) {
+	} else if (!hasNbr(Side::south)) {
 		y_transform     = FFTW_REDFT11;
 		y_transform_inv = FFTW_REDFT11;
-	} else if (nbr[0] == -1) {
+	} else if (!hasNbr(Side::north)) {
 		y_transform     = FFTW_RODFT11;
 		y_transform_inv = FFTW_RODFT11;
 	}
@@ -110,12 +110,11 @@ void Domain::planNeumann()
 	= fftw_plan_r2r_2d(ny, nx, &tmp[0], &u[0], y_transform_inv, x_transform_inv, FFTW_MEASURE);
 
 	// create denom vector
-	if (nbr[0] == -1 && nbr[4] == -1) {
+	if (!hasNbr(Side::north) && !hasNbr(Side::south)) {
 		for (int yi = 0; yi < nx; yi++) {
-			denom[slice(yi * ny, nx, 1)]
-			= -4 / (h_x * h_x) * pow(sin(yi * M_PI / (2 * nx)), 2);
+			denom[slice(yi * ny, nx, 1)] = -4 / (h_x * h_x) * pow(sin(yi * M_PI / (2 * nx)), 2);
 		}
-	} else if (nbr[4] == -1 || nbr[0] == -1) {
+	} else if (!hasNbr(Side::south) || !hasNbr(Side::north)) {
 		for (int yi = 0; yi < nx; yi++) {
 			denom[slice(yi * ny, nx, 1)]
 			= -4 / (h_x * h_x) * pow(sin((yi + 0.5) * M_PI / (2 * nx)), 2);
@@ -130,12 +129,11 @@ void Domain::planNeumann()
 	valarray<double> ones(ny);
 	ones = 1;
 
-	if (nbr[2] == -1 && nbr[6] == -1) {
+	if (!hasNbr(Side::east) && !hasNbr(Side::west)) {
 		for (int xi = 0; xi < ny; xi++) {
-			denom[slice(xi, ny, nx)]
-			-= 4 / (h_y * h_y) * pow(sin(xi * M_PI / (2 * ny)), 2) * ones;
+			denom[slice(xi, ny, nx)] -= 4 / (h_y * h_y) * pow(sin(xi * M_PI / (2 * ny)), 2) * ones;
 		}
-	} else if (nbr[6] == -1 || nbr[2] == -1) {
+	} else if (!hasNbr(Side::west) || !hasNbr(Side::east)) {
 		for (int xi = 0; xi < ny; xi++) {
 			denom[slice(xi, ny, nx)]
 			-= 4 / (h_y * h_y) * pow(sin((xi + 0.5) * M_PI / (2 * ny)), 2) * ones;

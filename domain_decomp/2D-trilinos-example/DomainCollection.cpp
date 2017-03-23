@@ -62,8 +62,9 @@ DomainCollection::DomainCollection(DomainSignatureCollection dsc, int n, double 
 void DomainCollection::initNeumann(function<double(double, double)> ffun,
                                    function<double(double, double)> efun,
                                    function<double(double, double)> nfunx,
-                                   function<double(double, double)> nfuny)
+                                   function<double(double, double)> nfuny, bool amr)
 {
+    this->amr = amr;
 	for (auto &p : domains) {
 		Domain &d        = *p.second;
 
@@ -73,24 +74,28 @@ void DomainCollection::initNeumann(function<double(double, double)> ffun,
 
 		for (int yi = 0; yi < n; yi++) {
 			for (int xi = 0; xi < n; xi++) {
-				double x           = d.x_start + h_x / 2.0 + d.x_length * xi / n;
-				double y           = d.y_start + h_y / 2.0 + d.y_length * yi / n;
+				double x           = d.x_start + d.h_x / 2.0 + d.x_length * xi / n;
+				double y           = d.y_start + d.h_y / 2.0 + d.y_length * yi / n;
 				f[yi * n + xi]     = ffun(x, y);
 				exact[yi * n + xi] = efun(x, y);
 				// west
-				if (d.nbr[6] == -1) {
+				if (!d.hasNbr(Side::west)) {
 					d.boundary_west[yi] = nfunx(0.0, y);
 				}
 				// east
-				if (d.nbr[2] == -1) {
-					d.boundary_east[yi] = nfunx(1.0, y);
+				if (!d.hasNbr(Side::east)) {
+					double x = 1.0;
+					if (amr) {
+						x = 2.0;
+					}
+					d.boundary_east[yi] = nfunx(x, y);
 				}
 				// south
-				if (d.nbr[4] == -1) {
+				if (!d.hasNbr(Side::south)) {
 					d.boundary_south[xi] = nfuny(x, 0.0);
 				}
 				// north
-				if (d.nbr[0] == -1) {
+				if (!d.hasNbr(Side::north)) {
 					d.boundary_north[xi] = nfuny(x, 1.0);
 				}
 			}
@@ -100,7 +105,9 @@ void DomainCollection::initNeumann(function<double(double, double)> ffun,
 
 	// create map for domains
 	generateMaps();
-	distributeIfaceInfo();
+	if (!amr) {
+		distributeIfaceInfo();
+	}
 }
 
 void DomainCollection::initDirichlet(function<double(double, double)> ffun,
