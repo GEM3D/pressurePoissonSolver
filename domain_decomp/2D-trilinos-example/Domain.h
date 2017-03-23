@@ -2,13 +2,13 @@
 #define DOMAIN_H
 #include "DomainSignatureCollection.h"
 #include "MyTypeDefs.h"
+#include "Side.h"
 #include <Teuchos_RCP.hpp>
 #include <Tpetra_Import_decl.hpp>
 #include <array>
 #include <cmath>
 #include <fftw3.h>
 #include <valarray>
-enum class Side { north, east, south, west };
 class Domain
 {
 	public:
@@ -31,11 +31,11 @@ class Domain
 	std::valarray<double>  boundary_east_refined_left;
 	std::valarray<double>  boundary_east_refined_right;
 	std::valarray<double>  boundary_west;
-	std::array<int, 8> nbr           = {-1, -1, -1, -1, -1, -1, -1, -1};
-	std::array<int, 8> local_i       = {-1, -1, -1, -1, -1, -1, -1, -1};
-	std::array<int, 8> global_i      = {-1, -1, -1, -1, -1, -1, -1, -1};
-	std::array<int, 8> iface_i       = {-1, -1, -1, -1, -1, -1, -1, -1};
-	std::array<int, 8> iface_local_i = {-1, -1, -1, -1, -1, -1, -1, -1};
+	std::array<int, 8>  nbr           = {-1, -1, -1, -1, -1, -1, -1, -1};
+	std::array<int, 12> local_i       = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+	std::array<int, 12> global_i      = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+	std::array<int, 12> iface_i       = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+	std::array<int, 12> iface_local_i = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 	Teuchos::RCP<map_type> domain_map;
 	fftw_plan              plan1;
 	fftw_plan              plan2;
@@ -63,7 +63,11 @@ class Domain
 	double exactNorm(double eavg);
 	double exactSum();
 
-	std::valarray<double> getStencil(Side s);
+	std::valarray<double> getStencil(Side s, Tilt t = Tilt::center);
+	std::valarray<double> getSide(Side s);
+	std::valarray<double> getSideCoarseLeft(Side s);
+	std::valarray<double> getSideCoarseRight(Side s);
+	std::valarray<double> getSideFine(Side s);
 	void fillBoundary(Side s, const single_vector_type &gamma);
 	void fillDiffVector(Side s, single_vector_type &diff, bool weight = true);
 
@@ -72,16 +76,16 @@ class Domain
 		bool retval;
 		switch (s) {
 			case Side::north:
-				retval = ds.nbr_refined[0];
+				retval = ds.nbr_coarse[0];
 				break;
 			case Side::east:
-				retval = ds.nbr_refined[1];
+				retval = ds.nbr_coarse[1];
 				break;
 			case Side::south:
-				retval = ds.nbr_refined[2];
+				retval = ds.nbr_coarse[2];
 				break;
 			case Side::west:
-				retval = ds.nbr_refined[3];
+				retval = ds.nbr_coarse[3];
 		}
 		return retval;
 	}

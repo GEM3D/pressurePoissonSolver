@@ -107,10 +107,11 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank,
 			DomainSignature &high_nbr = domains[d_y * d_x + (2 * i + 1) * d_x * 2];
 			left.nbr[2]               = high_nbr.id;
 			left.nbr[3]               = low_nbr.id;
+			left.nbr_fine[1]          = true;
 			low_nbr.nbr[6]            = left.id;
-			low_nbr.nbr_refined[3]    = true;
+			low_nbr.nbr_coarse[3]     = true;
 			high_nbr.nbr[6]           = left.id;
-			high_nbr.nbr_refined[3]   = true;
+			high_nbr.nbr_coarse[3]    = true;
 		}
 	}
     indexInterfacesBFS();
@@ -130,24 +131,45 @@ void DomainSignatureCollection::indexInterfacesBFS()
 		DomainSignature &d    = domains.at(curr);
 		queue.pop_front();
 		visited.insert(curr);
-		for (int q = 0; q < 8; q++) {
-			if (d.nbr[q] != -1 && visited.count(d.nbr[q]) == 0) {
+		for (int side = 0; side < 4; side++) {
+			if (d.nbr[2 * side] != -1 && visited.count(d.nbr[2 * side]) == 0) {
 				// a new edge that we have not assigned an index to
-				DomainSignature &nbr   = domains.at(d.nbr[q]);
-				int              nbr_q = -1;
-				for (int i = 0; i < 8; i++) {
-					if (nbr.nbr[i] == d.id) {
-						nbr_q = i;
-					}
-				}
+				DomainSignature &nbr      = domains.at(d.nbr[2 * side]);
+				int              nbr_side = (side + 2) % 4;
 
-				d.global_i[q]       = curr_i;
-				nbr.global_i[nbr_q] = curr_i;
-				if (enqueued.count(d.nbr[q]) == 0) {
-					queue.push_back(d.nbr[q]);
-					enqueued.insert(d.nbr[q]);
+				d.global_i[3 * side]       = curr_i;
+				nbr.global_i[3 * nbr_side] = curr_i;
+				if (enqueued.count(d.nbr[2 * side]) == 0) {
+					queue.push_back(d.nbr[2 * side]);
+					enqueued.insert(d.nbr[2 * side]);
 				}
 				curr_i++;
+
+                // fine case
+                if(d.nbr_fine[side]){
+					// set left index
+					d.global_i[3 * side + 1]       = curr_i;
+					nbr.global_i[3 * nbr_side + 1] = curr_i;
+					curr_i++;
+
+					// get right domain
+					DomainSignature &nbr_right = domains.at(d.nbr[2 * side + 1]);
+					if (enqueued.count(d.nbr[2 * side + 1]) == 0) {
+						queue.push_back(d.nbr[2 * side + 1]);
+						enqueued.insert(d.nbr[2 * side + 1]);
+					}
+					nbr_right.global_i[3 * nbr_side] = nbr.global_i[3 * nbr_side];
+
+					// set right index
+					d.global_i[3 * side + 2]             = curr_i;
+					nbr_right.global_i[3 * nbr_side + 2] = curr_i;
+					curr_i++;
+				}
+
+				// coarse case
+				if (d.nbr_coarse[side]) {
+					// TODO
+				}
 			}
 		}
 	}

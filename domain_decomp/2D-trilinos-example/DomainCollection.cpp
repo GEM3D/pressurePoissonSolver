@@ -203,40 +203,111 @@ void DomainCollection::generateMaps()
 			queue.pop_front();
 			visited.insert(curr);
             not_visited.erase(curr);
-			for (int q = 0; q < 8; q++) {
-				if (d.nbr[q] != -1 && visited.count(d.nbr[q]) == 0) {
+			for (int side = 0; side < 4; side++) {
+				if (d.nbr[2 * side] != -1 && visited.count(d.nbr[2 * side]) == 0) {
 					// a new edge that we have not assigned an index to
-					try {
-						Domain &nbr   = *domains.at(d.nbr[q]);
-						int     nbr_q = -1;
-						do {
-							nbr_q++;
-						} while (nbr.nbr[nbr_q] != curr);
-						nbr.local_i[nbr_q]       = curr_i;
-						nbr.iface_local_i[nbr_q] = curr_c_i;
-						if (enqueued.count(d.nbr[q]) == 0) {
-							queue.push_back(d.nbr[q]);
-							enqueued.insert(d.nbr[q]);
-						}
-					} catch (const out_of_range &oor) {
-						// do nothing
+					Domain &nbr      = *domains.at(d.nbr[2 * side]);
+                    cerr << "ID:  " << d.ds.id << endl;
+                    cerr << "NBL: " << nbr.ds.id << endl;
+					int              nbr_side = (side + 2) % 4;
+
+					d.local_i[3 * side]             = curr_i;
+					nbr.local_i[3 * nbr_side]       = curr_i;
+					d.iface_local_i[3 * side]       = curr_c_i;
+					nbr.iface_local_i[3 * nbr_side] = curr_c_i;
+					if (enqueued.count(d.nbr[2 * side]) == 0) {
+						queue.push_back(d.nbr[2 * side]);
+						enqueued.insert(d.nbr[2 * side]);
 					}
-					d.local_i[q]       = curr_i;
-					d.iface_local_i[q] = curr_c_i;
 					for (int i = 0; i < 22; i++) {
-						c_iface_global.push_back(d.iface_i[q] + i);
-						iface_global.push_back(d.iface_i[q] + i);
+						c_iface_global.push_back(d.iface_i[3 * side] + i);
+						iface_global.push_back(d.iface_i[3 * side] + i);
 						curr_c_i++;
 					}
 					for (int i = 0; i < n; i++) {
-						global.push_back(d.global_i[q] + i);
-						matrix_global.push_back(d.global_i[q] + i);
+						global.push_back(d.global_i[3 * side] + i);
+						matrix_global.push_back(d.global_i[3 * side] + i);
 						curr_matrix_i++;
 					}
 					curr_i += n;
+					    cerr<<d.global_i[3 * side + 0]<<endl;
+
+					// fine case
+					if (d.ds.nbr_fine[side]) {
+						// set left index
+						d.local_i[3 * side + 1]             = curr_i;
+						nbr.local_i[3 * nbr_side + 1]       = curr_i;
+						d.iface_local_i[3 * side + 1]       = curr_c_i;
+						nbr.iface_local_i[3 * nbr_side + 1] = curr_c_i;
+						for (int i = 0; i < 22; i++) {
+							c_iface_global.push_back(d.iface_i[3 * side + 1] + i);
+							iface_global.push_back(d.iface_i[3 * side + 1] + i);
+							curr_c_i++;
+						}
+						for (int i = 0; i < n; i++) {
+							global.push_back(d.global_i[3 * side + 1] + i);
+							matrix_global.push_back(d.global_i[3 * side + 1] + i);
+							curr_matrix_i++;
+						}
+						curr_i += n;
+
+						// get right domain
+						Domain &nbr_right = *domains.at(d.nbr[2 * side + 1]);
+                    cerr << "NBR: " << nbr_right.ds.id << endl;
+						if (enqueued.count(d.nbr[2 * side + 1]) == 0) {
+							queue.push_back(d.nbr[2 * side + 1]);
+							enqueued.insert(d.nbr[2 * side + 1]);
+						}
+						nbr_right.local_i[3 * nbr_side] = nbr.local_i[3 * nbr_side];
+						nbr_right.iface_local_i[3 * nbr_side] = nbr.iface_local_i[3 * nbr_side];
+
+						// set right index
+						d.local_i[3 * side + 2]                   = curr_i;
+						nbr_right.local_i[3 * nbr_side + 2]       = curr_i;
+						d.iface_local_i[3 * side + 2]             = curr_c_i;
+						nbr_right.iface_local_i[3 * nbr_side + 2] = curr_c_i;
+						for (int i = 0; i < 22; i++) {
+							c_iface_global.push_back(d.iface_i[3 * side + 2] + i);
+							iface_global.push_back(d.iface_i[3 * side + 2] + i);
+							curr_c_i++;
+						}
+						for (int i = 0; i < n; i++) {
+							global.push_back(d.global_i[3 * side + 2] + i);
+							matrix_global.push_back(d.global_i[3 * side + 2] + i);
+							curr_matrix_i++;
+						}
+					    cerr<<d.global_i[3 * side + 1]<<endl;
+					    cerr<<d.global_i[3 * side + 2]<<endl;
+						curr_i += n;
+					}
+
+					// coarse case
+					if (d.ds.nbr_coarse[side]) {
+						// TODO
+					}
 				}
 			}
 		}
+	}
+	for (auto &p : domains) {
+		Domain &d = *p.second;
+		cerr << "I am Domain: " << d.ds.id << "\n";
+		cerr << "h:           " << this->h_x << endl;
+		cerr << "I start at:  " << d.ds.x_start << ", " << d.ds.y_start << "\n";
+		cerr << "Length:     " << d.ds.x_length << ", " << d.ds.y_length << "\n";
+		cerr << "North: " << d.nbr[0] << ", " << d.nbr[1] << "\n";
+		cerr << "Idx:   " << d.local_i[0] << ", " << d.local_i[1] << ", " << d.local_i[2]
+		     << "\n";
+		cerr << "East:  " << d.nbr[2] << ", " << d.nbr[3] << "\n";
+		cerr << "Idx:   " << d.local_i[3] << ", " << d.local_i[4] << ", " << d.local_i[5]
+		     << "\n";
+		cerr << "South: " << d.nbr[4] << ", " << d.nbr[5] << "\n";
+		cerr << "Idx:   " << d.local_i[6] << ", " << d.local_i[7] << ", " << d.local_i[8]
+		     << "\n";
+		cerr << "West:  " << d.nbr[6] << ", " << d.nbr[7] << "\n";
+		cerr << "Idx:   " << d.local_i[9] << ", " << d.local_i[10] << ", " << d.local_i[11]
+		     << "\n";
+		cerr << "\n";
 	}
 	// Now that the global indices have been calculated, we can create a map for the interface
 	// points

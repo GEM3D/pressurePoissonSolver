@@ -12,13 +12,14 @@ Domain::Domain(DomainSignature ds, int nx, int ny, double h_x, double h_y)
 	cerr << "I start at:  " << ds.x_start << ", " << ds.y_start << "\n";
 	cerr << "Length:     " << ds.x_length << ", " << ds.y_length << "\n";
 	cerr << "North: " << ds.nbr[0] << ", " << ds.nbr[1] << "\n";
-	cerr << "Idx:   " << ds.global_i[0] << ", " << ds.global_i[1] << "\n";
+	cerr << "Idx:   " << ds.global_i[0] << ", " << ds.global_i[1] << ", " << ds.global_i[2] << "\n";
 	cerr << "East:  " << ds.nbr[2] << ", " << ds.nbr[3] << "\n";
-	cerr << "Idx:   " << ds.global_i[2] << ", " << ds.global_i[3] << "\n";
+	cerr << "Idx:   " << ds.global_i[3] << ", " << ds.global_i[4] << ", " << ds.global_i[5] << "\n";
 	cerr << "South: " << ds.nbr[4] << ", " << ds.nbr[5] << "\n";
-	cerr << "Idx:   " << ds.global_i[4] << ", " << ds.global_i[5] << "\n";
+	cerr << "Idx:   " << ds.global_i[6] << ", " << ds.global_i[7] << ", " << ds.global_i[8] << "\n";
 	cerr << "West:  " << ds.nbr[6] << ", " << ds.nbr[7] << "\n";
-	cerr << "Idx:   " << ds.global_i[6] << ", " << ds.global_i[7] << "\n";
+	cerr << "Idx:   " << ds.global_i[9] << ", " << ds.global_i[10] << ", " << ds.global_i[11]
+	     << "\n";
 	cerr << "\n";
 	f      = valarray<double>(nx * ny);
 	f_copy = valarray<double>(nx * ny);
@@ -32,8 +33,8 @@ Domain::Domain(DomainSignature ds, int nx, int ny, double h_x, double h_y)
 	boundary_east  = valarray<double>(ny);
 	boundary_west  = valarray<double>(ny);
 
-	for (int q = 0; q < 8; q++) {
-		if (ds.nbr[q] != -1) {
+	for (int q = 0; q < 12; q++) {
+		if (ds.global_i[q] != -1) {
 			global_i[q] = ds.global_i[q] * nx;
 			iface_i[q]  = ds.global_i[q] * 22;
 		}
@@ -150,22 +151,22 @@ void Domain::planNeumann()
 void Domain::solve()
 {
 	f_copy = f;
-	if (nbr[0] == -1 && neumann) {
+	if (!hasNbr(Side::north) && neumann) {
 		f_copy[slice(nx * (ny - 1), nx, 1)] -= 1 / h_y * boundary_north;
 	} else {
 		f_copy[slice(nx * (ny - 1), nx, 1)] -= 2 / (h_y * h_y) * boundary_north;
 	}
-	if (nbr[2] == -1 && neumann) {
+	if (!hasNbr(Side::east) && neumann) {
 		f_copy[slice((nx - 1), ny, nx)] -= 1 / h_x * boundary_east;
 	} else {
 		f_copy[slice((nx - 1), ny, nx)] -= 2 / (h_x * h_x) * boundary_east;
 	}
-	if (nbr[4] == -1 && neumann) {
+	if (!hasNbr(Side::south) && neumann) {
 		f_copy[slice(0, nx, 1)] += 1 / h_y * boundary_south;
 	} else {
 		f_copy[slice(0, nx, 1)] -= 2 / (h_y * h_y) * boundary_south;
 	}
-	if (nbr[6] == -1 && neumann) {
+	if (!hasNbr(Side::west) && neumann) {
 		f_copy[slice(0, ny, nx)] += 1 / h_x * boundary_west;
 	} else {
 		f_copy[slice(0, ny, nx)] -= 2 / (h_x * h_x) * boundary_west;
@@ -307,6 +308,11 @@ double Domain::residual(vector_type &ghost)
 			f_comp[(ny - 1) * nx + i] += (south - 2 * center + north) / (h_y * h_y);
 		}
 	}
+	if (hasFineNbr(Side::east)) {
+		for (int j = 0; j < ny; j++) {
+            f_comp[j*nx+nx-1]=f[j*nx+nx-1];
+		}
+	}
 	resid = f - f_comp;
 	return sqrt(pow(f - f_comp, 2).sum());
 }
@@ -360,198 +366,354 @@ double Domain::exactNorm() { return sqrt((exact * exact).sum()); }
 double Domain::fNorm() { return sqrt((f * f).sum()); }
 double Domain::exactNorm(double eavg) { return sqrt(pow(exact - eavg, 2).sum()); }
 double                          Domain::exactSum() { return exact.sum(); }
-valarray<double> Domain::getStencil(Side s)
-{
+valarray<double> Domain::getSide(Side s){
 	valarray<double> retval(nx);
-	bool             nbr_left;
-	bool             nbr_right;
-	double           val_left;
-	double           val_right;
 	switch (s) {
 		case Side::north:
 			retval    = u[slice(nx * (nx - 1), nx, 1)];
-			nbr_left  = hasNbr(Side::west);
-			val_left  = boundary_west[nx - 1];
-			nbr_right = hasNbr(Side::east);
-			val_right = boundary_east[nx - 1];
 			break;
 		case Side::east:
 			retval    = u[slice(nx - 1, nx, nx)];
-			nbr_left  = hasNbr(Side::south);
-			val_left  = boundary_south[nx - 1];
-			nbr_right = hasNbr(Side::north);
-			val_right = boundary_north[nx - 1];
 			break;
 		case Side::south:
 			retval    = u[slice(0, nx, 1)];
-			nbr_left  = hasNbr(Side::west);
-			val_left  = boundary_west[0];
-			nbr_right = hasNbr(Side::east);
-			val_right = boundary_east[0];
 			break;
 		case Side::west:
 			retval    = u[slice(0, nx, nx)];
-			nbr_left  = hasNbr(Side::south);
-			val_left  = boundary_south[0];
-			nbr_right = hasNbr(Side::north);
-			val_right = boundary_north[0];
 	}
-	if (hasFineNbr(s)) {
-		valarray<double> refined(2 * nx);
-
-		int  grid_i = 0;
-		bool right  = false;
-
-		if (!nbr_left) {
-			refined[0] = (val_left + retval[0]) / 2.0;
-		} else {
-			refined[0] = retval[0] - (retval[0] - retval[1]) / 2.0;
-		}
-		for (int i = 1; i < 2 * nx - 1; i++) {
-			if (right) {
-				refined[i] = (retval[grid_i] + 3 * retval[grid_i + 1]) / 4.0;
-				right      = false;
-				grid_i++;
-			} else {
-				refined[i] = (3 * retval[grid_i] + retval[grid_i + 1]) / 4.0;
-				right      = true;
+    return retval;
+}
+valarray<double> Domain::getSideCoarseLeft(Side s)
+{
+	valarray<double> retval(nx);
+	valarray<double> side = getSide(s);
+	switch (s) {
+		case Side::north:
+			retval[0] = (boundary_west[nx - 1] + side[0])/2.0;
+			for (int i = 1; i < nx; i++) {
+                if(i%2==1){
+					retval[i] = (3.0 * side[(i - 1) / 2] + side[(i - 1) / 2 + 1]) / 4.0;
+				}else{
+					retval[i] = (side[(i - 1) / 2] + 3.0 * side[(i - 1) / 2 + 1]) / 4.0;
+				}
 			}
-		}
-		if (!nbr_right) {
-			refined[2 * nx - 1] = (val_right + retval[nx - 1]) / 2.0;
-		} else {
-			refined[2 * nx - 1] = retval[nx - 1] - (retval[nx - 1] - retval[nx - 2]) / 2.0;
-		}
-
-		retval = refined;
+			break;
+		case Side::east:
+			retval[nx-1] = (boundary_north[nx-1] + side[nx-1])/2.0;
+			for (int i = nx; i < 2*nx-1; i++) {
+                if(i%2==1){
+					retval[i-nx] = (3.0 * side[(i - 1) / 2] + side[(i - 1) / 2 + 1]) / 4.0;
+				}else{
+					retval[i-nx] = (side[(i - 1) / 2] + 3.0 * side[(i - 1) / 2 + 1]) / 4.0;
+				}
+			}
+			break;
+		case Side::south:
+			retval[nx-1] = (boundary_east[0] + side[nx-1])/2.0;
+			for (int i = nx; i < 2*nx-1; i++) {
+                if(i%2==1){
+					retval[i-nx] = (3.0 * side[(i - 1) / 2] + side[(i - 1) / 2 + 1]) / 4.0;
+				}else{
+					retval[i-nx] = (side[(i - 1) / 2] + 3.0 * side[(i - 1) / 2 + 1]) / 4.0;
+				}
+			}
+			break;
+		case Side::west:
+			retval[0] = (boundary_south[0] + side[0])/2.0;
+			for (int i = 1; i < nx; i++) {
+                if(i%2==1){
+					retval[i] = (3.0 * side[(i - 1) / 2] + side[(i - 1) / 2 + 1]) / 4.0;
+				}else{
+					retval[i] = (side[(i - 1) / 2] + 3.0 * side[(i - 1) / 2 + 1]) / 4.0;
+				}
+			}
 	}
-	return retval;
+    return retval;
+}
+valarray<double> Domain::getSideCoarseRight(Side s)
+{
+	valarray<double> retval(nx);
+	valarray<double> side = getSide(s);
+	switch (s) {
+		case Side::north:
+			retval[nx-1] = (boundary_east[nx - 1] + side[nx-1])/2.0;
+			for (int i = nx; i < 2*nx-1; i++) {
+                if(i%2==1){
+					retval[i-nx] = (3.0 * side[(i - 1) / 2] + side[(i - 1) / 2 + 1]) / 4.0;
+				}else{
+					retval[i-nx] = (side[(i - 1) / 2] + 3.0 * side[(i - 1) / 2 + 1]) / 4.0;
+				}
+			}
+			break;
+		case Side::east:
+			retval[0] = (boundary_south[nx-1] + side[0])/2.0;
+			for (int i = 1; i < nx; i++) {
+                if(i%2==1){
+					retval[i] = (3.0 * side[(i - 1) / 2] + side[(i - 1) / 2 + 1]) / 4.0;
+				}else{
+					retval[i] = (side[(i - 1) / 2] + 3.0 * side[(i - 1) / 2 + 1]) / 4.0;
+				}
+			}
+			break;
+		case Side::south:
+			retval[0] = (boundary_west[0] + side[0])/2.0;
+			for (int i = 1; i < nx; i++) {
+                if(i%2==1){
+					retval[i] = (3.0 * side[(i - 1) / 2] + side[(i - 1) / 2 + 1]) / 4.0;
+				}else{
+					retval[i] = (side[(i - 1) / 2] + 3.0 * side[(i - 1) / 2 + 1]) / 4.0;
+				}
+			}
+			break;
+		case Side::west:
+			retval[nx-1] = (boundary_north[0] + side[nx-1])/2.0;
+			for (int i = nx; i < 2*nx-1; i++) {
+                if(i%2==1){
+					retval[i-nx] = (3.0 * side[(i - 1) / 2] + side[(i - 1) / 2 + 1]) / 4.0;
+				}else{
+					retval[i-nx] = (side[(i - 1) / 2] + 3.0 * side[(i - 1) / 2 + 1]) / 4.0;
+				}
+			}
+	}
+    return retval;
+}
+valarray<double> Domain::getSideFine(Side s)
+{
+	valarray<double> retval(nx);
+	valarray<double> side = getSide(s);
+	switch (s) {
+		case Side::north:
+			// left case
+			if (global_i[1] != -1) {
+				for (int i = 0; i < nx; i++) {
+					retval[i / 2] += side[i];
+				}
+			}else{
+				for (int i = 0; i < nx; i++) {
+					retval[nx - 1 - i / 2] += side[nx - 1 - i];
+				}
+            }
+			break;
+		case Side::east:
+			// left case
+			if (global_i[4] != -1) {
+				for (int i = 0; i < nx; i++) {
+					retval[nx - 1 - i / 2] += side[nx - 1 - i];
+				}
+			} else {
+				for (int i = 0; i < nx; i++) {
+					retval[i / 2] += side[i];
+				}
+			}
+			break;
+		case Side::south:
+			// left case
+			if (global_i[7] != -1) {
+				for (int i = 0; i < nx; i++) {
+					retval[nx - 1 - i / 2] += side[nx - 1 - i];
+				}
+			} else {
+				for (int i = 0; i < nx; i++) {
+					retval[i / 2] += side[i];
+				}
+			}
+			break;
+		case Side::west:
+			// left case
+			if (global_i[10] != -1) {
+				for (int i = 0; i < nx; i++) {
+					retval[nx - 1 - i / 2] += side[nx - 1 - i];
+				}
+			} else {
+				for (int i = 0; i < nx; i++) {
+					retval[i / 2] += side[i];
+				}
+			}
+	}
+    retval/=2;
+    return retval;
+}
+valarray<double> Domain::getStencil(Side s,Tilt t)
+{
+		return getSide(s);
 }
 
 void Domain::fillBoundary(Side s, const single_vector_type &gamma)
 {
-	if (hasFineNbr(s)) {
-		int               curr_i_left;
-		int               curr_i_right;
-		valarray<double> *boundary_ptr;
+	int               curr_i;
+	valarray<double> *boundary_ptr;
+    if(hasCoarseNbr(s)){
 		switch (s) {
 			case Side::north:
-				curr_i_left  = global_i[0];
-				curr_i_right = global_i[1];
+				if (global_i[1] != -1) {
+					curr_i = global_i[1];
+				} else {
+					curr_i = global_i[2];
+				}
 				boundary_ptr = &boundary_north;
 				break;
 			case Side::east:
-				curr_i_left  = global_i[3];
-				curr_i_right = global_i[2];
+				if (global_i[4] != -1) {
+					curr_i = global_i[4];
+				} else {
+					curr_i = global_i[5];
+				}
 				boundary_ptr = &boundary_east;
 				break;
 			case Side::south:
-				curr_i_left  = global_i[5];
-				curr_i_right = global_i[4];
+				if (global_i[7] != -1) {
+					curr_i = global_i[7];
+				} else {
+					curr_i = global_i[8];
+				}
 				boundary_ptr = &boundary_south;
 				break;
 			case Side::west:
-				curr_i_left  = global_i[6];
-				curr_i_right = global_i[7];
+				if (global_i[10] != -1) {
+					curr_i = global_i[10];
+				} else {
+					curr_i = global_i[11];
+				}
 				boundary_ptr = &boundary_west;
 		}
-		valarray<double> &boundary   = *boundary_ptr;
-		auto              gamma_view = gamma.getLocalView<Kokkos::HostSpace>();
-		boundary                     = 0;
-		for (int i = 0; i < nx; i++) {
-			boundary[i / 2] += gamma_view(curr_i_left, 0);
-			curr_i_left++;
-		}
-		for (int i = nx; i < 2 * nx; i++) {
-			boundary[i / 2] += gamma_view(curr_i_right, 0);
-			curr_i_right++;
-		}
-		boundary /= 2.0;
 	} else {
-		int               curr_i;
-		valarray<double> *boundary_ptr;
 		switch (s) {
 			case Side::north:
 				curr_i       = global_i[0];
 				boundary_ptr = &boundary_north;
 				break;
 			case Side::east:
-				curr_i       = global_i[2];
+				curr_i       = global_i[3];
 				boundary_ptr = &boundary_east;
 				break;
 			case Side::south:
-				curr_i       = global_i[4];
+				curr_i       = global_i[6];
 				boundary_ptr = &boundary_south;
 				break;
 			case Side::west:
-				curr_i       = global_i[6];
+				curr_i       = global_i[9];
 				boundary_ptr = &boundary_west;
 		}
-		valarray<double> &boundary   = *boundary_ptr;
-		auto              gamma_view = gamma.getLocalView<Kokkos::HostSpace>();
-		for (int i = 0; i < nx; i++) {
-			boundary[i] = gamma_view(curr_i, 0);
-			curr_i++;
-		}
+	}
+	valarray<double> &boundary   = *boundary_ptr;
+	auto              gamma_view = gamma.getLocalView<Kokkos::HostSpace>();
+
+	for (int i = 0; i < nx; i++) {
+		boundary[i] = gamma_view(curr_i, 0);
+		curr_i++;
 	}
 }
 void Domain::fillDiffVector(Side s, single_vector_type &diff, bool weight)
 {
-	valarray<double> stencil = getStencil(s);
-	if (weight) {
-		if (hasFineNbr(s)) {
-			stencil *= 2.0 * 1.0 / 3.0;
-		}
-		if (hasCoarseNbr(s)) {
-			stencil *= 2.0 * 2.0 / 3.0;
-		}
-	}
+    //weight=false;
 	auto diff_view = diff.getLocalView<Kokkos::HostSpace>();
-	if (hasFineNbr(s)) {
-		int curr_i_left;
-		int curr_i_right;
+    if(hasFineNbr(s)){
+		valarray<double> center = getSide(s);
+		valarray<double> left = getSideCoarseLeft(s);
+		valarray<double> right = getSideCoarseRight(s);
+        if(weight){
+            center*=2.0/3.0;
+            left*=2.0/3.0;
+            right*=2.0/3.0;
+        }
+		int              curr_i;
+		int              curr_i_left;
+		int              curr_i_right;
 		switch (s) {
 			case Side::north:
-				curr_i_left  = global_i[0];
-				curr_i_right = global_i[1];
-				break;
-			case Side::east:
-				curr_i_left  = global_i[3];
+				curr_i       = global_i[0];
+				curr_i_left  = global_i[1];
 				curr_i_right = global_i[2];
 				break;
+			case Side::east:
+				curr_i       = global_i[3];
+				curr_i_left  = global_i[4];
+				curr_i_right = global_i[5];
+				break;
 			case Side::south:
-				curr_i_left  = global_i[5];
-				curr_i_right = global_i[4];
+				curr_i       = global_i[6];
+				curr_i_left  = global_i[7];
+				curr_i_right = global_i[8];
 				break;
 			case Side::west:
-				curr_i_left  = global_i[6];
-				curr_i_right = global_i[7];
+				curr_i       = global_i[9];
+				curr_i_left  = global_i[10];
+				curr_i_right = global_i[11];
 		}
 		for (int i = 0; i < nx; i++) {
-			diff_view(curr_i_left, 0) += stencil[i];
+			diff_view(curr_i, 0) += center[i];
+			//diff_view(curr_i_left, 0) += left[i];
+			//diff_view(curr_i_right, 0) += right[i];
+			curr_i++;
 			curr_i_left++;
-		}
-		for (int i = nx; i < 2 * nx; i++) {
-			diff_view(curr_i_right, 0) += stencil[i];
 			curr_i_right++;
 		}
+    }else if(hasCoarseNbr(s)){
+		valarray<double> center = getSideFine(s);
+		valarray<double> side = getSide(s);
+        if(weight){
+            center*=4.0/3.0;
+            side*=4.0/2.0;
+        }
+        int curr_i_center;
+        int curr_i;
+		switch (s) {
+			case Side::north:
+                curr_i_center = global_i[0];
+				if (global_i[1] != -1) {
+					curr_i = global_i[1];
+				} else {
+					curr_i = global_i[2];
+				}
+				break;
+			case Side::east:
+                curr_i_center = global_i[3];
+				if (global_i[4] != -1) {
+					curr_i = global_i[4];
+				} else {
+					curr_i = global_i[5];
+				}
+				break;
+			case Side::south:
+                curr_i_center = global_i[6];
+				if (global_i[7] != -1) {
+					curr_i = global_i[7];
+				} else {
+					curr_i = global_i[8];
+				}
+                break;
+			case Side::west:
+                curr_i_center = global_i[9];
+				if (global_i[10] != -1) {
+					curr_i = global_i[10];
+				} else {
+					curr_i = global_i[11];
+				}
+		}
+		for (int i = 0; i < nx; i++) {
+			diff_view(curr_i_center, 0) += center[i];
+			diff_view(curr_i, 0) += side[i];
+			curr_i++;
+			curr_i_center++;
+		}
 	} else {
+		valarray<double> side = getSide(s);
 		int curr_i;
 		switch (s) {
 			case Side::north:
 				curr_i = global_i[0];
 				break;
 			case Side::east:
-				curr_i = global_i[2];
+				curr_i = global_i[3];
 				break;
 			case Side::south:
-				curr_i = global_i[4];
+				curr_i = global_i[6];
 				break;
 			case Side::west:
-				curr_i = global_i[6];
+				curr_i = global_i[9];
 		}
 		for (int i = 0; i < nx; i++) {
-			diff_view(curr_i, 0) += stencil[i];
+			diff_view(curr_i, 0) += side[i];
 			curr_i++;
 		}
 	}

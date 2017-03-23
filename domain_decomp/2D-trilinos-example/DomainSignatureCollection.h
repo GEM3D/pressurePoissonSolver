@@ -1,5 +1,6 @@
 #ifndef DOMAINSIGNATURECOLLECTION_H
 #define DOMAINSIGNATURECOLLECTION_H
+#include "Side.h"
 #include <map>
 #include <array>
 #include <bitset>
@@ -17,8 +18,9 @@ struct DomainSignature {
 
 	std::array<int, 8> nbr      = {-1, -1, -1, -1, -1, -1, -1, -1};
 	std::array<int, 8> proc     = {-1, -1, -1, -1, -1, -1, -1, -1};
-	std::array<int, 8> global_i = {-1, -1, -1, -1, -1, -1, -1, -1};
-    std::bitset<4> nbr_refined;
+	std::array<int, 12> global_i = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+	std::bitset<4> nbr_coarse;
+	std::bitset<4> nbr_fine;
 	int global_i_west = -1;
 	/**
 	 * @brief The lower left x coordinate of domain
