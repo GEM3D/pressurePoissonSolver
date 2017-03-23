@@ -8,6 +8,8 @@ F90       = mpif90
 HYPRE_DIR = /cm/shared/apps/hypre/gcc/64/2.10.1/
 LAPACK_DIR = /cm/shared/apps/lapack/gcc/64/3.5.0/lib/cmaike/lapack-3.4.2/
 
+#set environment variable for hypre_dir and Lapack_dir
+
 ########################################################################
 # Compiling and linking options
 ########################################################################
