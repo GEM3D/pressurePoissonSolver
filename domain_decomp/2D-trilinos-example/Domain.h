@@ -69,7 +69,7 @@ class Domain
 	std::valarray<double> getSideCoarseRight(Side s);
 	std::valarray<double> getSideFine(Side s);
 	void fillBoundary(Side s, const single_vector_type &gamma);
-	void fillDiffVector(Side s, single_vector_type &diff, bool weight = true);
+	void fillDiffVector(Side s, single_vector_type &diff, bool residual = false);
 
 	inline bool hasCoarseNbr(Side s)
 	{

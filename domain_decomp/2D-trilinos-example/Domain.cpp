@@ -190,17 +190,16 @@ void Domain::putGhostCells(vector_type &ghost)
 	auto left_ptr  = ghost.getVectorNonConst(0);
 	auto right_ptr = ghost.getVectorNonConst(1);
 	if (hasNbr(Side::north)) {
-		fillDiffVector(Side::north, *right_ptr, false);
+		fillDiffVector(Side::north, *right_ptr, true);
 	}
 	if (hasNbr(Side::east)) {
-		fillDiffVector(Side::east, *right_ptr, false);
+		fillDiffVector(Side::east, *right_ptr, true);
 	}
 	if (hasNbr(Side::south)) {
-		fillDiffVector(Side::south, *left_ptr, false);
-	}
-;
+		fillDiffVector(Side::south, *left_ptr, true);
+	};
 	if (hasNbr(Side::west)) {
-		fillDiffVector(Side::west, *left_ptr, false);
+		fillDiffVector(Side::west, *left_ptr, true);
 	}
 }
 
@@ -209,6 +208,7 @@ double Domain::residual(vector_type &ghost)
 	auto left_ptr  = ghost.getVector(0);
 	auto right_ptr = ghost.getVector(1);
 
+    /*
 	if (hasNbr(Side::north)) {
 		fillBoundary(Side::north, *left_ptr);
 	}
@@ -221,6 +221,7 @@ double Domain::residual(vector_type &ghost)
 	if (hasNbr(Side::west)) {
 		fillBoundary(Side::west, *right_ptr);
 	}
+    */
 
 	valarray<double> f_comp = valarray<double>(nx * ny);
 	// integrate in x secton
@@ -232,16 +233,21 @@ double Domain::residual(vector_type &ghost)
 		east   = u[j * nx + 1];
 		if (neumann && !hasNbr(Side::west)) {
 			f_comp[j * nx] = (-h_x * west - center + east) / (h_x * h_x);
-		} else if (!hasNbr(Side::west)) {
+		} else {
 			f_comp[j * nx] = (2 * west - 3 * center + east) / (h_x * h_x);
+        }
+        /*
+		} else if (!hasNbr(Side::west)) {
 		} else if (hasFineNbr(Side::west)) {
 			// TODO
 			// f_comp[j * nx] = (1.0 / 3.0 * west - 4.0 / 3.0 * center + east) / (h_x * h_x);
 		} else if (hasCoarseNbr(Side::west)) {
-			f_comp[j * nx] = (2.0 / 3.0 * west - 5.0 / 3.0 * center + east) / (h_x * h_x);
-		} else {
+			// TODO
+			f_comp[j * nx] = (2.6118 * west - 3.6105 * center + east) / (h_x * h_x);
+            cerr << west << ", " << center << ", " << east << ", " << f[j*nx]*h_x*h_x << ", " <<f_comp[j*nx]*h_x*h_x << endl;
 			f_comp[j * nx] = (west - 2 * center + east) / (h_x * h_x);
 		}
+        */
 	}
 	// middle
 	for (int i = 1; i < nx - 1; i++) {
@@ -260,17 +266,20 @@ double Domain::residual(vector_type &ghost)
 		east   = boundary_east[j];
 		if (neumann && !hasNbr(Side::east)) {
 			f_comp[j * nx + nx - 1] = (west - center + h_x * east) / (h_x * h_x);
-		} else if (!hasNbr(Side::east)) {
+		} else {
 			f_comp[j * nx + nx - 1] = (west - 3 * center + 2 * east) / (h_x * h_x);
+        }
+        /*
+		} else if (!hasNbr(Side::east)) {
 		} else if (hasFineNbr(Side::east)) {
 			f_comp[j * nx + nx - 1] = (west - 7.0 / 3.0 * center + 4.0 / 3.0 * east) / (h_x * h_x);
 		} else if (hasCoarseNbr(Side::east)) {
 			// TODO
 			// f_comp[j * nx + nx - 1] = (west - 4.0 / 3.0 * center + 1.0 / 3.0 * east) / (h_x *
 			// h_x);
-		} else {
 			f_comp[j * nx + nx - 1] = (west - 2 * center + east) / (h_x * h_x);
 		}
+        */
 	}
 	// south
 	for (int i = 0; i < nx; i++) {
@@ -279,11 +288,14 @@ double Domain::residual(vector_type &ghost)
 		north  = u[nx + i];
 		if (neumann && !hasNbr(Side::south)) {
 			f_comp[i] += (-h_y * south - center + north) / (h_y * h_y);
-		} else if (!hasNbr(Side::south)) {
-			f_comp[i] += (2 * south - 3 * center + north) / (h_y * h_y);
 		} else {
+			f_comp[i] += (2 * south - 3 * center + north) / (h_y * h_y);
+        }
+        /*
+		} else if (!hasNbr(Side::south)) {
 			f_comp[i] += (south - 2 * center + north) / (h_y * h_y);
 		}
+        */
 	}
 	// middle
 	for (int i = 0; i < nx; i++) {
@@ -302,11 +314,14 @@ double Domain::residual(vector_type &ghost)
 		north  = boundary_north[i];
 		if (neumann && !hasNbr(Side::north)) {
 			f_comp[(ny - 1) * nx + i] += (south - center + h_y * north) / (h_y * h_y);
-		} else if (!hasNbr(Side::north)) {
-			f_comp[(ny - 1) * nx + i] += (south - 3 * center + 2 * north) / (h_y * h_y);
 		} else {
+			f_comp[(ny - 1) * nx + i] += (south - 3 * center + 2 * north) / (h_y * h_y);
+        }
+        /*
+		} else if (!hasNbr(Side::north)) {
 			f_comp[(ny - 1) * nx + i] += (south - 2 * center + north) / (h_y * h_y);
 		}
+        */
 	}
 	if (hasFineNbr(Side::east)) {
 		for (int j = 0; j < ny; j++) {
@@ -603,22 +618,22 @@ void Domain::fillBoundary(Side s, const single_vector_type &gamma)
 		curr_i++;
 	}
 }
-void Domain::fillDiffVector(Side s, single_vector_type &diff, bool weight)
+void Domain::fillDiffVector(Side s, single_vector_type &diff, bool residual)
 {
-    //weight=false;
+	// weight=false;
 	auto diff_view = diff.getLocalView<Kokkos::HostSpace>();
-    if(hasFineNbr(s)){
+	if (hasFineNbr(s)) {
 		valarray<double> center = getSide(s);
-		valarray<double> left = getSideCoarseLeft(s);
-		valarray<double> right = getSideCoarseRight(s);
-        if(weight){
-            center*=2.0/3.0;
-            left*=2.0/3.0;
-            right*=2.0/3.0;
-        }
-		int              curr_i;
-		int              curr_i_left;
-		int              curr_i_right;
+		valarray<double> left   = getSideCoarseLeft(s);
+		valarray<double> right  = getSideCoarseRight(s);
+		if (!residual) {
+			center *= 2.0 / 3.0;
+			left *= 2.0 / 3.0;
+			right *= 2.0 / 3.0;
+		}
+		int curr_i;
+		int curr_i_left;
+		int curr_i_right;
 		switch (s) {
 			case Side::north:
 				curr_i       = global_i[0];
@@ -642,8 +657,10 @@ void Domain::fillDiffVector(Side s, single_vector_type &diff, bool weight)
 		}
 		for (int i = 0; i < nx; i++) {
 			diff_view(curr_i, 0) += center[i];
-			//diff_view(curr_i_left, 0) += left[i];
-			//diff_view(curr_i_right, 0) += right[i];
+			if (residual) {
+				diff_view(curr_i_left, 0) += left[i];
+				diff_view(curr_i_right, 0) += right[i];
+			}
 			curr_i++;
 			curr_i_left++;
 			curr_i_right++;
@@ -651,15 +668,15 @@ void Domain::fillDiffVector(Side s, single_vector_type &diff, bool weight)
     }else if(hasCoarseNbr(s)){
 		valarray<double> center = getSideFine(s);
 		valarray<double> side = getSide(s);
-        if(weight){
-            center*=4.0/3.0;
-            side*=4.0/2.0;
-        }
-        int curr_i_center;
-        int curr_i;
+        if(!residual){
+			center *= 4.0 / 3.0;
+			side *= 2.0;
+		}
+		int curr_i_center;
+		int curr_i;
 		switch (s) {
 			case Side::north:
-                curr_i_center = global_i[0];
+				curr_i_center = global_i[0];
 				if (global_i[1] != -1) {
 					curr_i = global_i[1];
 				} else {
