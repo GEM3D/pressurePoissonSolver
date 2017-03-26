@@ -10,23 +10,23 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank)
 		for (int domain_y = 0; domain_y < d_y; domain_y++) {
 			for (int domain_x = 0; domain_x < d_x; domain_x++) {
 				DomainSignature ds;
-				ds.id = domain_y * d_x + domain_x;
-                ds.refine_level=1;
+				ds.id           = domain_y * d_x + domain_x;
+				ds.refine_level = 1;
 				if (domain_y != d_y - 1) {
-					ds.nbr[0]  = (domain_y + 1) * d_x + domain_x;
-					ds.proc[0] = 0;
+					ds.nbr(Side::north) = (domain_y + 1) * d_x + domain_x;
+					ds.proc[0]          = 0;
 				}
 				if (domain_x != d_x - 1) {
-					ds.nbr[2]  = domain_y * d_x + domain_x + 1;
-					ds.proc[2] = 0;
+					ds.nbr(Side::east) = domain_y * d_x + domain_x + 1;
+					ds.proc[2]         = 0;
 				}
 				if (domain_y != 0) {
-					ds.nbr[4]  = (domain_y - 1) * d_x + domain_x;
-					ds.proc[4] = 0;
+					ds.nbr(Side::south) = (domain_y - 1) * d_x + domain_x;
+					ds.proc[4]          = 0;
 				}
 				if (domain_x != 0) {
-					ds.nbr[6]  = domain_y * d_x + domain_x - 1;
-					ds.proc[6] = 0;
+					ds.nbr(Side::west) = domain_y * d_x + domain_x - 1;
+					ds.proc[6]         = 0;
 				}
 				ds.x_length    = 1.0 / d_x;
 				ds.y_length    = 1.0 / d_y;
@@ -49,19 +49,19 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank,
 				ds.id = domain_y * d_x + domain_x;
                 ds.refine_level=1;
 				if (domain_y != d_y - 1) {
-					ds.nbr[0]  = (domain_y + 1) * d_x + domain_x;
-					ds.proc[0] = 0;
+					ds.nbr(Side::north) = (domain_y + 1) * d_x + domain_x;
+					ds.proc[0]          = 0;
 				}
 				if (domain_x != d_x - 1) {
-					ds.nbr[2]  = domain_y * d_x + domain_x + 1;
-					ds.proc[2] = 0;
+					ds.nbr(Side::east) = domain_y * d_x + domain_x + 1;
+					ds.proc[2]         = 0;
 				}
 				if (domain_y != 0) {
-					ds.nbr[4]  = (domain_y - 1) * d_x + domain_x;
-					ds.proc[4] = 0;
+					ds.nbr(Side::south) = (domain_y - 1) * d_x + domain_x;
+					ds.proc[4]          = 0;
 				}
 				if (domain_x != 0) {
-					ds.nbr[6]  = domain_y * d_x + domain_x - 1;
+					ds.nbr(Side::west) = domain_y * d_x + domain_x - 1;
 					ds.proc[6] = 0;
 				}
 				ds.x_length    = 1.0 / d_x;
@@ -77,21 +77,21 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank,
 				DomainSignature ds;
 				ds.id           = domain_y * d_x * 2 + domain_x + d_x * d_y;
 				ds.refine_level = 2;
-				if (domain_y != 2*d_y - 1) {
-					ds.nbr[0]  = d_x * d_y + 2 * (domain_y + 1) * d_x + domain_x;
-					ds.proc[0] = 0;
+				if (domain_y != 2 * d_y - 1) {
+					ds.nbr(Side::north) = d_x * d_y + 2 * (domain_y + 1) * d_x + domain_x;
+					ds.proc[0]          = 0;
 				}
-				if (domain_x != 2*d_x - 1) {
-					ds.nbr[2]  = d_x * d_y + 2 * domain_y * d_x + domain_x + 1;
-					ds.proc[2] = 0;
+				if (domain_x != 2 * d_x - 1) {
+					ds.nbr(Side::east) = d_x * d_y + 2 * domain_y * d_x + domain_x + 1;
+					ds.proc[2]         = 0;
 				}
 				if (domain_y != 0) {
-					ds.nbr[4]  = d_x * d_y + 2 * (domain_y - 1) * d_x + domain_x;
-					ds.proc[4] = 0;
+					ds.nbr(Side::south) = d_x * d_y + 2 * (domain_y - 1) * d_x + domain_x;
+					ds.proc[4]          = 0;
 				}
 				if (domain_x != 0) {
-					ds.nbr[6]  = d_x * d_y + 2 * domain_y * d_x + domain_x - 1;
-					ds.proc[6] = 0;
+					ds.nbr(Side::west) = d_x * d_y + 2 * domain_y * d_x + domain_x - 1;
+					ds.proc[6]         = 0;
 				}
 				ds.x_length    = 1.0 / (2 * d_x);
 				ds.y_length    = 1.0 / (2 * d_y);
@@ -102,16 +102,18 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank,
 		}
         //stitch together grids
         for(int i=0;i<d_y;i++){
-			DomainSignature &left     = domains[i * d_x + d_x - 1];
-			DomainSignature &low_nbr  = domains[d_y * d_x + 2*i * d_x * 2];
-			DomainSignature &high_nbr = domains[d_y * d_x + (2 * i + 1) * d_x * 2];
-			left.nbr[2]               = high_nbr.id;
-			left.nbr[3]               = low_nbr.id;
-			left.nbr_fine[1]          = true;
-			low_nbr.nbr[6]            = left.id;
-			low_nbr.nbr_coarse[3]     = true;
-			high_nbr.nbr[6]           = left.id;
-			high_nbr.nbr_coarse[3]    = true;
+			DomainSignature &left      = domains[i * d_x + d_x - 1];
+			DomainSignature &low_nbr   = domains[d_y * d_x + 2 * i * d_x * 2];
+			DomainSignature &high_nbr  = domains[d_y * d_x + (2 * i + 1) * d_x * 2];
+			left.nbr(Side::east)       = high_nbr.id;
+			left.nbrRight(Side::east)  = low_nbr.id;
+			left.nbr_fine[1]           = true;
+			low_nbr.nbr(Side::west)    = left.id;
+			low_nbr.nbr_coarse[3]      = true;
+			low_nbr.left_of_coarse[3]  = true;
+			high_nbr.nbr(Side::west)   = left.id;
+			high_nbr.nbr_coarse[3]     = true;
+			high_nbr.left_of_coarse[3] = false;
 		}
 	}
     indexInterfacesBFS();
@@ -131,44 +133,48 @@ void DomainSignatureCollection::indexInterfacesBFS()
 		DomainSignature &d    = domains.at(curr);
 		queue.pop_front();
 		visited.insert(curr);
-		for (int side = 0; side < 4; side++) {
-			if (d.nbr[2 * side] != -1 && visited.count(d.nbr[2 * side]) == 0) {
+		for (Side s = Side::north; s <=Side::west; s++) {
+			if (d.hasNbr(s) && visited.count(d.nbr(s)) == 0) {
 				// a new edge that we have not assigned an index to
-				DomainSignature &nbr      = domains.at(d.nbr[2 * side]);
-				int              nbr_side = (side + 2) % 4;
-
-				d.global_i[3 * side]       = curr_i;
-				nbr.global_i[3 * nbr_side] = curr_i;
-				if (enqueued.count(d.nbr[2 * side]) == 0) {
-					queue.push_back(d.nbr[2 * side]);
-					enqueued.insert(d.nbr[2 * side]);
-				}
+				d.index(s) = curr_i;
 				curr_i++;
 
-                // fine case
-                if(d.nbr_fine[side]){
-					// set left index
-					d.global_i[3 * side + 1]       = curr_i;
-					nbr.global_i[3 * nbr_side + 1] = curr_i;
+				// fine case
+				if (d.hasFineNbr(s)) {
+					DomainSignature &nbr_left  = domains.at(d.nbr(s));
+					DomainSignature &nbr_right = domains.at(d.nbrRight(s));
+
+					// set center indexes
+					nbr_left.indexCenter(!s)  = d.index(s);
+					nbr_right.indexCenter(!s) = d.index(s);
+
+					// set left and right indexes index
+					nbr_left.index(!s) = curr_i;
+					curr_i++;
+					nbr_right.index(!s) = curr_i;
 					curr_i++;
 
-					// get right domain
-					DomainSignature &nbr_right = domains.at(d.nbr[2 * side + 1]);
-					if (enqueued.count(d.nbr[2 * side + 1]) == 0) {
-						queue.push_back(d.nbr[2 * side + 1]);
-						enqueued.insert(d.nbr[2 * side + 1]);
+					// enqueue domains
+					if (enqueued.count(d.nbr(s)) == 0) {
+						queue.push_back(d.nbr(s));
+						enqueued.insert(d.nbr(s));
 					}
-					nbr_right.global_i[3 * nbr_side] = nbr.global_i[3 * nbr_side];
-
-					// set right index
-					d.global_i[3 * side + 2]             = curr_i;
-					nbr_right.global_i[3 * nbr_side + 2] = curr_i;
-					curr_i++;
-				}
-
-				// coarse case
-				if (d.nbr_coarse[side]) {
+					if (enqueued.count(d.nbrRight(s)) == 0) {
+						queue.push_back(d.nbrRight(s));
+						enqueued.insert(d.nbrRight(s));
+					}
+					// coarse case
+				} else if (d.hasCoarseNbr(s)) {
 					// TODO
+					// normal case
+				} else {
+					DomainSignature &nbr = domains.at(d.nbr(s));
+					nbr.index(!s)        = d.index(s);
+					// enqueue domain
+					if (enqueued.count(d.nbr(s)) == 0) {
+						queue.push_back(d.nbr(s));
+						enqueued.insert(d.nbr(s));
+					}
 				}
 			}
 		}
@@ -312,8 +318,8 @@ void DomainSignatureCollection::pack_objects(void *data, int num_gid_entries, in
 	for (int i = 0; i < num_ids; i++) {
 		auto &ds = dsc->domains[global_ids[i]];
 		for (int q = 0; q < 8; q++) {
-			if (ds.nbr[q] != -1) {
-				auto &nbr   = dsc->domains[ds.nbr[q]];
+			if (ds.nbr_id[q] != -1) {
+				auto &nbr   = dsc->domains[ds.nbr_id[q]];
 				nbr.proc[q] = dest[i];
 			}
 		}
@@ -342,7 +348,7 @@ int DomainSignatureCollection::numInterfaces(void *data, int num_gid_entries, in
 	auto &ds                       = dsc->domains[*global_id];
 	int   num_iface                = 0;
 	for (int q = 0; q < 8; q++) {
-		if (ds.nbr[q] != -1) num_iface++;
+		if (ds.nbr_id[q] != -1) num_iface++;
 	}
 	return num_iface;
 }
@@ -356,8 +362,8 @@ void DomainSignatureCollection::interfaceList(void *data, int num_gid_entries, i
 	auto &ds                       = dsc->domains[*global_id];
 	int   i                        = 0;
 	for (int q = 0; q < 8; q++) {
-		if (ds.nbr[q] != -1) {
-			nbor_global_id[i] = ds.nbr[q];
+		if (ds.nbr_id[q] != -1) {
+			nbor_global_id[i] = ds.nbr_id[q];
 			nbor_procs[i]     = ds.proc[q];
 			i++;
 		}

@@ -16,11 +16,13 @@ struct DomainSignature {
 
     int refine_level;
 
-	std::array<int, 8> nbr      = {-1, -1, -1, -1, -1, -1, -1, -1};
+	std::array<int, 8> nbr_id      = {-1, -1, -1, -1, -1, -1, -1, -1};
 	std::array<int, 8> proc     = {-1, -1, -1, -1, -1, -1, -1, -1};
-	std::array<int, 12> global_i = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+	std::array<int, 12> global_i = {-1, -1, -1, -1};
+	std::array<int, 12> global_i_center = {-1, -1, -1, -1};
 	std::bitset<4> nbr_coarse;
 	std::bitset<4> nbr_fine;
+	std::bitset<4> left_of_coarse;
 	int global_i_west = -1;
 	/**
 	 * @brief The lower left x coordinate of domain
@@ -43,6 +45,13 @@ struct DomainSignature {
 	{
 		return l.id < r.id;
 	}
+	inline int &index(Side s) { return global_i[static_cast<int>(s)]; }
+	inline int &indexCenter(Side s) { return global_i_center[static_cast<int>(s)]; }
+	inline int &nbr(Side s) { return nbr_id[2*static_cast<int>(s)]; }
+	inline int &nbrRight(Side s) { return nbr_id[2*static_cast<int>(s)+1]; }
+	inline bool hasNbr(Side s) { return nbr_id[static_cast<int>(s) * 2] != -1; }
+	inline bool hasFineNbr(Side s) { return nbr_fine[static_cast<int>(s)]; }
+	inline bool hasCoarseNbr(Side s) { return nbr_coarse[static_cast<int>(s)]; }
 };
 
 /**

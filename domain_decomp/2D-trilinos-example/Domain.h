@@ -31,11 +31,8 @@ class Domain
 	std::valarray<double>  boundary_east_refined_left;
 	std::valarray<double>  boundary_east_refined_right;
 	std::valarray<double>  boundary_west;
-	std::array<int, 8>  nbr           = {-1, -1, -1, -1, -1, -1, -1, -1};
-	std::array<int, 12> local_i       = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
-	std::array<int, 12> global_i      = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
-	std::array<int, 12> iface_i       = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
-	std::array<int, 12> iface_local_i = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+	std::array<int, 4> local_i        = {-1, -1, -1, -1};
+	std::array<int, 4> local_i_center = {-1, -1, -1, -1};
 	Teuchos::RCP<map_type> domain_map;
 	fftw_plan              plan1;
 	fftw_plan              plan2;
@@ -65,64 +62,41 @@ class Domain
 
 	std::valarray<double> getStencil(Side s, Tilt t = Tilt::center);
 	std::valarray<double> getSide(Side s);
-	std::valarray<double> getSideCoarseLeft(Side s);
-	std::valarray<double> getSideCoarseRight(Side s);
 	std::valarray<double> getSideFine(Side s);
 	void fillBoundary(Side s, const single_vector_type &gamma);
 	void fillDiffVector(Side s, single_vector_type &diff, bool residual = false);
 
-	inline bool hasCoarseNbr(Side s)
+	inline int &index(Side s) { return local_i[static_cast<int>(s)]; }
+	inline int &indexCenter(Side s) { return local_i_center[static_cast<int>(s)]; }
+	inline int &globalIndex(Side s) { return ds.index(s); }
+	inline int &globalIndexCenter(Side s) { return ds.indexCenter(s); }
+	inline int &nbr(Side s) { return ds.nbr(s); }
+	inline int &nbrRight(Side     s) { return ds.nbrRight(s); }
+	inline std::valarray<double> *getBoundaryPtr(Side s)
 	{
-		bool retval;
+		std::valarray<double> *retval = nullptr;
 		switch (s) {
 			case Side::north:
-				retval = ds.nbr_coarse[0];
+				retval = &boundary_north;
 				break;
 			case Side::east:
-				retval = ds.nbr_coarse[1];
+				retval = &boundary_east;
 				break;
 			case Side::south:
-				retval = ds.nbr_coarse[2];
+				retval = &boundary_south;
 				break;
 			case Side::west:
-				retval = ds.nbr_coarse[3];
+				retval = &boundary_west;
 		}
 		return retval;
 	}
-	inline bool hasNbr(Side s)
+	inline bool hasNbr(Side s) { return ds.hasNbr(s); }
+	inline bool hasFineNbr(Side s) { return ds.hasFineNbr(s); }
+	inline bool hasCoarseNbr(Side s) { return ds.hasCoarseNbr(s); }
+	inline bool isCoarseLeft(Side s) { return ds.left_of_coarse[static_cast<int>(s)]; }
+	inline bool leftToRight(Side s)
 	{
-		bool retval;
-		switch (s) {
-			case Side::north:
-				retval = nbr[0] != -1;
-				break;
-			case Side::east:
-				retval = nbr[2] != -1;
-				break;
-			case Side::south:
-				retval = nbr[4] != -1;
-				break;
-			case Side::west:
-				retval = nbr[6] != -1;
-		}
-		return retval;
-	}
-	inline bool hasFineNbr(Side s)
-	{
-		bool retval;
-		switch (s) {
-			case Side::north:
-				retval = nbr[1] != -1;
-				break;
-			case Side::east:
-				retval = nbr[3] != -1;
-				break;
-			case Side::south:
-				retval = nbr[5] != -1;
-				break;
-			case Side::west:
-				retval = nbr[7] != -1;
-		}
+		bool retval = (s == Side::north || s == Side::west);
 		return retval;
 	}
 };
