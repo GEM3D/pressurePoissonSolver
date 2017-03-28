@@ -16,10 +16,9 @@ int main(int argc, char *argv[]) {
 	int i ,j;
 	int myid, num_procs;
 	int n;
-	//int vis;
 	int ilower[2], iupper[2];
 	int nparts = 2;
-	int part0 = 0;
+	int part0  = 0;
 	int part1 = 1;
 	int nvars = 1;
 	int var  = 0;
@@ -55,8 +54,7 @@ printf("variables setup\n");
 
 
 	//Set defaults
-	n = 100;
-	//vis = 1;
+	n = 512;
 	h = 1.0/(n);
 	h2inv = 1.0/(h*h);
 
@@ -86,6 +84,28 @@ printf("grid extents set\n");
 	HYPRE_SStructGridSetVariables(grid, part0, nvars, vartypes);
 	HYPRE_SStructGridSetVariables(grid, part1, nvars, vartypes);
 
+
+/*
+//temporary set neighbor part for testing
+//part 0 to 1
+{
+	int part = 0;
+	int nbor_part = 1;
+	int b_ilower[2] = {n,1}, b_iupper[2] = {n,n};
+	int nbor_ilower[2] = {1,1}, nbor_iupper[2] = {1,n};
+	int index_map[2] = {0,1};
+	int index_dir[2] = {1,1};
+	
+	HYPRE_SStructGridSetNeighborPart(grid, part, b_ilower, b_iupper, nbor_part, b_ilower, b_iupper, index_map, index_dir);
+	HYPRE_SStructGridSetNeighborPart(grid, nbor_part, nbor_ilower, nbor_iupper, part, nbor_ilower, nbor_iupper, index_map, index_dir);
+}
+
+*/
+
+
+
+
+
 	
 	HYPRE_SStructGridAssemble(grid);
 
@@ -107,7 +127,6 @@ printf("grid set\n");
 	
 	HYPRE_SStructGraphSetStencil(graph, part1, var, stencil);
 
-	//HYPRE_SStructGraphSetStencil(graph, part1, var, stencil);
 	HYPRE_SStructGraphSetStencil(graph, part0, var, stencil);
 
 printf("halo begin\n");
@@ -119,19 +138,19 @@ HYPRE_SStructGraphAssemble(graph);
 
         int *halo1;
 	int *halo2;
-        halo1 = calloc(n, sizeof(int));
-	halo2 = calloc(n, sizeof(int));
+        halo1 = calloc(2, sizeof(int));
+	halo2 = calloc(2, sizeof(int));
 
-        for(j = 0; j < n; j+=1) {
-                halo1[j] = j*n+n-2;
-		halo2[j] = j*n+1;
-        }
-printf("forloop\n");
+        for(j = 1; j <= n; j++) {
+                halo1[0] = n- 1 ;
+		halo1[1] = j;
+		halo2[0] = 2;
+		halo2[1] = j;
+//printf("%d, %d\n", halo1[1], halo2[1]);
 
-
-        //HYPRE_SStructGraphAddEntries(graph, 1, halo2, var, 0, halo1, var);
-        //HYPRE_SStructGraphAddEntries(graph, 0, halo1, var, 1, halo2, var);
-	
+        	HYPRE_SStructGraphAddEntries(graph, 1, halo2, var, 0, halo1, var);
+        	HYPRE_SStructGraphAddEntries(graph, 0, halo1, var, 1, halo2, var);
+}	
 	HYPRE_SStructGraphAssemble(graph);
 
 printf("graph set\n");
@@ -142,27 +161,15 @@ printf("graph set\n");
 	HYPRE_SStructMatrixSetObjectType(A, HYPRE_PARCSR);
 	HYPRE_SStructMatrixInitialize(A);
 	
-
-	printf("num stencil entries = %d\n", num_stencil_entries);
-
-	printf("i = %d\n", i);
 	values = calloc(nvalues, sizeof(double));
-	for (j = 0; j < num_stencil_entries; j++);{
-		printf("= %d\n",j);
-		stencil_indices[j] = j;
-		printf("%d\n",stencil_indices[j]);
-		printf("%d\n", j);
-	}
-	
 
-	stencil_indices[0] = 0;
-	stencil_indices[1] = 1;
-	stencil_indices[2] = 2;
-	stencil_indices[3] = 3;
-	stencil_indices[4] = 4;
+	for (i = 0; i < num_stencil_entries; i++){
+		stencil_indices[i] = i;
+	}
+
 
 printf("stencil indices set\n");
-/*
+
 	values = calloc(nvalues, sizeof(double));
 	for (i = 0; i < nvalues; i += num_stencil_entries) {
 		values[i] = -4.0 * h2inv;
@@ -173,9 +180,8 @@ printf("stencil indices set\n");
 	}
 
 printf("matrix values pre-set\n");
-printf("%d\n", nvalues);
-printf("[%d,%d] [%d, %d]\n", ilower[0], ilower[1], iupper[0], iupper[1]);
-printf("part: %d, var: %d, numstencilentries: %d\n", part0, var, num_stencil_entries);
+
+
 	HYPRE_SStructMatrixSetBoxValues(A, part0, ilower, iupper, var, num_stencil_entries, stencil_indices, values);
 
 printf("matrix values set part0\n");
@@ -228,15 +234,16 @@ printf("bottom part 0\n");
 
 printf("set\n");
 	//This is preventing the code from running and is causing the segmentation fault
-	HYPRE_SStructMatrixAddToBoxValues(A, part1, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesy);
+	HYPRE_SStructMatrixAddToBoxValues(A, part0, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesy);
 	center_valuesy[1] = h2inv;
 
 printf("bottom part 1\n");
 
 	HYPRE_SStructMatrixSetBoxValues(A, part1, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesy); 
-	HYPRE_SStructMatrixAddToBoxValues(A, part0, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesy);
+	//HYPRE_SStructMatrixAddToBoxValues(A, part0, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesy);
 	HYPRE_SStructMatrixAddToBoxValues(A, part1, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesy);	
-printf("bottom row set\n");
+center_valuesy[1] = h2inv;
+//printf("bottom row set\n");
 
 	//Top row of gridpoints
 	bc_ilower[0] = 1;
@@ -252,7 +259,7 @@ printf("bottom row set\n");
 	HYPRE_SStructMatrixSetBoxValues(A, part1, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesx);
 	HYPRE_SStructMatrixAddToBoxValues(A, part1, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesx);
 
-printf("top row set\n");
+//printf("top row set\n");
 
 	//Left Column of gridpoints (Note only gets set for part0 as this portion of part1 is not on the boundary)
 	bc_ilower[0] = 1;
@@ -265,6 +272,10 @@ printf("top row set\n");
 	
 	HYPRE_SStructMatrixSetBoxValues(A, part0, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesx);
 	HYPRE_SStructMatrixAddToBoxValues(A, part0, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesx);
+
+//REMOVE THIS
+//	HYPRE_SStructMatrixSetBoxValues(A, part1, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesx);
+//	HYPRE_SStructMatrixAddToBoxValues(A, part1, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesx);
 	
 printf("left column set\n");
 
@@ -277,10 +288,15 @@ printf("left column set\n");
 
 	stencil_index[0] = 2;
 
-printf("right column set\n");	
-
 	HYPRE_SStructMatrixSetBoxValues(A, part1, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesx);	
 	HYPRE_SStructMatrixAddToBoxValues(A, part1,bc_ilower, bc_iupper, var, nentries, center_index, center_valuesx);
+
+//REMOVE THIS
+//	HYPRE_SStructMatrixSetBoxValues(A, part0, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesx);
+//	HYPRE_SStructMatrixAddToBoxValues(A, part0, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesx);
+
+printf("right column set\n");
+
 	free(valuesx);
 	free(center_valuesx);
 	free(valuesy);
@@ -306,7 +322,7 @@ printf("boundary conditions set\n");
 
 	rhs_values = calloc(nvalues, sizeof(double));
 	x_values = calloc(nvalues, sizeof(double));
-	exactsolution = calloc(nvalues, sizeof(double));
+	exactsolution = calloc(nvalues* nparts, sizeof(double));
 
 	for (j = 0; j < n; j++) {
 		Y = (j + .5) * h;
@@ -316,8 +332,11 @@ printf("boundary conditions set\n");
 			exactsolution[i + j * n] = 1.0 * cos(2. * M_PI * X) * cos(2. * M_PI * Y);
 			x_values[i+ j * n] = 0.0;
 		}
-	}
+	
+//printf("i+j*n: %d\n", i+j*n);
 
+	}
+//printf("%f\n", rhs_values[0]);
 	HYPRE_SStructVectorSetBoxValues(b, part0, ilower, iupper, var, rhs_values);
 	HYPRE_SStructVectorSetBoxValues(x, part0, ilower, iupper, var, x_values);
 	HYPRE_SStructVectorSetBoxValues(x, part1, ilower, iupper, var, x_values);
@@ -327,11 +346,13 @@ printf("boundary conditions set\n");
                for(i = 0; i < n; i++) {
                        X = (n*part1 * i + .5) * h;
                        rhs_values[i + j * n] = -8. * PI2 * cos(2. * M_PI * X)*cos(2 * M_PI * Y);
-                       exactsolution[i + j * n] = 1.0 * cos(2. * M_PI * X) * cos(2. * M_PI * Y);
+                       exactsolution[i + j * n + n*n] = 1.0 * cos(2. * M_PI * X) * cos(2. * M_PI * Y);
                        x_values[i+ j * n] = 0.0;
+//printf("i+j*n: %d\n", i+j*n +n*n);
                 }
         }
 
+//printf("%f\n", rhs_values[0]);	
 	HYPRE_SStructVectorSetBoxValues(b, part1, ilower, iupper, var, rhs_values);
 
 printf("rhs and x vectors set\n");
@@ -345,12 +366,12 @@ printf("rhs and x vectors set\n");
 	HYPRE_SStructVectorGetObject(x, (void **)&par_x);
 
 	HYPRE_SStructMatrixPrint("ss_halo_data/ss.initial.A", A, 0);
-	HYPRE_SStructVectorPrint("ss_halo_data/ss.initial.A", b, 0);
+	HYPRE_SStructVectorPrint("ss_halo_data/ss.initial.b", b, 0);
 
 
 	HYPRE_ParCSRPCGCreate(MPI_COMM_WORLD, &solver);
 	HYPRE_ParCSRPCGSetTol(solver, 1.0e-10);
-	HYPRE_ParCSRPCGSetMaxIter(solver, 500);
+	HYPRE_ParCSRPCGSetMaxIter(solver, 1000);
 	HYPRE_ParCSRPCGSetTwoNorm(solver, 1);
 	HYPRE_ParCSRPCGSetLogging(solver, 3);
 	
@@ -415,9 +436,12 @@ printf("rhs and x vectors set\n");
 	}
 
 	mean /= nvalues;
-	printf("The mean is: %f\n", mean);
+//printf("mean = %f\n", mean);
 	for (i = 1; i < totalvalues + 1; i++) {
 		diff = values[i] -mean - exactsolution[i-1];
+		if (isnan(diff)){
+			printf("i: %d, value: %f, mean: %f, exactsolution: %f\n",i, values[i], mean, exactsolution[i-1]);		
+		}
 		diff2 = diff * diff;
 		if (diff2 > 10){
 			//printf("%+6f       %+6f     %+6f\n", values[i], exactsolution[i-1],diff);
@@ -426,7 +450,8 @@ printf("rhs and x vectors set\n");
 	}	
 
 	double L2 = sum/totalvalues;
-
+//printf("totalvalues = %f\n", totalvalues);
+//printf("sum = %f\n", sum);
 	printf("The L2 norm is %e\n", L2);
 	
 	fflush(solution);
@@ -440,7 +465,7 @@ printf("rhs and x vectors set\n");
 	HYPRE_SStructMatrixDestroy(A);
 	HYPRE_SStructVectorDestroy(b);
 	HYPRE_SStructVectorDestroy(x);
-*/
+
 	MPI_Finalize();
 
 	return(0);
