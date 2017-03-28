@@ -2,21 +2,24 @@
 % Script for testing fd2poisson over the square [a,b]x[a,b]
 a = 0; 
 b = 1;
-k = 6;
+k = 11;
 m = 2^k;  % Number of interior grid points in one direction
 
 f = @(x,y) -5*pi^2*sin(pi*x).*cos(2*pi*y);  % Laplacian(u) = f
 g = @(x,y) sin(pi*x).*cos(2*pi*y);          % u = g on Boundary
 uexact = @(x,y) g(x,y);                     % Exact solution is g.
 
-% Compute and time the solution
-tic
-[usp,x,y] = fd2poissonsp(f,g,a,b,m,m/2);
-gesp = toc;
+% % Compute and time the solution
+% tic
+% [usp,x,y] = fd2poissonsp(f,g,a,b,m,m/2);
+% gesp = toc;
 
 tic
-[ufft,x,y] = fd2poissonfft(f,g,[],[],a,b,m,m/2,1);
-gefft = toc;
+[ufft,x,y] = fd2poissonfft(f,g,[],[],a,b,m,m,1);
+gefft = toc
+
+
+%%
 
 fprintf('Direct Gaussian elimination takes %d s\n',gesp);
 fprintf('FFT solver takes %d s\n',gefft);
@@ -34,7 +37,7 @@ title(strcat('Error, m=',num2str(m)));
 %% Test of all 10 types of (mixed) boundary conditions
 a = 0; 
 b = 1;
-k = 8;
+k = 10;
 m = 2^k;  % Number of interior grid points in one direction
 
 f = @(x,y) -5*pi^2*sin(pi*(x+1/sqrt(99))).*cos(2*pi*(y-1/sqrt(101)));      % Laplacian(u) = f

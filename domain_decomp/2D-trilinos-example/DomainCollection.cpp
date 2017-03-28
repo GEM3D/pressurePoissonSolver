@@ -62,8 +62,9 @@ DomainCollection::DomainCollection(DomainSignatureCollection dsc, int n, double 
 void DomainCollection::initNeumann(function<double(double, double)> ffun,
                                    function<double(double, double)> efun,
                                    function<double(double, double)> nfunx,
-                                   function<double(double, double)> nfuny)
+                                   function<double(double, double)> nfuny, bool amr)
 {
+    this->amr = amr;
 	for (auto &p : domains) {
 		Domain &d        = *p.second;
 
@@ -73,24 +74,28 @@ void DomainCollection::initNeumann(function<double(double, double)> ffun,
 
 		for (int yi = 0; yi < n; yi++) {
 			for (int xi = 0; xi < n; xi++) {
-				double x           = d.x_start + h_x / 2.0 + d.x_length * xi / n;
-				double y           = d.y_start + h_y / 2.0 + d.y_length * yi / n;
+				double x           = d.x_start + d.h_x / 2.0 + d.x_length * xi / n;
+				double y           = d.y_start + d.h_y / 2.0 + d.y_length * yi / n;
 				f[yi * n + xi]     = ffun(x, y);
 				exact[yi * n + xi] = efun(x, y);
 				// west
-				if (d.nbr[6] == -1) {
+				if (!d.hasNbr(Side::west)) {
 					d.boundary_west[yi] = nfunx(0.0, y);
 				}
 				// east
-				if (d.nbr[2] == -1) {
-					d.boundary_east[yi] = nfunx(1.0, y);
+				if (!d.hasNbr(Side::east)) {
+					double x = 1.0;
+					if (amr) {
+						x = 2.0;
+					}
+					d.boundary_east[yi] = nfunx(x, y);
 				}
 				// south
-				if (d.nbr[4] == -1) {
+				if (!d.hasNbr(Side::south)) {
 					d.boundary_south[xi] = nfuny(x, 0.0);
 				}
 				// north
-				if (d.nbr[0] == -1) {
+				if (!d.hasNbr(Side::north)) {
 					d.boundary_north[xi] = nfuny(x, 1.0);
 				}
 			}
@@ -100,7 +105,9 @@ void DomainCollection::initNeumann(function<double(double, double)> ffun,
 
 	// create map for domains
 	generateMaps();
-	distributeIfaceInfo();
+	if (!amr) {
+		distributeIfaceInfo();
+	}
 }
 
 void DomainCollection::initDirichlet(function<double(double, double)> ffun,
@@ -198,42 +205,84 @@ void DomainCollection::generateMaps()
 		queue.push_back(first);
 		enqueued.insert(first);
 		while (!queue.empty()) {
-			int     curr = queue.front();
-			Domain &d    = *domains[curr];
+			int              curr = queue.front();
+			Domain &d    = *domains.at(curr);
 			queue.pop_front();
 			visited.insert(curr);
             not_visited.erase(curr);
-			for (int q = 0; q < 8; q++) {
-				if (d.nbr[q] != -1 && visited.count(d.nbr[q]) == 0) {
+			for (Side s = Side::north; s <= Side::west; s++) {
+				if (d.hasNbr(s) && visited.count(d.nbr(s)) == 0) {
 					// a new edge that we have not assigned an index to
-					try {
-						Domain &nbr   = *domains.at(d.nbr[q]);
-						int     nbr_q = -1;
-						do {
-							nbr_q++;
-						} while (nbr.nbr[nbr_q] != curr);
-						nbr.local_i[nbr_q]       = curr_i;
-						nbr.iface_local_i[nbr_q] = curr_c_i;
-						if (enqueued.count(d.nbr[q]) == 0) {
-							queue.push_back(d.nbr[q]);
-							enqueued.insert(d.nbr[q]);
-						}
-					} catch (const out_of_range &oor) {
-						// do nothing
-					}
-					d.local_i[q]       = curr_i;
-					d.iface_local_i[q] = curr_c_i;
+					d.index(s) = curr_i;
 					for (int i = 0; i < 22; i++) {
-						c_iface_global.push_back(d.iface_i[q] + i);
-						iface_global.push_back(d.iface_i[q] + i);
+						c_iface_global.push_back(curr_i*22 + i);
+						iface_global.push_back(curr_i*22 + i);
 						curr_c_i++;
 					}
 					for (int i = 0; i < n; i++) {
-						global.push_back(d.global_i[q] + i);
-						matrix_global.push_back(d.global_i[q] + i);
+						global.push_back(curr_i*n + i);
+						matrix_global.push_back(curr_i*n + i);
 						curr_matrix_i++;
 					}
-					curr_i += n;
+					curr_i++;
+
+					// fine case
+					if (d.hasFineNbr(s)) {
+						Domain &nbr_left  = *domains.at(d.nbr(s));
+						Domain &nbr_right = *domains.at(d.nbrRight(s));
+
+						// set center indexes
+						nbr_left.indexCenter(!s)  = d.index(s);
+						nbr_right.indexCenter(!s) = d.index(s);
+
+						// set left and right indexes index
+						nbr_left.index(!s) = curr_i;
+						for (int i = 0; i < 22; i++) {
+							c_iface_global.push_back(curr_i * 22 + i);
+							iface_global.push_back(curr_i * 22 + i);
+							curr_c_i++;
+						}
+						for (int i = 0; i < n; i++) {
+							global.push_back(curr_i * n + i);
+							matrix_global.push_back(curr_i * n + i);
+							curr_matrix_i++;
+						}
+						curr_i++;
+						nbr_right.index(!s) = curr_i;
+						for (int i = 0; i < 22; i++) {
+							c_iface_global.push_back(curr_i * 22 + i);
+							iface_global.push_back(curr_i * 22 + i);
+							curr_c_i++;
+						}
+						for (int i = 0; i < n; i++) {
+							global.push_back(curr_i * n + i);
+							matrix_global.push_back(curr_i * n + i);
+							curr_matrix_i++;
+						}
+						curr_i++;
+
+						// enqueue domains
+						if (enqueued.count(d.nbr(s)) == 0) {
+							queue.push_back(d.nbr(s));
+							enqueued.insert(d.nbr(s));
+						}
+						if (enqueued.count(d.nbrRight(s)) == 0) {
+							queue.push_back(d.nbrRight(s));
+							enqueued.insert(d.nbrRight(s));
+						}
+						// coarse case
+					} else if (d.hasCoarseNbr(s)) {
+						// TODO
+						// normal case
+					} else {
+						Domain &nbr = *domains.at(d.nbr(s));
+						nbr.index(!s)        = d.index(s);
+						// enqueue domain
+						if (enqueued.count(d.nbr(s)) == 0) {
+							queue.push_back(d.nbr(s));
+							enqueued.insert(d.nbr(s));
+						}
+					}
 				}
 			}
 		}
@@ -258,6 +307,7 @@ void DomainCollection::generateMaps()
 }
 void DomainCollection::distributeIfaceInfo(){
     //
+    /*
 	int_vector_type dist(collection_iface_map, 1);
 	iface_info = rcp(new int_vector_type(iface_map, 1));
 	auto             dist_view = dist.getLocalView<Kokkos::HostSpace>();
@@ -383,6 +433,7 @@ void DomainCollection::distributeIfaceInfo(){
 	}
 	Tpetra::Export<> exporter(collection_iface_map, iface_map);
 	iface_info->doExport(dist, exporter, Tpetra::CombineMode::ADD);
+    */
 }
 void DomainCollection::solveWithInterface(const vector_type &gamma, vector_type &diff)
 {
@@ -493,373 +544,6 @@ double DomainCollection::residual()
 	Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &residual, &retval);
 	return sqrt(retval);
 }
-RCP<matrix_type> DomainCollection::formMatrix(RCP<map_type> map, int delete_row)
-{
-	int              size = max(n, n);
-	RCP<matrix_type> A    = rcp(new matrix_type(map, size * 6));
-    // create iface objects
-	/*set<Iface> ifaces;
-	auto       iface_view = iface_info->getLocalView<Kokkos::HostSpace>();
-	for (size_t i = 0; i < iface_view.dimension(0); i += 22) {
-		Iface right;
-		Iface left;
-
-		right.right   = true;
-		right.axis    = iface_view(i + 21, 0);
-		right.i_south = iface_view(i, 0);
-		right.t_south = iface_view(i + 1, 0);
-		right.l_south = iface_view(i + 2, 0);
-		right.i_west  = iface_view(i + 3, 0);
-		right.t_west  = iface_view(i + 4, 0);
-		right.l_west  = iface_view(i + 5, 0);
-		right.i_north = iface_view(i + 6, 0);
-		right.t_north = iface_view(i + 7, 0);
-		right.l_north = iface_view(i + 8, 0);
-		right.i_east  = iface_view(i + 9, 0);
-		right.t_east  = iface_view(i + 10, 0);
-		right.l_east  = iface_view(i + 11, 0);
-
-		left.right   = false;
-		left.axis    = iface_view(i + 21, 0);
-		left.i_south = iface_view(i, 0);
-		left.t_south = iface_view(i + 1, 0);
-		left.l_south = iface_view(i + 2, 0);
-		left.i_west  = iface_view(i + 12, 0);
-		left.t_west  = iface_view(i + 13, 0);
-		left.l_west  = iface_view(i + 14, 0);
-		left.i_north = iface_view(i + 15, 0);
-		left.t_north = iface_view(i + 16, 0);
-		left.l_north = iface_view(i + 17, 0);
-		left.i_east  = iface_view(i + 18, 0);
-		left.t_east  = iface_view(i + 19, 0);
-		left.l_east  = iface_view(i + 20, 0);
-        
-        ifaces.insert(left);
-        ifaces.insert(right);
-	}
-    
-    int num_types=0;
-	while(!ifaces.empty()){
-        num_types++;
-		// the first in the set is the type of interface that we are going to solve for
-		set<Iface> todo;
-		Iface      curr_type = *ifaces.begin();
-		ifaces.erase(ifaces.begin());
-		todo.insert(curr_type);
-        set<Iface> to_be_deleted;
-		for (auto iter = ifaces.begin(); iter != ifaces.end(); iter++) {
-			if (*iter == curr_type) {
-				todo.insert(*iter);
-				to_be_deleted.insert(*iter);
-
-				// TODO fix this iterator
-				// iter=ifaces.begin();
-			}
-		}
-		for (Iface i : to_be_deleted) {
-			ifaces.erase(i);
-		}
-
-		// create domain representing curr_type
-		DomainSignature ds;
-		if (curr_type.t_north == NEUMANN) {
-			ds.nbr[0] = -1;
-		} else {
-			ds.nbr[0] = 1;
-		}
-		if (curr_type.t_east == NEUMANN) {
-			ds.nbr[2] = -1;
-		} else {
-			ds.nbr[2] = 1;
-		}
-		if (curr_type.t_south == NEUMANN) {
-			ds.nbr[4] = -1;
-		} else {
-			ds.nbr[4] = 1;
-		}
-		if (curr_type.t_west == NEUMANN) {
-			ds.nbr[6] = -1;
-		} else {
-			ds.nbr[6] = 1;
-		}
-		Domain d(ds, n, n, h_x, h_y);
-
-		d.boundary_north = valarray<double>(n);
-		d.boundary_south = valarray<double>(n);
-		d.boundary_east  = valarray<double>(n);
-		d.boundary_west  = valarray<double>(n);
-		d.planNeumann();
-
-		// solve over south interface, and save results
-		valarray<double> north_block(n * n);
-		valarray<double> east_block(n * n);
-		valarray<double> south_block(n * n);
-		valarray<double> west_block(n * n);
-		for (int i = 0; i < n; i++) {
-			d.boundary_south[i] = 1;
-			d.solve();
-			// fill the blocks
-
-			north_block[slice(i * n, n, 1)] = d.u[slice(n * (n - 1), n, 1)];
-			east_block[slice(i * n, n, 1)]  = d.u[slice((n - 1), n, n)];
-			south_block[slice(i * n, n, 1)] = d.u[slice(0, n, 1)];
-			west_block[slice(i * n, n, 1)]  = d.u[slice(0, n, n)];
-			south_block[i * n + i] -= 1;
-			d.boundary_south[i] = 0;
-		}
-
-		//now insert these results into the matrix for each interface
-        for(Iface iface: todo){
-			bool reverse_x = false;
-			if ((iface.axis == X_AXIS && !iface.right) || (iface.axis == Y_AXIS && iface.right)) {
-				reverse_x = true;
-			}
-
-			for (int x = 0; x < iface.l_south; x++) {
-				int j       = iface.i_south + x;
-				int block_i = x;
-				if (reverse_x) {
-					block_i = iface.l_south - 1 - x;
-				}
-
-				vector<double> row;
-				vector<int>    global;
-				row.reserve(n * 2 + n * 2);
-				global.reserve(n * 3 + n * 4);
-				for (int y = 0; y < iface.l_south; y++) {
-					int block_j = y;
-					if (reverse_x) {
-						block_j = iface.l_south - 1 - y;
-					}
-					row.push_back(-south_block[block_i * n + block_j]);
-					global.push_back(iface.i_south + y);
-				}
-				if (iface.i_west != -1) {
-					for (int y = 0; y < iface.l_south; y++) {
-						int block_j = y;
-						row.push_back(-west_block[block_i * n + block_j]);
-						if (iface.right) {
-							global.push_back(iface.i_west + y);
-						} else {
-							global.push_back(iface.i_west + iface.l_south - 1 - y);
-						}
-					}
-				}
-				if (iface.i_north != -1) {
-					for (int y = 0; y < iface.l_south; y++) {
-						int block_j = y;
-						if (reverse_x) {
-							block_j = iface.l_south - 1 - y;
-						}
-						row.push_back(-north_block[block_i * n + block_j]);
-						global.push_back(iface.i_north + y);
-					}
-				}
-				if (iface.i_east != -1) {
-					for (int y = 0; y < iface.l_south; y++) {
-						int block_j = y;
-						row.push_back(-east_block[block_i * n + block_j]);
-						if (iface.right) {
-							global.push_back(iface.i_east + y);
-						} else {
-							global.push_back(iface.i_east + iface.l_south - 1 - y);
-						}
-					}
-				}
-				// insert row for domain
-				if (j == delete_row) {
-					double one=1;
-					A->insertGlobalValues(j, 1, &one, &j);
-				} else {
-					A->insertGlobalValues(j, row.size(), &row[0], &global[0]);
-				}
-			}
-		}
-	}
-
-	// cerr << "Num types: " << num_types << "\n";
-	// transpose matrix and return
-	A->fillComplete();
-    */
-	return A;
-}
-RCP<matrix_type> DomainCollection::formInvDiag(RCP<map_type> map, int del_row)
-{
-	int              size = max(n, n);
-	RCP<matrix_type> A    = rcp(new matrix_type(map, size * 6));
-    /*
-    // create iface objects
-	set<pair<Iface,Iface>> ifaces;
-	auto       iface_view = iface_info->getLocalView<Kokkos::HostSpace>();
-	for (size_t i = 0; i < iface_view.dimension(0); i += 22) {
-		Iface right;
-		Iface left;
-
-		right.right       = true;
-		right.axis        = iface_view(i + 21, 0);
-		right.global_i[0] = iface_view(i, 0);
-		right.types[0]    = iface_view(i, 1);
-
-		for (int q = 1; q < 4; q++) {
-			right.global_i[q * 2] = iface_view(i + q * 3, 0);
-			right.types[q]        = iface_view(i + q * 3 + 1, 0);
-		}
-
-		left.right   = false;
-		left.axis    = iface_view(i + 21, 0);
-		left.global_i[0] = iface_view(i, 0);
-		left.types[0]    = iface_view(i, 1);
-		for (int q = 1; q < 4; q++) {
-			left.global_i[q * 2] = iface_view(i + 9 + q * 3, 0);
-			left.types[q]        = iface_view(i + 9 + q * 3 + 1, 0);
-		}
-
-		pair<Iface,Iface> p;
-        p.first = left;
-        p.second = right;
-		ifaces.insert(p);
-	}
-
-	while (!ifaces.empty()) {
-		// the first in the set is the type of interface that we are going to solve for
-		set<Iface> todo;
-		pair<Iface, Iface> curr_pair = *ifaces.begin();
-
-		ifaces.erase(ifaces.begin());
-		Iface curr_type_left  = curr_pair.first;
-		Iface curr_type_right = curr_pair.second;
-		// todo.insert(curr_type_left);
-		todo.insert(curr_type_right);
-		bool contains_del_row = (del_row != -1 && curr_type_right.i_south <= del_row
-		                         && del_row < curr_type_right.i_south + curr_type_right.l_south);
-		if (!contains_del_row) {
-			set<pair<Iface, Iface>> to_be_deleted;
-			for (auto iter = ifaces.begin(); iter != ifaces.end(); iter++) {
-				if (*iter == curr_pair) {
-					todo.insert(iter->second);
-					to_be_deleted.insert(*iter);
-				}
-			}
-			for (auto i : to_be_deleted) {
-				ifaces.erase(i);
-			}
-		}
-
-		// create domain representing curr_type_left
-		DomainSignature ds;
-		if (curr_type_left.t_north == NEUMANN) {
-			ds.nbr[0] = -1;
-		} else {
-			ds.nbr[0] = 1;
-		}
-		if (curr_type_left.t_east == NEUMANN) {
-			ds.nbr[2] = -1;
-		} else {
-			ds.nbr[2] = 1;
-		}
-		if (curr_type_left.t_south == NEUMANN) {
-			ds.nbr[4] = -1;
-		} else {
-			ds.nbr[4] = 1;
-		}
-		if (curr_type_left.t_west == NEUMANN) {
-			ds.nbr[6] = -1;
-		} else {
-			ds.nbr[6] = 1;
-		}
-		Domain d_left(ds, n, n, h_x, h_y);
-		d_left.boundary_north = valarray<double>(n);
-		d_left.boundary_south = valarray<double>(n);
-		d_left.boundary_east  = valarray<double>(n);
-		d_left.boundary_west  = valarray<double>(n);
-		d_left.planNeumann();
-
-		if (curr_type_right.t_north == NEUMANN) {
-			ds.nbr[0] = -1;
-		} else {
-			ds.nbr[0] = 1;
-		}
-		if (curr_type_right.t_east == NEUMANN) {
-			ds.nbr[2] = -1;
-		} else {
-			ds.nbr[2] = 1;
-		}
-		if (curr_type_right.t_south == NEUMANN) {
-			ds.nbr[4] = -1;
-		} else {
-			ds.nbr[4] = 1;
-		}
-		if (curr_type_right.t_west == NEUMANN) {
-			ds.nbr[6] = -1;
-		} else {
-			ds.nbr[6] = 1;
-		}
-		Domain d_right(ds, n, n, h_x, h_y);
-		d_right.boundary_north = valarray<double>(n);
-		d_right.boundary_south = valarray<double>(n);
-		d_right.boundary_east  = valarray<double>(n);
-		d_right.boundary_west  = valarray<double>(n);
-		d_right.planNeumann();
-
-		// solve over south interface, and save results
-		valarray<double> south_block(n * n);
-		for (int i = 0; i < n; i++) {
-			d_right.boundary_south[i] = 1;
-            d_left.boundary_south[n-1-i] =1;
-			d_right.solve();
-			d_left.solve();
-
-			// fill the blocks
-			south_block[slice(i * n, n, 1)] = d_right.u[slice(0, n, 1)];
-			for (int j = 0; j < n; j++) {
-				south_block[i * n + j] += d_left.u[n - 1 - j];
-			}
-			south_block[i * n + i] -= 2;
-
-			d_right.boundary_south[i] = 0;
-            d_left.boundary_south[n-1-i] =0;
-		}
-
-		//south_block *= 2;
-		int internal_i = del_row % n;
-		if(contains_del_row){
-            for(int x = 0;x<n;x++){
-				south_block[internal_i * n + x] =0;
-			}
-			south_block[internal_i * n + internal_i] = -1;
-		}
-
-        //compute inverse of block
-        valarray<int> ipiv(n+1);
-        int lwork = n*n;
-        valarray<double> work(lwork);
-        int info;
-		dgetrf_(&n, &n, &south_block[0], &n, &ipiv[0], &info);
-		dgetri_(&n, &south_block[0], &n, &ipiv[0], &work[0], &lwork, &info);
-
-		// now insert these results into the matrix for each interface
-		for(Iface iface: todo){
-			for (int x = 0; x < iface.l_south; x++) {
-				int j = iface.i_south + x;
-				vector<double> row;
-				vector<int>    global;
-				row.reserve(n * 2 + n * 2);
-				global.reserve(n * 3 + n * 4);
-				for (int y = 0; y < iface.l_south; y++) {
-					row.push_back(-south_block[x * n + y]);
-					global.push_back(iface.i_south + y);
-				}
-				// insert row for domain
-				A->insertGlobalValues(j, row.size(), &row[0], &global[0]);
-			}
-		}
-	}
-
-	// transpose matrix and return
-	A->fillComplete();
-    */
-	return A;
-}
 RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 {
 	// create iface objects
@@ -920,9 +604,9 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 		DomainSignature ds;
         for(int q=0;q<4;q++){
 			if (curr_type.types[q] == NEUMANN) {
-				ds.nbr[(q * 2 + 4) % 8] = -1;
+				ds.nbr_id[(q * 2 + 4) % 8] = -1;
 			} else {
-				ds.nbr[(q * 2 + 4) % 8] = 1;
+				ds.nbr_id[(q * 2 + 4) % 8] = 1;
 			}
 		}
 		Domain d(ds, n, n, h_x, h_y);
