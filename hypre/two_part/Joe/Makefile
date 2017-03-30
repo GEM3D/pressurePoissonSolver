@@ -9,8 +9,8 @@ F90       = mpif90
 #LAPACK_DIR = ${GEM3D_HYPRE}/src/lapack
 #HYPRE_DIR = ${GEM3D_HYPRE}/src/hypre
 
-HYPRE_DIR = /cm/shared/apps/hypre/gcc/64/2.11.2/
-LAPACK_DIR = /cm/shared/apps/lapack/gcc/64/3.5.0/lib/cmaike/lapack-3.4.2/
+HYPRE_DIR = ${LOCAL_HYPRE}/src/hypre
+LAPACK_DIR = /usr/lib/lapack-3.4.2/
 
 ########################################################################
 # Compiling and linking options
@@ -280,7 +280,7 @@ two_parts_ss: two_parts_ss.o
 	$(CC) -o $@ $^ $(LFLAGS)
 
 
-halo_ss: halo_ss.o
+halo_ss: halo_ss.o 
 	$(CC) -o $@ $^ $(LFLAGS)
 
 halo_ss_varxy: halo_ss_varxy.o
