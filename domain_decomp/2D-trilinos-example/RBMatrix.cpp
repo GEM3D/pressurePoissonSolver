@@ -120,26 +120,22 @@ void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 			Block curr_block = p.second;
 			for (int iii = 0; iii < block_size; iii++) {
 				int matrix_i = start_i + iii;
-				if (matrix_i == local_skip_i && local_skip_i != -1 && local_skip_j != -1) {
-					y_view(matrix_i, 0) += x_view(local_skip_j, 0);
-				} else {
-					int block_i = iii;
-					if (curr_block.flip_i) {
-						block_i = block_size - 1 - iii;
-					}
-					valarray<double> &curr_blk = *curr_block.block;
+				int block_i  = iii;
+				if (curr_block.flip_i) {
+					block_i = block_size - 1 - iii;
+				}
+				valarray<double> &curr_blk = *curr_block.block;
 
-					if (curr_block.flip_j) {
-						for (int i = 0; i < block_size; i++) {
-							y_view(matrix_i, 0)
-							+= x_view(start_j + i, 0)
-							   * curr_blk[block_i + block_size * (block_size - 1 - i)];
-						}
-					} else {
-						for (int i = 0; i < block_size; i++) {
-							y_view(matrix_i, 0)
-							+= x_view(start_j + i, 0) * curr_blk[block_i + block_size * i];
-						}
+				if (curr_block.flip_j) {
+					for (int i = 0; i < block_size; i++) {
+						y_view(matrix_i, 0)
+						+= x_view(start_j + i, 0)
+						   * curr_blk[block_i + block_size * (block_size - 1 - i)];
+					}
+				} else {
+					for (int i = 0; i < block_size; i++) {
+						y_view(matrix_i, 0)
+						+= x_view(start_j + i, 0) * curr_blk[block_i + block_size * i];
 					}
 				}
 			}
@@ -149,6 +145,8 @@ void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 }
 void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_i, bool flip_j)
 {
+    i *=block_size;
+    j *=block_size;
 	int   local_j = domain->getLocalElement(j);
 	int   local_i = -1;
 	try{
@@ -222,10 +220,6 @@ void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_
 void RBMatrix::createRangeMap()
 {
 	range = Teuchos::rcp(new map_type(-1, &global_i[0], global_i.size(), 0, domain->getComm()));
-	if (skip_index != -1) {
-		local_skip_i = range->getLocalElement(skip_index);
-		local_skip_j = domain->getLocalElement(skip_index);
-	}
 	exporter = rcp(new Tpetra::Export<>(range, domain));
 }
 RCP<RBMatrix> RBMatrix::invBlockDiag(){

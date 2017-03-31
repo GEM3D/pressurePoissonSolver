@@ -1,6 +1,7 @@
 #ifndef DOMAINCOLLECTION_H
 #define DOMAINCOLLECTION_H
 #include "Domain.h"
+#include "Iface.h"
 #include "DomainSignatureCollection.h"
 #include "MyTypeDefs.h"
 #include "RBMatrix.h"
@@ -31,6 +32,8 @@ class DomainCollection
 	 */
 	int n;
 
+	int num_cols = 0;
+
 	bool amr = false;
 	/**
 	 * @brief Spacing of coarsest grid in x direction
@@ -45,6 +48,7 @@ class DomainCollection
 	 */
 	int num_global_domains;
 	/**
+     * TODO update this
 	 * @brief a vector of integers that stores information for each inteface.
 	 *
 	 * For the current format each interface requires 15 integers in order to store information.
@@ -67,6 +71,8 @@ class DomainCollection
 	 *   14. The axis that the interface resides on
 	 */
 	Teuchos::RCP<int_vector_type> iface_info;
+
+    std::set<Iface> ifaces;
 
 	public:
 	/**

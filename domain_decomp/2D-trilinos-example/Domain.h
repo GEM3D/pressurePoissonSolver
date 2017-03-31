@@ -21,8 +21,7 @@ class Domain
 	std::valarray<double>  tmp;
 	std::valarray<double>  denom;
 	std::valarray<double>  error;
-	int                    nx;
-	int                    ny;
+	int                    n;
 	double                 h_x;
 	double                 h_y;
 	std::valarray<double>  boundary_north;
@@ -43,7 +42,7 @@ class Domain
 	double                 y_length = 0;
 
 	Domain() = default;
-	Domain(DomainSignature ds, int nx, int ny, double h_x, double h_y);
+	Domain(DomainSignature ds, int n, double h_x, double h_y);
 	~Domain();
 
 	void planDirichlet();

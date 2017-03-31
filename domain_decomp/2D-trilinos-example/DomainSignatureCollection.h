@@ -14,7 +14,7 @@ struct DomainSignature {
 	 */
 	int id;
 
-    int refine_level;
+	int refine_level = 1;
 
 	std::array<int, 8> nbr_id      = {-1, -1, -1, -1, -1, -1, -1, -1};
 	std::array<int, 8> proc     = {-1, -1, -1, -1, -1, -1, -1, -1};
