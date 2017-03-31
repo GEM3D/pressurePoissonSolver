@@ -41,13 +41,7 @@
        _a > _b ? _a : _b; })
 
 
-void qtrue_constant(double x, double y, double *q, double *qx, double *qy, double *qxx, double *qyy);
-void qtrue_plane(double x, double y, double *q, double *qx, double *qy, double *qxx, double *qyy);
-void qtrue_parabola(double x, double y, double *q, double *qx, double *qy, double *qxx, double *qyy);
-void qtrue_trig(double x, double y, double *q, double *qx, double *qy, double *qxx, double *qyy);
-
-typedef void (*solution_t)(double x, double y, double *q, double *qx, double *qy, double *qxx, double *qyy);
-
+#include <test_solns.h>
 
 int main (int argc, char *argv[])
 {
@@ -632,7 +626,11 @@ int main (int argc, char *argv[])
 
 
 
-        /* Set boundary stencils to use homogenous Neumann conditions. */
+        /* Set boundary stencils to use homogenous Dirichlet onditions.
+           (u0 + u1)/2 = ub
+               --> u0 = 2*ub - u1;
+               --> u0 + u2 - 2*u1 = u2 - 3*u1 + 2*ub
+        */
         {
             int nentries = 2;
             int maxnvalues = nentries*MAX(nx,ny);
@@ -1503,51 +1501,4 @@ int main (int argc, char *argv[])
     MPI_Finalize();
 
     return (0);
-}
-
-
-void qtrue_constant(double x, double y, double *q, double *qx, double *qy, double *qxx, double *qyy)
-{
-    double c = 2;
-    *q = c;
-    *qx = 0;
-    *qy = 0;
-    *qxx = 0;
-    *qyy = 0;
-}
-
-void qtrue_plane(double x, double y, double *q, double *qx, double *qy, double *qxx, double *qyy)
-{
-    double a = 0;
-    double b = 1;
-    *q = a*x + b*y;
-    *qx = a;
-    *qy = b;
-    *qxx = 0;
-    *qyy = 0;
-}
-
-void qtrue_parabola(double x, double y, double *q, double *qx, double *qy, double *qxx, double *qyy)
-{
-    double a = 1;
-    double b = 0;
-    *q = a*x*x + b*y*y;
-    *qx = 2*a*x;
-    *qy = 2*b*y;
-    *qxx = 2*a;
-    *qyy = 2*b;
-}
-
-
-void qtrue_trig(double x, double y, double *q, double *qx, double *qy, double *qxx, double *qyy)
-{
-    double C = 2;
-    double D = 2;
-    double Cpi = C*M_PI;
-    double Dpi = D*M_PI;
-    *q = cos(Cpi*x)*cos(Dpi*y);
-    *qx = -Cpi*sin(Cpi*x)*cos(Dpi*y);
-    *qy = -Dpi*cos(Cpi*x)*sin(Dpi*y);
-    *qxx = -Cpi*Cpi*(*q);
-    *qyy = -Dpi*Dpi*(*q);
 }
