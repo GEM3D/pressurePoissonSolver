@@ -20,33 +20,41 @@ class Iface
 	{
 		auto iface_view = iface_info.getLocalView<Kokkos::HostSpace>();
 		for (size_t i = 0; i < iface_view.dimension(0); i += size) {
-			Iface right;
 			Iface left;
+			Iface right;
 			int blr = iface_view(i, 0);
 
-			right.right        = true;
-			right.axis         = iface_view(i + 1, 0);
-			right.refine_level = iface_view(i + 2, 0);
-			right.global_i[0] = iface_view(i + left_offset, 0);
+			left.right           = false;
+			left.axis            = iface_view(i + 1, 0);
+			left.refine_level    = iface_view(i + 2, 0);
+			left.global_i[0]     = iface_view(i + left_offset, 0);
+			left.center_i[0]     = iface_view(i + left_offset + 1, 0);
+			left.hasFineNbr[0]   = iface_view(i + left_offset + 2, 0);
+			left.hasCoarseNbr[0] = iface_view(i + left_offset + 3, 0);
+			left.isCoarseLeft[0] = iface_view(i + left_offset + 4, 0);
 
 			for (int q = 1; q < 4; q++) {
-				right.global_i[q]     = iface_view(i + left_offset + q * side_size, 0);
-				right.center_i[q]     = iface_view(i + left_offset + q * side_size + 1, 0);
-				right.hasFineNbr[q]   = iface_view(i + left_offset + q * side_size + 2, 0);
-				right.hasCoarseNbr[q] = iface_view(i + left_offset + q * side_size + 3, 0);
-				right.isCoarseLeft[q] = iface_view(i + left_offset + q * side_size + 4, 0);
+				left.global_i[q]     = iface_view(i + left_offset + q * side_size, 0);
+				left.center_i[q]     = iface_view(i + left_offset + q * side_size + 1, 0);
+				left.hasFineNbr[q]   = iface_view(i + left_offset + q * side_size + 2, 0);
+				left.hasCoarseNbr[q] = iface_view(i + left_offset + q * side_size + 3, 0);
+				left.isCoarseLeft[q] = iface_view(i + left_offset + q * side_size + 4, 0);
 			}
 
-			left.right        = false;
-			left.axis         = iface_view(i + 1, 0);
-			left.refine_level = iface_view(i + 2, 0);
-			left.global_i[0] = iface_view(i + left_offset, 0);
+			right.right           = true;
+			right.axis            = iface_view(i + 1, 0);
+			right.refine_level    = iface_view(i + 2, 0);
+			right.global_i[0]     = iface_view(i + left_offset, 0);
+			right.center_i[0]     = iface_view(i + left_offset + 1, 0);
+			right.hasFineNbr[0]   = iface_view(i + left_offset + 2, 0);
+			right.hasCoarseNbr[0] = iface_view(i + left_offset + 3, 0);
+			right.isCoarseLeft[0] = iface_view(i + left_offset + 4, 0);
 			for (int q = 1; q < 4; q++) {
-				left.global_i[q]     = iface_view(i + right_offset + (q - 1) * side_size, 0);
-				left.center_i[q]     = iface_view(i + right_offset + (q - 1) * side_size + 1, 0);
-				left.hasFineNbr[q]   = iface_view(i + right_offset + (q - 1) * side_size + 2, 0);
-				left.hasCoarseNbr[q] = iface_view(i + right_offset + (q - 1) * side_size + 3, 0);
-				left.isCoarseLeft[q] = iface_view(i + right_offset + (q - 1) * side_size + 4, 0);
+				right.global_i[q]     = iface_view(i + right_offset + (q - 1) * side_size, 0);
+				right.center_i[q]     = iface_view(i + right_offset + (q - 1) * side_size + 1, 0);
+				right.hasFineNbr[q]   = iface_view(i + right_offset + (q - 1) * side_size + 2, 0);
+				right.hasCoarseNbr[q] = iface_view(i + right_offset + (q - 1) * side_size + 3, 0);
+				right.isCoarseLeft[q] = iface_view(i + right_offset + (q - 1) * side_size + 4, 0);
 			}
 
 			if (blr == 0) {
@@ -125,6 +133,11 @@ class Iface
 							dist_view(iface_i + 1, 0) = 1;
 						}
 						dist_view(iface_i + 2, 0) = d.ds.refine_level;
+						dist_view(iface_i + left_offset, 0)     = d.globalIndex(iface_s);
+						dist_view(iface_i + left_offset + 1, 0) = d.globalIndexCenter(iface_s);
+						dist_view(iface_i + left_offset + 2, 0) = d.hasFineNbr(iface_s);
+						dist_view(iface_i + left_offset + 3, 0) = d.hasCoarseNbr(iface_s);
+						dist_view(iface_i + left_offset + 4, 0) = d.isCoarseLeft(iface_s);
 					}
 					Side s = iface_s;
 					s++;

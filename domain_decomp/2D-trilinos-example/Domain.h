@@ -62,6 +62,8 @@ class Domain
 	std::valarray<double> getStencil(Side s, Tilt t = Tilt::center);
 	std::valarray<double> getSide(Side s);
 	std::valarray<double> getSideFine(Side s);
+	std::valarray<double> getSideFineLeft(Side s);
+	std::valarray<double> getSideFineRight(Side s);
 	void fillBoundary(Side s, const single_vector_type &gamma);
 	void fillDiffVector(Side s, single_vector_type &diff, bool residual = false);
 

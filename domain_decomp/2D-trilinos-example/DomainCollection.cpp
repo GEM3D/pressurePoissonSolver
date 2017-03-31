@@ -157,7 +157,7 @@ void DomainCollection::initDirichletRefined(function<double(double, double)> ffu
 	}
 	// create map for domains
 	generateMaps();
-	//distributeIfaceInfo();
+	distributeIfaceInfo();
 }
 void DomainCollection::generateMaps()
 {
@@ -407,6 +407,11 @@ double DomainCollection::residual()
 RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 {
 	RCP<RBMatrix> A = rcp(new RBMatrix(map, n, num_cols));
+#if NDEBUG
+	for (Iface i : ifaces) {
+		cerr << i << endl;
+	}
+#endif
 	// create iface objects
 	set<Iface> ifaces = this->ifaces;
 
@@ -441,7 +446,7 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 				ds.nbr_id[(q * 2 + 4) % 8] = 1;
 			}
 		}
-		Domain d(ds, n, h_x, h_y);
+		Domain d(ds, n, 1.0, 1.0);
 		d.boundary_north = valarray<double>(n);
 		d.boundary_south = valarray<double>(n);
 		d.boundary_east  = valarray<double>(n);
@@ -449,27 +454,60 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 		d.planNeumann();
 
 		// solve over south interface, and save results
-		RCP<valarray<double>> north_block_ptr = rcp(new valarray<double>(n * n));
-		valarray<double> &    north_block     = *north_block_ptr;
+		RCP<valarray<double>> north_block_ptr       = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> north_block_ptr_left  = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> north_block_ptr_right = rcp(new valarray<double>(n * n));
+		valarray<double> &    north_block           = *north_block_ptr;
+		valarray<double> &    north_block_left      = *north_block_ptr_left;
+		valarray<double> &    north_block_right     = *north_block_ptr_right;
 
-		RCP<valarray<double>> east_block_ptr = rcp(new valarray<double>(n * n));
-		valarray<double> &    east_block     = *east_block_ptr;
+		RCP<valarray<double>> east_block_ptr       = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> east_block_ptr_left  = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> east_block_ptr_right = rcp(new valarray<double>(n * n));
+		valarray<double> &    east_block           = *east_block_ptr;
+		valarray<double> &    east_block_left      = *east_block_ptr_left;
+		valarray<double> &    east_block_right     = *east_block_ptr_right;
 
-		RCP<valarray<double>> south_block_ptr = rcp(new valarray<double>(n * n));
-		valarray<double> &    south_block     = *south_block_ptr;
+		RCP<valarray<double>> south_block_ptr        = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> south_block_ptr_left   = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> south_block_ptr_right  = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> south_block_ptr_fine   = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> south_block_ptr_coarse = rcp(new valarray<double>(n * n));
+		valarray<double> &    south_block            = *south_block_ptr;
+		valarray<double> &    south_block_fine       = *south_block_ptr_fine;
+		valarray<double> &    south_block_coarse     = *south_block_ptr_coarse;
+		valarray<double> &    south_block_left       = *south_block_ptr_left;
+		valarray<double> &    south_block_right      = *south_block_ptr_right;
 
-		RCP<valarray<double>> west_block_ptr = rcp(new valarray<double>(n * n));
-		valarray<double> &    west_block     = *west_block_ptr;
+		RCP<valarray<double>> west_block_ptr       = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> west_block_ptr_left  = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> west_block_ptr_right = rcp(new valarray<double>(n * n));
+		valarray<double> &    west_block           = *west_block_ptr;
+		valarray<double> &    west_block_left      = *west_block_ptr_left;
+		valarray<double> &    west_block_right     = *west_block_ptr_right;
+
+		valarray<double> zeros(n);
 
 		for (int i = 0; i < n; i++) {
 			d.boundary_south[i] = 1;
 			d.solve();
 
 			// fill the blocks
-			north_block[slice(i * n, n, 1)] = d.boundary_north - d.getSide(Side::north);
-			east_block[slice(i * n, n, 1)]  = d.boundary_east - d.getSide(Side::east);
-			south_block[slice(i * n, n, 1)] = d.boundary_south - d.getSide(Side::south);
-			west_block[slice(i * n, n, 1)]  = d.boundary_west - d.getSide(Side::west);
+			north_block[slice(i * n, n, 1)]       = zeros - d.getSide(Side::north);
+			north_block_left[slice(i * n, n, 1)]  = zeros - d.getSideFineLeft(Side::north);
+			north_block_right[slice(i * n, n, 1)] = zeros - d.getSideFineRight(Side::north);
+			east_block[slice(i * n, n, 1)]        = zeros - d.getSide(Side::east);
+			east_block_left[slice(i * n, n, 1)]   = zeros - d.getSideFineLeft(Side::east);
+			east_block_right[slice(i * n, n, 1)]  = zeros - d.getSideFineRight(Side::east);
+			south_block[slice(i * n, n, 1)]       = d.boundary_south - d.getSide(Side::south);
+			south_block_fine[slice(i * n, n, 1)]  = 2.0 * d.boundary_south - 2.0/3.0*d.getSide(Side::south);
+			south_block_coarse[slice(i * n, n, 1)]
+			= 2.0 * d.boundary_south - 2.0/3.0*d.getSide(Side::south);
+			south_block_left[slice(i * n, n, 1)]  = zeros - d.getSideFineLeft(Side::south);
+			south_block_right[slice(i * n, n, 1)] = zeros - d.getSideFineRight(Side::south);
+			west_block[slice(i * n, n, 1)]        = zeros - d.getSide(Side::west);
+			west_block_left[slice(i * n, n, 1)]   = zeros - d.getSideFineLeft(Side::west);
+			west_block_right[slice(i * n, n, 1)]  = zeros - d.getSideFineRight(Side::west);
 
 			d.boundary_south[i] = 0;
 		}
@@ -477,25 +515,76 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 		// now insert these results into the matrix for each interface
 		for (Iface iface : todo) {
 			bool reverse_x
-			= (iface.axis == X_AXIS && iface.right) || (iface.axis == Y_AXIS && !iface.right);
-			bool reverse_y = iface.right;
+			= (iface.axis == X_AXIS && !iface.right) || (iface.axis == Y_AXIS && iface.right);
+			bool reverse_y = !iface.right;
 
 			int j = iface.global_i[0];
 			int i = iface.global_i[0];
-
-			A->insertBlock(i, j, south_block_ptr, reverse_x, reverse_x);
+			if (iface.hasFineNbr[0]) {
+				A->insertBlock(i, j, south_block_ptr_coarse, reverse_x, reverse_x, 1.0);
+			} else if (iface.hasCoarseNbr[0]) {
+				A->insertBlock(i, j, south_block_ptr, reverse_x, reverse_x, 2.0);
+				if (iface.isCoarseLeft[0]) {
+					A->insertBlock(iface.center_i[0], j, south_block_ptr_left, reverse_x, reverse_x,
+					               4.0 / 3.0);
+				} else {
+					A->insertBlock(iface.center_i[0], j, south_block_ptr_right, reverse_x,
+					               reverse_x, 4.0 / 3.0);
+				}
+			} else {
+				A->insertBlock(i, j, south_block_ptr, reverse_x, reverse_x, 1.0);
+			}
 
 			if (iface.global_i[1] != -1) {
 				i = iface.global_i[1];
-				A->insertBlock(i, j, west_block_ptr, reverse_y, reverse_x);
+				if (iface.hasFineNbr[1]) {
+					A->insertBlock(i, j, west_block_ptr, reverse_y, reverse_x, 2.0 / 3.0);
+				} else if (iface.hasCoarseNbr[1]) {
+					A->insertBlock(i, j, west_block_ptr, reverse_y, reverse_x, 2.0);
+					if (iface.isCoarseLeft[1]) {
+						A->insertBlock(iface.center_i[1], j, west_block_ptr_left, reverse_y,
+						               reverse_x, 4.0 / 3.0);
+					} else {
+						A->insertBlock(iface.center_i[1], j, west_block_ptr_right, reverse_y,
+						               reverse_x, 4.0 / 3.0);
+					}
+				} else {
+					A->insertBlock(i, j, west_block_ptr, reverse_y, reverse_x, 1.0);
+				}
 			}
 			if (iface.global_i[2] != -1) {
 				i = iface.global_i[2];
-				A->insertBlock(i, j, north_block_ptr, reverse_x, reverse_x);
+				if (iface.hasFineNbr[2]) {
+					A->insertBlock(i, j, north_block_ptr, reverse_x, reverse_x, 2.0 / 3.0);
+				} else if (iface.hasCoarseNbr[2]) {
+					A->insertBlock(i, j, north_block_ptr, reverse_x, reverse_x, 2.0);
+					if (iface.isCoarseLeft[2]) {
+						A->insertBlock(iface.center_i[2], j, north_block_ptr_left, reverse_x,
+						               reverse_x, 4.0 / 3.0);
+					} else {
+						A->insertBlock(iface.center_i[2], j, north_block_ptr_right, reverse_x,
+						               reverse_x, 4.0 / 3.0);
+					}
+				} else {
+					A->insertBlock(i, j, north_block_ptr, reverse_x, reverse_x, 1.0);
+				}
 			}
 			if (iface.global_i[3] != -1) {
 				i = iface.global_i[3];
-				A->insertBlock(i, j, east_block_ptr, reverse_y, reverse_x);
+				if (iface.hasFineNbr[3]) {
+					A->insertBlock(i, j, east_block_ptr, reverse_y, reverse_x, 2.0 / 3.0);
+				} else if (iface.hasCoarseNbr[3]) {
+					A->insertBlock(i, j, east_block_ptr, reverse_y, reverse_x, 2.0);
+					if (iface.isCoarseLeft[3]) {
+						A->insertBlock(iface.center_i[3], j, east_block_ptr_left, reverse_y,
+						               reverse_x, 4.0 / 3.0);
+					} else {
+						A->insertBlock(iface.center_i[3], j, east_block_ptr_right, reverse_y,
+						               reverse_x, 4.0 / 3.0);
+					}
+				} else {
+					A->insertBlock(i, j, east_block_ptr, reverse_y, reverse_x, 1.0);
+				}
 			}
 		}
 	}

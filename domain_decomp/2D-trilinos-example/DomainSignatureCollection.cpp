@@ -110,10 +110,10 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank,
 			left.nbr_fine[1]           = true;
 			low_nbr.nbr(Side::west)    = left.id;
 			low_nbr.nbr_coarse[3]      = true;
-			low_nbr.left_of_coarse[3]  = true;
+			low_nbr.left_of_coarse[3]  = false;
 			high_nbr.nbr(Side::west)   = left.id;
 			high_nbr.nbr_coarse[3]     = true;
-			high_nbr.left_of_coarse[3] = false;
+			high_nbr.left_of_coarse[3] = true;
 		}
 	}
     indexInterfacesBFS();

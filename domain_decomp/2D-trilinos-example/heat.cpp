@@ -293,37 +293,10 @@ int main(int argc, char *argv[])
 					comm->barrier();
 					duration<double> write_time = steady_clock::now() - write_start;
 					if (my_global_rank == 0)
-						cout << "Time to write matix to file: " << write_time.count() << "\n";
+						cout << "Time to write matrix to file: " << write_time.count() << "\n";
 				}
 				op = RBA;
-			} /* else {
-			     // Form the matrix
-			     comm->barrier();
-			     steady_clock::time_point form_start = steady_clock::now();
-
-			     RCP<matrix_type> A = dc.formMatrix(matrix_map, del);
-
-			     comm->barrier();
-			     duration<double> form_time = steady_clock::now() - form_start;
-
-			     if (my_global_rank == 0)
-			         cout << "Matrix Formation Time: " << form_time.count() << "\n";
-
-			     if (save_matrix_file != "") {
-			         comm->barrier();
-			         steady_clock::time_point write_start = steady_clock::now();
-
-			         Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A,
-			                                                                    "", "");
-
-			         comm->barrier();
-			         duration<double> write_time = steady_clock::now() - write_start;
-			         if (my_global_rank == 0)
-			             cout << "Time to write matix to file: " << write_time.count() << "\n";
-			     }
-
-			     op = A;
-			 }*/
+			} 
 
 			// Create linear problem for the Belos solver
 			Belos::LinearProblem<double, vector_type, Tpetra::Operator<>> problem(op, gamma, b);
@@ -363,6 +336,21 @@ int main(int argc, char *argv[])
 
 					if (my_global_rank == 0)
 						cout << "Preconditioner Formation Time: " << prec_time.count() << "\n";
+
+					if (save_prec_file != "") {
+						comm->barrier();
+						steady_clock::time_point write_start = steady_clock::now();
+
+						ofstream out_file(save_prec_file);
+						out_file << *P;
+						out_file.close();
+
+						comm->barrier();
+						duration<double> write_time = steady_clock::now() - write_start;
+						if (my_global_rank == 0)
+							cout << "Time to write preconditioner to file: " << write_time.count()
+							     << "\n";
+				}
 				}
 			}
 

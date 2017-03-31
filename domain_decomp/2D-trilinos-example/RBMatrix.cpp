@@ -130,20 +130,24 @@ void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 					for (int i = 0; i < block_size; i++) {
 						y_view(matrix_i, 0)
 						+= x_view(start_j + i, 0)
-						   * curr_blk[block_i + block_size * (block_size - 1 - i)];
+						   * curr_blk[block_i + block_size * (block_size - 1 - i)]
+						   * curr_block.scale;
 					}
 				} else {
 					for (int i = 0; i < block_size; i++) {
-						y_view(matrix_i, 0)
-						+= x_view(start_j + i, 0) * curr_blk[block_i + block_size * i];
+						y_view(matrix_i, 0) += x_view(start_j + i, 0)
+						                       * curr_blk[block_i + block_size * i]
+						                       * curr_block.scale;
 					}
 				}
 			}
 		}
 	}
 	y.doExport(my_y, *exporter, Tpetra::CombineMode::ADD);
+	// y.update(2, x, 1);
 }
-void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_i, bool flip_j)
+void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_i, bool flip_j,
+                           double scale)
 {
     i *=block_size;
     j *=block_size;
@@ -158,11 +162,11 @@ void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_
 		for (int x = i; x <i+ block_size; x++) {
 			global_i.push_back(x);
 		}
-        curr_local_i+=block_size;
+		curr_local_i += block_size;
 		range_map[i] = local_i;
 	}
 
-	Block b(block, flip_i, flip_j);
+	Block b(block, flip_i, flip_j,scale);
 
     int index = local_j/block_size;
 	if (block_cols[index].count(local_i) > 0) {
@@ -192,7 +196,8 @@ void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_
 					if (first_block.flip_j) {
 						block_j = block_size - j - 1;
 					}
-					new_blk[i + block_size * j] = first_blk[block_i + block_size * block_j];
+					new_blk[i + block_size * j]
+					= first_blk[block_i + block_size * block_j] * first_block.scale;
 				}
 			}
 			for (int i = 0; i < block_size; i++) {
@@ -205,7 +210,8 @@ void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_
 					if (b.flip_j) {
 						block_j = block_size - j - 1;
 					}
-					new_blk[i + block_size * j] += second_blk[block_i + block_size * block_j];
+					new_blk[i + block_size * j]
+					+= second_blk[block_i + block_size * block_j] * b.scale;
 				}
 			}
 			block_cols[index][local_i] = new_block;
@@ -235,18 +241,13 @@ RCP<RBMatrix> RBMatrix::invBlockDiag(){
 			if (global_j == global_i) {
 				RCP<valarray<double>> blk_inv_ptr;
 				Block                 curr_block = p.second;
-				if (local_skip_i != -1 && local_skip_i <= start_i
-				    && start_i < local_skip_i + block_size) {
-					// modify the row of this block and invert
-					blk_inv_ptr               = rcp(new valarray<double>(*curr_block.block));
-					valarray<double> &blk_inv = *blk_inv_ptr;
 
-					// modify the row
-					int block_i = local_skip_i % block_size;
-					for (int j = 0; j < block_size; j++) {
-						blk_inv[block_i * block_size + j] = 0;
-					}
-					blk_inv[block_i * block_size + block_i] = 1;
+				try {
+					blk_inv_ptr = computed.at(&(*curr_block.block)[0]);
+				} catch (const out_of_range &oor) {
+					// invert this block
+					blk_inv_ptr               = blkCopy(curr_block);
+					valarray<double> &blk_inv = *blk_inv_ptr;
 
 					// compute inverse of block
 					valarray<int>    ipiv(block_size + 1);
@@ -256,29 +257,11 @@ RCP<RBMatrix> RBMatrix::invBlockDiag(){
 					dgetrf_(&block_size, &block_size, &blk_inv[0], &block_size, &ipiv[0], &info);
 					dgetri_(&block_size, &blk_inv[0], &block_size, &ipiv[0], &work[0], &lwork,
 					        &info);
-				} else {
-					try {
-						blk_inv_ptr = computed.at(&(*curr_block.block)[0]);
-					} catch (const out_of_range &oor) {
-						// invert this block
-						blk_inv_ptr               = rcp(new valarray<double>(*curr_block.block));
-						valarray<double> &blk_inv = *blk_inv_ptr;
 
-						// compute inverse of block
-						valarray<int>    ipiv(block_size + 1);
-						int              lwork = block_size * block_size;
-						valarray<double> work(lwork);
-						int              info;
-						dgetrf_(&block_size, &block_size, &blk_inv[0], &block_size, &ipiv[0],
-						        &info);
-						dgetri_(&block_size, &blk_inv[0], &block_size, &ipiv[0], &work[0], &lwork,
-						        &info);
-
-						// insert the block
-						computed[&(*curr_block.block)[0]] = blk_inv_ptr;
-					}
+					// insert the block
+					computed[&(*curr_block.block)[0]] = blk_inv_ptr;
 				}
-				Inv->insertBlock(global_i, global_j, blk_inv_ptr, false, false);
+				Inv->insertBlock(global_i/block_size, global_j/block_size, blk_inv_ptr);
 			}
 		}
 	}
@@ -369,7 +352,7 @@ blk_ptr RBMatrix::blkCopy(Block in)
 			if (in.flip_j) {
 				in_j = block_size - 1 - j;
 			}
-			(*C)[i + block_size * j] = (*in.block)[in_i + block_size * in_j];
+			(*C)[i + block_size * j] = (*in.block)[in_i + block_size * in_j] * in.scale;
 		}
 	}
 	return C;
@@ -670,8 +653,8 @@ ostream& operator<<(ostream& os, const RBMatrix& A) {
 					if (curr_block.flip_j) {
 						block_j = A.block_size - 1 - jjj;
 					}
-					os << i + 1 << ' ' << j + 1 << ' ' << curr_blk[block_i + A.block_size * block_j]
-					   << "\n";
+					os << i + 1 << ' ' << j + 1 << ' '
+					   << curr_blk[block_i + A.block_size * block_j] * curr_block.scale << "\n";
 				}
 			}
 		}
