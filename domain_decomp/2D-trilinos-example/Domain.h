@@ -15,8 +15,10 @@ class Domain
 	DomainSignature        ds;
 	std::valarray<double>  f;
 	std::valarray<double>  f_copy;
+	std::valarray<double>  f_back;
 	std::valarray<double>  resid;
 	std::valarray<double>  u;
+	std::valarray<double>  u_back;
 	std::valarray<double>  exact;
 	std::valarray<double>  tmp;
 	std::valarray<double>  denom;
@@ -27,9 +29,11 @@ class Domain
 	std::valarray<double>  boundary_north;
 	std::valarray<double>  boundary_south;
 	std::valarray<double>  boundary_east;
-	std::valarray<double>  boundary_east_refined_left;
-	std::valarray<double>  boundary_east_refined_right;
 	std::valarray<double>  boundary_west;
+	std::valarray<double>  boundary_north_back;
+	std::valarray<double>  boundary_south_back;
+	std::valarray<double>  boundary_east_back;
+	std::valarray<double>  boundary_west_back;
 	std::array<int, 4> local_i        = {-1, -1, -1, -1};
 	std::array<int, 4> local_i_center = {-1, -1, -1, -1};
 	Teuchos::RCP<map_type> domain_map;
@@ -58,6 +62,8 @@ class Domain
 	double fNorm();
 	double exactNorm(double eavg);
 	double exactSum();
+	void   swapResidSol();
+	void   sumResidIntoSol();
 
 	std::valarray<double> getStencil(Side s, Tilt t = Tilt::center);
 	std::valarray<double> getSide(Side s);

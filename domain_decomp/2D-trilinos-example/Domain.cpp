@@ -24,16 +24,23 @@ Domain::Domain(DomainSignature ds, int n, double h_x, double h_y)
 	cerr << "\n";
 #endif
 	f      = valarray<double>(n * n);
+	f_back = valarray<double>(n * n);
 	f_copy = valarray<double>(n * n);
 	exact  = valarray<double>(n * n);
 	tmp    = valarray<double>(n * n);
 	u      = valarray<double>(n * n);
+	u_back = valarray<double>(n * n);
 	denom  = valarray<double>(n * n);
 
 	boundary_north = valarray<double>(n);
 	boundary_south = valarray<double>(n);
 	boundary_east  = valarray<double>(n);
 	boundary_west  = valarray<double>(n);
+
+	boundary_north_back = valarray<double>(n);
+	boundary_south_back = valarray<double>(n);
+	boundary_east_back  = valarray<double>(n);
+	boundary_west_back  = valarray<double>(n);
 
 	x_start  = ds.x_start;
 	y_start  = ds.y_start;
@@ -498,4 +505,25 @@ void Domain::fillDiffVector(Side s, single_vector_type &diff, bool residual)
 			curr_i++;
 		}
 	}
+}
+void Domain::swapResidSol(){
+	boundary_north_back = boundary_north;
+	boundary_east_back  = boundary_east;
+	boundary_south_back = boundary_south;
+	boundary_west_back  = boundary_west;
+	boundary_north      = 0;
+	boundary_east       = 0;
+	boundary_south      = 0;
+	boundary_west       = 0;
+	u_back              = u;
+	f_back              = f;
+	f                   = resid;
+}
+void Domain::sumResidIntoSol(){
+	boundary_north = boundary_north_back;
+	boundary_east  = boundary_east_back;
+	boundary_south = boundary_south_back;
+	boundary_west  = boundary_west_back;
+    f = f_back;
+	u += u_back;
 }

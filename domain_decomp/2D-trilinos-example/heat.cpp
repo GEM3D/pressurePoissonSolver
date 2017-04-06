@@ -90,6 +90,7 @@ int main(int argc, char *argv[])
 	                    {"nozero"});
 	args::Flag f_lu(parser, "lu", "use LU decomposition", {"lu"});
 	args::Flag f_ilu(parser, "ilu", "use incomplete LU preconditioner", {"ilu"});
+	args::Flag f_iter(parser, "iterative", "use iterative method", {"iterative"});
 
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;
@@ -250,9 +251,15 @@ int main(int argc, char *argv[])
 
 		// Create the gamma and diff vectors
 		RCP<vector_type> gamma = rcp(new vector_type(matrix_map, 1));
+		RCP<vector_type> r     = rcp(new vector_type(matrix_map, 1));
+		RCP<vector_type> x     = rcp(new vector_type(matrix_map, 1));
+		RCP<vector_type> d     = rcp(new vector_type(matrix_map, 1));
 		RCP<vector_type> diff  = rcp(new vector_type(matrix_map, 1));
-		RCP<RBMatrix> RBA;
+		RCP<RBMatrix>    RBA;
 
+		// Create linear problem for the Belos solver
+		RCP<Belos::LinearProblem<double, vector_type, Tpetra::Operator<>>> problem;
+		RCP<Belos::SolverManager<double, vector_type, Tpetra::Operator<>>> solver;
 		if (f_amr || num_domains_x * num_domains_y != 1) {
 			// do iterative solve
 
@@ -296,10 +303,10 @@ int main(int argc, char *argv[])
 						cout << "Time to write matrix to file: " << write_time.count() << "\n";
 				}
 				op = RBA;
-			} 
+			}
 
-			// Create linear problem for the Belos solver
-			Belos::LinearProblem<double, vector_type, Tpetra::Operator<>> problem(op, gamma, b);
+			problem
+			= rcp(new Belos::LinearProblem<double, vector_type, Tpetra::Operator<>>(op, gamma, b));
 
 			if (f_prec || f_ilu) {
 				if (f_ilu) {
@@ -308,9 +315,9 @@ int main(int argc, char *argv[])
 
 					RCP<RBMatrix> L, U;
 					RBMatrix      Copy = *RBA;
-					Copy.ilu2(L, U);
+					Copy.ilu(L, U);
 					RCP<LUSolver> solver = rcp(new LUSolver(L, U));
-					problem.setLeftPrec(solver);
+					problem->setLeftPrec(solver);
 
 					comm->barrier();
 					duration<double> prec_time = steady_clock::now() - prec_start;
@@ -329,7 +336,7 @@ int main(int argc, char *argv[])
 					steady_clock::time_point prec_start = steady_clock::now();
 
 					RCP<RBMatrix> P = RBA->invBlockDiag();
-					problem.setRightPrec(P);
+					problem->setRightPrec(P);
 
 					comm->barrier();
 					duration<double> prec_time = steady_clock::now() - prec_start;
@@ -350,7 +357,7 @@ int main(int argc, char *argv[])
 						if (my_global_rank == 0)
 							cout << "Time to write preconditioner to file: " << write_time.count()
 							     << "\n";
-				}
+					}
 				}
 			}
 
@@ -375,7 +382,7 @@ int main(int argc, char *argv[])
 				// out_file.close();
 
 			} else {
-				problem.setProblem();
+				problem->setProblem();
 
 				comm->barrier();
 				steady_clock::time_point iter_start = steady_clock::now();
@@ -389,23 +396,23 @@ int main(int argc, char *argv[])
 				belosList.set("Verbosity", verbosity);
 
 				// Create solver and solve
-				RCP<Belos::SolverManager<double, vector_type, Tpetra::Operator<>>> solver;
 				if (f_gmres) {
 					solver
 					= rcp(new Belos::BlockGmresSolMgr<double, vector_type, Tpetra::Operator<>>(
-					rcp(&problem, false), rcp(&belosList, false)));
+					problem, rcp(&belosList, false)));
 				} else if (f_bicg) {
 					solver = rcp(new Belos::BiCGStabSolMgr<double, vector_type, Tpetra::Operator<>>(
-					rcp(&problem, false), rcp(&belosList, false)));
+					problem, rcp(&belosList, false)));
 				} else {
 					solver = rcp(new Belos::BlockCGSolMgr<double, vector_type, Tpetra::Operator<>>(
-					rcp(&problem, false), rcp(&belosList, false)));
+					problem, rcp(&belosList, false)));
 				}
 				solver->solve();
 
 				comm->barrier();
 				duration<double> iter_time = steady_clock::now() - iter_start;
-				if (my_global_rank == 0) std::cout << "CG Time: " << iter_time.count() << "\n";
+				if (my_global_rank == 0)
+					std::cout << "Gamma Solve Time: " << iter_time.count() << "\n";
 			}
 		}
 
@@ -420,6 +427,17 @@ int main(int argc, char *argv[])
 
 		if (my_global_rank == 0)
 			std::cout << "Time to solve with given set of gammas: " << solve_time.count() << "\n";
+
+        if(f_iter){
+            dc.residual();
+            dc.swapResidSol();
+			dc.solveWithInterface(*x, *r);
+			problem->setProblem(x, r);
+			solver->setProblem(problem);
+			solver->solve();
+			dc.solveWithInterface(*x, *d);
+            dc.sumResidIntoSol();
+		}
 
 		// Calcuate error
 		RCP<map_type>    err_map = rcp(new map_type(-1, 1, 0, comm));
