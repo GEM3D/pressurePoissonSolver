@@ -7,11 +7,14 @@ CXX       = mpicxx
 F90       = mpif90
 HYPRE_DIR = ${GEM3D_HYPRE}/src/hypre
 
+SRC_COMMON = ../all
+
+
 ########################################################################
 # Compiling and linking options
 ########################################################################
 COPTS     = -g -Wall
-CINCLUDES = -I$(HYPRE_DIR)/include
+CINCLUDES = -I$(HYPRE_DIR)/include -I$(SRC_COMMON)
 CDEFS     = -DHAVE_CONFIG_H -DHYPRE_TIMING
 CFLAGS    = $(COPTS) $(CINCLUDES) $(CDEFS)
 FOPTS     = -g
@@ -82,7 +85,10 @@ usage:
 #       %> gmake ex4 "CDEFS=-D USE_GRAPH_ENTRIES"
 
 ########################################################################
-ex4: ex4.o
+test_solns.o :
+	$(CC) -c $(SRC_COMMON)/test_solns.c $(CINCLUDES)
+	
+ex4: ex4.o test_solns.o
 	$(CC) -o $@ $^ $(LFLAGS)
 
 ########################################################################
