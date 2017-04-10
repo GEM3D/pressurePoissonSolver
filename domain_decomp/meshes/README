@@ -39,5 +39,14 @@ Each mesh directory contains
 
            >> help clawgraphics
 
+Examples : 
+
+    -- mesh0  : 8x8 array of grids (uniform refinement)
+    -- mesh1  : Two levels of refinement around a circle (levels 3-4)
+    -- mesh2  : Three levels of refinement around a circle (levels 3-5)
+    -- mesh3  : Four levels of refinement around a circle (levels 3-6)
+    -- mesh4  : More interesting refinement
+
+
 
 
