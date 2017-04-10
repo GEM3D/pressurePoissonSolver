@@ -90,6 +90,7 @@ int main(int argc, char *argv[])
 	                    {"nozero"});
 	args::Flag f_lu(parser, "lu", "use LU decomposition", {"lu"});
 	args::Flag f_ilu(parser, "ilu", "use incomplete LU preconditioner", {"ilu"});
+	args::Flag f_iter(parser, "iterative", "use iterative method", {"iterative"});
 
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;
@@ -250,9 +251,15 @@ int main(int argc, char *argv[])
 
 		// Create the gamma and diff vectors
 		RCP<vector_type> gamma = rcp(new vector_type(matrix_map, 1));
+		RCP<vector_type> r     = rcp(new vector_type(matrix_map, 1));
+		RCP<vector_type> x     = rcp(new vector_type(matrix_map, 1));
+		RCP<vector_type> d     = rcp(new vector_type(matrix_map, 1));
 		RCP<vector_type> diff  = rcp(new vector_type(matrix_map, 1));
-		RCP<RBMatrix> RBA;
+		RCP<RBMatrix>    RBA;
 
+		// Create linear problem for the Belos solver
+		RCP<Belos::LinearProblem<double, vector_type, Tpetra::Operator<>>> problem;
+		RCP<Belos::SolverManager<double, vector_type, Tpetra::Operator<>>> solver;
 		if (f_amr || num_domains_x * num_domains_y != 1) {
 			// do iterative solve
 
@@ -293,40 +300,13 @@ int main(int argc, char *argv[])
 					comm->barrier();
 					duration<double> write_time = steady_clock::now() - write_start;
 					if (my_global_rank == 0)
-						cout << "Time to write matix to file: " << write_time.count() << "\n";
+						cout << "Time to write matrix to file: " << write_time.count() << "\n";
 				}
 				op = RBA;
-			} /* else {
-			     // Form the matrix
-			     comm->barrier();
-			     steady_clock::time_point form_start = steady_clock::now();
+			}
 
-			     RCP<matrix_type> A = dc.formMatrix(matrix_map, del);
-
-			     comm->barrier();
-			     duration<double> form_time = steady_clock::now() - form_start;
-
-			     if (my_global_rank == 0)
-			         cout << "Matrix Formation Time: " << form_time.count() << "\n";
-
-			     if (save_matrix_file != "") {
-			         comm->barrier();
-			         steady_clock::time_point write_start = steady_clock::now();
-
-			         Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A,
-			                                                                    "", "");
-
-			         comm->barrier();
-			         duration<double> write_time = steady_clock::now() - write_start;
-			         if (my_global_rank == 0)
-			             cout << "Time to write matix to file: " << write_time.count() << "\n";
-			     }
-
-			     op = A;
-			 }*/
-
-			// Create linear problem for the Belos solver
-			Belos::LinearProblem<double, vector_type, Tpetra::Operator<>> problem(op, gamma, b);
+			problem
+			= rcp(new Belos::LinearProblem<double, vector_type, Tpetra::Operator<>>(op, gamma, b));
 
 			if (f_prec || f_ilu) {
 				if (f_ilu) {
@@ -335,9 +315,9 @@ int main(int argc, char *argv[])
 
 					RCP<RBMatrix> L, U;
 					RBMatrix      Copy = *RBA;
-					Copy.ilu2(L, U);
+					Copy.ilu(L, U);
 					RCP<LUSolver> solver = rcp(new LUSolver(L, U));
-					problem.setLeftPrec(solver);
+					problem->setLeftPrec(solver);
 
 					comm->barrier();
 					duration<double> prec_time = steady_clock::now() - prec_start;
@@ -352,12 +332,11 @@ int main(int argc, char *argv[])
 					// out_file << *U;
 					// out_file.close();
 				} else {
-					//			if (f_rbmatrix) {
 					comm->barrier();
 					steady_clock::time_point prec_start = steady_clock::now();
 
 					RCP<RBMatrix> P = RBA->invBlockDiag();
-					problem.setRightPrec(P);
+					problem->setRightPrec(P);
 
 					comm->barrier();
 					duration<double> prec_time = steady_clock::now() - prec_start;
@@ -365,38 +344,20 @@ int main(int argc, char *argv[])
 					if (my_global_rank == 0)
 						cout << "Preconditioner Formation Time: " << prec_time.count() << "\n";
 
-					/*			} else {
-					                // form preconditioner
-					                comm->barrier();
-					                steady_clock::time_point prec_start = steady_clock::now();
+					if (save_prec_file != "") {
+						comm->barrier();
+						steady_clock::time_point write_start = steady_clock::now();
 
-					                RCP<matrix_type> P = dc.formInvDiag(matrix_map, del);
-					                problem.setRightPrec(P);
+						ofstream out_file(save_prec_file);
+						out_file << *P;
+						out_file.close();
 
-					                comm->barrier();
-					                duration<double> prec_time = steady_clock::now() - prec_start;
-
-					                if (my_global_rank == 0)
-					                    cout << "Preconditioner Formation Time: " <<
-					   prec_time.count() << "\n";
-
-					                if (save_prec_file != "") {
-					                    comm->barrier();
-					                    steady_clock::time_point write_start = steady_clock::now();
-
-					                    Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(
-					                    save_prec_file, P, "", "");
-
-					                    comm->barrier();
-					                    duration<double> write_time = steady_clock::now() -
-					   write_start;
-					                    if (my_global_rank == 0)
-					                        cout
-					                        << "Time to write preconditioner to file: " <<
-					   write_time.count()
-					                        << "\n";
-					                }
-					            }*/
+						comm->barrier();
+						duration<double> write_time = steady_clock::now() - write_start;
+						if (my_global_rank == 0)
+							cout << "Time to write preconditioner to file: " << write_time.count()
+							     << "\n";
+					}
 				}
 			}
 
@@ -421,7 +382,7 @@ int main(int argc, char *argv[])
 				// out_file.close();
 
 			} else {
-				problem.setProblem();
+				problem->setProblem();
 
 				comm->barrier();
 				steady_clock::time_point iter_start = steady_clock::now();
@@ -435,23 +396,23 @@ int main(int argc, char *argv[])
 				belosList.set("Verbosity", verbosity);
 
 				// Create solver and solve
-				RCP<Belos::SolverManager<double, vector_type, Tpetra::Operator<>>> solver;
 				if (f_gmres) {
 					solver
 					= rcp(new Belos::BlockGmresSolMgr<double, vector_type, Tpetra::Operator<>>(
-					rcp(&problem, false), rcp(&belosList, false)));
+					problem, rcp(&belosList, false)));
 				} else if (f_bicg) {
 					solver = rcp(new Belos::BiCGStabSolMgr<double, vector_type, Tpetra::Operator<>>(
-					rcp(&problem, false), rcp(&belosList, false)));
+					problem, rcp(&belosList, false)));
 				} else {
 					solver = rcp(new Belos::BlockCGSolMgr<double, vector_type, Tpetra::Operator<>>(
-					rcp(&problem, false), rcp(&belosList, false)));
+					problem, rcp(&belosList, false)));
 				}
 				solver->solve();
 
 				comm->barrier();
 				duration<double> iter_time = steady_clock::now() - iter_start;
-				if (my_global_rank == 0) std::cout << "CG Time: " << iter_time.count() << "\n";
+				if (my_global_rank == 0)
+					std::cout << "Gamma Solve Time: " << iter_time.count() << "\n";
 			}
 		}
 
@@ -466,6 +427,17 @@ int main(int argc, char *argv[])
 
 		if (my_global_rank == 0)
 			std::cout << "Time to solve with given set of gammas: " << solve_time.count() << "\n";
+
+        if(f_iter){
+            dc.residual();
+            dc.swapResidSol();
+			dc.solveWithInterface(*x, *r);
+			problem->setProblem(x, r);
+			solver->setProblem(problem);
+			solver->solve();
+			dc.solveWithInterface(*x, *d);
+            dc.sumResidIntoSol();
+		}
 
 		// Calcuate error
 		RCP<map_type>    err_map = rcp(new map_type(-1, 1, 0, comm));

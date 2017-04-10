@@ -110,10 +110,10 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank,
 			left.nbr_fine[1]           = true;
 			low_nbr.nbr(Side::west)    = left.id;
 			low_nbr.nbr_coarse[3]      = true;
-			low_nbr.left_of_coarse[3]  = true;
+			low_nbr.left_of_coarse[3]  = false;
 			high_nbr.nbr(Side::west)   = left.id;
 			high_nbr.nbr_coarse[3]     = true;
-			high_nbr.left_of_coarse[3] = false;
+			high_nbr.left_of_coarse[3] = true;
 		}
 	}
     indexInterfacesBFS();
@@ -133,7 +133,8 @@ void DomainSignatureCollection::indexInterfacesBFS()
 		DomainSignature &d    = domains.at(curr);
 		queue.pop_front();
 		visited.insert(curr);
-		for (Side s = Side::north; s <=Side::west; s++) {
+        Side s = Side::north;
+        do{
 			if (d.hasNbr(s) && visited.count(d.nbr(s)) == 0) {
 				// a new edge that we have not assigned an index to
 				d.index(s) = curr_i;
@@ -177,7 +178,8 @@ void DomainSignatureCollection::indexInterfacesBFS()
 					}
 				}
 			}
-		}
+			s++;
+		} while (s != Side::north);
 	}
 }
 void DomainSignatureCollection::zoltanBalance()
@@ -185,12 +187,12 @@ void DomainSignatureCollection::zoltanBalance()
 	Zoltan *zz = new Zoltan(MPI_COMM_WORLD);
 
 	// parameters
-	zz->Set_Param("LB_METHOD", "GRAPH");   /* Zoltan method: "BLOCK" */
-	zz->Set_Param("LB_APPROACH", "PARTITION");   /* Zoltan method: "BLOCK" */
-	zz->Set_Param("NUM_GID_ENTRIES", "1"); /* global ID is 1 integer */
-	zz->Set_Param("NUM_LID_ENTRIES", "1"); /* local ID is 1 integer */
-	zz->Set_Param("OBJ_WEIGHT_DIM", "0");  /* we omit object weights */
-	zz->Set_Param("AUTO_MIGRATE", "TRUE");  /* we omit object weights */
+	zz->Set_Param("LB_METHOD", "GRAPH");       /* Zoltan method: "BLOCK" */
+	zz->Set_Param("LB_APPROACH", "PARTITION"); /* Zoltan method: "BLOCK" */
+	zz->Set_Param("NUM_GID_ENTRIES", "1");     /* global ID is 1 integer */
+	zz->Set_Param("NUM_LID_ENTRIES", "1");     /* local ID is 1 integer */
+	zz->Set_Param("OBJ_WEIGHT_DIM", "0");      /* we omit object weights */
+	zz->Set_Param("AUTO_MIGRATE", "TRUE");     /* we omit object weights */
 
 	// Query functions
 	zz->Set_Num_Obj_Fn(DomainSignatureCollection::get_number_of_objects, this);
@@ -200,8 +202,8 @@ void DomainSignatureCollection::zoltanBalance()
 	zz->Set_Obj_Size_Multi_Fn(DomainSignatureCollection::object_sizes, this);
 	zz->Set_Num_Edges_Fn(DomainSignatureCollection::numInterfaces, this);
 	zz->Set_Edge_List_Fn(DomainSignatureCollection::interfaceList, this);
-	//zz->Set_Geom_Fn(DomainSignatureCollection::coord, this);
-	//zz->Set_Num_Geom_Fn(DomainSignatureCollection::dimensions, this);
+	// zz->Set_Geom_Fn(DomainSignatureCollection::coord, this);
+	// zz->Set_Num_Geom_Fn(DomainSignatureCollection::dimensions, this);
 
 	////////////////////////////////////////////////////////////////
 	// Zoltan can now partition the objects in this collection.

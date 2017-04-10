@@ -7,30 +7,35 @@
 #include <valarray>
 #include <map>
 #include <iostream>
-class Block{
+class Block
+{
 	public:
-	bool flip_i;
-	bool flip_j;
+	bool   flip_i;
+	bool   flip_j;
+	double scale = 1;
 
 	Teuchos::RCP<std::valarray<double>> block;
 
-    Block(){}
-	Block(Teuchos::RCP<std::valarray<double>> block, bool flip_i = false, bool flip_j = false)
+	Block() {}
+	Block(Teuchos::RCP<std::valarray<double>> block, bool flip_i = false, bool flip_j = false,
+	      double scale = 1)
 	{
 		this->block  = block;
 		this->flip_i = flip_i;
 		this->flip_j = flip_j;
+		this->scale  = scale;
 	}
 	friend bool operator==(const Block &l, const Block &r)
 	{
-		return std::tie(l.flip_i, l.flip_j, l.block) == std::tie(r.flip_i, r.flip_j, r.block);
+		return std::tie(l.flip_i, l.flip_j, l.block, l.scale)
+		       == std::tie(r.flip_i, r.flip_j, r.block, r.scale);
 	}
 	friend bool operator<(const Block &l, const Block &r)
 	{
-        double* left_ptr = &(*l.block)[0];
-        double* right_ptr = &(*r.block)[0];
-		return std::tie(l.flip_i, l.flip_j, left_ptr)
-		       < std::tie(r.flip_i, r.flip_j, right_ptr);
+		double *left_ptr  = &(*l.block)[0];
+		double *right_ptr = &(*r.block)[0];
+		return std::tie(l.flip_i, l.flip_j, left_ptr, l.scale)
+		       < std::tie(r.flip_i, r.flip_j, right_ptr, r.scale);
 	}
 };
 class RBMatrix : public Tpetra::Operator<>
@@ -59,8 +64,8 @@ class RBMatrix : public Tpetra::Operator<>
 	void apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode = Teuchos::NO_TRANS,
 	           double alpha = Teuchos::ScalarTraits<double>::one(),
 	           double beta  = Teuchos::ScalarTraits<double>::zero()) const;
-	void insertBlock(int i, int j, Teuchos::RCP<std::valarray<double>> block, bool flip_i,
-	                 bool flip_j);
+	void insertBlock(int i, int j, Teuchos::RCP<std::valarray<double>> block, bool flip_i = false,
+	                 bool flip_j = false, double scale = 1);
 	void                                createRangeMap();
 	Teuchos::RCP<const map_type>        getDomainMap() const { return domain; }
 	Teuchos::RCP<const map_type>        getRangeMap() const { return range; }

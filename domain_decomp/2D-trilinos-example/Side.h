@@ -3,7 +3,7 @@
 enum class Side { north, east, south, west };
 inline Side operator++(Side &s,int i)
 {
-	s = static_cast<Side>((static_cast<int>(s) + 1));
+	s = static_cast<Side>((static_cast<int>(s) + 1)%4);
 	return s;
 }
 inline Side operator!(const Side s) { return static_cast<Side>((static_cast<int>(s) + 2) % 4); }

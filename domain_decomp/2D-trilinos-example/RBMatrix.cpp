@@ -45,12 +45,14 @@ void LUSolver::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 	for (int j = 0; j < L->getNumBlocks(); j++) {
 		// do lower triangular block
 		blk_ptr Lkk = L->getBlock(j * block_size, j * block_size);
-        int x_i = x.getMap()->getLocalElement(j*block_size);
+		valarray<double> &Lkk_blk = *Lkk;
+
+		int x_i = x.getMap()->getLocalElement(j * block_size);
 
 		for (int block_i = 0; block_i < block_size; block_i++) {
 			for (int block_j = block_i - 1; block_j >= 0; block_j--) {
 				x_view(x_i + block_i, 0)
-				-= x_view(x_i + block_j, 0) * (*Lkk)[block_i + block_size * block_j];
+				-= x_view(x_i + block_j, 0) * Lkk_blk[block_i + block_size * block_j];
 			}
 		}
 
@@ -59,10 +61,11 @@ void LUSolver::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 			int     x_i2 = x.getMap()->getLocalElement(i * block_size);
 			blk_ptr Lik  = L->getBlock(i * block_size, j * block_size);
 			if (!Lik.is_null()) {
-				for (int block_j = 0; block_j < block_size; block_j++) {
-					for (int block_i = 0; block_i < block_size; block_i++) {
+				valarray<double> &Lik_blk = *Lik;
+				for (int block_i = 0; block_i < block_size; block_i++) {
+					for (int block_j = 0; block_j < block_size; block_j++) {
 						x_view(x_i2 + block_i, 0)
-						-= x_view(x_i + block_j, 0) * (*Lik)[block_i + block_size * block_j];
+						-= x_view(x_i + block_j, 0) * Lik_blk[block_i + block_size * block_j];
 					}
 				}
 			}
@@ -71,13 +74,15 @@ void LUSolver::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 	// U solve
 	for (int j = U->getNumBlocks() - 1; j >= 0; j--) {
 		// do lower triangular block
-		blk_ptr Ukk = U->getBlock(j * block_size, j * block_size);
-		int     x_i = x.getMap()->getLocalElement(j * block_size);
+		blk_ptr           Ukk     = U->getBlock(j * block_size, j * block_size);
+		valarray<double> &Ukk_blk = *Ukk;
+
+		int x_i = x.getMap()->getLocalElement(j * block_size);
 
 		for (int block_i = block_size - 1; block_i >= 0; block_i--) {
 			for (int block_j = block_size - 1; block_j > block_i; block_j--) {
 				x_view(x_i + block_i, 0)
-				-= x_view(x_i + block_j, 0) * (*Ukk)[block_i + block_size * block_j];
+				-= x_view(x_i + block_j, 0) * Ukk_blk[block_i + block_size * block_j];
 			}
 			// dvide by diagonal
 			x_view(x_i + block_i, 0) /= (*Ukk)[block_i + block_size * block_i];
@@ -88,10 +93,11 @@ void LUSolver::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 			int     x_i2 = x.getMap()->getLocalElement(i * block_size);
 			blk_ptr Uik  = U->getBlock(i * block_size, j * block_size);
 			if (!Uik.is_null()) {
-				for (int block_j = 0; block_j < block_size; block_j++) {
+				valarray<double> &Uik_blk = *Uik;
 					for (int block_i = 0; block_i < block_size; block_i++) {
+				for (int block_j = 0; block_j < block_size; block_j++) {
 						x_view(x_i2 + block_i, 0)
-						-= x_view(x_i + block_j, 0) * (*Uik)[block_i + block_size * block_j];
+						-= x_view(x_i + block_j, 0) * Uik_blk[block_i + block_size * block_j];
 						//cerr << x_view(x_i2 + block_i, 0) << endl;
 					}
 				}
@@ -120,35 +126,37 @@ void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 			Block curr_block = p.second;
 			for (int iii = 0; iii < block_size; iii++) {
 				int matrix_i = start_i + iii;
-				if (matrix_i == local_skip_i && local_skip_i != -1 && local_skip_j != -1) {
-					y_view(matrix_i, 0) += x_view(local_skip_j, 0);
-				} else {
-					int block_i = iii;
-					if (curr_block.flip_i) {
-						block_i = block_size - 1 - iii;
-					}
-					valarray<double> &curr_blk = *curr_block.block;
+				int block_i  = iii;
+				if (curr_block.flip_i) {
+					block_i = block_size - 1 - iii;
+				}
+				valarray<double> &curr_blk = *curr_block.block;
 
-					if (curr_block.flip_j) {
-						for (int i = 0; i < block_size; i++) {
-							y_view(matrix_i, 0)
-							+= x_view(start_j + i, 0)
-							   * curr_blk[block_i + block_size * (block_size - 1 - i)];
-						}
-					} else {
-						for (int i = 0; i < block_size; i++) {
-							y_view(matrix_i, 0)
-							+= x_view(start_j + i, 0) * curr_blk[block_i + block_size * i];
-						}
+				if (curr_block.flip_j) {
+					for (int i = 0; i < block_size; i++) {
+						y_view(matrix_i, 0)
+						+= x_view(start_j + i, 0)
+						   * curr_blk[block_i + block_size * (block_size - 1 - i)]
+						   * curr_block.scale;
+					}
+				} else {
+					for (int i = 0; i < block_size; i++) {
+						y_view(matrix_i, 0) += x_view(start_j + i, 0)
+						                       * curr_blk[block_i + block_size * i]
+						                       * curr_block.scale;
 					}
 				}
 			}
 		}
 	}
 	y.doExport(my_y, *exporter, Tpetra::CombineMode::ADD);
+	// y.update(2, x, 1);
 }
-void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_i, bool flip_j)
+void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_i, bool flip_j,
+                           double scale)
 {
+    i *=block_size;
+    j *=block_size;
 	int   local_j = domain->getLocalElement(j);
 	int   local_i = -1;
 	try{
@@ -160,11 +168,11 @@ void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_
 		for (int x = i; x <i+ block_size; x++) {
 			global_i.push_back(x);
 		}
-        curr_local_i+=block_size;
+		curr_local_i += block_size;
 		range_map[i] = local_i;
 	}
 
-	Block b(block, flip_i, flip_j);
+	Block b(block, flip_i, flip_j,scale);
 
     int index = local_j/block_size;
 	if (block_cols[index].count(local_i) > 0) {
@@ -194,7 +202,8 @@ void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_
 					if (first_block.flip_j) {
 						block_j = block_size - j - 1;
 					}
-					new_blk[i + block_size * j] = first_blk[block_i + block_size * block_j];
+					new_blk[i + block_size * j]
+					= first_blk[block_i + block_size * block_j] * first_block.scale;
 				}
 			}
 			for (int i = 0; i < block_size; i++) {
@@ -207,7 +216,8 @@ void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_
 					if (b.flip_j) {
 						block_j = block_size - j - 1;
 					}
-					new_blk[i + block_size * j] += second_blk[block_i + block_size * block_j];
+					new_blk[i + block_size * j]
+					+= second_blk[block_i + block_size * block_j] * b.scale;
 				}
 			}
 			block_cols[index][local_i] = new_block;
@@ -222,10 +232,6 @@ void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_
 void RBMatrix::createRangeMap()
 {
 	range = Teuchos::rcp(new map_type(-1, &global_i[0], global_i.size(), 0, domain->getComm()));
-	if (skip_index != -1) {
-		local_skip_i = range->getLocalElement(skip_index);
-		local_skip_j = domain->getLocalElement(skip_index);
-	}
 	exporter = rcp(new Tpetra::Export<>(range, domain));
 }
 RCP<RBMatrix> RBMatrix::invBlockDiag(){
@@ -241,18 +247,13 @@ RCP<RBMatrix> RBMatrix::invBlockDiag(){
 			if (global_j == global_i) {
 				RCP<valarray<double>> blk_inv_ptr;
 				Block                 curr_block = p.second;
-				if (local_skip_i != -1 && local_skip_i <= start_i
-				    && start_i < local_skip_i + block_size) {
-					// modify the row of this block and invert
-					blk_inv_ptr               = rcp(new valarray<double>(*curr_block.block));
-					valarray<double> &blk_inv = *blk_inv_ptr;
 
-					// modify the row
-					int block_i = local_skip_i % block_size;
-					for (int j = 0; j < block_size; j++) {
-						blk_inv[block_i * block_size + j] = 0;
-					}
-					blk_inv[block_i * block_size + block_i] = 1;
+				try {
+					blk_inv_ptr = computed.at(&(*curr_block.block)[0]);
+				} catch (const out_of_range &oor) {
+					// invert this block
+					blk_inv_ptr               = blkCopy(curr_block);
+					valarray<double> &blk_inv = *blk_inv_ptr;
 
 					// compute inverse of block
 					valarray<int>    ipiv(block_size + 1);
@@ -262,29 +263,11 @@ RCP<RBMatrix> RBMatrix::invBlockDiag(){
 					dgetrf_(&block_size, &block_size, &blk_inv[0], &block_size, &ipiv[0], &info);
 					dgetri_(&block_size, &blk_inv[0], &block_size, &ipiv[0], &work[0], &lwork,
 					        &info);
-				} else {
-					try {
-						blk_inv_ptr = computed.at(&(*curr_block.block)[0]);
-					} catch (const out_of_range &oor) {
-						// invert this block
-						blk_inv_ptr               = rcp(new valarray<double>(*curr_block.block));
-						valarray<double> &blk_inv = *blk_inv_ptr;
 
-						// compute inverse of block
-						valarray<int>    ipiv(block_size + 1);
-						int              lwork = block_size * block_size;
-						valarray<double> work(lwork);
-						int              info;
-						dgetrf_(&block_size, &block_size, &blk_inv[0], &block_size, &ipiv[0],
-						        &info);
-						dgetri_(&block_size, &blk_inv[0], &block_size, &ipiv[0], &work[0], &lwork,
-						        &info);
-
-						// insert the block
-						computed[&(*curr_block.block)[0]] = blk_inv_ptr;
-					}
+					// insert the block
+					computed[&(*curr_block.block)[0]] = blk_inv_ptr;
 				}
-				Inv->insertBlock(global_i, global_j, blk_inv_ptr, false, false);
+				Inv->insertBlock(global_i/block_size, global_j/block_size, blk_inv_ptr);
 			}
 		}
 	}
@@ -375,7 +358,7 @@ blk_ptr RBMatrix::blkCopy(Block in)
 			if (in.flip_j) {
 				in_j = block_size - 1 - j;
 			}
-			(*C)[i + block_size * j] = (*in.block)[in_i + block_size * in_j];
+			(*C)[i + block_size * j] = (*in.block)[in_i + block_size * in_j] * in.scale;
 		}
 	}
 	return C;
@@ -403,8 +386,8 @@ void RBMatrix::lu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
 		piv_ptr Pkk;
         // do lu on diagonal block
 		DGETRF(Akk, Lkk, Ukk, Pkk);
-		L->insertBlock(k * block_size, k * block_size, Lkk, false, false);
-		U->insertBlock(k * block_size, k * block_size, Ukk, false, false);
+		L->insertBlock(k, k, Lkk, false, false);
+		U->insertBlock(k, k, Ukk, false, false);
 		// get row of U's
 		for (int j = k + 1; j < num_blocks; j++) {
 			auto Akj_block = block_cols[j].find(range_k);
@@ -412,7 +395,7 @@ void RBMatrix::lu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
 				blk_ptr Ukj;
 				blk_ptr Akj = blkCopy(Akj_block->second);
 				DGESSM(Akj, Lkk, Ukj, Pkk);
-				U->insertBlock(k * block_size, j * block_size, Ukj, false, false);
+				U->insertBlock(k, j, Ukj, false, false);
 			}
 		}
 		// get Column of L's
@@ -423,7 +406,7 @@ void RBMatrix::lu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
 				blk_ptr Lik;
 				blk_ptr Aik = blkCopy(Aik_block->second);
 				LSolve(Aik, Lik, Ukk, Pkk);
-				L->insertBlock(i * block_size, k * block_size, Lik, false, false);
+				L->insertBlock(i, k, Lik, false, false);
 			}
 		}
         //update rest of matrix
@@ -445,7 +428,7 @@ void RBMatrix::lu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
 						dgemm_(&trans, &trans, &block_size, &block_size, &block_size, &one,
 						       &(*Lik)[0], &block_size, &(*Ukj)[0], &block_size, &zero, &(*C)[0],
 						       &block_size);
-						insertBlock(i * block_size, j * block_size, C, false, false);
+						insertBlock(i, j, C, false, false);
 					}
 				}
 			}
@@ -464,8 +447,8 @@ void RBMatrix::ilu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
 		blk_ptr Lkk, Ukk;
 		piv_ptr Pkk;
 		DGETRF(Akk, Lkk, Ukk, Pkk);
-		L->insertBlock(k * block_size, k * block_size, Lkk, false, false);
-		U->insertBlock(k * block_size, k * block_size, Ukk, false, false);
+		L->insertBlock(k, k, Lkk, false, false);
+		U->insertBlock(k, k, Ukk, false, false);
 		// get row of U's
 		for (int j = k + 1; j < num_blocks; j++) {
 			auto Akj_block = block_cols[j].find(range_k);
@@ -473,7 +456,7 @@ void RBMatrix::ilu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
 				blk_ptr Ukj;
 				blk_ptr Akj = blkCopy(Akj_block->second);
 				DGESSM(Akj, Lkk, Ukj, Pkk);
-				U->insertBlock(k * block_size, j * block_size, Ukj, false, false);
+				U->insertBlock(k, j, Ukj, false, false);
 			}
 		}
 		// get Column of L's
@@ -484,7 +467,7 @@ void RBMatrix::ilu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
 				blk_ptr Lik;
 				blk_ptr Aik = blkCopy(Aik_block->second);
 				LSolve(Aik, Lik, Ukk, Pkk);
-				L->insertBlock(i * block_size, k * block_size, Lik, false, false);
+				L->insertBlock(i, k, Lik, false, false);
 			}
 		}
         /*
@@ -676,8 +659,8 @@ ostream& operator<<(ostream& os, const RBMatrix& A) {
 					if (curr_block.flip_j) {
 						block_j = A.block_size - 1 - jjj;
 					}
-					os << i + 1 << ' ' << j + 1 << ' ' << curr_blk[block_i + A.block_size * block_j]
-					   << "\n";
+					os << i + 1 << ' ' << j + 1 << ' '
+					   << curr_blk[block_i + A.block_size * block_j] * curr_block.scale << "\n";
 				}
 			}
 		}
