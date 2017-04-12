@@ -30,6 +30,8 @@
 #include "HYPRE_parcsr_ls.h"
 #include "HYPRE_parcsr_mv.h"
 
+#include "../all/test_solns.h"
+
 #include "vis.c"
 #include "mpi.h"
 
@@ -239,13 +241,13 @@ int main (int argc, char *argv[])
     /* Ghost indices, needed for SetNeighborPart */
     int ll_g[2], lr_g[2], ul_g[2], ur_g[2];
     ll_g[0] = ll[0] - 1;
-    ll_g[1] = ll[1];
+    ll_g[1] = ll[1] - 1;
     lr_g[0] = lr[0] + 1;
-    lr_g[1] = lr[1];
+    lr_g[1] = lr[1] + 1;
     ul_g[0] = ul[0] - 1;
-    ul_g[1] = ul[1];
+    ul_g[1] = ul[1] + 1;
     ur_g[0] = ur[0] + 1;
-    ur_g[1] = ur[1];
+    ur_g[1] = ur[1] - 1;
 #endif
 
     int object_type;
@@ -303,17 +305,28 @@ int main (int argc, char *argv[])
             HYPRE_SStructGridSetVariables(grid, part, nvars, vartypes);
         }
 
-#ifndef USE_GRAPH_ENTRIES
-        /* Connectivity between four sibling grids (doesn't yet work)
+        /* Connectivity between four sibling grids 
 
            Vertical connections   : P1-P2, P3-P4
            Horizontal connections : P1-P3, P2-P4
         */
         {
             int index_dir[2] = {1,1};
+            int index_map[2] = {0,1};
             int nbor_part;
 
             {
+
+                /* Ghost indices, needed for SetNeighborPart */
+                ll_g[0] = ll[0] - 1;
+                ll_g[1] = ll[1];
+                lr_g[0] = lr[0] + 1;
+                lr_g[1] = lr[1];
+                ul_g[0] = ul[0] - 1;
+                ul_g[1] = ul[1];
+                ur_g[0] = ur[0] + 1;
+                ur_g[1] = ur[1];           
+
                 int index_map[2] = {0,1};
 
                 /* P1 and P2 */
@@ -327,9 +340,6 @@ int main (int argc, char *argv[])
                 HYPRE_SStructGridSetNeighborPart(grid, part, ll_g, ul_g,
                                                  nbor_part, lr, ur,
                                                  index_map, index_dir);
-            }
-            {
-                int index_map[2] = {0,1};
 
                 /* P3 and P4 */
                 part = 3;
@@ -345,7 +355,16 @@ int main (int argc, char *argv[])
             }
 
             {
-                int index_map[2] = {1,0};
+
+                /* Ghost indices, needed for SetNeighborPart */
+                ll_g[0] = ll[0];
+                ll_g[1] = ll[1] - 1;
+                lr_g[0] = lr[0];
+                lr_g[1] = lr[1] + 1;
+                ul_g[0] = ul[0];
+                ul_g[1] = ul[1] - 1;
+                ur_g[0] = ur[0];
+                ur_g[1] = ur[1] + 1;           
 
                 /* P1 and P3 */
                 part = 1;
@@ -358,9 +377,6 @@ int main (int argc, char *argv[])
                 HYPRE_SStructGridSetNeighborPart(grid, part, ll_g, lr_g,
                                                  nbor_part, ul, ur,
                                                  index_map, index_dir);
-            }
-            {
-                int index_map[2] = {1,0};
 
                 /* P2 and P4 */
                 part = 2;
@@ -375,7 +391,6 @@ int main (int argc, char *argv[])
                                                  index_map, index_dir);
             }
         }
-#endif
 
         HYPRE_SStructGridAssemble(grid);
     }
