@@ -18,8 +18,9 @@ struct DomainSignature {
 
 	std::array<int, 8> nbr_id      = {-1, -1, -1, -1, -1, -1, -1, -1};
 	std::array<int, 8> proc     = {-1, -1, -1, -1, -1, -1, -1, -1};
-	std::array<int, 12> global_i = {-1, -1, -1, -1};
-	std::array<int, 12> global_i_center = {-1, -1, -1, -1};
+	std::array<int, 4> global_i = {-1, -1, -1, -1};
+	std::array<int, 4> global_i_center = {-1, -1, -1, -1};
+	std::array<int, 8> global_i_refined = {-1, -1, -1, -1,-1,-1,-1,-1};
 	std::bitset<4> nbr_coarse;
 	std::bitset<4> nbr_fine;
 	std::bitset<4> left_of_coarse;
@@ -47,6 +48,8 @@ struct DomainSignature {
 	}
 	inline int &index(Side s) { return global_i[static_cast<int>(s)]; }
 	inline int &indexCenter(Side s) { return global_i_center[static_cast<int>(s)]; }
+	inline int &indexRefinedLeft(Side s) { return global_i_refined[2*static_cast<int>(s)]; }
+	inline int &indexRefinedRight(Side s) { return global_i_refined[1+2*static_cast<int>(s)]; }
 	inline int &nbr(Side s) { return nbr_id[2*static_cast<int>(s)]; }
 	inline int &nbrRight(Side s) { return nbr_id[2*static_cast<int>(s)+1]; }
 	inline bool hasNbr(Side s) { return nbr_id[static_cast<int>(s) * 2] != -1; }

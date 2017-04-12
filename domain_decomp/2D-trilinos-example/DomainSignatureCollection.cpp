@@ -155,6 +155,10 @@ void DomainSignatureCollection::indexInterfacesBFS()
 					nbr_right.index(!s) = curr_i;
 					curr_i++;
 
+                    // set refined indexes
+					d.indexRefinedLeft(s)  = nbr_left.index(!s);
+					d.indexRefinedRight(s) = nbr_right.index(!s);
+
 					// enqueue domains
 					if (enqueued.count(d.nbr(s)) == 0) {
 						queue.push_back(d.nbr(s));

@@ -201,11 +201,22 @@ int main(int argc, char *argv[])
 			return 11 * M_PI * sin(11 * M_PI * y) * exp(cos(11 * M_PI * y));
 		};
 	} else {
-		ffun
-		= [](double x, double y) { return -5 * M_PI * M_PI * sin(M_PI * y) * cos(2 * M_PI * x); };
-		gfun  = [](double x, double y) { return sin(M_PI * y) * cos(2 * M_PI * x); };
-		nfunx = [](double x, double y) { return -2 * M_PI * sin(M_PI * y) * sin(2 * M_PI * x); };
-		nfuny = [](double x, double y) { return M_PI * cos(M_PI * y) * cos(2 * M_PI * x); };
+		ffun = [](double x, double y) {
+			x -= .3;
+			return -5 * M_PI * M_PI * sin(M_PI * y) * cos(2 * M_PI * x);
+		};
+		gfun = [](double x, double y) {
+			x -= .3;
+			return sin(M_PI * y) * cos(2 * M_PI * x);
+		};
+		nfunx = [](double x, double y) {
+			x -= .3;
+			return -2 * M_PI * sin(M_PI * y) * sin(2 * M_PI * x);
+		};
+		nfuny = [](double x, double y) {
+			x -= .3;
+			return M_PI * cos(M_PI * y) * cos(2 * M_PI * x);
+		};
 	}
 
 	valarray<double> times(loop_count);
