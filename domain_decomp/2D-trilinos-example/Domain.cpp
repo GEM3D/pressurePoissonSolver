@@ -530,12 +530,16 @@ valarray<double> Domain::getSideCoarse(Side s)
 	int  grid_i = 1;
 	bool right  = false;
 
-	if (!nbr_left) {
-		refined[0] = (5.0 * val_left + 30.0 * retval[0] - 3.0 * retval[1]) / 32.0;
-		refined[1] = (5.0 * retval[1] + 30.0 * retval[0] - 3.0 * val_left) / 32.0;
-	} else {
-		refined[0] = retval[0] - (retval[0] - retval[1]) / 2.0;
-	}
+	if (!nbr_left && neumann) {
+		refined[0] = (-10.0 * val_left + 35.0 * retval[0] - 3.0 * retval[1]) / 32.0;
+		refined[1] = (6.0 * val_left + 27.0 * retval[0] + 5.0 * retval[1]) / 32.0;
+	} else if (!nbr_left) {
+		refined[0] = (10.0 * val_left + 15.0 * retval[0] - retval[1]) / 24.0;
+		refined[1] = (-2.0 * val_left + 9.0 * retval[0] + retval[1]) / 8.0;
+    }else{
+		refined[0] = (10.0 * val_left + 25.0 * retval[0] -3.0* retval[1]) / 32.0;
+		refined[1] = (-6.0 * val_left + 33.0 * retval[0] +5.0* retval[1]) / 32.0;
+    }
 	for (int i = 2; i < 2 * n - 2; i++) {
 		if (right) {
 			refined[i]
@@ -548,15 +552,18 @@ valarray<double> Domain::getSideCoarse(Side s)
 			right = true;
 		}
 	}
-	if (!nbr_right) {
-		refined[2 * n - 2]
-		= (5.0 * retval[n - 2] + 30.0 * retval[n - 1] - 3.0 * val_right) / 32.0;
+	if (!nbr_right && neumann) {
+		refined[2 * n - 2] = (6.0 * val_right + 27.0 * retval[n - 1] + 5.0 * retval[n - 2]) / 32.0;
 		refined[2 * n - 1]
-		= (5.0 * val_right + 30.0 * retval[n - 1] - 3.0 * retval[n - 2]) / 32.0;
-	} else {
-		refined[2 * n - 1] = retval[n - 1] - (retval[n - 1] - retval[n - 2]) / 2.0;
-	}
-
+		= (-10.0 * val_right + 35.0 * retval[n - 1] - 3.0 * retval[n - 2]) / 32.0;
+	}else
+    if(!nbr_right){
+		refined[2*n-2] = (-2.0 * val_right + 9.0 * retval[n-1] + retval[n-2]) / 8.0;
+		refined[2*n-1] = (10.0 * val_right + 15.0 * retval[n-1] - retval[n-2]) / 24.0;
+    }else{
+		refined[2*n-2] = (-6.0 * val_right + 33.0 * retval[n-1] +5.0 *retval[n-2]) / 32.0;
+		refined[2*n-1] = (10.0 * val_right + 25.0 * retval[n-1] -3.0* retval[n-2]) / 32.0;
+    }
 	return refined;
 }
 valarray<double> Domain::getStencil(Side s,Tilt t)
