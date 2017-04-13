@@ -46,7 +46,7 @@ class Domain
 	double                 y_length = 0;
 
 	Domain() = default;
-	Domain(DomainSignature ds, int n, double h_x, double h_y);
+	Domain(DomainSignature ds, int n);
 	~Domain();
 
 	void planDirichlet();

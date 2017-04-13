@@ -36,14 +36,6 @@ class DomainCollection
 
 	bool amr = false;
 	/**
-	 * @brief Spacing of coarsest grid in x direction
-	 */
-	double h_x;
-	/**
-	 * @brief Spacing of coarsest grid in y direction
-	 */
-	double h_y;
-	/**
 	 * @brief Number of global domains
 	 */
 	int num_global_domains;
@@ -101,7 +93,7 @@ class DomainCollection
 	 * @param h_y the y spacing
 	 * @param comm the teuchos communicator
 	 */
-	DomainCollection(DomainSignatureCollection dsc, int n, double h_x, double h_y,
+	DomainCollection(DomainSignatureCollection dsc, int n,
 	                 Teuchos::RCP<const Teuchos::Comm<int>> comm);
 
 	/**

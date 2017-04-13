@@ -15,22 +15,20 @@ void dgetri_(int *N, double *A, int *lda, int *IPIV, double *WORK, int *lwork, i
 enum axis_enum { X_AXIS, Y_AXIS };
 enum bc_enum { DIRICHLET, NEUMANN, REFINED };
 
-DomainCollection::DomainCollection(DomainSignatureCollection dsc, int n, double h_x, double h_y,
+DomainCollection::DomainCollection(DomainSignatureCollection dsc, int n,
                                    RCP<const Teuchos::Comm<int>> comm)
 {
 	// cerr<< "Low:  " << low << "\n";
 	// cerr<< "High: " << high << "\n";
 	this->comm         = comm;
 	this->n            = n;
-	this->h_x          = h_x;
-	this->h_y          = h_y;
 	num_global_domains = dsc.num_global_domains;
 	for (auto p : dsc.domains) {
 		DomainSignature ds       = p.second;
 		int             i        = ds.id;
 
 		// create a domain
-		RCP<Domain> d_ptr = rcp(new Domain(ds, n, h_x, h_y));
+		RCP<Domain> d_ptr = rcp(new Domain(ds, n));
 		domains[i]        = d_ptr;
 	}
 }
@@ -439,6 +437,8 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 
 		// create domain representing curr_type
 		DomainSignature ds;
+        ds.x_length=1;
+        ds.y_length=1;
         for(int q=0;q<4;q++){
 			if (curr_type.types[q] == NEUMANN) {
 				ds.nbr_id[(q * 2 + 4) % 8] = -1;
@@ -446,7 +446,7 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 				ds.nbr_id[(q * 2 + 4) % 8] = 1;
 			}
 		}
-		Domain d(ds, n, 1.0, 1.0);
+		Domain d(ds, n);
 		d.boundary_north = valarray<double>(n);
 		d.boundary_south = valarray<double>(n);
 		d.boundary_east  = valarray<double>(n);

@@ -1,12 +1,12 @@
 #include "Domain.h"
 #include "Iface.h"
 using namespace std;
-Domain::Domain(DomainSignature ds, int n, double h_x, double h_y)
+Domain::Domain(DomainSignature ds, int n)
 {
 	this->n  = n;
-	this->h_x = h_x / ds.refine_level;
-	this->h_y = h_y / ds.refine_level;
-	this->ds = ds;
+	this->h_x = ds.x_length / n;
+	this->h_y = ds.y_length / n;
+	this->ds  = ds;
 
 #if NDEBUG
 	cerr << "I am Domain: " << ds.id << "\n";

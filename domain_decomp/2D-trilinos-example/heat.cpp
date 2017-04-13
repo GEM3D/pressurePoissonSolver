@@ -54,13 +54,17 @@ int main(int argc, char *argv[])
 	// parse input
 	args::ArgumentParser  parser("");
 	args::HelpFlag        help(parser, "help", "Display this help menu", {'h', "help"});
-	args::Positional<int> d_x(parser, "d_x", "number of domains in the x direction");
-	args::Positional<int> d_y(parser, "d_y", "number of domains in the y direction");
-	args::Positional<int> n_x(parser, "n_x", "number of cells in the x direction, in each domain");
-	args::Positional<int> n_y(parser, "n_y", "number of cells in the y direction, in each domain");
-	args::Flag            f_amr(parser, "amr", "use a refined mesh", {"amr"});
-	args::Flag            f_outclaw(parser, "outclaw", "output amrclaw ascii file", {"outclaw"});
-	args::ValueFlag<int>  f_l(parser, "n", "run the program n times and print out the average",
+
+	args::ValueFlag<int> f_n(parser, "n", "number of cells in the x direction, in each domain",
+	                          {'n'});
+	args::ValueFlag<int> f_square(
+	parser, "num_domains", "create a num_domains x num_domains square of grids", {"square"});
+	args::ValueFlag<int> f_amr(parser, "num_domains", "create a num_domains x num_domains square "
+	                                                   "of grids, and a num_domains*2 x "
+	                                                   "num_domains*2 refined square next to it",
+	                            {"amr"});
+	args::Flag           f_outclaw(parser, "outclaw", "output amrclaw ascii file", {"outclaw"});
+	args::ValueFlag<int> f_l(parser, "n", "run the program n times and print out the average",
 	                         {'l'});
 	args::ValueFlag<string> f_m(parser, "matrix filename", "the file to write the matrix to",
 	                            {'m'});
@@ -78,13 +82,10 @@ int main(int argc, char *argv[])
 	                            "the file to write the preconditioner to", {'p'});
 	args::ValueFlag<double> f_t(
 	parser, "tolerance", "set the tolerance of the iterative solver (default is 1e-10)", {'t'});
-	args::ValueFlag<int> f_d(
-	parser, "row", "pin gamma value to zero (by modifying that row of the schur compliment matrix)",
-	{'z'});
 	args::Flag f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
 	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
 	args::Flag f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
-	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {'n', "neumann"});
+	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {"neumann"});
 	args::Flag f_gmres(parser, "gmres", "use GMRES for iterative solver", {"gmres"});
 	args::Flag f_bicg(parser, "gmres", "use BiCGStab for iterative solver", {"bicg"});
 	args::Flag f_nozero(parser, "nozero", "don't make the average of vector zero in CG solver",
@@ -115,31 +116,34 @@ int main(int argc, char *argv[])
 		}
 		return 1;
 	}
+	DomainSignatureCollection dsc;
+	if (f_amr) {
+        int d = args::get(f_amr);
+		dsc   = DomainSignatureCollection(d, d, comm->getRank(), true);
+	} else {
+        int d = args::get(f_square);
+		dsc = DomainSignatureCollection(d, d, comm->getRank());
+	}
 	// Set the number of discretization points in the x and y direction.
-	int    num_domains_x = args::get(d_x);
-	int    num_domains_y = args::get(d_y);
-	int    nx            = args::get(n_x);
-	int    ny            = args::get(n_y);
-	int    total_cells   = nx * num_domains_x * ny * num_domains_y;
+	int    nx            = args::get(f_n);
+	int    ny            = args::get(f_n);
+	int    total_cells   = dsc.num_global_domains*nx*ny;
 	if (f_amr) {
 		total_cells *= 5;
 	}
-	double h_x           = 1.0 / (nx * num_domains_x);
-	double h_y           = 1.0 / (ny * num_domains_y);
 
-	if (num_domains_x * num_domains_y < num_procs) {
+	if (dsc.num_global_domains < num_procs) {
 		std::cerr << "number of domains must be greater than or equal to the number of processes\n";
 		return 1;
+	}
+	// partition domains
+	if (num_procs > 1) {
+		dsc.zoltanBalance();
 	}
 
 	double tol = 1e-10;
 	if (f_t) {
 		tol = args::get(f_t);
-	}
-
-	int del = -1;
-	if (f_d) {
-		del = args::get(f_d);
 	}
 
 	int loop_count = 1;
@@ -223,19 +227,10 @@ int main(int argc, char *argv[])
 	valarray<double> times(loop_count);
 	for (int loop = 0; loop < loop_count; loop++) {
 		comm->barrier();
-		// partition domains
-		DomainSignatureCollection dsc;
-		if (f_amr) {
-			dsc = DomainSignatureCollection(num_domains_x, num_domains_y, comm->getRank(), true);
-		} else {
-			dsc = DomainSignatureCollection(num_domains_x, num_domains_y, comm->getRank());
-		}
-		if (num_procs > 1) {
-			dsc.zoltanBalance();
-		}
+		
 		steady_clock::time_point domain_start = steady_clock::now();
 
-		DomainCollection dc(dsc, nx, h_x, h_y, comm);
+		DomainCollection dc(dsc, nx, comm);
 
 		ZeroSum zs;
 		if (f_neumann) {
@@ -272,7 +267,7 @@ int main(int argc, char *argv[])
 		// Create linear problem for the Belos solver
 		RCP<Belos::LinearProblem<double, vector_type, Tpetra::Operator<>>> problem;
 		RCP<Belos::SolverManager<double, vector_type, Tpetra::Operator<>>> solver;
-		if (f_amr || num_domains_x * num_domains_y != 1) {
+		if (dsc.num_global_domains != 1) {
 			// do iterative solve
 
 			// Get the b vector
@@ -293,7 +288,7 @@ int main(int argc, char *argv[])
 				comm->barrier();
 				steady_clock::time_point form_start = steady_clock::now();
 
-				RBA = dc.formRBMatrix(matrix_map,del);
+				RBA = dc.formRBMatrix(matrix_map);
 
 				comm->barrier();
 				duration<double> form_time = steady_clock::now() - form_start;
