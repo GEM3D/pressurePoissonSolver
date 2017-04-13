@@ -211,10 +211,18 @@ void Domain::putGhostCells(vector_type &ghost)
 	auto left_ptr  = ghost.getVectorNonConst(0);
 	auto right_ptr = ghost.getVectorNonConst(1);
 	if (hasNbr(Side::north)) {
-		fillDiffVector(Side::north, *right_ptr, true);
+		if (hasFineNbr(Side::north) || hasCoarseNbr(Side::north)) {
+			fillDiffVector(Side::north, *left_ptr, true);
+		} else {
+			fillDiffVector(Side::north, *right_ptr, true);
+		}
 	}
 	if (hasNbr(Side::east)) {
-		fillDiffVector(Side::east, *right_ptr, true);
+		if (hasFineNbr(Side::east) || hasCoarseNbr(Side::east)) {
+			fillDiffVector(Side::east, *left_ptr, true);
+		} else {
+			fillDiffVector(Side::east, *right_ptr, true);
+		}
 	}
 	if (hasNbr(Side::south)) {
 		fillDiffVector(Side::south, *left_ptr, true);
@@ -236,10 +244,18 @@ double Domain::residual(vector_type &ghost)
 	    fillBoundary(Side::east, *left_ptr);
 	}
 	if (hasNbr(Side::south)) {
-	    fillBoundary(Side::south, *right_ptr);
+		if (hasFineNbr(Side::south) || hasCoarseNbr(Side::south)) {
+			fillBoundary(Side::south, *left_ptr);
+		} else {
+			fillBoundary(Side::south, *right_ptr);
+		}
 	}
 	if (hasNbr(Side::west)) {
-	    fillBoundary(Side::west, *right_ptr);
+		if (hasFineNbr(Side::west) || hasCoarseNbr(Side::west)) {
+			fillBoundary(Side::west, *left_ptr);
+		} else {
+			fillBoundary(Side::west, *right_ptr);
+		}
 	}
 
 	valarray<double> f_comp = valarray<double>(n * n);
@@ -254,12 +270,7 @@ double Domain::residual(vector_type &ghost)
 			f_comp[j * n] = (-h_x * west - center + east) / (h_x * h_x);
 		} else if (!hasNbr(Side::west)) {
 			f_comp[j * n] = (2 * west - 3 * center + east) / (h_x * h_x);
-		} else if (hasFineNbr(Side::west)) {
-		    // TODO
-		    // f_comp[j * n] = (1.0 / 3.0 * west - 4.0 / 3.0 * center + east) / (h_x * h_x);
-			f_comp[j * n] = (2.0 / 3.0 * west - 7.0 / 3.0 * center + east) / (h_x * h_x);
-		} else if (hasCoarseNbr(Side::west)) {
-		    // TODO
+		} else {
 		    f_comp[j * n] = (west - 2 * center + east) / (h_x * h_x);
 		}
 	}
@@ -282,12 +293,7 @@ double Domain::residual(vector_type &ghost)
 			f_comp[j * n + n - 1] = (west - center + h_x * east) / (h_x * h_x);
 		} else if (!hasNbr(Side::east)) {
 			f_comp[j * n + n - 1] = (west - 3 * center + 2 * east) / (h_x * h_x);
-		} else if (hasFineNbr(Side::east)) {
-			f_comp[j * n + n - 1] = (west - 7.0 / 3.0 * center + 4.0 / 3.0 * east) / (h_x * h_x);
-		} else if (hasCoarseNbr(Side::east)) {
-			// TODO
-			// f_comp[j * n + n - 1] = (west - 4.0 / 3.0 * center + 1.0 / 3.0 * east) / (h_x *
-			// h_x);
+		} else {
 			f_comp[j * n + n - 1] = (west - 2 * center + east) / (h_x * h_x);
 		}
 	}
@@ -327,11 +333,6 @@ double Domain::residual(vector_type &ghost)
 			f_comp[(n - 1) * n + i] += (south - 2 * center + north) / (h_y * h_y);
 		}
 	}
-	//if (hasFineNbr(Side::east)) {
-	//	for (int j = 0; j < n; j++) {
-     //       f_comp[j*n+n-1]=f[j*n+n-1];
-	//	}
-	//}
 	resid = f - f_comp;
 	return sqrt(pow(f - f_comp, 2).sum());
 }
@@ -556,14 +557,13 @@ valarray<double> Domain::getSideCoarse(Side s)
 		refined[2 * n - 2] = (6.0 * val_right + 27.0 * retval[n - 1] + 5.0 * retval[n - 2]) / 32.0;
 		refined[2 * n - 1]
 		= (-10.0 * val_right + 35.0 * retval[n - 1] - 3.0 * retval[n - 2]) / 32.0;
-	}else
-    if(!nbr_right){
-		refined[2*n-2] = (-2.0 * val_right + 9.0 * retval[n-1] + retval[n-2]) / 8.0;
-		refined[2*n-1] = (10.0 * val_right + 15.0 * retval[n-1] - retval[n-2]) / 24.0;
-    }else{
-		refined[2*n-2] = (-6.0 * val_right + 33.0 * retval[n-1] +5.0 *retval[n-2]) / 32.0;
-		refined[2*n-1] = (10.0 * val_right + 25.0 * retval[n-1] -3.0* retval[n-2]) / 32.0;
-    }
+	} else if (!nbr_right) {
+		refined[2 * n - 2] = (-2.0 * val_right + 9.0 * retval[n - 1] + retval[n - 2]) / 8.0;
+		refined[2 * n - 1] = (10.0 * val_right + 15.0 * retval[n - 1] - retval[n - 2]) / 24.0;
+	} else {
+		refined[2 * n - 2] = (-6.0 * val_right + 33.0 * retval[n - 1] + 5.0 * retval[n - 2]) / 32.0;
+		refined[2 * n - 1] = (10.0 * val_right + 25.0 * retval[n - 1] - 3.0 * retval[n - 2]) / 32.0;
+	}
 	return refined;
 }
 valarray<double> Domain::getStencil(Side s,Tilt t)
@@ -590,12 +590,17 @@ void Domain::fillDiffVector(Side s, single_vector_type &diff, bool residual)
 		valarray<double> side   = getSide(s);
 		valarray<double> coarse = getSideCoarse(s);
 		if (!residual) {
+			int curr_i = index(s) * n;
+			for (int i = 0; i < n; i++) {
+				diff_view(curr_i, 0) += side[i];
+				curr_i++;
+			}
 		}
 		int curr_i      = index(s) * n;
 		int curr_low_i  = indexRefinedRight(s) * n;
 		int curr_high_i = indexRefinedLeft(s) * n;
 		for (int i = 0; i < n; i++) {
-			diff_view(curr_i, 0) += 2.0 * side[i];
+			diff_view(curr_i, 0) += side[i];
 			diff_view(curr_i, 0) -= 8.0 / 15.0 * (coarse[2 * i] + coarse[2 * i + 1]);
 			diff_view(curr_low_i, 0) += coarse[i] * 8.0 / 15.0;
 			diff_view(curr_high_i, 0) += coarse[n + i]*8.0/15.0;
@@ -609,13 +614,20 @@ void Domain::fillDiffVector(Side s, single_vector_type &diff, bool residual)
 		valarray<double> side   = getSide(s);
         valarray<double> inside = getInnerSide(s);
 		if (!residual) {
+			int curr_i        = index(s) * n;
+			int curr_i_center = indexCenter(s) * n;
+			for (int i = 0; i < n; i++) {
+				diff_view(curr_i_center, 0) += center[i];
+				diff_view(curr_i, 0) += side[i];
+				curr_i_center++;
+				curr_i++;
+			}
 		}
 		int curr_i        = index(s) * n;
 		int curr_i_center = indexCenter(s) * n;
 		for (int i = 0; i < n; i++) {
-			diff_view(curr_i_center, 0) += center[i];
 			diff_view(curr_i_center, 0) -= 2.0 / 3.0 * center[i] - 1.0 / 5.0 * incenter[i];
-			diff_view(curr_i, 0) += 5.0 / 3.0 * side[i] - 1.0 / 5.0 * inside[i];
+			diff_view(curr_i, 0) += 2.0 / 3.0 * side[i] - 1.0 / 5.0 * inside[i];
 			curr_i_center++;
 			curr_i++;
 		}
@@ -642,11 +654,34 @@ void Domain::swapResidSol()
 	f_back              = f;
 	f                   = resid;
 }
-void Domain::sumResidIntoSol(){
+void Domain::sumResidIntoSol()
+{
 	boundary_north = boundary_north_back;
 	boundary_east  = boundary_east_back;
 	boundary_south = boundary_south_back;
 	boundary_west  = boundary_west_back;
-    f = f_back;
+	f              = f_back;
 	u += u_back;
+}
+void Domain::outputClaw(std::ostream &os)
+{
+	const string tab = "\t";
+	os << ds.id << tab << "grid_number" << endl;
+	os << ds.refine_level << tab << "AMR_level" << endl;
+	os << 0 << tab << "block_number" << endl;
+	os << 0 << tab << "mpi_rank" << endl;
+	os << n << tab << "mx" << endl;
+	os << n << tab << "my" << endl;
+	os << x_start << tab << "xlow" << endl;
+	os << y_start << tab << "ylow" << endl;
+	os << h_x << tab << "dx" << endl;
+	os << h_y << tab << "dy" << endl;
+	os << endl;
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < n; j++) {
+			int loc = j + i * n;
+			os << u[loc] << tab << error[loc] << tab << resid[loc] << endl;
+		}
+		os << endl;
+	}
 }

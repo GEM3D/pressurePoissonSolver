@@ -58,7 +58,8 @@ int main(int argc, char *argv[])
 	args::Positional<int> d_y(parser, "d_y", "number of domains in the y direction");
 	args::Positional<int> n_x(parser, "n_x", "number of cells in the x direction, in each domain");
 	args::Positional<int> n_y(parser, "n_y", "number of cells in the y direction, in each domain");
-	args::Flag f_amr(parser, "amr", "use a refined mesh", {"amr"});
+	args::Flag            f_amr(parser, "amr", "use a refined mesh", {"amr"});
+	args::Flag            f_outclaw(parser, "outclaw", "output amrclaw ascii file", {"outclaw"});
 	args::ValueFlag<int>  f_l(parser, "n", "run the program n times and print out the average",
 	                         {'l'});
 	args::ValueFlag<string> f_m(parser, "matrix filename", "the file to write the matrix to",
@@ -530,6 +531,9 @@ int main(int argc, char *argv[])
 		if (save_gamma_file != "") {
 			Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_gamma_file, gamma, "",
 			                                                          "");
+		}
+		if (f_outclaw) {
+			dc.outputClaw();
 		}
 	}
 

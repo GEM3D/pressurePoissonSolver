@@ -113,5 +113,6 @@ class Domain
 		bool retval = (s == Side::north || s == Side::west);
 		return retval;
 	}
+	void outputClaw(std::ostream &os);
 };
 #endif

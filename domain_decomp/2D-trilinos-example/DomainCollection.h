@@ -239,5 +239,6 @@ class DomainCollection
 			p.second->sumResidIntoSol();
 		}
     }
+	void outputClaw();
 };
 #endif

@@ -731,3 +731,23 @@ void DomainCollection::outputErrorRefined(std::ostream &os)
 		}
 	}
 }
+void DomainCollection::outputClaw()
+{
+	ofstream     t_file("fort.t0000");
+	const string tab = "\t";
+	t_file << 0.0 << tab << "time" << endl;
+	t_file << 3 << tab << "meqn" << endl;
+	t_file << num_global_domains << tab << "ngrids" << endl;
+	t_file << 2 << tab << "num_aux" << endl;
+	t_file << 2 << tab << "num_dim" << endl;
+	t_file.close();
+	ofstream q_file("fort.q0000");
+
+	q_file.precision(10);
+	q_file << scientific;
+	for (auto &p : domains) {
+		Domain &d = *p.second;
+		d.outputClaw(q_file);
+	}
+	q_file.close();
+}
