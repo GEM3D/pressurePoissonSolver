@@ -14,8 +14,11 @@
 int main(int argc, char *argv[]) 
 {
 
-	int i ,j;
 	int myid, num_procs;
+
+
+	/* Grid parameters */
+	int i ,j;
 	int n;
 	int ilower[2], iupper[2];
 	int nparts = 2;
@@ -23,11 +26,16 @@ int main(int argc, char *argv[])
 	int part1 = 1;
 	int nvars = 1;
 	int var  = 0;
+
+
+	/* Stencil things */
 	int num_stencil_entries = 5;
 	int entry;
 	int nvalues;
 	double *values;
 	int stencil_indices[5];
+
+	/* HYPRE things */
 	int object_type = HYPRE_PARCSR;
 	int num_iterations;
 	double final_res_norm, t1, t2;
