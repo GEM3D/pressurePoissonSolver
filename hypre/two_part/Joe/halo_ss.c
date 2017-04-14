@@ -106,7 +106,9 @@ int main(int argc, char *argv[])
 
 	//temporary set neighbor part for testing
 	//part 0 to 1
+	
 	{
+	#if 1
 		int lr_g[2], ur_g[2], ll_g[2], ul_g[2];
 		int part, nbor_part;
 		int index_map[2] = {0,1};
@@ -119,8 +121,8 @@ int main(int argc, char *argv[])
 
 		part = 0;
 		nbor_part = 1;
-//		HYPRE_SStructGridSetNeighborPart(grid, part, lr_g, ur_g, nbor_part, ll, ul,
-//		                                 index_map, index_dir);
+		//HYPRE_SStructGridSetNeighborPart(grid, part, lr_g, ur_g, nbor_part, ll, ul,
+		//                                 index_map, index_dir);
 
 		ll_g[0] = ll[0] - 1;
 		ll_g[1] = ll[1];
@@ -130,7 +132,8 @@ int main(int argc, char *argv[])
 
 		part = 1;
 		nbor_part = 0;
-//		HYPRE_SStructGridSetNeighborPart(grid, part, ll_g, ul_g, part, lr, ur, index_map, index_dir);
+		//HYPRE_SStructGridSetNeighborPart(grid, part, ll_g, ul_g, part, lr, ur, index_map, index_dir);
+#endif		
 
 		HYPRE_SStructGridAssemble(grid);
 
@@ -170,24 +173,28 @@ int main(int argc, char *argv[])
 
 		//Halo Stuff
 
-		int *halo1;
-		int *halo2;
-		halo1 = calloc(2, sizeof(int));
-		halo2 = calloc(2, sizeof(int));
+		int halo1[2], halo2[2];
+#if 1		
 
 		for(j = 1; j <= n; j++) 
 		{
-			halo1[0] = n-1 ;
+			halo1[0] = n ;
 			halo1[1] = j;
-			halo2[0] = 2;
+			halo2[0] = 1;
 			halo2[1] = j;
 			//printf("%d, %d\n", halo1[1], halo2[1]);
 
-			HYPRE_SStructGraphAddEntries(graph, 1, halo2, var, 0, halo1, var);
 			HYPRE_SStructGraphAddEntries(graph, 0, halo1, var, 1, halo2, var);
+
+			halo1[0] = 1 ;
+			halo1[1] = j;
+			halo2[0] = n;
+			halo2[1] = j;
+			HYPRE_SStructGraphAddEntries(graph, 1, halo1, var, 0, halo2, var);
 		}		
  		
 		HYPRE_SStructGraphAssemble(graph);
+#endif		
 
 	}
 
@@ -234,7 +241,7 @@ int main(int argc, char *argv[])
 		HYPRE_SStructMatrixSetBoxValues(A, part1, ilower, iupper, var, 
 		                                num_stencil_entries, stencil_indices, values);
 
-		//HYPRE_SStructMatrixAssemble(A);
+		HYPRE_SStructMatrixAssemble(A);
 
                 //HYPRE_SStructMatrixPrint("ss_halo_data/ss.preset.A", A, 0);
 
