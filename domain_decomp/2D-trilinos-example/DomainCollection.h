@@ -34,15 +34,6 @@ class DomainCollection
 
 	int num_cols = 0;
 
-	bool amr = false;
-	/**
-	 * @brief Spacing of coarsest grid in x direction
-	 */
-	double h_x;
-	/**
-	 * @brief Spacing of coarsest grid in y direction
-	 */
-	double h_y;
 	/**
 	 * @brief Number of global domains
 	 */
@@ -75,6 +66,7 @@ class DomainCollection
     std::set<Iface> ifaces;
 
 	public:
+	bool amr = false;
 	/**
 	 * @brief Tpetra map that assures each domains has access to it's interface values
 	 */
@@ -101,7 +93,7 @@ class DomainCollection
 	 * @param h_y the y spacing
 	 * @param comm the teuchos communicator
 	 */
-	DomainCollection(DomainSignatureCollection dsc, int n, double h_x, double h_y,
+	DomainCollection(DomainSignatureCollection dsc, int n,
 	                 Teuchos::RCP<const Teuchos::Comm<int>> comm);
 
 	/**
@@ -112,10 +104,6 @@ class DomainCollection
 	 */
 	void initDirichlet(std::function<double(double, double)> ffun,
 	                   std::function<double(double, double)> gfun);
-
-	void initDirichletRefined(std::function<double(double, double)> ffun,
-	                          std::function<double(double, double)> gfun);
-
 	/**
 	 * @brief Initialize domains using Neumann boundary conditions
 	 *
@@ -239,5 +227,6 @@ class DomainCollection
 			p.second->sumResidIntoSol();
 		}
     }
+	void outputClaw();
 };
 #endif

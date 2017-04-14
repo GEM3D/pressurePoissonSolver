@@ -55,21 +55,17 @@ int main(int argc, char *argv[])
 	HYPRE_SStructVector x;
 	HYPRE_ParVector par_x;
 
-
-
 	HYPRE_Solver solver;
-    HYPRE_Solver   precond;
+    	HYPRE_Solver precond;
 
 	MPI_Init(&argc, &argv);
 	MPI_Comm_rank(MPI_COMM_WORLD, &myid);
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
 
-
 	//Set defaults
-	n = 64;
+	n = 100;
 	h = 1.0/(n);
 	h2inv = 1.0/(h*h);
-
 
 	printf("defaults set\n");
 
@@ -89,9 +85,6 @@ int main(int argc, char *argv[])
 	ul[1] = n;
 	ur[0] = n;
 	ur[1] = n;
-
-
-
 
 	HYPRE_SStructGridCreate(MPI_COMM_WORLD, 2, nparts, &grid);
 	
@@ -124,19 +117,10 @@ int main(int argc, char *argv[])
 		ur_g[0] = ur[0] + 1;
 		ur_g[1] = ur[1];
 
- #if 0	
-	int b_ilower[2] = {n,1}; 
-	int b_iupper[2] = {n,n};
-	int nbor_ilower[2] = {1,1}; 
-	int nbor_iupper[2] = {1,n};
-#endif	
-
-
 		part = 0;
 		nbor_part = 1;
-		HYPRE_SStructGridSetNeighborPart(grid, part, lr_g, ur_g, nbor_part, ll, ul,
-		                                 index_map, index_dir);
-
+//		HYPRE_SStructGridSetNeighborPart(grid, part, lr_g, ur_g, nbor_part, ll, ul,
+//		                                 index_map, index_dir);
 
 		ll_g[0] = ll[0] - 1;
 		ll_g[1] = ll[1];
@@ -146,7 +130,7 @@ int main(int argc, char *argv[])
 
 		part = 1;
 		nbor_part = 0;
-		HYPRE_SStructGridSetNeighborPart(grid, part, ll_g, ul_g, part, lr, ur, index_map, index_dir);
+//		HYPRE_SStructGridSetNeighborPart(grid, part, ll_g, ul_g, part, lr, ur, index_map, index_dir);
 
 		HYPRE_SStructGridAssemble(grid);
 
@@ -175,8 +159,8 @@ int main(int argc, char *argv[])
 	{
 		HYPRE_SStructGraphCreate(MPI_COMM_WORLD, grid, &graph);
 		HYPRE_SStructGraphSetObjectType(graph, object_type);
-
-		for(int part = 0; part < nparts; part++)
+		int part;
+		for(part = 0; part < nparts; part++)
 		{
 			HYPRE_SStructGraphSetStencil(graph, part, var, stencil);
 		}
@@ -185,7 +169,7 @@ int main(int argc, char *argv[])
 
 
 		//Halo Stuff
-#if 0
+
 		int *halo1;
 		int *halo2;
 		halo1 = calloc(2, sizeof(int));
@@ -193,7 +177,7 @@ int main(int argc, char *argv[])
 
 		for(j = 1; j <= n; j++) 
 		{
-			halo1[0] = n- 1 ;
+			halo1[0] = n-1 ;
 			halo1[1] = j;
 			halo2[0] = 2;
 			halo2[1] = j;
@@ -202,8 +186,9 @@ int main(int argc, char *argv[])
 			HYPRE_SStructGraphAddEntries(graph, 1, halo2, var, 0, halo1, var);
 			HYPRE_SStructGraphAddEntries(graph, 0, halo1, var, 1, halo2, var);
 		}		
-#endif 		
+ 		
 		HYPRE_SStructGraphAssemble(graph);
+
 	}
 
 
@@ -229,6 +214,7 @@ int main(int argc, char *argv[])
 		printf("stencil indices set\n");
 
 		values = calloc(nvalues, sizeof(double));
+		
 		for (i = 0; i < nvalues; i += num_stencil_entries) 
 		{
 			values[i] = -4.0 * h2inv;
@@ -240,7 +226,6 @@ int main(int argc, char *argv[])
 
 		printf("matrix values pre-set\n");
 
-
 		HYPRE_SStructMatrixSetBoxValues(A, part0, ilower, iupper, var, 
 		                                num_stencil_entries, stencil_indices, values);
 
@@ -248,6 +233,11 @@ int main(int argc, char *argv[])
 
 		HYPRE_SStructMatrixSetBoxValues(A, part1, ilower, iupper, var, 
 		                                num_stencil_entries, stencil_indices, values);
+
+		//HYPRE_SStructMatrixAssemble(A);
+
+                //HYPRE_SStructMatrixPrint("ss_halo_data/ss.preset.A", A, 0);
+
 
 		printf("matrix set\n");
 	}	
@@ -318,10 +308,10 @@ int main(int argc, char *argv[])
 
 		stencil_index[0] = 4;
 
-		HYPRE_SStructMatrixSetBoxValues(A, part0, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesx);
-		HYPRE_SStructMatrixAddToBoxValues(A, part0, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesx);
-		HYPRE_SStructMatrixSetBoxValues(A, part1, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesx);
-		HYPRE_SStructMatrixAddToBoxValues(A, part1, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesx);
+		HYPRE_SStructMatrixSetBoxValues(A, part0, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesy);
+		HYPRE_SStructMatrixAddToBoxValues(A, part0, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesy);
+		HYPRE_SStructMatrixSetBoxValues(A, part1, bc_ilower, bc_iupper, var, nentries, stencil_index, valuesy);
+		HYPRE_SStructMatrixAddToBoxValues(A, part1, bc_ilower, bc_iupper, var, nentries, center_index, center_valuesy);
 
 		//printf("top row set\n");
 
@@ -416,10 +406,12 @@ int main(int argc, char *argv[])
 			Y = (j + .5) * h;
 			for(i = 0; i < n; i++) {
 				X = 1 + (i + .5) * h;
-				rhs_values[i + j * n] = -8. * PI2 * cos(2. * M_PI * X)*cos(2 * M_PI * Y);
+				rhs_values[i + j * n] = -8. * PI2 * cos(2. * M_PI * X)*cos(2. * M_PI * Y);
 				exactsolution[i + j * n + n*n] = 1.0 * cos(2. * M_PI * X) * cos(2. * M_PI * Y);
 				x_values[i+ j * n] = 0.0;
 				//printf("i+j*n: %d\n", i+j*n +n*n);
+				if (i && j == 1){
+				printf("%d, mid calc: %f:  %f\n", i, -8.*PI2*cos(2.*M_PI*X)*cos(2.*M_PI*Y)), rhs_values[i+j*n]+8.*PI2*cos(2.*M_PI*X)*cos(2.*M_PI*Y) ;}
 			}
 		}
 
@@ -434,7 +426,7 @@ int main(int argc, char *argv[])
 		HYPRE_SStructVectorAssemble(x);
 		HYPRE_SStructVectorGetObject(x, (void **)&par_x);
 
-		HYPRE_SStructMatrixPrint("ss_halo_data/ss.initial.A", A, 0);
+		HYPRE_SStructMatrixPrint("ss_halo_data/ss.A", A, 0);
 		HYPRE_SStructVectorPrint("ss_halo_data/ss.initial.b", b, 0);
 	
 
@@ -448,7 +440,6 @@ int main(int argc, char *argv[])
 		HYPRE_ParCSRPCGSetTwoNorm(solver, 1);
 		HYPRE_ParCSRPCGSetLogging(solver, 3);
 
-		// HYPRE_Solver precond;
 
 		HYPRE_BoomerAMGCreate(&precond);
 		HYPRE_BoomerAMGSetStrongThreshold(precond, .25);
@@ -464,14 +455,20 @@ int main(int argc, char *argv[])
 
 		HYPRE_ParCSRPCGSetPrecond(solver, HYPRE_BoomerAMGSolve, HYPRE_BoomerAMGSetup, precond);
 		HYPRE_ParCSRPCGSetup(solver, parcsr_A, par_b, par_x);
+		//HYPRE_BoomerAMGSetup(precond, parcsr_A, par_b, par_x);
 		t1 = MPI_Wtime();
 		HYPRE_ParCSRPCGSolve(solver, parcsr_A, par_b, par_x);
+		//HYPRE_BoomerAMGSolve(precond, parcsr_A, par_b, par_x);
 		t2 = MPI_Wtime();
 
 		double time = t2-t1;
 
 		HYPRE_ParCSRPCGGetNumIterations(solver, &num_iterations);
 		HYPRE_ParCSRPCGGetFinalRelativeResidualNorm(solver, &final_res_norm);
+
+		//HYPRE_BoomerAMGGetNumIterations(precond, &num_iterations);
+		//HYPRE_BoomerAMGGetFinalRelativeResidualNorm(precond, &final_res_norm);
+		
 
 		printf("\n");
 		printf("Iterations = %d\n", num_iterations);
@@ -508,7 +505,7 @@ int main(int argc, char *argv[])
 			}		
 		}
 
-		mean /= nvalues;
+		mean /= totalvalues;
 		//printf("mean = %f\n", mean);
 		for (i = 1; i < totalvalues + 1; i++) {
 			diff = values[i] -mean - exactsolution[i-1];
@@ -556,15 +553,15 @@ int main(int argc, char *argv[])
 				MPI_Finalize();
 				exit(1);
 			}
-
+printf("local solution obtained\n");
             /* From vis.c */
 			fprintf(file, "FiniteElementSpace\n");
             fprintf(file, "FiniteElementCollection: Local_L2_2D_P0\n");  /* cell-centered */
 			fprintf(file, "VDim: 1\n");
 			fprintf(file, "Ordering: 0\n\n");
-
+		int i;
             /* save solution */
-			for (int i = 0; i < nvalues; i++)
+			for (i = 0; i < nvalues; i++)
 			{
 				fprintf(file, "%.14e\n", values[i]);
 			}
@@ -584,7 +581,7 @@ int main(int argc, char *argv[])
 
 	HYPRE_BoomerAMGDestroy(precond);
 	HYPRE_ParCSRPCGDestroy(solver);
-
+	
 
 	HYPRE_SStructMatrixDestroy(A);
 	HYPRE_SStructVectorDestroy(b);

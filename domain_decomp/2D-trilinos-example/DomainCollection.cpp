@@ -15,22 +15,20 @@ void dgetri_(int *N, double *A, int *lda, int *IPIV, double *WORK, int *lwork, i
 enum axis_enum { X_AXIS, Y_AXIS };
 enum bc_enum { DIRICHLET, NEUMANN, REFINED };
 
-DomainCollection::DomainCollection(DomainSignatureCollection dsc, int n, double h_x, double h_y,
+DomainCollection::DomainCollection(DomainSignatureCollection dsc, int n,
                                    RCP<const Teuchos::Comm<int>> comm)
 {
 	// cerr<< "Low:  " << low << "\n";
 	// cerr<< "High: " << high << "\n";
 	this->comm         = comm;
 	this->n            = n;
-	this->h_x          = h_x;
-	this->h_y          = h_y;
 	num_global_domains = dsc.num_global_domains;
 	for (auto p : dsc.domains) {
 		DomainSignature ds       = p.second;
 		int             i        = ds.id;
 
 		// create a domain
-		RCP<Domain> d_ptr = rcp(new Domain(ds, n, h_x, h_y));
+		RCP<Domain> d_ptr = rcp(new Domain(ds, n));
 		domains[i]        = d_ptr;
 	}
 }
@@ -103,53 +101,16 @@ void DomainCollection::initDirichlet(function<double(double, double)> ffun,
 				f[yi * n + xi]     = ffun(x, y);
 				exact[yi * n + xi] = gfun(x, y);
 				if (!d.hasNbr(Side::north)) {
-					d.boundary_north[xi] = gfun(x, 1.0);
+					d.boundary_north[xi] = gfun(x, d.y_start+d.y_length);
 				}
 				if (!d.hasNbr(Side::east)) {
-					d.boundary_east[yi] = gfun(2.0, y);
+					d.boundary_east[yi] = gfun(d.x_start+d.x_length, y);
 				}
 				if (!d.hasNbr(Side::south)) {
-					d.boundary_south[xi] = gfun(x, 0.0);
+					d.boundary_south[xi] = gfun(x, d.y_start);
 				}
 				if (!d.hasNbr(Side::west)) {
-					d.boundary_west[yi] = gfun(0.0, y);
-				}
-			}
-		}
-		d.planDirichlet();
-	}
-	// create map for domains
-	generateMaps();
-	distributeIfaceInfo();
-}
-void DomainCollection::initDirichletRefined(function<double(double, double)> ffun,
-                                     function<double(double, double)> gfun)
-{
-	amr = true;
-	for (auto &p : domains) {
-		Domain &d = *p.second;
-
-		// Generate RHS vector
-		std::valarray<double> &f     = d.f;
-		std::valarray<double> &exact = d.exact;
-		// Use local indices to access the entries of f_data.
-		for (int yi = 0; yi < n; yi++) {
-			for (int xi = 0; xi < n; xi++) {
-				double x           = d.x_start + d.h_x / 2.0 + d.x_length * xi / n;
-				double y           = d.y_start + d.h_y / 2.0 + d.y_length * yi / n;
-				f[yi * n + xi]     = ffun(x, y);
-				exact[yi * n + xi] = gfun(x, y);
-				if (!d.hasNbr(Side::north)) {
-					d.boundary_north[xi] = gfun(x, 1.0);
-				}
-				if (!d.hasNbr(Side::east)) {
-					d.boundary_east[yi] = gfun(2.0, y);
-				}
-				if (!d.hasNbr(Side::south)) {
-					d.boundary_south[xi] = gfun(x, 0.0);
-				}
-				if (!d.hasNbr(Side::west)) {
-					d.boundary_west[yi] = gfun(0.0, y);
+					d.boundary_west[yi] = gfun(d.x_start, y);
 				}
 			}
 		}
@@ -188,7 +149,7 @@ void DomainCollection::generateMaps()
             not_visited.erase(curr);
             Side s = Side::north;
             do{
-				if (d.hasNbr(s) && visited.count(d.nbr(s)) == 0) {
+				if (d.hasNbr(s) && d.index(s) == -1) {
 					// a new edge that we have not assigned an index to
 					d.index(s) = curr_i;
 					for (int i = 0; i < Iface::size; i++) {
@@ -249,7 +210,89 @@ void DomainCollection::generateMaps()
 						}
 						// coarse case
 					} else if (d.hasCoarseNbr(s)) {
-						// TODO
+						Domain &nbr = *domains.at(d.nbr(s));
+						nbr.index(!s)        = d.index(s);
+						int buddy_id         = -1;
+						if (d.ds.leftOfCoarse(s)) {
+							Domain &buddy = *domains.at(nbr.nbrRight(!s));
+							buddy_id               = buddy.ds.id;
+
+							nbr.indexRefinedLeft(!s) = d.index(s);
+
+							nbr.indexRefinedRight(!s) = curr_i;
+							buddy.index(s)            = curr_i;
+							for (int i = 0; i < Iface::size; i++) {
+								c_iface_global.push_back(curr_i * Iface::size + i);
+								iface_global.push_back(curr_i * Iface::size + i);
+								curr_c_i++;
+							}
+							for (int i = 0; i < n; i++) {
+								global.push_back(curr_i * n + i);
+								matrix_global.push_back(curr_i * n + i);
+								curr_matrix_i++;
+							}
+							curr_i++;
+
+							d.indexCenter(s)     = curr_i;
+							nbr.index(!s)        = curr_i;
+							buddy.indexCenter(s) = curr_i;
+							for (int i = 0; i < Iface::size; i++) {
+								c_iface_global.push_back(curr_i * Iface::size + i);
+								iface_global.push_back(curr_i * Iface::size + i);
+								curr_c_i++;
+							}
+							for (int i = 0; i < n; i++) {
+								global.push_back(curr_i * n + i);
+								matrix_global.push_back(curr_i * n + i);
+								curr_matrix_i++;
+							}
+							curr_i++;
+						} else {
+							Domain &buddy = *domains.at(nbr.nbr(!s));
+							buddy_id               = buddy.ds.id;
+
+							nbr.indexRefinedRight(!s) = d.index(s);
+
+							nbr.indexRefinedLeft(!s) = curr_i;
+							buddy.index(s)           = curr_i;
+							for (int i = 0; i < Iface::size; i++) {
+								c_iface_global.push_back(curr_i * Iface::size + i);
+								iface_global.push_back(curr_i * Iface::size + i);
+								curr_c_i++;
+							}
+							for (int i = 0; i < n; i++) {
+								global.push_back(curr_i * n + i);
+								matrix_global.push_back(curr_i * n + i);
+								curr_matrix_i++;
+							}
+							curr_i++;
+
+							d.indexCenter(s)     = curr_i;
+							nbr.index(!s)        = curr_i;
+							buddy.indexCenter(s) = curr_i;
+							for (int i = 0; i < Iface::size; i++) {
+								c_iface_global.push_back(curr_i * Iface::size + i);
+								iface_global.push_back(curr_i * Iface::size + i);
+								curr_c_i++;
+							}
+							for (int i = 0; i < n; i++) {
+								global.push_back(curr_i * n + i);
+								matrix_global.push_back(curr_i * n + i);
+								curr_matrix_i++;
+							}
+							curr_i++;
+						}
+
+						// enqueue domains
+						if (enqueued.count(nbr.ds.id) == 0) {
+							queue.push_back(nbr.ds.id);
+							enqueued.insert(nbr.ds.id);
+						}
+						if (enqueued.count(buddy_id) == 0) {
+							queue.push_back(buddy_id);
+							enqueued.insert(buddy_id);
+						}
+
 						// normal case
 					} else {
 						Domain &nbr = *domains.at(d.nbr(s));
@@ -439,6 +482,8 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 
 		// create domain representing curr_type
 		DomainSignature ds;
+        ds.x_length=1;
+        ds.y_length=1;
         for(int q=0;q<4;q++){
 			if (curr_type.types[q] == NEUMANN) {
 				ds.nbr_id[(q * 2 + 4) % 8] = -1;
@@ -446,7 +491,7 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 				ds.nbr_id[(q * 2 + 4) % 8] = 1;
 			}
 		}
-		Domain d(ds, n, 1.0, 1.0);
+		Domain d(ds, n);
 		d.boundary_north = valarray<double>(n);
 		d.boundary_south = valarray<double>(n);
 		d.boundary_east  = valarray<double>(n);
@@ -730,4 +775,24 @@ void DomainCollection::outputErrorRefined(std::ostream &os)
 			os << domains[id]->error[internal_i * n + internal_j] << '\n';
 		}
 	}
+}
+void DomainCollection::outputClaw()
+{
+	ofstream     t_file("fort.t0000");
+	const string tab = "\t";
+	t_file << 0.0 << tab << "time" << endl;
+	t_file << 3 << tab << "meqn" << endl;
+	t_file << num_global_domains << tab << "ngrids" << endl;
+	t_file << 2 << tab << "num_aux" << endl;
+	t_file << 2 << tab << "num_dim" << endl;
+	t_file.close();
+	ofstream q_file("fort.q0000");
+
+	q_file.precision(10);
+	q_file << scientific;
+	for (auto &p : domains) {
+		Domain &d = *p.second;
+		d.outputClaw(q_file);
+	}
+	q_file.close();
 }
