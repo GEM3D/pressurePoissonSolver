@@ -45,12 +45,14 @@ void LUSolver::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 	for (int j = 0; j < L->getNumBlocks(); j++) {
 		// do lower triangular block
 		blk_ptr Lkk = L->getBlock(j * block_size, j * block_size);
-        int x_i = x.getMap()->getLocalElement(j*block_size);
+		valarray<double> &Lkk_blk = *Lkk;
+
+		int x_i = x.getMap()->getLocalElement(j * block_size);
 
 		for (int block_i = 0; block_i < block_size; block_i++) {
 			for (int block_j = block_i - 1; block_j >= 0; block_j--) {
 				x_view(x_i + block_i, 0)
-				-= x_view(x_i + block_j, 0) * (*Lkk)[block_i + block_size * block_j];
+				-= x_view(x_i + block_j, 0) * Lkk_blk[block_i + block_size * block_j];
 			}
 		}
 
@@ -59,10 +61,11 @@ void LUSolver::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 			int     x_i2 = x.getMap()->getLocalElement(i * block_size);
 			blk_ptr Lik  = L->getBlock(i * block_size, j * block_size);
 			if (!Lik.is_null()) {
-				for (int block_j = 0; block_j < block_size; block_j++) {
-					for (int block_i = 0; block_i < block_size; block_i++) {
+				valarray<double> &Lik_blk = *Lik;
+				for (int block_i = 0; block_i < block_size; block_i++) {
+					for (int block_j = 0; block_j < block_size; block_j++) {
 						x_view(x_i2 + block_i, 0)
-						-= x_view(x_i + block_j, 0) * (*Lik)[block_i + block_size * block_j];
+						-= x_view(x_i + block_j, 0) * Lik_blk[block_i + block_size * block_j];
 					}
 				}
 			}
@@ -71,13 +74,15 @@ void LUSolver::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 	// U solve
 	for (int j = U->getNumBlocks() - 1; j >= 0; j--) {
 		// do lower triangular block
-		blk_ptr Ukk = U->getBlock(j * block_size, j * block_size);
-		int     x_i = x.getMap()->getLocalElement(j * block_size);
+		blk_ptr           Ukk     = U->getBlock(j * block_size, j * block_size);
+		valarray<double> &Ukk_blk = *Ukk;
+
+		int x_i = x.getMap()->getLocalElement(j * block_size);
 
 		for (int block_i = block_size - 1; block_i >= 0; block_i--) {
 			for (int block_j = block_size - 1; block_j > block_i; block_j--) {
 				x_view(x_i + block_i, 0)
-				-= x_view(x_i + block_j, 0) * (*Ukk)[block_i + block_size * block_j];
+				-= x_view(x_i + block_j, 0) * Ukk_blk[block_i + block_size * block_j];
 			}
 			// dvide by diagonal
 			x_view(x_i + block_i, 0) /= (*Ukk)[block_i + block_size * block_i];
@@ -88,10 +93,11 @@ void LUSolver::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 			int     x_i2 = x.getMap()->getLocalElement(i * block_size);
 			blk_ptr Uik  = U->getBlock(i * block_size, j * block_size);
 			if (!Uik.is_null()) {
-				for (int block_j = 0; block_j < block_size; block_j++) {
+				valarray<double> &Uik_blk = *Uik;
 					for (int block_i = 0; block_i < block_size; block_i++) {
+				for (int block_j = 0; block_j < block_size; block_j++) {
 						x_view(x_i2 + block_i, 0)
-						-= x_view(x_i + block_j, 0) * (*Uik)[block_i + block_size * block_j];
+						-= x_view(x_i + block_j, 0) * Uik_blk[block_i + block_size * block_j];
 						//cerr << x_view(x_i2 + block_i, 0) << endl;
 					}
 				}
@@ -380,8 +386,8 @@ void RBMatrix::lu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
 		piv_ptr Pkk;
         // do lu on diagonal block
 		DGETRF(Akk, Lkk, Ukk, Pkk);
-		L->insertBlock(k * block_size, k * block_size, Lkk, false, false);
-		U->insertBlock(k * block_size, k * block_size, Ukk, false, false);
+		L->insertBlock(k, k, Lkk, false, false);
+		U->insertBlock(k, k, Ukk, false, false);
 		// get row of U's
 		for (int j = k + 1; j < num_blocks; j++) {
 			auto Akj_block = block_cols[j].find(range_k);
@@ -389,7 +395,7 @@ void RBMatrix::lu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
 				blk_ptr Ukj;
 				blk_ptr Akj = blkCopy(Akj_block->second);
 				DGESSM(Akj, Lkk, Ukj, Pkk);
-				U->insertBlock(k * block_size, j * block_size, Ukj, false, false);
+				U->insertBlock(k, j, Ukj, false, false);
 			}
 		}
 		// get Column of L's
@@ -400,7 +406,7 @@ void RBMatrix::lu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
 				blk_ptr Lik;
 				blk_ptr Aik = blkCopy(Aik_block->second);
 				LSolve(Aik, Lik, Ukk, Pkk);
-				L->insertBlock(i * block_size, k * block_size, Lik, false, false);
+				L->insertBlock(i, k, Lik, false, false);
 			}
 		}
         //update rest of matrix
@@ -422,7 +428,7 @@ void RBMatrix::lu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
 						dgemm_(&trans, &trans, &block_size, &block_size, &block_size, &one,
 						       &(*Lik)[0], &block_size, &(*Ukj)[0], &block_size, &zero, &(*C)[0],
 						       &block_size);
-						insertBlock(i * block_size, j * block_size, C, false, false);
+						insertBlock(i, j, C, false, false);
 					}
 				}
 			}
@@ -441,8 +447,8 @@ void RBMatrix::ilu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
 		blk_ptr Lkk, Ukk;
 		piv_ptr Pkk;
 		DGETRF(Akk, Lkk, Ukk, Pkk);
-		L->insertBlock(k * block_size, k * block_size, Lkk, false, false);
-		U->insertBlock(k * block_size, k * block_size, Ukk, false, false);
+		L->insertBlock(k, k, Lkk, false, false);
+		U->insertBlock(k, k, Ukk, false, false);
 		// get row of U's
 		for (int j = k + 1; j < num_blocks; j++) {
 			auto Akj_block = block_cols[j].find(range_k);
@@ -450,7 +456,7 @@ void RBMatrix::ilu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
 				blk_ptr Ukj;
 				blk_ptr Akj = blkCopy(Akj_block->second);
 				DGESSM(Akj, Lkk, Ukj, Pkk);
-				U->insertBlock(k * block_size, j * block_size, Ukj, false, false);
+				U->insertBlock(k, j, Ukj, false, false);
 			}
 		}
 		// get Column of L's
@@ -461,7 +467,7 @@ void RBMatrix::ilu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
 				blk_ptr Lik;
 				blk_ptr Aik = blkCopy(Aik_block->second);
 				LSolve(Aik, Lik, Ukk, Pkk);
-				L->insertBlock(i * block_size, k * block_size, Lik, false, false);
+				L->insertBlock(i, k, Lik, false, false);
 			}
 		}
         /*

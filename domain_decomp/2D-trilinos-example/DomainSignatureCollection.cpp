@@ -2,6 +2,335 @@
 #include <iostream>
 #include <Teuchos_FancyOStream.hpp>
 using namespace std;
+DomainSignatureCollection::DomainSignatureCollection(string file_name, int rank){
+	num_global_interfaces = 0;
+	ifstream mesh(file_name);
+    while(!mesh.eof()){
+        DomainSignature ds;
+		int null, nl, nr, el, er, sl, sr, wl, wr;
+		mesh >> ds.id >> null >> wl >> wr >> er >> el >> sr >> sl >> nl >> nr;
+
+        //north
+		ds.nbr(Side::north) = nl;
+		if (nl != nr) {
+			ds.nbrRight(Side::north) = nr;
+            ds.setHasFineNbr(Side::north);
+		}
+
+        //east
+		ds.nbr(Side::east) = el;
+		if (el != er) {
+			ds.nbrRight(Side::east) = er;
+            ds.setHasFineNbr(Side::east);
+		}
+
+        //south
+		ds.nbr(Side::south) = sl;
+		if (sl != sr) {
+			ds.nbrRight(Side::south) = sr;
+            ds.setHasFineNbr(Side::south);
+		}
+
+        //west
+		ds.nbr(Side::west) = wl;
+		if (wl != wr) {
+			ds.nbrRight(Side::west) = wr;
+            ds.setHasFineNbr(Side::west);
+		}
+		domains[ds.id] = ds;
+	}
+    determineCoarseness();
+    determineAmrLevel();
+    determineXY();
+    num_global_domains=domains.size();
+    indexInterfacesBFS();
+}
+void DomainSignatureCollection::determineCoarseness(){
+	set<int>   visited;
+	set<int>   enqueued;
+	deque<int> queue;
+	int        first = domains.begin()->first;
+	queue.push_back(first);
+	enqueued.insert(first);
+	while (!queue.empty()) {
+        num_global_interfaces++;
+		int              curr = queue.front();
+		DomainSignature &d    = domains.at(curr);
+		queue.pop_front();
+		visited.insert(curr);
+        Side s = Side::north;
+        do{
+			if (d.hasNbr(s)) {
+				if (d.hasFineNbr(s)) {
+					DomainSignature &nbr_left  = domains.at(d.nbr(s));
+					DomainSignature &nbr_right = domains.at(d.nbrRight(s));
+
+					// set center indexes
+					nbr_left.setHasCoarseNbr(!s);
+					nbr_left.setLeftOfCoarse(!s);
+					nbr_right.setHasCoarseNbr(!s);
+
+					// enqueue domains
+					if (enqueued.count(d.nbr(s)) == 0) {
+						queue.push_back(d.nbr(s));
+						enqueued.insert(d.nbr(s));
+					}
+					if (enqueued.count(d.nbrRight(s)) == 0) {
+						queue.push_back(d.nbrRight(s));
+						enqueued.insert(d.nbrRight(s));
+					}
+				} else {
+					// enqueue domain
+					if (enqueued.count(d.nbr(s)) == 0) {
+						queue.push_back(d.nbr(s));
+						enqueued.insert(d.nbr(s));
+					}
+				}
+			}
+			s++;
+		} while (s != Side::north);
+	}
+}
+void DomainSignatureCollection::determineAmrLevel(){
+	set<int>   visited;
+	set<int>   enqueued;
+	deque<int> queue;
+	int        first = domains.begin()->first;
+	queue.push_back(first);
+	enqueued.insert(first);
+	int min_level = 1;
+	while (!queue.empty()) {
+        num_global_interfaces++;
+		int              curr = queue.front();
+		DomainSignature &d    = domains.at(curr);
+		int              curr_level = d.refine_level;
+		queue.pop_front();
+		visited.insert(curr);
+        Side s = Side::north;
+        do{
+			if (d.hasNbr(s) && visited.count(d.nbr(s)) == 0) {
+				// fine case
+				if (d.hasFineNbr(s)) {
+					DomainSignature &nbr_left  = domains.at(d.nbr(s));
+					DomainSignature &nbr_right = domains.at(d.nbrRight(s));
+
+					nbr_left.refine_level      = curr_level + 1;
+					nbr_right.refine_level = curr_level + 1;
+					// enqueue domains
+					if (enqueued.count(d.nbr(s)) == 0) {
+						queue.push_back(d.nbr(s));
+						enqueued.insert(d.nbr(s));
+					}
+					if (enqueued.count(d.nbrRight(s)) == 0) {
+						queue.push_back(d.nbrRight(s));
+						enqueued.insert(d.nbrRight(s));
+					}
+					// coarse case
+				} else if (d.hasCoarseNbr(s)) {
+					DomainSignature &nbr = domains.at(d.nbr(s));
+
+					nbr.refine_level     = curr_level - 1;
+					if (curr_level - 1 < min_level) {
+						min_level = curr_level;
+					}
+
+					if (enqueued.count(d.nbr(s)) == 0) {
+						queue.push_back(d.nbr(s));
+						enqueued.insert(d.nbr(s));
+					}
+					// normal case
+				} else {
+					DomainSignature &nbr = domains.at(d.nbr(s));
+					nbr.refine_level     = curr_level;
+					// enqueue domain
+					if (enqueued.count(d.nbr(s)) == 0) {
+						queue.push_back(d.nbr(s));
+						enqueued.insert(d.nbr(s));
+					}
+				}
+			}
+			s++;
+		} while (s != Side::north);
+	}
+}
+void DomainSignatureCollection::determineXY(){
+	set<int>   visited;
+	set<int>   enqueued;
+	deque<int> queue;
+	int        first = domains.begin()->first;
+	queue.push_back(first);
+	enqueued.insert(first);
+	double x_min = 0;
+	double y_min = 0;
+	double x_max = 0;
+	double y_max = 0;
+	while (!queue.empty()) {
+		num_global_interfaces++;
+		int              curr = queue.front();
+		DomainSignature &d    = domains.at(curr);
+		queue.pop_front();
+		if (d.x_start < x_min) {
+			x_min = d.x_start;
+		}
+		if (d.y_start < y_min) {
+			y_min = d.y_start;
+		}
+        if(d.x_start+d.x_length>x_max){
+            x_max = d.x_start+d.x_length;
+        }
+        if(d.y_start+d.y_length>y_max){
+            y_max = d.y_start+d.y_length;
+        }
+		visited.insert(curr);
+        Side s = Side::north;
+        do{
+			if (d.hasNbr(s) && visited.count(d.nbr(s)) == 0) {
+				// a new edge that we have not assigned an index to
+
+				// fine case
+				if (d.hasFineNbr(s)) {
+					DomainSignature &nbr_left  = domains.at(d.nbr(s));
+					DomainSignature &nbr_right = domains.at(d.nbrRight(s));
+
+					switch (s) {
+						case Side::north:
+							nbr_left.x_start  = d.x_start;
+							nbr_left.y_start  = d.y_start + d.y_length;
+							nbr_right.x_start = d.x_start + d.x_length / 2;
+							nbr_right.y_start = d.y_start + d.y_length;
+							break;
+						case Side::east:
+							nbr_left.x_start  = d.x_start + d.x_length;
+							nbr_left.y_start  = d.y_start + d.y_length / 2;
+							nbr_right.x_start = d.x_start + d.x_length;
+							nbr_right.y_start = d.y_start;
+							break;
+						case Side::south:
+							nbr_left.x_start  = d.x_start + d.x_length / 2;
+							nbr_left.y_start  = d.y_start - d.y_length / 2;
+							nbr_right.x_start = d.x_start;
+							nbr_right.y_start = d.y_start - d.y_length / 2;
+							break;
+						case Side::west:
+							nbr_left.x_start  = d.x_start - d.x_length / 2;
+							nbr_left.y_start  = d.y_start;
+							nbr_right.x_start = d.x_start - d.x_length / 2;
+							nbr_right.y_start = d.y_start + d.y_length / 2;
+					}
+					nbr_left.x_length  = d.x_length / 2;
+					nbr_left.y_length  = d.y_length / 2;
+					nbr_right.x_length = d.x_length / 2;
+					nbr_right.y_length = d.y_length / 2;
+
+					// enqueue domains
+					if (enqueued.count(d.nbr(s)) == 0) {
+						queue.push_back(d.nbr(s));
+						enqueued.insert(d.nbr(s));
+					}
+					if (enqueued.count(d.nbrRight(s)) == 0) {
+						queue.push_back(d.nbrRight(s));
+						enqueued.insert(d.nbrRight(s));
+					}
+					// coarse case
+				} else if (d.hasCoarseNbr(s)) {
+					DomainSignature &nbr = domains.at(d.nbr(s));
+
+					switch (s) {
+						case Side::north:
+							if (d.leftOfCoarse(s)) {
+								nbr.x_start = d.x_start - d.x_length;
+								nbr.y_start = d.y_start + d.y_length;
+							} else {
+								nbr.x_start = d.x_start;
+								nbr.y_start = d.y_start + d.y_length;
+							}
+							break;
+                        case Side::east:
+							if (d.leftOfCoarse(s)) {
+								nbr.x_start = d.x_start + d.x_length;
+								nbr.y_start = d.y_start;
+							} else {
+								nbr.x_start = d.x_start + d.x_length;
+								nbr.y_start = d.y_start - d.y_length;
+							}
+							break;
+						case Side::south:
+							if (d.leftOfCoarse(s)) {
+								nbr.x_start = d.x_start;
+								nbr.y_start = d.y_start - d.y_length * 2;
+							} else {
+								nbr.x_start = d.x_start - d.x_length;
+								nbr.y_start = d.y_start - d.y_length * 2;
+							}
+							break;
+						case Side::west:
+							if (d.leftOfCoarse(s)) {
+								nbr.x_start = d.x_start - d.x_length * 2;
+								nbr.y_start = d.y_start - d.y_length;
+							} else {
+								nbr.x_start = d.x_start - d.x_length * 2;
+								nbr.y_start = d.y_start;
+							}
+					}
+					nbr.x_length = 2 * d.x_length;
+					nbr.y_length = 2 * d.y_length;
+
+					if (enqueued.count(d.nbr(s)) == 0) {
+						queue.push_back(d.nbr(s));
+						enqueued.insert(d.nbr(s));
+					}
+					// normal case
+				} else {
+					DomainSignature &nbr = domains.at(d.nbr(s));
+
+					switch (s) {
+						case Side::north:
+							nbr.x_start = d.x_start;
+							nbr.y_start = d.y_start + d.y_length;
+							break;
+						case Side::east:
+							nbr.x_start = d.x_start + d.x_length;
+							nbr.y_start = d.y_start;
+							break;
+						case Side::south:
+							nbr.x_start = d.x_start;
+							nbr.y_start = d.y_start - d.y_length;
+							break;
+						case Side::west:
+							nbr.x_start = d.x_start - d.x_length;
+							nbr.y_start = d.y_start;
+					}
+					nbr.x_length = d.x_length;
+					nbr.y_length = d.y_length;
+
+					// enqueue domain
+					if (enqueued.count(d.nbr(s)) == 0) {
+						queue.push_back(d.nbr(s));
+						enqueued.insert(d.nbr(s));
+					}
+				}
+			}
+			s++;
+		} while (s != Side::north);
+	}
+    double x_shift = -x_min;
+    double y_shift = -y_min;
+	double x_scale = x_max - x_min;
+	double y_scale = y_max - y_min;
+	double scale = x_scale;
+    if(y_scale>scale){
+        scale=y_scale;
+    }
+	for (auto &p : domains) {
+		DomainSignature &d = p.second;
+		d.x_start += x_shift;
+		d.y_start += y_shift;
+		d.x_start /= scale;
+		d.y_start /= scale;
+		d.x_length /= scale;
+		d.y_length /= scale;
+	}
+}
 DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank)
 {
 	num_global_domains    = d_x * d_y;
@@ -38,6 +367,7 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank)
 	}
     indexInterfacesBFS();
 }
+
 DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank,bool amr)
 {
 	num_global_domains    = d_x * d_y*5;
@@ -135,7 +465,7 @@ void DomainSignatureCollection::indexInterfacesBFS()
 		visited.insert(curr);
         Side s = Side::north;
         do{
-			if (d.hasNbr(s) && visited.count(d.nbr(s)) == 0) {
+			if (d.hasNbr(s) && d.index(s) == -1) {
 				// a new edge that we have not assigned an index to
 				d.index(s) = curr_i;
 				curr_i++;
@@ -155,6 +485,10 @@ void DomainSignatureCollection::indexInterfacesBFS()
 					nbr_right.index(!s) = curr_i;
 					curr_i++;
 
+                    // set refined indexes
+					d.indexRefinedLeft(s)  = nbr_left.index(!s);
+					d.indexRefinedRight(s) = nbr_right.index(!s);
+
 					// enqueue domains
 					if (enqueued.count(d.nbr(s)) == 0) {
 						queue.push_back(d.nbr(s));
@@ -166,7 +500,47 @@ void DomainSignatureCollection::indexInterfacesBFS()
 					}
 					// coarse case
 				} else if (d.hasCoarseNbr(s)) {
-					// TODO
+					DomainSignature &nbr      = domains.at(d.nbr(s));
+					int              buddy_id = -1;
+					if (d.leftOfCoarse(s)) {
+						DomainSignature &buddy = domains.at(nbr.nbrRight(!s));
+						buddy_id               = buddy.id;
+
+						nbr.indexRefinedLeft(!s) = d.index(s);
+
+						nbr.indexRefinedRight(!s) = curr_i;
+						buddy.index(s)            = curr_i;
+						curr_i++;
+
+						d.indexCenter(s)     = curr_i;
+						nbr.index(!s)        = curr_i;
+						buddy.indexCenter(s) = curr_i;
+						curr_i++;
+					} else {
+						DomainSignature &buddy = domains.at(nbr.nbr(!s));
+						buddy_id               = buddy.id;
+
+						nbr.indexRefinedRight(!s) = d.index(s);
+
+						nbr.indexRefinedLeft(!s) = curr_i;
+						buddy.index(s)           = curr_i;
+						curr_i++;
+
+						d.indexCenter(s)     = curr_i;
+						nbr.index(!s)        = curr_i;
+						buddy.indexCenter(s) = curr_i;
+						curr_i++;
+					}
+
+					// enqueue domains
+					if (enqueued.count(nbr.id) == 0) {
+						queue.push_back(nbr.id);
+						enqueued.insert(nbr.id);
+					}
+					if (enqueued.count(buddy_id) == 0) {
+						queue.push_back(buddy_id);
+						enqueued.insert(buddy_id);
+					}
 					// normal case
 				} else {
 					DomainSignature &nbr = domains.at(d.nbr(s));

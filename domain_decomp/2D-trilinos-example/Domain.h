@@ -15,8 +15,10 @@ class Domain
 	DomainSignature        ds;
 	std::valarray<double>  f;
 	std::valarray<double>  f_copy;
+	std::valarray<double>  f_back;
 	std::valarray<double>  resid;
 	std::valarray<double>  u;
+	std::valarray<double>  u_back;
 	std::valarray<double>  exact;
 	std::valarray<double>  tmp;
 	std::valarray<double>  denom;
@@ -27,9 +29,11 @@ class Domain
 	std::valarray<double>  boundary_north;
 	std::valarray<double>  boundary_south;
 	std::valarray<double>  boundary_east;
-	std::valarray<double>  boundary_east_refined_left;
-	std::valarray<double>  boundary_east_refined_right;
 	std::valarray<double>  boundary_west;
+	std::valarray<double>  boundary_north_back;
+	std::valarray<double>  boundary_south_back;
+	std::valarray<double>  boundary_east_back;
+	std::valarray<double>  boundary_west_back;
 	std::array<int, 4> local_i        = {-1, -1, -1, -1};
 	std::array<int, 4> local_i_center = {-1, -1, -1, -1};
 	Teuchos::RCP<map_type> domain_map;
@@ -42,7 +46,7 @@ class Domain
 	double                 y_length = 0;
 
 	Domain() = default;
-	Domain(DomainSignature ds, int n, double h_x, double h_y);
+	Domain(DomainSignature ds, int n);
 	~Domain();
 
 	void planDirichlet();
@@ -58,17 +62,26 @@ class Domain
 	double fNorm();
 	double exactNorm(double eavg);
 	double exactSum();
+	void   swapResidSol();
+	void   sumResidIntoSol();
 
 	std::valarray<double> getStencil(Side s, Tilt t = Tilt::center);
 	std::valarray<double> getSide(Side s);
+	std::valarray<double> getInnerSide(Side s);
 	std::valarray<double> getSideFine(Side s);
 	std::valarray<double> getSideFineLeft(Side s);
 	std::valarray<double> getSideFineRight(Side s);
+	std::valarray<double> getInnerSideFine(Side s);
+	std::valarray<double> getInnerSideFineLeft(Side s);
+	std::valarray<double> getInnerSideFineRight(Side s);
+	std::valarray<double> getSideCoarse(Side s);
 	void fillBoundary(Side s, const single_vector_type &gamma);
 	void fillDiffVector(Side s, single_vector_type &diff, bool residual = false);
 
 	inline int &index(Side s) { return local_i[static_cast<int>(s)]; }
 	inline int &indexCenter(Side s) { return local_i_center[static_cast<int>(s)]; }
+	inline int &indexRefinedLeft(Side s) { return ds.indexRefinedLeft(s); }
+	inline int &indexRefinedRight(Side s) { return ds.indexRefinedRight(s); }
 	inline int &globalIndex(Side s) { return ds.index(s); }
 	inline int &globalIndexCenter(Side s) { return ds.indexCenter(s); }
 	inline int &nbr(Side s) { return ds.nbr(s); }
@@ -100,5 +113,6 @@ class Domain
 		bool retval = (s == Side::north || s == Side::west);
 		return retval;
 	}
+	void outputClaw(std::ostream &os);
 };
 #endif
