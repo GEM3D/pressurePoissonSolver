@@ -1,9 +1,10 @@
 #ifndef DOMAINSIGNATURECOLLECTION_H
 #define DOMAINSIGNATURECOLLECTION_H
 #include "Side.h"
-#include <map>
 #include <array>
 #include <bitset>
+#include <map>
+#include <string>
 #include <zoltan_cpp.h>
 /**
  * @brief A structure that represents a domain and its relation to other domains.
@@ -36,11 +37,11 @@ struct DomainSignature {
 	/**
 	 * @brief length of domain in x direction
 	 */
-	double x_length = 0;
+	double x_length = 1;
 	/**
 	 * @brief length of odmain in y direction
 	 */
-	double y_length = 0;
+	double y_length = 1;
 
 	friend bool operator<(const DomainSignature &l, const DomainSignature &r)
 	{
@@ -48,13 +49,20 @@ struct DomainSignature {
 	}
 	inline int &index(Side s) { return global_i[static_cast<int>(s)]; }
 	inline int &indexCenter(Side s) { return global_i_center[static_cast<int>(s)]; }
-	inline int &indexRefinedLeft(Side s) { return global_i_refined[2*static_cast<int>(s)]; }
-	inline int &indexRefinedRight(Side s) { return global_i_refined[1+2*static_cast<int>(s)]; }
-	inline int &nbr(Side s) { return nbr_id[2*static_cast<int>(s)]; }
-	inline int &nbrRight(Side s) { return nbr_id[2*static_cast<int>(s)+1]; }
-	inline bool hasNbr(Side s) { return nbr_id[static_cast<int>(s) * 2] != -1; }
+	inline int &indexRefinedLeft(Side s) { return global_i_refined[2 * static_cast<int>(s)]; }
+	inline int &indexRefinedRight(Side s) { return global_i_refined[1 + 2 * static_cast<int>(s)]; }
+	inline int &nbr(Side s) { return nbr_id[2 * static_cast<int>(s)]; }
+	inline int &nbrRight(Side s) { return nbr_id[2 * static_cast<int>(s) + 1]; }
+	inline bool hasNbr(Side       s) { return nbr_id[static_cast<int>(s) * 2] != -1; }
 	inline bool hasFineNbr(Side s) { return nbr_fine[static_cast<int>(s)]; }
 	inline bool hasCoarseNbr(Side s) { return nbr_coarse[static_cast<int>(s)]; }
+	inline bool leftOfCoarse(Side s)
+	{
+		return left_of_coarse[static_cast<int>(s)];
+	}
+	inline void setHasFineNbr(Side s) { nbr_fine[static_cast<int>(s)] = true; }
+	inline void setHasCoarseNbr(Side s) { nbr_coarse[static_cast<int>(s)] = true; }
+	inline void setLeftOfCoarse(Side s) { left_of_coarse[static_cast<int>(s)] = true; }
 };
 
 /**
@@ -84,6 +92,11 @@ class DomainSignatureCollection
 	 * @brief Default empty constructor.
 	 */
 	DomainSignatureCollection() = default;
+
+	DomainSignatureCollection(std::string file_name, int rank);
+	void determineCoarseness();
+	void determineAmrLevel();
+	void determineXY();
 	/**
 	 * @brief Generate a grid of domains.
 	 *

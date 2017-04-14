@@ -14,13 +14,21 @@ Domain::Domain(DomainSignature ds, int n)
 	cerr << "I start at:  " << ds.x_start << ", " << ds.y_start << "\n";
 	cerr << "Length:     " << ds.x_length << ", " << ds.y_length << "\n";
 	cerr << "North: " << ds.nbr(Side::north) << ", " << ds.nbrRight(Side::north) << "\n";
-	cerr << "Idx:   " << globalIndex(Side::north) << ", " << globalIndexCenter(Side::north) << "\n";
+	cerr << "Idx:   " << ds.index(Side::north) << ", " << ds.indexCenter(Side::north) << "\n";
+	cerr << "       " << indexRefinedLeft(Side::north) << ", "
+	     << indexRefinedRight(Side::north) << "\n";
 	cerr << "East:  " << ds.nbr(Side::east) << ", " << ds.nbrRight(Side::east) << "\n";
-	cerr << "Idx:   " << globalIndex(Side::east) << ", " << globalIndexCenter(Side::east) << "\n";
+	cerr << "Idx:   " << ds.index(Side::east) << ", " << ds.indexCenter(Side::east) << "\n";
+	cerr << "       " << indexRefinedLeft(Side::east) << ", "
+	     << indexRefinedRight(Side::east) << "\n";
 	cerr << "South: " << ds.nbr(Side::south) << ", " << ds.nbrRight(Side::south) << "\n";
-	cerr << "Idx:   " << globalIndex(Side::south) << ", " << globalIndexCenter(Side::south) << "\n";
+	cerr << "Idx:   " << ds.index(Side::south) << ", " << ds.indexCenter(Side::south) << "\n";
+	cerr << "       " << indexRefinedLeft(Side::south) << ", "
+	     << indexRefinedRight(Side::south) << "\n";
 	cerr << "West:  " << ds.nbr(Side::west) << ", " << ds.nbrRight(Side::west) << "\n";
-	cerr << "Idx:   " << globalIndex(Side::west) << ", " << globalIndexCenter(Side::west) << "\n";
+	cerr << "Idx:   " << ds.index(Side::west) << ", " << ds.indexCenter(Side::west) << "\n";
+	cerr << "       " << indexRefinedLeft(Side::west) << ", "
+	     << indexRefinedRight(Side::west) << "\n";
 	cerr << "\n";
 #endif
 	f      = valarray<double>(n * n);
@@ -399,13 +407,13 @@ valarray<double> Domain::getInnerSide(Side s)
 	valarray<double> retval(n);
 	switch (s) {
 		case Side::north:
-			retval = u[slice(n * (n - 1), n, 1)];
+			retval = u[slice(n * (n - 2), n, 1)];
 			break;
 		case Side::east:
-			retval = u[slice(n - 1, n, n)];
+			retval = u[slice(n - 2, n, n)];
 			break;
 		case Side::south:
-			retval = u[slice(0, n, 1)];
+			retval = u[slice(n, n, 1)];
 			break;
 		case Side::west:
 			retval = u[slice(1, n, n)];
@@ -599,6 +607,11 @@ void Domain::fillDiffVector(Side s, single_vector_type &diff, bool residual)
 		int curr_i      = index(s) * n;
 		int curr_low_i  = indexRefinedRight(s) * n;
 		int curr_high_i = indexRefinedLeft(s) * n;
+		if (s == Side::north || s == Side::west) {
+			int tmp     = curr_high_i;
+			curr_high_i = curr_low_i;
+			curr_low_i  = tmp;
+		}
 		for (int i = 0; i < n; i++) {
 			diff_view(curr_i, 0) += side[i];
 			diff_view(curr_i, 0) -= 8.0 / 15.0 * (coarse[2 * i] + coarse[2 * i + 1]);

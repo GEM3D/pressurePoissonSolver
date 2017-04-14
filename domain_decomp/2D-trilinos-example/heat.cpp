@@ -57,6 +57,7 @@ int main(int argc, char *argv[])
 
 	args::ValueFlag<int> f_n(parser, "n", "number of cells in the x direction, in each domain",
 	                          {'n'});
+	args::ValueFlag<string> f_mesh(parser, "file_name", "read in a mesh", {"mesh"});
 	args::ValueFlag<int> f_square(
 	parser, "num_domains", "create a num_domains x num_domains square of grids", {"square"});
 	args::ValueFlag<int> f_amr(parser, "num_domains", "create a num_domains x num_domains square "
@@ -117,8 +118,11 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	DomainSignatureCollection dsc;
-	if (f_amr) {
-        int d = args::get(f_amr);
+	if (f_mesh) {
+		string d = args::get(f_mesh);
+		dsc      = DomainSignatureCollection(d, comm->getRank());
+	} else if (f_amr) {
+		int d = args::get(f_amr);
 		dsc   = DomainSignatureCollection(d, d, comm->getRank(), true);
 	} else {
         int d = args::get(f_square);
@@ -239,11 +243,7 @@ int main(int argc, char *argv[])
 			}
 			dc.initNeumann(ffun, gfun, nfunx, nfuny, f_amr);
 		} else {
-			if (f_amr) {
-				dc.initDirichletRefined(ffun, gfun);
-			} else {
-				dc.initDirichlet(ffun, gfun);
-			}
+			dc.initDirichlet(ffun, gfun);
 		}
 
 		comm->barrier();

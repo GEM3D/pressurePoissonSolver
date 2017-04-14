@@ -34,7 +34,6 @@ class DomainCollection
 
 	int num_cols = 0;
 
-	bool amr = false;
 	/**
 	 * @brief Number of global domains
 	 */
@@ -67,6 +66,7 @@ class DomainCollection
     std::set<Iface> ifaces;
 
 	public:
+	bool amr = false;
 	/**
 	 * @brief Tpetra map that assures each domains has access to it's interface values
 	 */
@@ -104,10 +104,6 @@ class DomainCollection
 	 */
 	void initDirichlet(std::function<double(double, double)> ffun,
 	                   std::function<double(double, double)> gfun);
-
-	void initDirichletRefined(std::function<double(double, double)> ffun,
-	                          std::function<double(double, double)> gfun);
-
 	/**
 	 * @brief Initialize domains using Neumann boundary conditions
 	 *
