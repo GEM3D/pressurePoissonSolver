@@ -7,8 +7,9 @@
 #include "args.h"
 //#include <Amesos2.hpp>
 //#include <Amesos2_Version.hpp>
-#include <BelosBlockCGSolMgr.hpp>
 #include <BelosBiCGStabSolMgr.hpp>
+#include <BelosBlockCGSolMgr.hpp>
+#include <BelosGCRODRSolMgr.hpp>
 #include <BelosBlockGmresSolMgr.hpp>
 #include <BelosConfigDefs.hpp>
 #include <BelosLinearProblem.hpp>
@@ -87,7 +88,10 @@ int main(int argc, char *argv[])
 	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
 	args::Flag f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
 	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {"neumann"});
+	args::Flag f_cg(parser, "gmres", "use CG for iterative solver", {"cg"});
 	args::Flag f_gmres(parser, "gmres", "use GMRES for iterative solver", {"gmres"});
+	args::Flag f_rgmres(parser, "rgmres", "use GCRO-DR (Recycling GMRES) for iterative solver",
+	                    {"rgmres"});
 	args::Flag f_bicg(parser, "gmres", "use BiCGStab for iterative solver", {"bicg"});
 	args::Flag f_nozero(parser, "nozero", "don't make the average of vector zero in CG solver",
 	                    {"nozero"});
@@ -244,6 +248,7 @@ int main(int argc, char *argv[])
 			dc.initNeumann(ffun, gfun, nfunx, nfuny, f_amr);
 		} else {
 			dc.initDirichlet(ffun, gfun);
+            dc.amr = f_amr;
 		}
 
 		comm->barrier();
@@ -263,6 +268,7 @@ int main(int argc, char *argv[])
 		RCP<vector_type> d     = rcp(new vector_type(matrix_map, 1));
 		RCP<vector_type> diff  = rcp(new vector_type(matrix_map, 1));
 		RCP<RBMatrix>    RBA;
+		RCP<Tpetra::Operator<>> op;
 
 		// Create linear problem for the Belos solver
 		RCP<Belos::LinearProblem<double, vector_type, Tpetra::Operator<>>> problem;
@@ -277,8 +283,6 @@ int main(int argc, char *argv[])
 			if (save_rhs_file != "") {
 				Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_rhs_file, b, "", "");
 			}
-
-			RCP<Tpetra::Operator<>> op;
 
 			if (f_wrapper) {
 				// Create a function wrapper
@@ -403,15 +407,19 @@ int main(int argc, char *argv[])
 				belosList.set("Verbosity", verbosity);
 
 				// Create solver and solve
-				if (f_gmres) {
+                if(f_rgmres){
 					solver
-					= rcp(new Belos::BlockGmresSolMgr<double, vector_type, Tpetra::Operator<>>(
+					= rcp(new Belos::GCRODRSolMgr<double, vector_type, Tpetra::Operator<>>(
+					problem, rcp(&belosList, false)));
+				} else if (f_cg) {
+					solver = rcp(new Belos::BlockCGSolMgr<double, vector_type, Tpetra::Operator<>>(
 					problem, rcp(&belosList, false)));
 				} else if (f_bicg) {
 					solver = rcp(new Belos::BiCGStabSolMgr<double, vector_type, Tpetra::Operator<>>(
 					problem, rcp(&belosList, false)));
 				} else {
-					solver = rcp(new Belos::BlockCGSolMgr<double, vector_type, Tpetra::Operator<>>(
+					solver
+					= rcp(new Belos::BlockGmresSolMgr<double, vector_type, Tpetra::Operator<>>(
 					problem, rcp(&belosList, false)));
 				}
 				solver->solve();
@@ -439,8 +447,13 @@ int main(int argc, char *argv[])
             dc.residual();
             dc.swapResidSol();
 			dc.solveWithInterface(*x, *r);
+            solver->reset(Belos::ResetType::Problem);
+            if(f_wrapper){
+				((FuncWrap*)op.getRawPtr())->setB(r);
+            }
 			problem->setProblem(x, r);
 			solver->setProblem(problem);
+            //cerr<<"solve with 0!!!!!!!!!!!!!!!!!!!!" <<endl;
 			solver->solve();
 			dc.solveWithInterface(*x, *d);
             dc.sumResidIntoSol();
@@ -455,11 +468,11 @@ int main(int argc, char *argv[])
 			double usum = dc.uSum();
 			double uavg;
 			Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &usum, &uavg);
-			uavg /= total_cells;
+			uavg /= dc.getGlobalNumCells();
 			double esum = dc.exactSum();
 			double eavg;
 			Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &esum, &eavg);
-			eavg /= total_cells;
+			eavg /= dc.getGlobalNumCells();
 
 			if (my_global_rank == 0) {
 				cout << "Average of computed solution: " << uavg << "\n";

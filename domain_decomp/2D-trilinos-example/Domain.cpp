@@ -1,3 +1,4 @@
+#include <valarray>
 #include "Domain.h"
 #include "Iface.h"
 using namespace std;
@@ -220,23 +221,23 @@ void Domain::putGhostCells(vector_type &ghost)
 	auto right_ptr = ghost.getVectorNonConst(1);
 	if (hasNbr(Side::north)) {
 		if (hasFineNbr(Side::north) || hasCoarseNbr(Side::north)) {
-			fillDiffVector(Side::north, *left_ptr, true);
+			fillGhostVector(Side::north, *left_ptr);
 		} else {
-			fillDiffVector(Side::north, *right_ptr, true);
+			fillGhostVector(Side::north, *right_ptr);
 		}
 	}
 	if (hasNbr(Side::east)) {
 		if (hasFineNbr(Side::east) || hasCoarseNbr(Side::east)) {
-			fillDiffVector(Side::east, *left_ptr, true);
+			fillGhostVector(Side::east, *left_ptr);
 		} else {
-			fillDiffVector(Side::east, *right_ptr, true);
+			fillGhostVector(Side::east, *right_ptr);
 		}
 	}
 	if (hasNbr(Side::south)) {
-		fillDiffVector(Side::south, *left_ptr, true);
-	};
+		fillGhostVector(Side::south, *left_ptr);
+	}
 	if (hasNbr(Side::west)) {
-		fillDiffVector(Side::west, *left_ptr, true);
+		fillGhostVector(Side::west, *left_ptr);
 	}
 }
 
@@ -384,7 +385,7 @@ double Domain::exactNorm() { return sqrt((exact * exact).sum()); }
 double Domain::fNorm() { return sqrt((f * f).sum()); }
 double Domain::exactNorm(double eavg) { return sqrt(pow(exact - eavg, 2).sum()); }
 double                          Domain::exactSum() { return exact.sum(); }
-valarray<double> Domain::getSide(Side s)
+valarray<double> Domain::getSide(const Side s) const
 {
 	valarray<double> retval(n);
 	switch (s) {
@@ -402,7 +403,7 @@ valarray<double> Domain::getSide(Side s)
 	}
 	return retval;
 }
-valarray<double> Domain::getInnerSide(Side s)
+valarray<double> Domain::getInnerSide(const Side s) const
 {
 	valarray<double> retval(n);
 	switch (s) {
@@ -420,7 +421,7 @@ valarray<double> Domain::getInnerSide(Side s)
 	}
 	return retval;
 }
-valarray<double> Domain::getSideFineLeft(Side s)
+valarray<double> Domain::getSideFineLeft(const Side s) const
 {
 	valarray<double> retval(n);
 	valarray<double> side = getSide(s);
@@ -435,7 +436,7 @@ valarray<double> Domain::getSideFineLeft(Side s)
 	}
 	return retval;
 }
-valarray<double> Domain::getSideFineRight(Side s)
+valarray<double> Domain::getSideFineRight(const Side s) const
 {
 	valarray<double> retval(n);
 	valarray<double> side = getSide(s);
@@ -449,19 +450,18 @@ valarray<double> Domain::getSideFineRight(Side s)
 		}
 	}
 	return retval;
-
 }
-valarray<double> Domain::getSideFine(Side s)
+valarray<double> Domain::getSideFine(const Side s) const
 {
 	valarray<double> retval(n);
 	if (isCoarseLeft(s)) {
-        retval = getSideFineLeft(s);
+		retval = getSideFineLeft(s);
 	} else {
-        retval = getSideFineRight(s);
+		retval = getSideFineRight(s);
 	}
 	return retval;
 }
-valarray<double> Domain::getInnerSideFineLeft(Side s)
+valarray<double> Domain::getInnerSideFineLeft(const Side s) const
 {
 	valarray<double> retval(n);
 	valarray<double> side = getInnerSide(s);
@@ -476,7 +476,7 @@ valarray<double> Domain::getInnerSideFineLeft(Side s)
 	}
 	return retval;
 }
-valarray<double> Domain::getInnerSideFineRight(Side s)
+valarray<double> Domain::getInnerSideFineRight(const Side s) const
 {
 	valarray<double> retval(n);
 	valarray<double> side = getInnerSide(s);
@@ -490,65 +490,27 @@ valarray<double> Domain::getInnerSideFineRight(Side s)
 		}
 	}
 	return retval;
-
 }
-valarray<double> Domain::getInnerSideFine(Side s)
+valarray<double> Domain::getInnerSideFine(const Side s) const
 {
 	valarray<double> retval(n);
 	if (isCoarseLeft(s)) {
-        retval = getInnerSideFineLeft(s);
+		retval = getInnerSideFineLeft(s);
 	} else {
-        retval = getInnerSideFineRight(s);
+		retval = getInnerSideFineRight(s);
 	}
 	return retval;
 }
 valarray<double> Domain::getSideCoarse(Side s)
 {
-	bool   nbr_left=false;
-	bool   nbr_right=false;
-	double val_left=0;
-	double val_right=0;
-	switch (s) {
-		case Side::north:
-			nbr_left  = hasNbr(Side::west);
-			val_left  = boundary_west[n - 1];
-			nbr_right = hasNbr(Side::east);
-			val_right = boundary_east[n - 1];
-			break;
-		case Side::east:
-			nbr_left  = hasNbr(Side::south);
-			val_left  = boundary_south[n - 1];
-			nbr_right = hasNbr(Side::north);
-			val_right = boundary_north[n - 1];
-			break;
-		case Side::south:
-			nbr_left  = hasNbr(Side::west);
-			val_left  = boundary_west[0];
-			nbr_right = hasNbr(Side::east);
-			val_right = boundary_east[0];
-			break;
-		case Side::west:
-			nbr_left  = hasNbr(Side::south);
-			val_left  = boundary_south[0];
-			nbr_right = hasNbr(Side::north);
-			val_right = boundary_north[0];
-	}
-    valarray<double> retval = getSide(s);
+	valarray<double> retval = getSide(s);
 	valarray<double> refined(2 * n);
 
 	int  grid_i = 1;
 	bool right  = false;
 
-	if (!nbr_left && neumann) {
-		refined[0] = (-10.0 * val_left + 35.0 * retval[0] - 3.0 * retval[1]) / 32.0;
-		refined[1] = (6.0 * val_left + 27.0 * retval[0] + 5.0 * retval[1]) / 32.0;
-	} else if (!nbr_left) {
-		refined[0] = (10.0 * val_left + 15.0 * retval[0] - retval[1]) / 24.0;
-		refined[1] = (-2.0 * val_left + 9.0 * retval[0] + retval[1]) / 8.0;
-    }else{
-		refined[0] = (10.0 * val_left + 25.0 * retval[0] -3.0* retval[1]) / 32.0;
-		refined[1] = (-6.0 * val_left + 33.0 * retval[0] +5.0* retval[1]) / 32.0;
-    }
+	refined[0] = (45.0 * retval[0] - 18.0 * retval[1] + 5.0 * retval[2]) / 32.0;
+	refined[1] = (21.0 * retval[0] + 14.0 * retval[1] - 3.0 * retval[2]) / 32.0;
 	for (int i = 2; i < 2 * n - 2; i++) {
 		if (right) {
 			refined[i]
@@ -561,24 +523,117 @@ valarray<double> Domain::getSideCoarse(Side s)
 			right = true;
 		}
 	}
-	if (!nbr_right && neumann) {
-		refined[2 * n - 2] = (6.0 * val_right + 27.0 * retval[n - 1] + 5.0 * retval[n - 2]) / 32.0;
-		refined[2 * n - 1]
-		= (-10.0 * val_right + 35.0 * retval[n - 1] - 3.0 * retval[n - 2]) / 32.0;
-	} else if (!nbr_right) {
-		refined[2 * n - 2] = (-2.0 * val_right + 9.0 * retval[n - 1] + retval[n - 2]) / 8.0;
-		refined[2 * n - 1] = (10.0 * val_right + 15.0 * retval[n - 1] - retval[n - 2]) / 24.0;
-	} else {
-		refined[2 * n - 2] = (-6.0 * val_right + 33.0 * retval[n - 1] + 5.0 * retval[n - 2]) / 32.0;
-		refined[2 * n - 1] = (10.0 * val_right + 25.0 * retval[n - 1] - 3.0 * retval[n - 2]) / 32.0;
+	refined[2 * n - 2] = (21.0 * retval[n - 1] + 14.0 * retval[n - 2] - 3.0 * retval[n - 3]) / 32.0;
+	refined[2 * n - 1] = (45.0 * retval[n - 1] - 18.0 * retval[n - 2] + 5.0 * retval[n - 3]) / 32.0;
+	return refined;
+}
+valarray<double> Domain::getSideCoarseCombined(const Side s) const
+{
+	valarray<double> retval = getSide(s);
+	valarray<double> refined(n);
+
+	refined[0] = (45.0 * retval[0] - 18.0 * retval[1] + 5.0 * retval[2]) / 32.0;
+	refined[0] += (21.0 * retval[0] + 14.0 * retval[1] - 3.0 * retval[2]) / 32.0;
+	for (int i = 1; i < n - 1; i++) {
+		refined[i] = (5.0 * retval[i - 1] + 30.0 * retval[i] - 3.0 * retval[i + 1]) / 32.0;
+		refined[i] += (5.0 * retval[i + 1] + 30.0 * retval[i] - 3.0 * retval[i - 1]) / 32.0;
+	}
+	refined[n - 1] = (21.0 * retval[n - 1] + 14.0 * retval[n - 2] - 3.0 * retval[n - 3]) / 32.0;
+	refined[n - 1] += (45.0 * retval[n - 1] - 18.0 * retval[n - 2] + 5.0 * retval[n - 3]) / 32.0;
+	return refined;
+}
+valarray<double> Domain::getSideCoarseRelativeLeft(const Side s) const
+{
+	valarray<double> side = getSide(s);
+	valarray<double> refined(n);
+
+	int  grid_i = 1;
+	bool right  = false;
+
+	refined[0] = (45.0 * side[0] - 18.0 * side[1] + 5.0 * side[2]) / 32.0;
+	refined[1] = (21.0 * side[0] + 14.0 * side[1] - 3.0 * side[2]) / 32.0;
+	for (int i = 2; i < n; i++) {
+		if (right) {
+			refined[i]
+			= (5.0 * side[grid_i + 1] + 30.0 * side[grid_i] - 3.0 * side[grid_i - 1]) / 32.0;
+			right = false;
+			grid_i++;
+		} else {
+			refined[i]
+			= (5.0 * side[grid_i - 1] + 30.0 * side[grid_i] - 3.0 * side[grid_i + 1]) / 32.0;
+			right = true;
+		}
 	}
 	return refined;
 }
-valarray<double> Domain::getStencil(Side s,Tilt t)
+valarray<double> Domain::getSideCoarseRelativeRight(const Side s) const
 {
-		return getSide(s);
+	valarray<double> side = getSide(s);
+	valarray<double> refined(n);
+
+	int  grid_i = n - 2;
+	bool left   = false;
+
+	refined[n - 1] = (45.0 * side[n - 1] - 18.0 * side[n - 2] + 5.0 * side[n - 3]) / 32.0;
+	refined[n - 2] = (21.0 * side[n - 1] + 14.0 * side[n - 2] - 3.0 * side[n - 3]) / 32.0;
+	for (int i = n - 3; i >= 0; i--) {
+		if (left) {
+			refined[i]
+			= (5.0 * side[grid_i - 1] + 30.0 * side[grid_i] - 3.0 * side[grid_i + 1]) / 32.0;
+			left = false;
+			grid_i--;
+		} else {
+			refined[i]
+			= (5.0 * side[grid_i + 1] + 30.0 * side[grid_i] - 3.0 * side[grid_i - 1]) / 32.0;
+			left = true;
+		}
+	}
+	return refined;
 }
 
+valarray<double> Domain::getDiff(const Side s) const { return getBoundary(s) - getSide(s); }
+valarray<double> Domain::getDiffFine(const Side s) const
+{
+	return 2.0 * getBoundary(s)
+	       - (getSide(s) + 2.0 / 3.0 * getSide(s) - 1.0 / 5.0 * getInnerSide(s));
+}
+
+valarray<double> Domain::getDiffFineToCoarseLeft(const Side s) const
+{
+	return -1.0 * (getSideFineLeft(s)
+	               - (10.0 * getSideFineLeft(s) - 3.0 * getInnerSideFineLeft(s)) / 15.0);
+}
+
+valarray<double> Domain::getDiffFineToCoarseRight(const Side s) const
+{
+	return -1.0 * (getSideFineRight(s)
+	               - (10.0 * getSideFineRight(s) - 3.0 * getInnerSideFineRight(s)) / 15.0);
+}
+
+valarray<double> Domain::getDiffFineToCoarse(const Side s) const
+{
+	valarray<double> retval(n);
+	if (isCoarseLeft(s)) {
+		retval = getDiffFineToCoarseLeft(s);
+	} else {
+		retval = getDiffFineToCoarseRight(s);
+	}
+	return retval;
+}
+
+valarray<double> Domain::getDiffCoarse(const Side s) const
+{
+	return 2.0 * getBoundary(s)
+	       - (getSide(s) + (getSide(s) - 8.0 / 15.0 * getSideCoarseCombined(s)));
+}
+valarray<double> Domain::getDiffCoarseToFineLeft(const Side s) const
+{
+	return -8.0 / 15.0 * getSideCoarseLeft(s);
+}
+valarray<double> Domain::getDiffCoarseToFineRight(const Side s) const
+{
+	return -8.0 / 15.0 * getSideCoarseRight(s);
+}
 void Domain::fillBoundary(Side s, const single_vector_type &gamma)
 {
 	int               curr_i     = index(s) * n;
@@ -590,20 +645,53 @@ void Domain::fillBoundary(Side s, const single_vector_type &gamma)
 		curr_i++;
 	}
 }
-void Domain::fillDiffVector(Side s, single_vector_type &diff, bool residual)
+
+void Domain::fillDiffVector(Side s, single_vector_type &diff)
+{
+	auto             diff_view = diff.getLocalView<Kokkos::HostSpace>();
+	valarray<double> boundary  = getBoundary(s);
+	if (hasFineNbr(s)) {
+		valarray<double> diff         = getDiffCoarse(s);
+		valarray<double> diff_left    = getDiffCoarseToFineLeft(s);
+		valarray<double> diff_right   = getDiffCoarseToFineRight(s);
+		int              curr_i       = index(s) * n;
+		int              curr_left_i  = indexRefinedLeft(s) * n;
+		int              curr_right_i = indexRefinedRight(s) * n;
+		for (int i = 0; i < n; i++) {
+			diff_view(curr_i, 0) += diff[i];
+			diff_view(curr_left_i, 0) += diff_left[i];
+			diff_view(curr_right_i, 0) += diff_right[i];
+			curr_i++;
+			curr_left_i++;
+			curr_right_i++;
+		}
+	} else if (hasCoarseNbr(s)) {
+		valarray<double> diff          = getDiffFine(s);
+		valarray<double> diff_coarse   = getDiffFineToCoarse(s);
+		int              curr_i        = index(s) * n;
+		int              curr_i_center = indexCenter(s) * n;
+		for (int i = 0; i < n; i++) {
+			diff_view(curr_i, 0) += diff[i];
+			diff_view(curr_i_center, 0) += diff_coarse[i];
+			curr_i_center++;
+			curr_i++;
+		}
+	} else {
+		valarray<double> diff   = getDiff(s);
+		int              curr_i = index(s) * n;
+		for (int i = 0; i < n; i++) {
+			diff_view(curr_i, 0) += diff[i];
+			curr_i++;
+		}
+	}
+}
+void Domain::fillGhostVector(Side s, single_vector_type &diff)
 {
 	// weight=false;
 	auto diff_view = diff.getLocalView<Kokkos::HostSpace>();
 	if (hasFineNbr(s)) {
 		valarray<double> side   = getSide(s);
 		valarray<double> coarse = getSideCoarse(s);
-		if (!residual) {
-			int curr_i = index(s) * n;
-			for (int i = 0; i < n; i++) {
-				diff_view(curr_i, 0) += side[i];
-				curr_i++;
-			}
-		}
 		int curr_i      = index(s) * n;
 		int curr_low_i  = indexRefinedRight(s) * n;
 		int curr_high_i = indexRefinedLeft(s) * n;
@@ -626,19 +714,10 @@ void Domain::fillDiffVector(Side s, single_vector_type &diff, bool residual)
 		valarray<double> incenter = getInnerSideFine(s);
 		valarray<double> side   = getSide(s);
         valarray<double> inside = getInnerSide(s);
-		if (!residual) {
-			int curr_i        = index(s) * n;
-			int curr_i_center = indexCenter(s) * n;
-			for (int i = 0; i < n; i++) {
-				diff_view(curr_i_center, 0) += center[i];
-				diff_view(curr_i, 0) += side[i];
-				curr_i_center++;
-				curr_i++;
-			}
-		}
 		int curr_i        = index(s) * n;
 		int curr_i_center = indexCenter(s) * n;
 		for (int i = 0; i < n; i++) {
+				diff_view(curr_i_center, 0) += center[i];
 			diff_view(curr_i_center, 0) -= 2.0 / 3.0 * center[i] - 1.0 / 5.0 * incenter[i];
 			diff_view(curr_i, 0) += 2.0 / 3.0 * side[i] - 1.0 / 5.0 * inside[i];
 			curr_i_center++;
@@ -693,7 +772,7 @@ void Domain::outputClaw(std::ostream &os)
 	for (int i = 0; i < n; i++) {
 		for (int j = 0; j < n; j++) {
 			int loc = j + i * n;
-			os << u[loc] << tab << error[loc] << tab << resid[loc] << endl;
+			os << u[loc] << tab << abs(error[loc]) << tab << resid[loc] << endl;
 		}
 		os << endl;
 	}

@@ -228,5 +228,6 @@ class DomainCollection
 		}
     }
 	void outputClaw();
+	int  getGlobalNumCells() { return num_global_domains * n * n; }
 };
 #endif

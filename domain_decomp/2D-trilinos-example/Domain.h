@@ -65,18 +65,47 @@ class Domain
 	void   swapResidSol();
 	void   sumResidIntoSol();
 
-	std::valarray<double> getStencil(Side s, Tilt t = Tilt::center);
-	std::valarray<double> getSide(Side s);
-	std::valarray<double> getInnerSide(Side s);
-	std::valarray<double> getSideFine(Side s);
-	std::valarray<double> getSideFineLeft(Side s);
-	std::valarray<double> getSideFineRight(Side s);
-	std::valarray<double> getInnerSideFine(Side s);
-	std::valarray<double> getInnerSideFineLeft(Side s);
-	std::valarray<double> getInnerSideFineRight(Side s);
+	std::valarray<double> getDiff(const Side s) const;
+	std::valarray<double> getDiffFine(const Side s) const;
+	std::valarray<double> getDiffFineToCoarse(const Side s) const;
+	std::valarray<double> getDiffFineToCoarseLeft(const Side s) const;
+	std::valarray<double> getDiffFineToCoarseRight(const Side s) const;
+	std::valarray<double> getDiffCoarse(const Side s) const;
+	std::valarray<double> getDiffCoarseToFineLeft(const Side s) const;
+	std::valarray<double> getDiffCoarseToFineRight(const Side s) const;
+
+	std::valarray<double> getSide(const Side s) const;
+	std::valarray<double> getInnerSide(const Side s) const;
+	std::valarray<double> getSideFine(const Side s) const;
+	std::valarray<double> getSideFineLeft(const Side s) const;
+	std::valarray<double> getSideFineRight(const Side s) const;
+	std::valarray<double> getInnerSideFine(const Side s) const;
+	std::valarray<double> getInnerSideFineLeft(const Side s) const;
+	std::valarray<double> getInnerSideFineRight(const Side s) const;
 	std::valarray<double> getSideCoarse(Side s);
+	std::valarray<double> getSideCoarseCombined(const Side s) const;
+	inline std::valarray<double> getSideCoarseLeft(const Side s) const
+	{
+		if (s == Side::west || s == Side::north) {
+			return getSideCoarseRelativeLeft(s);
+		} else {
+			return getSideCoarseRelativeRight(s);
+		}
+	}
+	inline std::valarray<double> getSideCoarseRight(const Side s) const
+	{
+		if (s == Side::west || s == Side::north) {
+			return getSideCoarseRelativeRight(s);
+		} else {
+			return getSideCoarseRelativeLeft(s);
+		}
+	}
+
+	std::valarray<double> getSideCoarseRelativeLeft(const Side s) const;
+	std::valarray<double> getSideCoarseRelativeRight(const Side s) const;
 	void fillBoundary(Side s, const single_vector_type &gamma);
-	void fillDiffVector(Side s, single_vector_type &diff, bool residual = false);
+	void fillDiffVector(Side s, single_vector_type &diff);
+	void fillGhostVector(Side s, single_vector_type &diff);
 
 	inline int &index(Side s) { return local_i[static_cast<int>(s)]; }
 	inline int &indexCenter(Side s) { return local_i_center[static_cast<int>(s)]; }
@@ -84,8 +113,8 @@ class Domain
 	inline int &indexRefinedRight(Side s) { return ds.indexRefinedRight(s); }
 	inline int &globalIndex(Side s) { return ds.index(s); }
 	inline int &globalIndexCenter(Side s) { return ds.indexCenter(s); }
-	inline int &nbr(Side s) { return ds.nbr(s); }
-	inline int &nbrRight(Side     s) { return ds.nbrRight(s); }
+	inline int nbr(Side s) { return ds.nbr(s); }
+	inline int nbrRight(Side      s) { return ds.nbrRight(s); }
 	inline std::valarray<double> *getBoundaryPtr(Side s)
 	{
 		std::valarray<double> *retval = nullptr;
@@ -104,10 +133,28 @@ class Domain
 		}
 		return retval;
 	}
+	inline std::valarray<double> getBoundary(const Side s) const
+	{
+		std::valarray<double> retval(n);
+		switch (s) {
+			case Side::north:
+				retval = boundary_north;
+				break;
+			case Side::east:
+				retval = boundary_east;
+				break;
+			case Side::south:
+				retval = boundary_south;
+				break;
+			case Side::west:
+				retval = boundary_west;
+		}
+		return retval;
+	}
 	inline bool hasNbr(Side s) { return ds.hasNbr(s); }
 	inline bool hasFineNbr(Side s) { return ds.hasFineNbr(s); }
 	inline bool hasCoarseNbr(Side s) { return ds.hasCoarseNbr(s); }
-	inline bool isCoarseLeft(Side s) { return ds.left_of_coarse[static_cast<int>(s)]; }
+	inline bool isCoarseLeft(const Side s) const { return ds.left_of_coarse[static_cast<int>(s)]; }
 	inline bool leftToRight(Side s)
 	{
 		bool retval = (s == Side::north || s == Side::west);

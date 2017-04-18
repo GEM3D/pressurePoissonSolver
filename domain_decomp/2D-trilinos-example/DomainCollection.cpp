@@ -54,23 +54,19 @@ void DomainCollection::initNeumann(function<double(double, double)> ffun,
 				exact[yi * n + xi] = efun(x, y);
 				// west
 				if (!d.hasNbr(Side::west)) {
-					d.boundary_west[yi] = nfunx(0.0, y);
+					d.boundary_west[yi] = nfunx(d.x_start, y);
 				}
 				// east
 				if (!d.hasNbr(Side::east)) {
-					double x = 1.0;
-					if (amr) {
-						x = 2.0;
-					}
-					d.boundary_east[yi] = nfunx(x, y);
+					d.boundary_east[yi] = nfunx(d.x_start+d.x_length, y);
 				}
 				// south
 				if (!d.hasNbr(Side::south)) {
-					d.boundary_south[xi] = nfuny(x, 0.0);
+					d.boundary_south[xi] = nfuny(x, d.y_start);
 				}
 				// north
 				if (!d.hasNbr(Side::north)) {
-					d.boundary_north[xi] = nfuny(x, 1.0);
+					d.boundary_north[xi] = nfuny(x, d.y_start+d.y_length);
 				}
 			}
 		}
@@ -367,7 +363,7 @@ void DomainCollection::solveWithInterface(const vector_type &gamma, vector_type 
 	// diff.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
 	// if(has_east)std::cout <<"GAMMA\n";
 	// gamma.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
-	diff.update(-2, gamma, 1);
+	// diff.update(-2, gamma, 1);
 }
 double DomainCollection::diffNorm()
 {
