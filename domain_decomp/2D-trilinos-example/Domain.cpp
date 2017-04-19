@@ -648,15 +648,15 @@ void Domain::fillBoundary(Side s, const single_vector_type &gamma)
 
 void Domain::fillDiffVector(Side s, single_vector_type &diff)
 {
-	auto             diff_view = diff.getLocalView<Kokkos::HostSpace>();
-	valarray<double> boundary  = getBoundary(s);
+	auto diff_view = diff.getLocalView<Kokkos::HostSpace>();
 	if (hasFineNbr(s)) {
-		valarray<double> diff         = getDiffCoarse(s);
-		valarray<double> diff_left    = getDiffCoarseToFineLeft(s);
-		valarray<double> diff_right   = getDiffCoarseToFineRight(s);
-		int              curr_i       = index(s) * n;
-		int              curr_left_i  = indexRefinedLeft(s) * n;
-		int              curr_right_i = indexRefinedRight(s) * n;
+		valarray<double> diff       = getDiffCoarse(s);
+		valarray<double> diff_left  = getDiffCoarseToFineLeft(s);
+		valarray<double> diff_right = getDiffCoarseToFineRight(s);
+
+		int curr_i       = index(s) * n;
+		int curr_left_i  = indexRefinedLeft(s) * n;
+		int curr_right_i = indexRefinedRight(s) * n;
 		for (int i = 0; i < n; i++) {
 			diff_view(curr_i, 0) += diff[i];
 			diff_view(curr_left_i, 0) += diff_left[i];
@@ -666,10 +666,11 @@ void Domain::fillDiffVector(Side s, single_vector_type &diff)
 			curr_right_i++;
 		}
 	} else if (hasCoarseNbr(s)) {
-		valarray<double> diff          = getDiffFine(s);
-		valarray<double> diff_coarse   = getDiffFineToCoarse(s);
-		int              curr_i        = index(s) * n;
-		int              curr_i_center = indexCenter(s) * n;
+		valarray<double> diff        = getDiffFine(s);
+		valarray<double> diff_coarse = getDiffFineToCoarse(s);
+
+		int curr_i        = index(s) * n;
+		int curr_i_center = indexCenter(s) * n;
 		for (int i = 0; i < n; i++) {
 			diff_view(curr_i, 0) += diff[i];
 			diff_view(curr_i_center, 0) += diff_coarse[i];
@@ -677,8 +678,9 @@ void Domain::fillDiffVector(Side s, single_vector_type &diff)
 			curr_i++;
 		}
 	} else {
-		valarray<double> diff   = getDiff(s);
-		int              curr_i = index(s) * n;
+		valarray<double> diff = getDiff(s);
+
+		int curr_i = index(s) * n;
 		for (int i = 0; i < n; i++) {
 			diff_view(curr_i, 0) += diff[i];
 			curr_i++;

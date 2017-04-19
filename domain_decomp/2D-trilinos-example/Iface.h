@@ -94,10 +94,12 @@ class Iface
 	}*/
 	friend std::ostream &operator<<(std::ostream &os, const Iface &iface)
 	{
-		os << "N: " << iface.global_i[0] << std::endl;
-		os << "E: " << iface.global_i[1] << std::endl;
-		os << "S: " << iface.global_i[2] << std::endl;
-		os << "W: " << iface.global_i[3] << std::endl;
+		os << "N:     " << iface.global_i[0] << std::endl;
+		os << "E:     " << iface.global_i[1] << std::endl;
+		os << "S:     " << iface.global_i[2] << std::endl;
+		os << "W:     " << iface.global_i[3] << std::endl;
+		os << "AXIS:  " << iface.axis << std::endl;
+		os << "RIGHT: " << iface.right << std::endl;
 		return os;
 	}
     static void writeIfaces(Domain &d, int_vector_type &iface_info){
