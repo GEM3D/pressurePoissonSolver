@@ -15,6 +15,7 @@ class Domain
 	DomainSignature        ds;
 	std::valarray<double>  f;
 	std::valarray<double>  f_copy;
+	std::valarray<double>  f_comp;
 	std::valarray<double>  f_back;
 	std::valarray<double>  resid;
 	std::valarray<double>  u;
@@ -62,10 +63,15 @@ class Domain
 	double fNorm();
 	double exactNorm(double eavg);
 	double exactSum();
+	double integrateF() { return f.sum() * h_x * h_y; }
+	double integrateAU() { return f_comp.sum() * h_x * h_y; }
 	void   swapResidSol();
 	void   sumResidIntoSol();
 
 	std::valarray<double> getDiff(const Side s) const;
+	std::valarray<double> getDiffCombined(const Side s) const;
+	std::valarray<double> getDiffCombinedLeft(const Side s) const;
+	std::valarray<double> getDiffCombinedRight(const Side s) const;
 	std::valarray<double> getDiffFine(const Side s) const;
 	std::valarray<double> getDiffFineToCoarse(const Side s) const;
 	std::valarray<double> getDiffFineToCoarseLeft(const Side s) const;
@@ -106,8 +112,13 @@ class Domain
 	void fillBoundary(Side s, const single_vector_type &gamma);
 	void fillDiffVector(Side s, single_vector_type &diff);
 	void fillGhostVector(Side s, single_vector_type &diff);
+	void getFluxDiff(vector_type &flux);
+	void fillFluxVector(Side s, single_vector_type &diff);
 
-	inline int &index(Side s) { return local_i[static_cast<int>(s)]; }
+	inline int &index(Side s)
+	{
+		return local_i[static_cast<int>(s)];
+	}
 	inline int &indexCenter(Side s) { return local_i_center[static_cast<int>(s)]; }
 	inline int &indexRefinedLeft(Side s) { return ds.indexRefinedLeft(s); }
 	inline int &indexRefinedRight(Side s) { return ds.indexRefinedRight(s); }

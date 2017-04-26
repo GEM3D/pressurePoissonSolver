@@ -75,8 +75,9 @@ void DomainCollection::initNeumann(function<double(double, double)> ffun,
 
 	// create map for domains
 	generateMaps();
-	if (!amr) {
-		distributeIfaceInfo();
+	distributeIfaceInfo();
+	for (const Iface &i : ifaces) {
+        const_cast<Iface&>(i).setNeumann();
 	}
 }
 
@@ -334,6 +335,19 @@ void DomainCollection::distributeIfaceInfo()
 	iface_info->doExport(dist, exporter, Tpetra::CombineMode::ADD);
 	Iface::readIfaces(ifaces, *iface_info);
 }
+void DomainCollection::getFluxDiff(vector_type &diff)
+{
+	Tpetra::Import<> importer(diff.getMap(), collection_map);
+	vector_type      local_diff(collection_map, 1);
+
+	// solve over domains on this proc
+	for (auto &p : domains) {
+		p.second->getFluxDiff(local_diff);
+	}
+
+	diff.scale(0);
+	diff.doExport(local_diff, importer, Tpetra::CombineMode::ADD);
+}
 void DomainCollection::solveWithInterface(const vector_type &gamma, vector_type &diff)
 {
 	// auto out = Teuchos::getFancyOStream (Teuchos::rcpFromRef (std::cout));
@@ -444,6 +458,46 @@ double DomainCollection::residual()
 	Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &residual, &retval);
 	return sqrt(retval);
 }
+double DomainCollection::integrateF()
+{
+	vector_type ghost(collection_map, 2);
+	vector_type one_ghost(matrix_map, 2);
+	for (auto &p : domains) {
+		p.second->putGhostCells(ghost);
+	}
+	Tpetra::Export<> exporter(collection_map, matrix_map);
+	one_ghost.doExport(ghost, exporter, Tpetra::CombineMode::ADD);
+	ghost.putScalar(0);
+	ghost.doImport(one_ghost, exporter, Tpetra::CombineMode::ADD);
+
+	double sum = 0;
+	for (auto &p : domains) {
+		sum += p.second->integrateF();
+	}
+	double retval;
+	Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &sum, &retval);
+	return retval;
+}
+double DomainCollection::integrateAU()
+{
+	vector_type ghost(collection_map, 2);
+	vector_type one_ghost(matrix_map, 2);
+	for (auto &p : domains) {
+		p.second->putGhostCells(ghost);
+	}
+	Tpetra::Export<> exporter(collection_map, matrix_map);
+	one_ghost.doExport(ghost, exporter, Tpetra::CombineMode::ADD);
+	ghost.putScalar(0);
+	ghost.doImport(one_ghost, exporter, Tpetra::CombineMode::ADD);
+
+	double sum = 0;
+	for (auto &p : domains) {
+		sum += p.second->integrateAU();
+	}
+	double retval;
+	Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &sum, &retval);
+	return retval;
+}
 RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 {
 	RCP<RBMatrix> A = rcp(new RBMatrix(map, n, num_cols));
@@ -482,7 +536,7 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
         ds.x_length=n;
         ds.y_length=n;
         for(int q=0;q<4;q++){
-			if (curr_type.types[q] == NEUMANN) {
+			if (curr_type.neumann[q]) {
 				ds.nbr_id[q * 2] = -1;
 			} else {
 				ds.nbr_id[q * 2] = 1;

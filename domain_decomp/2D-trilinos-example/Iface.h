@@ -14,10 +14,15 @@ class Iface
 	std::array<int, 4> center_i      = {-1, -1, -1, -1};
 	std::array<int, 4> refined_left  = {-1, -1, -1, -1};
 	std::array<int, 4> refined_right = {-1, -1, -1, -1};
-	std::array<int, 4> types         = {0, 0, 0, 0};
+	std::bitset<4> neumann;
 	std::bitset<4> hasCoarseNbr;
 	std::bitset<4> hasFineNbr;
 	std::bitset<4> isCoarseLeft;
+    void setNeumann(){
+		for (int q = 0; q < 4; q++) {
+			neumann[q] = global_i[q] == -1;
+		}
+    }
 	static void readIfaces(std::set<Iface> &ifaces, int_vector_type &iface_info)
 	{
 		auto iface_view = iface_info.getLocalView<Kokkos::HostSpace>();
@@ -83,7 +88,7 @@ class Iface
 	}
 	friend bool operator==(const Iface &l, const Iface &r)
 	{
-		return l.types == r.types;
+		return l.neumann == r.neumann;
 	}
 	/*friend bool operator!=(const Iface &l, const Iface &r)
 	{

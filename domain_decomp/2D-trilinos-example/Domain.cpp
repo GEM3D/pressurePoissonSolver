@@ -35,6 +35,7 @@ Domain::Domain(DomainSignature ds, int n)
 	f      = valarray<double>(n * n);
 	f_back = valarray<double>(n * n);
 	f_copy = valarray<double>(n * n);
+	f_comp = valarray<double>(n * n);
 	exact  = valarray<double>(n * n);
 	tmp    = valarray<double>(n * n);
 	u      = valarray<double>(n * n);
@@ -215,6 +216,42 @@ void Domain::solve()
 	u /= 4 * n * n;
 }
 
+void Domain::getFluxDiff(vector_type &flux){
+	auto ptr  = flux.getVectorNonConst(0);
+	if (hasNbr(Side::north)) {
+		fillFluxVector(Side::north, *ptr);
+	}
+	if (hasNbr(Side::east)) {
+	    fillFluxVector(Side::east, *ptr);
+	}
+	if (hasNbr(Side::south)) {
+		fillFluxVector(Side::south, *ptr);
+	}
+	if (hasNbr(Side::west)) {
+		fillFluxVector(Side::west, *ptr);
+	}
+}
+void Domain::fillFluxVector(Side s, single_vector_type &diff)
+{
+	auto diff_view = diff.getLocalView<Kokkos::HostSpace>();
+	if (hasFineNbr(s)) {
+		valarray<double> diff = getDiff(s);
+
+		int curr_i = index(s) * n;
+		for (int i = 0; i < n; i++) {
+			diff_view(curr_i, 0) += diff[i];
+			curr_i++;
+		}
+	} else if (hasCoarseNbr(s)) {
+		valarray<double> diff_coarse = getDiffCombined(s);
+
+		int curr_i_center = indexCenter(s) * n;
+		for (int i = 0; i < n; i++) {
+			diff_view(curr_i_center, 0) += diff_coarse[i];
+			curr_i_center++;
+		}
+	}
+}
 void Domain::putGhostCells(vector_type &ghost)
 {
 	auto left_ptr  = ghost.getVectorNonConst(0);
@@ -267,7 +304,6 @@ double Domain::residual(vector_type &ghost)
 		}
 	}
 
-	valarray<double> f_comp = valarray<double>(n * n);
 	// integrate in x secton
 	double center, north, east, south, west;
 	// west
@@ -617,6 +653,54 @@ valarray<double> Domain::getDiffFineToCoarse(const Side s) const
 		retval = getDiffFineToCoarseLeft(s);
 	} else {
 		retval = getDiffFineToCoarseRight(s);
+	}
+	return retval;
+}
+valarray<double> Domain::getDiffCombinedLeft(const Side s) const
+{
+	valarray<double> retval(n);
+	valarray<double> side = getSide(s);
+	valarray<double> boundary = getBoundary(s);
+	if (s == Side::north || s == Side::west) {
+		for (int i = 0; i < n; i++) {
+			retval[n - 1 - i / 2] -= side[n - 1 - i];
+			retval[n - 1 - i / 2] += boundary[n - 1 - i];
+		}
+	} else {
+		for (int i = 0; i < n; i++) {
+			retval[i / 2] -= side[i];
+			retval[i / 2] += boundary[i];
+		}
+	}
+	return retval;
+}
+
+valarray<double> Domain::getDiffCombinedRight(const Side s) const
+{
+	valarray<double> retval(n);
+	valarray<double> side = getSide(s);
+	valarray<double> boundary = getBoundary(s);
+	if (s == Side::north || s == Side::west) {
+		for (int i = 0; i < n; i++) {
+			retval[i / 2] -= side[i];
+			retval[i / 2] += boundary[i];
+		}
+	} else {
+		for (int i = 0; i < n; i++) {
+			retval[n - 1 - i / 2] -= side[n - 1 - i];
+            retval[n - 1 - i / 2] += boundary[n - 1 - i];
+		}
+	}
+	return retval;
+}
+
+valarray<double> Domain::getDiffCombined(const Side s) const
+{
+	valarray<double> retval(n);
+	if (isCoarseLeft(s)) {
+		retval = getDiffCombinedLeft(s);
+	} else {
+		retval = getDiffCombinedRight(s);
 	}
 	return retval;
 }

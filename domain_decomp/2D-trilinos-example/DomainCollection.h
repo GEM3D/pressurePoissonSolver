@@ -149,6 +149,11 @@ class DomainCollection
 	 */
 	void solveWithInterface(const vector_type &gamma, vector_type &diff);
 
+    /**
+     * @brief get the difference in flux on refined boundaries
+     */
+	void getFluxDiff(vector_type &diff);
+
 	/**
 	 * @brief Generate Tpetra maps
 	 */
@@ -207,6 +212,9 @@ class DomainCollection
 	 * @return the residual
 	 */
 	double residual();
+
+	double integrateF();
+	double integrateAU();
 
 	/**
 	 * @brief Form the Schur complement matrix using an RBMatrix

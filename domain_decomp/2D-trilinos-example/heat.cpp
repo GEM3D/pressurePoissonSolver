@@ -80,6 +80,8 @@ int main(int argc, char *argv[])
 	                            {'r'});
 	args::ValueFlag<string> f_g(parser, "gamma filename", "the file to write the gamma vector to",
 	                            {'g'});
+	args::ValueFlag<string> f_flux(parser, "flux filename", "the file to write flux difference to",
+	                            {"flux"});
 	args::ValueFlag<string> f_p(parser, "preconditioner filename",
 	                            "the file to write the preconditioner to", {'p'});
 	args::ValueFlag<double> f_t(
@@ -256,7 +258,7 @@ int main(int argc, char *argv[])
 		duration<double>         domain_time = domain_stop - domain_start;
 
 		if (my_global_rank == 0)
-			cout << "Domain Initialization Time: " << domain_time.count() << "\n";
+			cout << "Domain Initialization Time: " << domain_time.count() << endl;
 
 		// Create a map that will be used in the iterative solver
 		RCP<map_type> matrix_map = dc.matrix_map;
@@ -298,7 +300,7 @@ int main(int argc, char *argv[])
 				duration<double> form_time = steady_clock::now() - form_start;
 
 				if (my_global_rank == 0)
-					cout << "Matrix Formation Time: " << form_time.count() << "\n";
+					cout << "Matrix Formation Time: " << form_time.count() << endl;
 
 				if (save_matrix_file != "") {
 					comm->barrier();
@@ -311,7 +313,7 @@ int main(int argc, char *argv[])
 					comm->barrier();
 					duration<double> write_time = steady_clock::now() - write_start;
 					if (my_global_rank == 0)
-						cout << "Time to write matrix to file: " << write_time.count() << "\n";
+						cout << "Time to write matrix to file: " << write_time.count() << endl;
 				}
 				op = RBA;
 			}
@@ -334,7 +336,7 @@ int main(int argc, char *argv[])
 					duration<double> prec_time = steady_clock::now() - prec_start;
 
 					if (my_global_rank == 0)
-						cout << "Preconditioner Formation Time: " << prec_time.count() << "\n";
+						cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
 
 					// ofstream out_file("L.mm");
 					// out_file << *L;
@@ -353,7 +355,7 @@ int main(int argc, char *argv[])
 					duration<double> prec_time = steady_clock::now() - prec_start;
 
 					if (my_global_rank == 0)
-						cout << "Preconditioner Formation Time: " << prec_time.count() << "\n";
+						cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
 
 					if (save_prec_file != "") {
 						comm->barrier();
@@ -367,7 +369,7 @@ int main(int argc, char *argv[])
 						duration<double> write_time = steady_clock::now() - write_start;
 						if (my_global_rank == 0)
 							cout << "Time to write preconditioner to file: " << write_time.count()
-							     << "\n";
+							     << endl;
 					}
 				}
 			}
@@ -383,7 +385,7 @@ int main(int argc, char *argv[])
 
 				comm->barrier();
 				duration<double> lu_time = steady_clock::now() - lu_start;
-				if (my_global_rank == 0) std::cout << "LU Time: " << lu_time.count() << "\n";
+				if (my_global_rank == 0) std::cout << "LU Time: " << lu_time.count() << endl;
 
 				// ofstream out_file("L.mm");
 				// out_file << *L;
@@ -427,7 +429,7 @@ int main(int argc, char *argv[])
 				comm->barrier();
 				duration<double> iter_time = steady_clock::now() - iter_start;
 				if (my_global_rank == 0)
-					std::cout << "Gamma Solve Time: " << iter_time.count() << "\n";
+					std::cout << "Gamma Solve Time: " << iter_time.count() << endl;
 			}
 		}
 
@@ -441,7 +443,7 @@ int main(int argc, char *argv[])
 		duration<double> solve_time = steady_clock::now() - solve_start;
 
 		if (my_global_rank == 0)
-			std::cout << "Time to solve with given set of gammas: " << solve_time.count() << "\n";
+			std::cout << "Time to solve with given set of gammas: " << solve_time.count() << endl;
 
         if(f_iter){
             dc.residual();
@@ -475,8 +477,8 @@ int main(int argc, char *argv[])
 			eavg /= dc.getGlobalNumCells();
 
 			if (my_global_rank == 0) {
-				cout << "Average of computed solution: " << uavg << "\n";
-				cout << "Average of exact solution: " << eavg << "\n";
+				cout << "Average of computed solution: " << uavg << endl;
+				cout << "Average of exact solution: " << eavg << endl;
 			}
 
 			exact_norm.getDataNonConst()[0] = dc.exactNorm(eavg);
@@ -496,12 +498,15 @@ int main(int argc, char *argv[])
 
 		double residual = dc.residual();
 		double fnorm    = dc.fNorm();
+		double ausum    = dc.integrateAU();
+		double fsum     = dc.integrateF();
 		if (my_global_rank == 0) {
-			std::cout << "Total run time: " << total_time.count() << "\n";
+			std::cout << "Total run time: " << total_time.count() << endl;
 			std::cout << std::scientific;
 			std::cout.precision(13);
-			std::cout << "Error: " << global_diff_norm / global_exact_norm << "\n";
-			std::cout << "Residual: " << residual / fnorm << "\n";
+			std::cout << "Error: " << global_diff_norm / global_exact_norm << endl;
+			std::cout << "Residual: " << residual / fnorm << endl;
+			std::cout << u8"ΣAu-Σf: " << ausum-fsum << endl;
 			cout << std::fixed;
 			cout.precision(2);
 		}
@@ -540,6 +545,11 @@ int main(int argc, char *argv[])
 			Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_gamma_file, gamma, "",
 			                                                          "");
 		}
+        if (f_flux){
+            dc.getFluxDiff(*gamma);
+			Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(args::get(f_flux), gamma, "",
+			                                                          "");
+		}
 		if (f_outclaw) {
 			dc.outputClaw();
 		}
@@ -552,8 +562,8 @@ int main(int argc, char *argv[])
 		for (double t : times) {
 			cout << t << " ";
 		}
-		cout << "\n";
-		cout << "Average: " << times.sum() / times.size() << "\n";
+		cout << endl;
+		cout << "Average: " << times.sum() / times.size() << endl;
 	}
 
 	return 0;

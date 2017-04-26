@@ -38,6 +38,11 @@ class Block
 		       < std::tie(r.flip_i, r.flip_j, right_ptr, r.scale);
 	}
 };
+struct LUP {
+	Teuchos::RCP<std::valarray<double>> L;
+	Teuchos::RCP<std::valarray<double>> U;
+	Teuchos::RCP<std::valarray<int>> P;
+};
 class RBMatrix : public Tpetra::Operator<>
 {
     private:
@@ -52,6 +57,8 @@ class RBMatrix : public Tpetra::Operator<>
 	std::vector<std::map<int, Block>> block_cols;
 
 	std::map<std::pair<Block, Block>, Block> combos;
+	std::map<Block, LUP> dgetrf_cache;
+	std::map<Block, Teuchos::RCP<std::valarray<double>>> lsolve_cache;
 
 	int block_size;
 	int num_blocks;
@@ -78,11 +85,11 @@ class RBMatrix : public Tpetra::Operator<>
 	Teuchos::RCP<std::valarray<double>> getBlock(int i,int j);
 	int  getNumBlocks() { return num_blocks; }
 	int  getBlockSize() { return block_size; }
-	void DGETRF(Teuchos::RCP<std::valarray<double>> &A, Teuchos::RCP<std::valarray<double>> &L,
+	void DGETRF(Block &A, Teuchos::RCP<std::valarray<double>> &L,
 	            Teuchos::RCP<std::valarray<double>> &U, Teuchos::RCP<std::valarray<int>> &P);
 	void DGESSM(Teuchos::RCP<std::valarray<double>> &A, Teuchos::RCP<std::valarray<double>> &L,
 	            Teuchos::RCP<std::valarray<double>> &U, Teuchos::RCP<std::valarray<int>> &P);
-	void LSolve(Teuchos::RCP<std::valarray<double>> &A, Teuchos::RCP<std::valarray<double>> &L,
+	void LSolve(Block &A, Teuchos::RCP<std::valarray<double>> &L,
 	            Teuchos::RCP<std::valarray<double>> &U, Teuchos::RCP<std::valarray<int>> &P);
 	void DTSTRF(Teuchos::RCP<std::valarray<double>> A, Teuchos::RCP<std::valarray<double>> L,
 	            Teuchos::RCP<std::valarray<double>> U, Teuchos::RCP<std::valarray<int>> P);
