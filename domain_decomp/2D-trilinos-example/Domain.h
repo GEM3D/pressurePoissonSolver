@@ -88,7 +88,7 @@ class Domain
 	std::valarray<double> getInnerSideFine(const Side s) const;
 	std::valarray<double> getInnerSideFineLeft(const Side s) const;
 	std::valarray<double> getInnerSideFineRight(const Side s) const;
-	std::valarray<double> getSideCoarse(Side s);
+	std::valarray<double> getSideCoarse(const Side s) const;
 	std::valarray<double> getSideCoarseCombined(const Side s) const;
 	inline std::valarray<double> getSideCoarseLeft(const Side s) const
 	{
@@ -162,9 +162,9 @@ class Domain
 		}
 		return retval;
 	}
-	inline bool hasNbr(Side s) { return ds.hasNbr(s); }
-	inline bool hasFineNbr(Side s) { return ds.hasFineNbr(s); }
-	inline bool hasCoarseNbr(Side s) { return ds.hasCoarseNbr(s); }
+	inline bool hasNbr(Side s) const { return ds.hasNbr(s); }
+	inline bool hasFineNbr(Side s) const { return ds.hasFineNbr(s); }
+	inline bool hasCoarseNbr(Side s) const { return ds.hasCoarseNbr(s); }
 	inline bool isCoarseLeft(const Side s) const { return ds.left_of_coarse[static_cast<int>(s)]; }
 	inline bool leftToRight(Side s)
 	{

@@ -537,7 +537,7 @@ valarray<double> Domain::getInnerSideFine(const Side s) const
 	}
 	return retval;
 }
-valarray<double> Domain::getSideCoarse(Side s)
+valarray<double> Domain::getSideCoarse(const Side s) const
 {
 	valarray<double> retval = getSide(s);
 	valarray<double> refined(2 * n);
@@ -708,7 +708,7 @@ valarray<double> Domain::getDiffCombined(const Side s) const
 valarray<double> Domain::getDiffCoarse(const Side s) const
 {
 	return 2.0 * getBoundary(s)
-	       - (getSide(s) + (getSide(s) - 8.0 / 15.0 * getSideCoarseCombined(s)));
+	       - (getSide(s) + (15.0 * getSide(s) - 8.0 * getSideCoarseCombined(s)) / 15.0);
 }
 valarray<double> Domain::getDiffCoarseToFineLeft(const Side s) const
 {
@@ -776,11 +776,11 @@ void Domain::fillGhostVector(Side s, single_vector_type &diff)
 	// weight=false;
 	auto diff_view = diff.getLocalView<Kokkos::HostSpace>();
 	if (hasFineNbr(s)) {
-		valarray<double> side   = getSide(s);
-		valarray<double> coarse = getSideCoarse(s);
-		int curr_i      = index(s) * n;
-		int curr_low_i  = indexRefinedRight(s) * n;
-		int curr_high_i = indexRefinedLeft(s) * n;
+		valarray<double> side        = getSide(s);
+		valarray<double> coarse      = getSideCoarse(s);
+		int              curr_i      = index(s) * n;
+		int              curr_low_i  = indexRefinedRight(s) * n;
+		int              curr_high_i = indexRefinedLeft(s) * n;
 		if (s == Side::north || s == Side::west) {
 			int tmp     = curr_high_i;
 			curr_high_i = curr_low_i;
@@ -790,20 +790,20 @@ void Domain::fillGhostVector(Side s, single_vector_type &diff)
 			diff_view(curr_i, 0) += side[i];
 			diff_view(curr_i, 0) -= 8.0 / 15.0 * (coarse[2 * i] + coarse[2 * i + 1]);
 			diff_view(curr_low_i, 0) += coarse[i] * 8.0 / 15.0;
-			diff_view(curr_high_i, 0) += coarse[n + i]*8.0/15.0;
+			diff_view(curr_high_i, 0) += coarse[n + i] * 8.0 / 15.0;
 			curr_i++;
 			curr_low_i++;
 			curr_high_i++;
 		}
 	} else if (hasCoarseNbr(s)) {
-		valarray<double> center = getSideFine(s);
-		valarray<double> incenter = getInnerSideFine(s);
-		valarray<double> side   = getSide(s);
-        valarray<double> inside = getInnerSide(s);
-		int curr_i        = index(s) * n;
-		int curr_i_center = indexCenter(s) * n;
+		valarray<double> center        = getSideFine(s);
+		valarray<double> incenter      = getInnerSideFine(s);
+		valarray<double> side          = getSide(s);
+		valarray<double> inside        = getInnerSide(s);
+		int              curr_i        = index(s) * n;
+		int              curr_i_center = indexCenter(s) * n;
 		for (int i = 0; i < n; i++) {
-				diff_view(curr_i_center, 0) += center[i];
+			diff_view(curr_i_center, 0) += center[i];
 			diff_view(curr_i_center, 0) -= 2.0 / 3.0 * center[i] - 1.0 / 5.0 * incenter[i];
 			diff_view(curr_i, 0) += 2.0 / 3.0 * side[i] - 1.0 / 5.0 * inside[i];
 			curr_i_center++;
@@ -813,7 +813,7 @@ void Domain::fillGhostVector(Side s, single_vector_type &diff)
 		valarray<double> side   = getSide(s);
 		int              curr_i = index(s) * n;
 		for (int i = 0; i < n; i++) {
-			diff_view(curr_i, 0) += side[i];
+			diff_view(curr_i, 0) = side[i];
 			curr_i++;
 		}
 	}
@@ -858,7 +858,7 @@ void Domain::outputClaw(std::ostream &os)
 	for (int i = 0; i < n; i++) {
 		for (int j = 0; j < n; j++) {
 			int loc = j + i * n;
-			os << u[loc] << tab << abs(error[loc]) << tab << resid[loc] << endl;
+			os << u[loc] << tab << error[loc] << tab << resid[loc] * h_x * h_y << endl;
 		}
 		os << endl;
 	}

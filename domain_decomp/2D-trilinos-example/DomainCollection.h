@@ -67,6 +67,7 @@ class DomainCollection
 
 	public:
 	bool amr = false;
+	double f_mean=0;
 	/**
 	 * @brief Tpetra map that assures each domains has access to it's interface values
 	 */

@@ -53,13 +53,10 @@ struct DomainSignature {
 	inline int &indexRefinedRight(Side s) { return global_i_refined[1 + 2 * static_cast<int>(s)]; }
 	inline int &nbr(Side s) { return nbr_id[2 * static_cast<int>(s)]; }
 	inline int &nbrRight(Side s) { return nbr_id[2 * static_cast<int>(s) + 1]; }
-	inline bool hasNbr(Side       s) { return nbr_id[static_cast<int>(s) * 2] != -1; }
-	inline bool hasFineNbr(Side s) { return nbr_fine[static_cast<int>(s)]; }
-	inline bool hasCoarseNbr(Side s) { return nbr_coarse[static_cast<int>(s)]; }
-	inline bool leftOfCoarse(Side s)
-	{
-		return left_of_coarse[static_cast<int>(s)];
-	}
+	inline bool hasNbr(Side s) const { return nbr_id[static_cast<int>(s) * 2] != -1; }
+	inline bool hasFineNbr(Side s) const { return nbr_fine[static_cast<int>(s)]; }
+	inline bool hasCoarseNbr(Side s) const { return nbr_coarse[static_cast<int>(s)]; }
+	inline bool leftOfCoarse(Side s) const { return left_of_coarse[static_cast<int>(s)]; }
 	inline void setHasFineNbr(Side s) { nbr_fine[static_cast<int>(s)] = true; }
 	inline void setHasCoarseNbr(Side s) { nbr_coarse[static_cast<int>(s)] = true; }
 	inline void setLeftOfCoarse(Side s) { left_of_coarse[static_cast<int>(s)] = true; }

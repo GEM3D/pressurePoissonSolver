@@ -3,6 +3,7 @@
 #include "DomainSignatureCollection.h"
 #include "FunctionWrapper.h"
 #include "MyTypeDefs.h"
+#include "OpATA.h"
 #include "ZeroSum.h"
 #include "args.h"
 //#include <Amesos2.hpp>
@@ -80,14 +81,21 @@ int main(int argc, char *argv[])
 	                            {'r'});
 	args::ValueFlag<string> f_g(parser, "gamma filename", "the file to write the gamma vector to",
 	                            {'g'});
+	args::ValueFlag<string> f_read_gamma(parser, "gamma filename",
+	                                     "the file to read gamma vector from", {"readgamma"});
 	args::ValueFlag<string> f_flux(parser, "flux filename", "the file to write flux difference to",
 	                            {"flux"});
 	args::ValueFlag<string> f_p(parser, "preconditioner filename",
 	                            "the file to write the preconditioner to", {'p'});
 	args::ValueFlag<double> f_t(
 	parser, "tolerance", "set the tolerance of the iterative solver (default is 1e-10)", {'t'});
+    args::ValueFlag<int> f_d(
+	parser, "row", "pin gamma value to zero (by modifying that row of the schur compliment matrix)",
+	{'z'});
+	args::Flag f_pinv(parser, "wrapper", "compute using pseudoinverse", {"pinv"});
 	args::Flag f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
 	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
+	args::Flag f_oldgauss(parser, "gauss", "solve gaussian function", {"oldgauss"});
 	args::Flag f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
 	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {"neumann"});
 	args::Flag f_cg(parser, "gmres", "use CG for iterative solver", {"cg"});
@@ -99,7 +107,7 @@ int main(int argc, char *argv[])
 	                    {"nozero"});
 	args::Flag f_lu(parser, "lu", "use LU decomposition", {"lu"});
 	args::Flag f_ilu(parser, "ilu", "use incomplete LU preconditioner", {"ilu"});
-	args::Flag f_iter(parser, "iterative", "use iterative method", {"iterative"});
+	args::ValueFlag<int> f_iter(parser, "iterative", "use iterative method", {"iterative"});
 
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;
@@ -161,6 +169,11 @@ int main(int argc, char *argv[])
 		loop_count = args::get(f_l);
 	}
 
+    int del = -1;
+	if (f_d) {
+		del = args::get(f_d);
+	}
+
 	string save_matrix_file = "";
 	if (f_m) {
 		save_matrix_file = args::get(f_m);
@@ -195,12 +208,80 @@ int main(int argc, char *argv[])
 
     
 	// the functions that we are using
+	vector<double> xval
+	= {0.07768174089481361, 0.4208838472612919,  0.9473139111796449,  0.5089692183323905,
+	   0.9570464247595821,  0.15905126169737582, 0.11849894156700524, 0.40999270280625555,
+	   0.255893751363913,   0.4596839214805539,  0.48802004339584437, 0.13220719550284032,
+	   0.15010376352950006, 0.6220357288995026,  0.5745530849579297,  0.19647252248155644,
+	   0.22117387776294362, 0.20684448971820446, 0.24214199341522935, 0.7996623718773789};
+
+	vector<double> yval
+	= {0.2626206022801887,  0.5901019591033256, 0.22507728085248468, 0.6589237056448219,
+	   0.16792176055765118, 0.7467770932376991, 0.586093747878745,   0.20084730007838192,
+	   0.2305544870010452,  0.6032035084811954, 0.7616342948448442,  0.07395053135567398,
+	   0.3145108689728848,  0.7994789501256063, 0.31702627032281594, 0.9410740272588111,
+	   0.4335486185679469,  0.8896958913102787, 0.8237038487836723,  0.5312785837478274};
+
+	vector<double> alpha = {
+	57.12450253383478, 99.4615147296493,  55.26433103539979, 92.3500405527951,  87.67509863441407,
+	76.12508998928006, 73.05691678209054, 84.58106997693446, 77.51740813583851, 89.11178685086824,
+	79.61010770157222, 77.8956019831367,  76.6795489632914,  71.36011508633008, 99.5339946457969,
+	59.75741874591391, 77.37272321552643, 91.75611892120241, 85.7168895671343,  68.55489734818805};
+
 	function<double(double, double)> ffun;
 	function<double(double, double)> gfun;
 	function<double(double, double)> nfunx;
 	function<double(double, double)> nfuny;
 
-	if (f_gauss) {
+	if (f_oldgauss) {
+		ffun = [xval, yval, alpha](double x, double y) {
+			double retval = 0;
+			for (int i = 0; i < 20; i++) {
+				double xv = xval[i];
+				double yv = yval[i];
+				double a  = alpha[i];
+				double r2 = (xv - x) * (xv - x) + (yv - y) * (yv - y);
+				retval += 4 * a * (a * r2 - 1) * exp(-a * r2);
+			}
+			return retval;
+		};
+
+		gfun = [xval, yval, alpha](double x, double y) {
+			double retval = 0;
+			for (int i = 0; i < 20; i++) {
+				double xv = xval[i];
+				double yv = yval[i];
+				double a  = alpha[i];
+				double r2 = (xv - x) * (xv - x) + (yv - y) * (yv - y);
+				retval += exp(-a * r2);
+			}
+			return retval;
+		};
+
+		nfunx = [xval, yval, alpha](double x, double y) {
+			double retval = 0;
+			for (int i = 0; i < 20; i++) {
+				double xv = xval[i];
+				double yv = yval[i];
+				double a  = alpha[i];
+				double r2 = (xv - x) * (xv - x) + (yv - y) * (yv - y);
+				retval += 2 * a * (xv - x) * exp(-a * r2);
+			}
+			return retval;
+		};
+
+		nfuny = [xval, yval, alpha](double x, double y) {
+			double retval = 0;
+			for (int i = 0; i < 20; i++) {
+				double xv = xval[i];
+				double yv = yval[i];
+				double a  = alpha[i];
+				double r2 = (xv - x) * (xv - x) + (yv - y) * (yv - y);
+				retval += 2 * a * (yv - y) * exp(-a * r2);
+			}
+			return retval;
+		};
+	} else if (f_gauss) {
 		gfun = [](double x, double y) { return exp(cos(10 * M_PI * x)) - exp(cos(11 * M_PI * y)); };
 		ffun = [](double x, double y) {
 			return 100 * M_PI * M_PI * (pow(sin(10 * M_PI * x), 2) - cos(10 * M_PI * x))
@@ -217,19 +298,15 @@ int main(int argc, char *argv[])
 		};
 	} else {
 		ffun = [](double x, double y) {
-			x -= .3;
 			return -5 * M_PI * M_PI * sin(M_PI * y) * cos(2 * M_PI * x);
 		};
 		gfun = [](double x, double y) {
-			x -= .3;
 			return sin(M_PI * y) * cos(2 * M_PI * x);
 		};
 		nfunx = [](double x, double y) {
-			x -= .3;
 			return -2 * M_PI * sin(M_PI * y) * sin(2 * M_PI * x);
 		};
 		nfuny = [](double x, double y) {
-			x -= .3;
 			return M_PI * cos(M_PI * y) * cos(2 * M_PI * x);
 		};
 	}
@@ -261,7 +338,8 @@ int main(int argc, char *argv[])
 			cout << "Domain Initialization Time: " << domain_time.count() << endl;
 
 		// Create a map that will be used in the iterative solver
-		RCP<map_type> matrix_map = dc.matrix_map;
+		RCP<map_type>       matrix_map       = dc.matrix_map;
+		RCP<const map_type> matrix_map_const = dc.matrix_map;
 
 		// Create the gamma and diff vectors
 		RCP<vector_type> gamma = rcp(new vector_type(matrix_map, 1));
@@ -275,6 +353,7 @@ int main(int argc, char *argv[])
 		// Create linear problem for the Belos solver
 		RCP<Belos::LinearProblem<double, vector_type, Tpetra::Operator<>>> problem;
 		RCP<Belos::SolverManager<double, vector_type, Tpetra::Operator<>>> solver;
+		Teuchos::ParameterList belosList;
 		if (dsc.num_global_domains != 1) {
 			// do iterative solve
 
@@ -294,7 +373,7 @@ int main(int argc, char *argv[])
 				comm->barrier();
 				steady_clock::time_point form_start = steady_clock::now();
 
-				RBA = dc.formRBMatrix(matrix_map);
+				RBA = dc.formRBMatrix(matrix_map, del);
 
 				comm->barrier();
 				duration<double> form_time = steady_clock::now() - form_start;
@@ -315,11 +394,22 @@ int main(int argc, char *argv[])
 					if (my_global_rank == 0)
 						cout << "Time to write matrix to file: " << write_time.count() << endl;
 				}
-				op = RBA;
+				if (f_pinv) {
+					op = rcp(new OpATA(RBA));
+				} else {
+					op = RBA;
+				}
 			}
 
-			problem
-			= rcp(new Belos::LinearProblem<double, vector_type, Tpetra::Operator<>>(op, gamma, b));
+            if(f_pinv){
+				RCP<vector_type> ATb = rcp(new vector_type(matrix_map, 1));
+				RBA->apply(*b, *ATb);
+				problem = rcp(
+				new Belos::LinearProblem<double, vector_type, Tpetra::Operator<>>(op, gamma, ATb));
+			}else{
+				problem = rcp(
+				new Belos::LinearProblem<double, vector_type, Tpetra::Operator<>>(op, gamma, b));
+			}
 
 			if (f_prec || f_ilu) {
 				if (f_ilu) {
@@ -374,7 +464,10 @@ int main(int argc, char *argv[])
 				}
 			}
 
-			if (f_lu) {
+			if (f_read_gamma) {
+				gamma = Tpetra::MatrixMarket::Reader<matrix_type>::readDenseFile(
+				args::get(f_read_gamma), comm, matrix_map_const);
+			} else if (f_lu) {
 				comm->barrier();
 				steady_clock::time_point lu_start = steady_clock::now();
 
@@ -400,18 +493,17 @@ int main(int argc, char *argv[])
 				comm->barrier();
 				steady_clock::time_point iter_start = steady_clock::now();
 				// Set the parameters
-				Teuchos::ParameterList belosList;
 				belosList.set("Block Size", 1);
 				belosList.set("Maximum Iterations", 5000);
 				belosList.set("Convergence Tolerance", tol);
 				int verbosity = Belos::Errors + Belos::StatusTestDetails + Belos::Warnings
 				                + Belos::TimingDetails + Belos::Debug;
 				belosList.set("Verbosity", verbosity);
+				// belosList.set("Orthogonalization", "ICGS");
 
 				// Create solver and solve
-                if(f_rgmres){
-					solver
-					= rcp(new Belos::GCRODRSolMgr<double, vector_type, Tpetra::Operator<>>(
+				if (f_rgmres) {
+					solver = rcp(new Belos::GCRODRSolMgr<double, vector_type, Tpetra::Operator<>>(
 					problem, rcp(&belosList, false)));
 				} else if (f_cg) {
 					solver = rcp(new Belos::BlockCGSolMgr<double, vector_type, Tpetra::Operator<>>(
@@ -425,6 +517,31 @@ int main(int argc, char *argv[])
 					problem, rcp(&belosList, false)));
 				}
 				solver->solve();
+
+				if (f_pinv) {
+					for (int i = 0; i < 10; i++) {
+						RCP<vector_type> r   = rcp(new vector_type(matrix_map, 1));
+						RCP<vector_type> ATr = rcp(new vector_type(matrix_map, 1));
+						RCP<vector_type> e   = rcp(new vector_type(matrix_map, 1));
+						RBA->apply(*gamma, *r);
+						r->update(1, *b, -1);
+						Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile("tv.mm", r, "",
+						                                                          "");
+						RBA->apply(*r, *ATr);
+						Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile("atrv.mm", ATr, "",
+						                                                          "");
+						problem->setProblem(e, ATr);
+						solver->setProblem(problem);
+						solver->solve();
+						Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile("gb.mm", gamma,
+						                                                          "", "");
+						Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile("ev.mm", e, "",
+						                                                          "");
+						gamma->update(1, *e, 1);
+						Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile("ga.mm", gamma,
+						                                                          "", "");
+					}
+				}
 
 				comm->barrier();
 				duration<double> iter_time = steady_clock::now() - iter_start;
@@ -445,20 +562,36 @@ int main(int argc, char *argv[])
 		if (my_global_rank == 0)
 			std::cout << "Time to solve with given set of gammas: " << solve_time.count() << endl;
 
-        if(f_iter){
-            dc.residual();
-            dc.swapResidSol();
-			dc.solveWithInterface(*x, *r);
-            solver->reset(Belos::ResetType::Problem);
-            if(f_wrapper){
-				((FuncWrap*)op.getRawPtr())->setB(r);
-            }
-			problem->setProblem(x, r);
-			solver->setProblem(problem);
-            //cerr<<"solve with 0!!!!!!!!!!!!!!!!!!!!" <<endl;
-			solver->solve();
-			dc.solveWithInterface(*x, *d);
-            dc.sumResidIntoSol();
+		dc.residual();
+		double ausum2 = dc.integrateAU();
+		double fsum2  = dc.integrateF();
+		std::cout << u8"Σf-Au: " << fsum2 - ausum2 << endl;
+		std::cout << u8"Σf: " << fsum2 << endl;
+		std::cout << u8"ΣAu: " << ausum2 << endl;
+		if (f_iter) {
+			for (int i = 0; i < args::get(f_iter); i++) {
+				dc.residual();
+				dc.swapResidSol();
+				x->putScalar(0);
+				dc.solveWithInterface(*x, *r);
+        
+				solver->reset(Belos::ResetType::Problem);
+				Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile("rrr.mm", r, "", "");
+				if (f_wrapper) {
+					((FuncWrap *) op.getRawPtr())->setB(r);
+				}
+				if (f_pinv) {
+					RCP<vector_type> ATr = rcp(new vector_type(matrix_map, 1));
+					RBA->apply(*r, *ATr);
+					problem->setProblem(x, ATr);
+				}else{
+					problem->setProblem(x, r);
+				}
+				solver->setProblem(problem);
+				solver->solve();
+				dc.solveWithInterface(*x, *d);
+				dc.sumResidIntoSol();
+			}
 		}
 
 		// Calcuate error

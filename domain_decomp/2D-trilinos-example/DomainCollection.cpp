@@ -501,6 +501,7 @@ double DomainCollection::integrateAU()
 RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 {
 	RCP<RBMatrix> A = rcp(new RBMatrix(map, n, num_cols));
+    A->skip_index=delete_row;
 #if NDEBUG
 	for (Iface i : ifaces) {
 		cerr << i << endl;
@@ -812,7 +813,8 @@ void DomainCollection::outputResidual(std::ostream &os)
 			int domain_i   = i / n;
 			int internal_i = i % n;
 			int id         = domain_i * d_x + domain_j;
-			os << domains[id]->resid[internal_i * n + internal_j] << '\n';
+            Domain &d = *domains[id];
+			os << d.resid[internal_i * n + internal_j]*d.h_x*d.h_y << '\n';
 		}
 	}
 }
@@ -831,7 +833,8 @@ void DomainCollection::outputResidualRefined(std::ostream &os)
 			int domain_i   = i / n;
 			int internal_i = i % n;
 			int id         = d_x * d_x / 4 + domain_i * d_x + domain_j;
-			os << domains[id]->resid[internal_i * n + internal_j] << '\n';
+            Domain &d = *domains[id];
+			os << d.resid[internal_i * n + internal_j]*d.h_x*d.h_y << '\n';
 		}
 	}
 }
