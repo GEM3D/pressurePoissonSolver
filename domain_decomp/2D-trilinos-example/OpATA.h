@@ -6,7 +6,7 @@
 #include <BelosLinearProblem.hpp>
 #include <BelosTpetraAdapter.hpp>
 #include <Teuchos_RCP.hpp>
-class OpATA : public Tpetra::Operator<>
+class OpATA : public Tpetra::Operator<scalar_type>
 {
 	public:
 	Teuchos::RCP<RBMatrix> A;
@@ -15,8 +15,8 @@ class OpATA : public Tpetra::Operator<>
 		this->A  = A;
 	}
 	void apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode = Teuchos::NO_TRANS,
-	           double alpha = Teuchos::ScalarTraits<double>::one(),
-	           double beta  = Teuchos::ScalarTraits<double>::zero()) const
+	           scalar_type alpha = Teuchos::ScalarTraits<scalar_type>::one(),
+	           scalar_type beta  = Teuchos::ScalarTraits<scalar_type>::zero()) const
 	{
 		vector_type x2(x.getMap(), 1);
         A->apply(x,x2);

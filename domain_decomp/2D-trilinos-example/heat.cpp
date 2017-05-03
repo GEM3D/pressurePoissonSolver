@@ -11,6 +11,7 @@
 #include <BelosBiCGStabSolMgr.hpp>
 #include <BelosBlockCGSolMgr.hpp>
 #include <BelosGCRODRSolMgr.hpp>
+#include <BelosLSQRSolMgr.hpp>
 #include <BelosBlockGmresSolMgr.hpp>
 #include <BelosConfigDefs.hpp>
 #include <BelosLinearProblem.hpp>
@@ -23,6 +24,7 @@
 #include <Teuchos_Tuple.hpp>
 #include <Teuchos_VerboseObject.hpp>
 #include <Teuchos_oblackholestream.hpp>
+#include <BelosLSQRSolMgr.hpp>
 #include <chrono>
 #include <cmath>
 #include <iostream>
@@ -97,9 +99,11 @@ int main(int argc, char *argv[])
 	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
 	args::Flag f_oldgauss(parser, "gauss", "solve gaussian function", {"oldgauss"});
 	args::Flag f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
+	args::Flag f_precata(parser, "prec", "use block diagonal preconditioner", {"precata"});
 	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {"neumann"});
 	args::Flag f_cg(parser, "gmres", "use CG for iterative solver", {"cg"});
 	args::Flag f_gmres(parser, "gmres", "use GMRES for iterative solver", {"gmres"});
+	args::Flag f_lsqr(parser, "gmres", "use GMRES for iterative solver", {"lsqr"});
 	args::Flag f_rgmres(parser, "rgmres", "use GCRO-DR (Recycling GMRES) for iterative solver",
 	                    {"rgmres"});
 	args::Flag f_bicg(parser, "gmres", "use BiCGStab for iterative solver", {"bicg"});
@@ -159,7 +163,7 @@ int main(int argc, char *argv[])
 		dsc.zoltanBalance();
 	}
 
-	double tol = 1e-10;
+	scalar_type tol = 1e-10;
 	if (f_t) {
 		tol = args::get(f_t);
 	}
@@ -298,15 +302,19 @@ int main(int argc, char *argv[])
 		};
 	} else {
 		ffun = [](double x, double y) {
+            x-=.3;
 			return -5 * M_PI * M_PI * sin(M_PI * y) * cos(2 * M_PI * x);
 		};
 		gfun = [](double x, double y) {
+            x-=.3;
 			return sin(M_PI * y) * cos(2 * M_PI * x);
 		};
 		nfunx = [](double x, double y) {
+            x-=.3;
 			return -2 * M_PI * sin(M_PI * y) * sin(2 * M_PI * x);
 		};
 		nfuny = [](double x, double y) {
+            x-=.3;
 			return M_PI * cos(M_PI * y) * cos(2 * M_PI * x);
 		};
 	}
@@ -348,11 +356,11 @@ int main(int argc, char *argv[])
 		RCP<vector_type> d     = rcp(new vector_type(matrix_map, 1));
 		RCP<vector_type> diff  = rcp(new vector_type(matrix_map, 1));
 		RCP<RBMatrix>    RBA;
-		RCP<Tpetra::Operator<>> op;
+		RCP<Tpetra::Operator<scalar_type>> op;
 
 		// Create linear problem for the Belos solver
-		RCP<Belos::LinearProblem<double, vector_type, Tpetra::Operator<>>> problem;
-		RCP<Belos::SolverManager<double, vector_type, Tpetra::Operator<>>> solver;
+		RCP<Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>> problem;
+		RCP<Belos::SolverManager<scalar_type, vector_type, Tpetra::Operator<scalar_type>>> solver;
 		Teuchos::ParameterList belosList;
 		if (dsc.num_global_domains != 1) {
 			// do iterative solve
@@ -405,63 +413,89 @@ int main(int argc, char *argv[])
 				RCP<vector_type> ATb = rcp(new vector_type(matrix_map, 1));
 				RBA->apply(*b, *ATb);
 				problem = rcp(
-				new Belos::LinearProblem<double, vector_type, Tpetra::Operator<>>(op, gamma, ATb));
+				new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(op, gamma, ATb));
 			}else{
 				problem = rcp(
-				new Belos::LinearProblem<double, vector_type, Tpetra::Operator<>>(op, gamma, b));
+				new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(op, gamma, b));
 			}
 
-			if (f_prec || f_ilu) {
-				if (f_ilu) {
+			if (f_ilu) {
+				comm->barrier();
+				steady_clock::time_point prec_start = steady_clock::now();
+
+				RCP<RBMatrix> L, U;
+				RBMatrix      Copy = *RBA;
+				Copy.ilu(L, U);
+				RCP<LUSolver> solver = rcp(new LUSolver(L, U));
+				problem->setLeftPrec(solver);
+
+				comm->barrier();
+				duration<double> prec_time = steady_clock::now() - prec_start;
+
+				if (my_global_rank == 0)
+					cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
+
+				// ofstream out_file("L.mm");
+				// out_file << *L;
+				// out_file.close();
+				// out_file = ofstream("U.mm");
+				// out_file << *U;
+				// out_file.close();
+			} else if (f_prec) {
+				comm->barrier();
+				steady_clock::time_point prec_start = steady_clock::now();
+
+				RCP<RBMatrix> P = RBA->invBlockDiag();
+				problem->setRightPrec(P);
+
+				comm->barrier();
+				duration<double> prec_time = steady_clock::now() - prec_start;
+
+				if (my_global_rank == 0)
+					cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
+
+				if (save_prec_file != "") {
 					comm->barrier();
-					steady_clock::time_point prec_start = steady_clock::now();
+					steady_clock::time_point write_start = steady_clock::now();
 
-					RCP<RBMatrix> L, U;
-					RBMatrix      Copy = *RBA;
-					Copy.ilu(L, U);
-					RCP<LUSolver> solver = rcp(new LUSolver(L, U));
-					problem->setLeftPrec(solver);
+					ofstream out_file(save_prec_file);
+					out_file << *P;
+					out_file.close();
 
 					comm->barrier();
-					duration<double> prec_time = steady_clock::now() - prec_start;
-
+					duration<double> write_time = steady_clock::now() - write_start;
 					if (my_global_rank == 0)
-						cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
-
-					// ofstream out_file("L.mm");
-					// out_file << *L;
-					// out_file.close();
-					// out_file = ofstream("U.mm");
-					// out_file << *U;
-					// out_file.close();
-				} else {
-					comm->barrier();
-					steady_clock::time_point prec_start = steady_clock::now();
-
-					RCP<RBMatrix> P = RBA->invBlockDiag();
-					problem->setRightPrec(P);
-
-					comm->barrier();
-					duration<double> prec_time = steady_clock::now() - prec_start;
-
-					if (my_global_rank == 0)
-						cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
-
-					if (save_prec_file != "") {
-						comm->barrier();
-						steady_clock::time_point write_start = steady_clock::now();
-
-						ofstream out_file(save_prec_file);
-						out_file << *P;
-						out_file.close();
-
-						comm->barrier();
-						duration<double> write_time = steady_clock::now() - write_start;
-						if (my_global_rank == 0)
-							cout << "Time to write preconditioner to file: " << write_time.count()
-							     << endl;
-					}
+						cout << "Time to write preconditioner to file: " << write_time.count()
+						     << endl;
 				}
+			} else if (f_precata) {
+				comm->barrier();
+				steady_clock::time_point prec_start = steady_clock::now();
+
+				RCP<RBMatrix> P = RBA->invBlockDiagATA();
+				problem->setRightPrec(P);
+
+				comm->barrier();
+				duration<double> prec_time = steady_clock::now() - prec_start;
+
+				if (my_global_rank == 0)
+					cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
+
+				if (save_prec_file != "") {
+					comm->barrier();
+					steady_clock::time_point write_start = steady_clock::now();
+
+					ofstream out_file(save_prec_file);
+					out_file << *P;
+					out_file.close();
+
+					comm->barrier();
+					duration<double> write_time = steady_clock::now() - write_start;
+					if (my_global_rank == 0)
+						cout << "Time to write preconditioner to file: " << write_time.count()
+						     << endl;
+				}
+
 			}
 
 			if (f_read_gamma) {
@@ -500,48 +534,33 @@ int main(int argc, char *argv[])
 				                + Belos::TimingDetails + Belos::Debug;
 				belosList.set("Verbosity", verbosity);
 				// belosList.set("Orthogonalization", "ICGS");
+                //
+                belosList.set("Rel RHS Err",0.0);
+                belosList.set("Rel Mat Err",0.0);
 
 				// Create solver and solve
-				if (f_rgmres) {
-					solver = rcp(new Belos::GCRODRSolMgr<double, vector_type, Tpetra::Operator<>>(
+				if (f_lsqr) {
+					solver = rcp(new Belos::LSQRSolMgr<scalar_type, vector_type,
+					                                     Tpetra::Operator<scalar_type>>(
+					problem, rcp(&belosList, false)));
+				} else if (f_rgmres) {
+					solver = rcp(new Belos::GCRODRSolMgr<scalar_type, vector_type,
+					                                     Tpetra::Operator<scalar_type>>(
 					problem, rcp(&belosList, false)));
 				} else if (f_cg) {
-					solver = rcp(new Belos::BlockCGSolMgr<double, vector_type, Tpetra::Operator<>>(
+					solver = rcp(new Belos::BlockCGSolMgr<scalar_type, vector_type,
+					                                      Tpetra::Operator<scalar_type>>(
 					problem, rcp(&belosList, false)));
 				} else if (f_bicg) {
-					solver = rcp(new Belos::BiCGStabSolMgr<double, vector_type, Tpetra::Operator<>>(
+					solver = rcp(new Belos::BiCGStabSolMgr<scalar_type, vector_type,
+					                                       Tpetra::Operator<scalar_type>>(
 					problem, rcp(&belosList, false)));
 				} else {
-					solver
-					= rcp(new Belos::BlockGmresSolMgr<double, vector_type, Tpetra::Operator<>>(
+					solver = rcp(new Belos::BlockGmresSolMgr<scalar_type, vector_type,
+					                                         Tpetra::Operator<scalar_type>>(
 					problem, rcp(&belosList, false)));
 				}
 				solver->solve();
-
-				if (f_pinv) {
-					for (int i = 0; i < 10; i++) {
-						RCP<vector_type> r   = rcp(new vector_type(matrix_map, 1));
-						RCP<vector_type> ATr = rcp(new vector_type(matrix_map, 1));
-						RCP<vector_type> e   = rcp(new vector_type(matrix_map, 1));
-						RBA->apply(*gamma, *r);
-						r->update(1, *b, -1);
-						Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile("tv.mm", r, "",
-						                                                          "");
-						RBA->apply(*r, *ATr);
-						Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile("atrv.mm", ATr, "",
-						                                                          "");
-						problem->setProblem(e, ATr);
-						solver->setProblem(problem);
-						solver->solve();
-						Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile("gb.mm", gamma,
-						                                                          "", "");
-						Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile("ev.mm", e, "",
-						                                                          "");
-						gamma->update(1, *e, 1);
-						Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile("ga.mm", gamma,
-						                                                          "", "");
-					}
-				}
 
 				comm->barrier();
 				duration<double> iter_time = steady_clock::now() - iter_start;
@@ -554,7 +573,7 @@ int main(int argc, char *argv[])
 		comm->barrier();
 		steady_clock::time_point solve_start = steady_clock::now();
 
-		dc.solveWithInterface(*gamma, *diff);
+		dc.solveWithInterface(*gamma);
 
 		comm->barrier();
 		duration<double> solve_time = steady_clock::now() - solve_start;
@@ -584,6 +603,7 @@ int main(int argc, char *argv[])
 					RCP<vector_type> ATr = rcp(new vector_type(matrix_map, 1));
 					RBA->apply(*r, *ATr);
 					problem->setProblem(x, ATr);
+					problem->setProblem(x, r);
 				}else{
 					problem->setProblem(x, r);
 				}

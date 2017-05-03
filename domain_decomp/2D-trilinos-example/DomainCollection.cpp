@@ -38,6 +38,7 @@ void DomainCollection::initNeumann(function<double(double, double)> ffun,
                                    function<double(double, double)> nfunx,
                                    function<double(double, double)> nfuny, bool amr)
 {
+    neumann = true;
     this->amr = amr;
 	for (auto &p : domains) {
 		Domain &d        = *p.second;
@@ -358,13 +359,27 @@ void DomainCollection::solveWithInterface(const vector_type &gamma, vector_type 
 	Tpetra::Export<> exporter(collection_map, diff.getMap());
 	vector_type      local_gamma(collection_map, 1);
 	vector_type      local_diff(collection_map, 1);
-	local_gamma.doImport(diff, importer, Tpetra::CombineMode::INSERT);
+	local_gamma.doImport(gamma, importer, Tpetra::CombineMode::INSERT);
 
 	// solve over domains on this proc
+    double usum = 0;
 	for (auto &p : domains) {
-		p.second->solveWithInterface(local_gamma, local_diff);
+        Domain&d = *p.second;
+		d.solveWithInterface(local_gamma);
+		usum += d.u.sum() * d.h_x * d.h_y;
 	}
 
+    if(neumann){
+        //make avarage of solution be zero
+		double avg = usum / (num_global_domains * n * n);
+		for (auto &p : domains) {
+			Domain &d = *p.second;
+			d.u -= avg / (d.h_x * d.h_y);
+		}
+	}
+	for (auto &p : domains) {
+		p.second->getDiff(local_diff);
+	}
 	// export diff vector
 
 	// if(has_east)std::cout <<"LOCAL AFEr\n";
@@ -379,6 +394,21 @@ void DomainCollection::solveWithInterface(const vector_type &gamma, vector_type 
 	// gamma.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
 	// diff.update(-2, gamma, 1);
 	diff.scale(-1);
+}
+void DomainCollection::solveWithInterface(const vector_type &gamma)
+{
+	// auto out = Teuchos::getFancyOStream (Teuchos::rcpFromRef (std::cout));
+	// if(has_east)std::cout << "Gamma begin\n";
+	// gamma.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
+	Tpetra::Import<> importer(gamma.getMap(), collection_map);
+	vector_type      local_gamma(collection_map, 1);
+	local_gamma.doImport(gamma, importer, Tpetra::CombineMode::INSERT);
+
+	// solve over domains on this proc
+	for (auto &p : domains) {
+        Domain&d = *p.second;
+		d.solveWithInterface(local_gamma);
+	}
 }
 double DomainCollection::diffNorm()
 {
@@ -622,9 +652,15 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 		valarray<double> &    wcr_b   = *wcr_ptr;
 
 
+        valarray<double> shift(n);
+        valarray<double> shift_rev(n);
 		for (int i = 0; i < n; i++) {
 			d.boundary_north[i] = 1;
 			d.solve();
+			d.boundary_north[i] = 0;
+
+			shift[i]             = d.u.sum() * 2 / (num_global_domains * n * n);
+			shift_rev[n - 1 - i] = shift[i];
 
 			// fill the blocks
 			n_b[slice(i * n, n, 1)] = d.getDiff(Side::north);
@@ -662,17 +698,24 @@ RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 			scr_b[slice(i * n, n, 1)] = d.getDiffCoarseToFineRight(Side::south);
 			wcr_b[slice(i * n, n, 1)] = d.getDiffCoarseToFineRight(Side::west);
 
-			d.boundary_north[i] = 0;
 		}
 
 		// now insert these results into the matrix for each interface
 		for (Iface iface : todo) {
+
 			bool reverse_x
 			= (iface.axis == X_AXIS && iface.right) || (iface.axis == Y_AXIS && !iface.right);
 			bool reverse_y = iface.right;
 
 			int j = iface.global_i[0];
 
+			if (neumann) {
+				if (reverse_x) {
+					A->getShift(j) += shift_rev;
+				} else {
+					A->getShift(j) += shift;
+				}
+			}
 			if (iface.hasFineNbr[0]) {
 				A->insertBlock(iface.global_i[0], j, nc_ptr, reverse_x, reverse_x);
 				A->insertBlock(iface.refined_left[0], j, ncl_ptr, reverse_x, reverse_x);

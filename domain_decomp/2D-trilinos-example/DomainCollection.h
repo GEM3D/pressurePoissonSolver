@@ -17,6 +17,8 @@
 class DomainCollection
 {
 	private:
+
+    bool neumann = false;
 	/**
 	 * @brief A map of domain ids to the domain objects.
 	 */
@@ -149,6 +151,7 @@ class DomainCollection
 	 * @param diff the resulting difference
 	 */
 	void solveWithInterface(const vector_type &gamma, vector_type &diff);
+	void solveWithInterface(const vector_type &gamma);
 
     /**
      * @brief get the difference in flux on refined boundaries

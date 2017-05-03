@@ -7,9 +7,10 @@
 #include <Tpetra_Vector.hpp>
 #include <Tpetra_Map.hpp>
 #include <Tpetra_MultiVector.hpp>
-typedef Tpetra::CrsMatrix<>      matrix_type;
-typedef Tpetra::MultiVector<>    vector_type;
-typedef Tpetra::Vector<>    single_vector_type;
+typedef double scalar_type;
+typedef Tpetra::CrsMatrix<scalar_type>      matrix_type;
+typedef Tpetra::MultiVector<scalar_type>    vector_type;
+typedef Tpetra::Vector<scalar_type>    single_vector_type;
 typedef Tpetra::MultiVector<int> int_vector_type;
 typedef Kokkos::View<double **, Kokkos::Serial> view_type;
 typedef Tpetra::Map<> map_type;

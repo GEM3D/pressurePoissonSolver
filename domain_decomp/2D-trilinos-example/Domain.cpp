@@ -214,6 +214,7 @@ void Domain::solve()
 	fftw_execute(plan2);
 
 	u /= 4 * n * n;
+
 }
 
 void Domain::getFluxDiff(vector_type &flux){
@@ -382,10 +383,9 @@ double Domain::residual(vector_type &ghost)
 	return sqrt(pow(f - f_comp, 2).sum());
 }
 
-void Domain::solveWithInterface(const vector_type &gamma, vector_type &diff)
+void Domain::solveWithInterface(const vector_type &gamma)
 {
 	auto vec_ptr  = gamma.getVector(0);
-	auto diff_ptr = diff.getVectorNonConst(0);
 
 	Side s = Side::north;
 	do {
@@ -398,7 +398,11 @@ void Domain::solveWithInterface(const vector_type &gamma, vector_type &diff)
 	// solve
 	solve();
 
-	s = Side::north;
+}
+void Domain::getDiff(vector_type &diff)
+{
+	auto diff_ptr = diff.getVectorNonConst(0);
+	Side s = Side::north;
 	do {
 		if (hasNbr(s)) {
 			fillDiffVector(s, *diff_ptr);

@@ -55,7 +55,8 @@ class Domain
 	void solve();
 	void putGhostCells(vector_type &ghost);
 	double residual(vector_type &ghost);
-	void solveWithInterface(const vector_type &gamma, vector_type &diff);
+	void solveWithInterface(const vector_type &gamma);
+	void getDiff(vector_type &diff);
 	double diffNorm();
 	double diffNorm(double uavg, double eavg);
 	double uSum();

@@ -9,6 +9,7 @@ void dgetrs_(char *TRANS, int *N, int *NRHS, double *A, int *lda, int *IPIV, dou
              int *INFO);
 void dgemm_(char *TRANSA, char *TRANSB, int *M, int *N, int *K, double *ALPHA, double *A, int *LDA,
             double *B, int *LDB, double *BETA, double *C, int *LDC);
+void dsyrk_(char*,char*,int*,int*,double*,double*,int*,double*,double*,int*);
 
 // generate inverse of a matrix given its LU decomposition
 void dgetri_(int *N, double *A, int *lda, int *IPIV, double *WORK, int *lwork, int *INFO);
@@ -26,6 +27,7 @@ RBMatrix::RBMatrix(Teuchos::RCP<map_type> map, int block_size, int num_blocks)
 	this->block_size = block_size;
 
 	block_cols = vector<std::map<int, Block>>(num_blocks);
+	shift = vector<valarray<double>>(num_blocks, valarray<double>(block_size));
 	for (int x = 0; x < num_blocks; x++) {
 		int i = domain->getGlobalElement(curr_local_i);
 		range_map[i] = curr_local_i;
@@ -34,9 +36,12 @@ RBMatrix::RBMatrix(Teuchos::RCP<map_type> map, int block_size, int num_blocks)
 		}
 		curr_local_i += block_size;
 	}
+	shift_vec = rcp(new single_vector_type(domain, 1));
+	ones       = rcp(new vector_type(domain, 1));
+	ones->putScalar(1);
 }
-void LUSolver::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode, double alpha,
-                     double beta) const
+void LUSolver::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode, scalar_type alpha,
+                     scalar_type beta) const
 {
 	auto x_view = x.getLocalView<Kokkos::HostSpace>();
 	auto y_view = y.getLocalView<Kokkos::HostSpace>();
@@ -111,8 +116,8 @@ void LUSolver::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 
 	y.update(1,x,0);
 }
-void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode, double alpha,
-                     double beta) const
+void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode, scalar_type alpha,
+                     scalar_type beta) const
 {
     vector_type my_y(range, 1);
 	auto x_view = x.getLocalView<Kokkos::HostSpace>();
@@ -122,7 +127,6 @@ void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 	// column loop
 	for (int index = 0; index < num_blocks; index++) {
 		int              start_j = index * block_size;
-		valarray<double> slot_rev(block_size);
 		// go down the column
 		for (auto &p : block_cols[index]) {
 			int   start_i    = p.first;
@@ -157,7 +161,9 @@ void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 		}
 	}
 	y.doExport(my_y, *exporter, Tpetra::CombineMode::ADD);
-	// y.update(2, x, 1);
+	y.update(2, x, 1);
+    double dot = shift_vec->dot(*x.getVector(0));
+	y.update(dot, *ones, 1);
 }
 void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_i, bool flip_j,
                            double scale)
@@ -243,6 +249,13 @@ void RBMatrix::createRangeMap()
 		local_skip_i = range->getLocalElement(skip_index);
 		local_skip_j = domain->getLocalElement(skip_index);
 	}
+	auto shift_view = shift_vec->getLocalView<Kokkos::HostSpace>();
+	for (int index = 0; index < num_blocks; index++) {
+        valarray<double> s = shift[index];
+        for (int j=0;j<block_size;j++){
+			shift_view(index * block_size + j, 0) = s[j];
+		}
+	}
 	exporter = rcp(new Tpetra::Export<>(range, domain));
 }
 RCP<RBMatrix> RBMatrix::invBlockDiag()
@@ -305,6 +318,47 @@ RCP<RBMatrix> RBMatrix::invBlockDiag()
 				}
 			}
 		}
+	}
+	Inv->createRangeMap();
+	return Inv;
+}
+RCP<RBMatrix> RBMatrix::invBlockDiagATA()
+{
+	RCP<RBMatrix>    Inv    = rcp(new RBMatrix(domain, block_size, num_blocks));
+	map<double *, RCP<valarray<double>>> computed;
+	for (int index = 0; index < num_blocks; index++) {
+		int                   start_j  = index * block_size;
+		int                   global_j = domain->getGlobalElement(start_j);
+		RCP<valarray<double>> ata_ptr  = rcp(new valarray<double>(block_size * block_size));
+		valarray<double> &    ata      = *ata_ptr;
+		// go down the column
+		for (auto &p : block_cols[index]) {
+			RCP<valarray<double>> blk_ptr;
+			Block                 curr_block = p.second;
+			// invert this block
+			blk_ptr                 = blkCopy(curr_block);
+			valarray<double> &blk   = *blk_ptr;
+			char              uplo  = 'U';
+			char              trans = 'N';
+			double            one   = 1;
+			dsyrk_(&uplo, &trans, &block_size, &block_size, &one, &blk[0], &block_size, &one,
+			       &ata[0], &block_size);
+            
+
+		}
+		for (int j = 0; j < block_size; j++) {
+			for (int i = j + 1; i < block_size; i++) {
+				ata[i + j * block_size] = ata[i * block_size + j];
+			}
+		}
+		valarray<int>    ipiv(block_size + 1);
+		int              lwork = block_size * block_size;
+		valarray<double> work(lwork);
+		int              info;
+		dgetrf_(&block_size, &block_size, &ata[0], &block_size, &ipiv[0], &info);
+		dgetri_(&block_size, &ata[0], &block_size, &ipiv[0], &work[0], &lwork, &info);
+
+		Inv->insertBlock(global_j / block_size, global_j / block_size, ata_ptr);
 	}
 	Inv->createRangeMap();
 	return Inv;
@@ -690,30 +744,50 @@ ostream& operator<<(ostream& os, const RBMatrix& A) {
     int size= A.num_blocks*A.block_size;
     os.precision(15);
 	os << "%%MatrixMarket matrix coordinate real general\n";
-	os << size << ' ' << size << ' ' << A.nz << '\n';
+	os << size << ' ' << size << ' ' << A.block_size*A.num_blocks*A.block_size*A.num_blocks << '\n';
 	for (size_t index = 0; index < A.block_cols.size(); index++) {
 		int start_j = A.domain->getGlobalElement(index * A.block_size);
-		for (auto &p : A.block_cols[index]) {
-			Block                 curr_block = p.second;
-			std::valarray<double> curr_blk   = *curr_block.block;
-			int                   start_i    = A.range->getGlobalElement(p.first);
-			for (int iii = 0; iii < A.block_size; iii++) {
-				int i = start_i + iii;
-                int block_i = iii;
-				if (curr_block.flip_i) {
-					block_i = A.block_size - 1 - iii;
-				}
-				for (int jjj = 0; jjj < A.block_size; jjj++) {
-					int j       = start_j + jjj;
-					int block_j = jjj;
-					if (curr_block.flip_j) {
-						block_j = A.block_size - 1 - jjj;
+        valarray<double> s = A.shift[index];
+        for(int local_i=0;local_i<A.block_size*A.num_blocks;local_i+=A.block_size){
+			int start_i = A.range->getGlobalElement(local_i);
+			try {
+				Block                 curr_block = A.block_cols[index].at(local_i);
+				std::valarray<double> curr_blk   = *curr_block.block;
+				for (int iii = 0; iii < A.block_size; iii++) {
+					int i       = start_i + iii;
+					int block_i = iii;
+					if (curr_block.flip_i) {
+						block_i = A.block_size - 1 - iii;
 					}
-					os << i + 1 << ' ' << j + 1 << ' '
-					   << curr_blk[block_i + A.block_size * block_j] * curr_block.scale << "\n";
+					for (int jjj = 0; jjj < A.block_size; jjj++) {
+						int j       = start_j + jjj;
+						int block_j = jjj;
+						if (curr_block.flip_j) {
+							block_j = A.block_size - 1 - jjj;
+						}
+						if (i == j) {
+							os << i + 1 << ' ' << j + 1 << ' '
+							   << (curr_blk[block_i + A.block_size * block_j] + s[jjj] + 2.0)
+							      * curr_block.scale
+							   << "\n";
+						} else {
+							os << i + 1 << ' ' << j + 1 << ' '
+							   << (curr_blk[block_i + A.block_size * block_j] + s[jjj])
+							      * curr_block.scale
+							   << "\n";
+						}
+					}
+				}
+			} catch (out_of_range oor) {
+				for (int iii = 0; iii < A.block_size; iii++) {
+					int i       = start_i + iii;
+					for (int jjj = 0; jjj < A.block_size; jjj++) {
+						int j       = start_j + jjj;
+						os << i + 1 << ' ' << j + 1 << ' ' << s[jjj] << "\n";
+					}
 				}
 			}
 		}
 	}
-    return os;
+	return os;
 }
