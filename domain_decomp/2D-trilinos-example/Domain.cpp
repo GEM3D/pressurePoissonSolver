@@ -1,6 +1,7 @@
 #include <valarray>
 #include "Domain.h"
 #include "Iface.h"
+#include "FftwSolver.h"
 using namespace std;
 Domain::Domain(DomainSignature ds, int n)
 {
@@ -34,10 +35,8 @@ Domain::Domain(DomainSignature ds, int n)
 #endif
 	f      = valarray<double>(n * n);
 	f_back = valarray<double>(n * n);
-	f_copy = valarray<double>(n * n);
 	f_comp = valarray<double>(n * n);
 	exact  = valarray<double>(n * n);
-	tmp    = valarray<double>(n * n);
 	u      = valarray<double>(n * n);
 	u_back = valarray<double>(n * n);
 	denom  = valarray<double>(n * n);
@@ -60,8 +59,7 @@ Domain::Domain(DomainSignature ds, int n)
 
 Domain::~Domain()
 {
-	fftw_destroy_plan(plan1);
-	fftw_destroy_plan(plan2);
+    delete solver;
 #if NDEBUG
 	cerr << "I am Domain: " << ds.id << "\n";
 	cerr << "h:           " << this->h_x << endl;
@@ -87,134 +85,23 @@ Domain::~Domain()
 #endif
 }
 
+void Domain::plan(){
+    solver = new FftwSolver(this); 
+}
 void Domain::planDirichlet()
 {
-	// create plan
-	plan1 = fftw_plan_r2r_2d(n, n, &f_copy[0], &tmp[0], FFTW_RODFT10, FFTW_RODFT10, FFTW_MEASURE);
-
-	plan2 = fftw_plan_r2r_2d(n, n, &tmp[0], &u[0], FFTW_RODFT01, FFTW_RODFT01, FFTW_MEASURE);
-	// create denom vector
-
-	for (int yi = 0; yi < n; yi++) {
-		denom[slice(yi * n, n, 1)] = -4 / (h_x * h_x) * pow(sin((yi + 1) * M_PI / (2 * n)), 2);
-	}
-
-	valarray<double> ones(n);
-	ones = 1;
-	for (int xi = 0; xi < n; xi++) {
-		denom[slice(xi, n, n)]
-		-= 4 / (h_y * h_y) * pow(sin((xi + 1) * M_PI / (2 * n)), 2) * ones;
-	};
-
+    plan();
 }
 
 void Domain::planNeumann()
 {
 	neumann                       = true;
-	fftw_r2r_kind x_transform     = FFTW_RODFT10;
-	fftw_r2r_kind x_transform_inv = FFTW_RODFT01;
-	fftw_r2r_kind y_transform     = FFTW_RODFT10;
-	fftw_r2r_kind y_transform_inv = FFTW_RODFT01;
-	if (!hasNbr(Side::east) && !hasNbr(Side::west)) {
-		x_transform     = FFTW_REDFT10;
-		x_transform_inv = FFTW_REDFT01;
-	} else if (!hasNbr(Side::west)) {
-		x_transform     = FFTW_REDFT11;
-		x_transform_inv = FFTW_REDFT11;
-	} else if (!hasNbr(Side::east)) {
-		x_transform     = FFTW_RODFT11;
-		x_transform_inv = FFTW_RODFT11;
-	}
-	if (!hasNbr(Side::north) && !hasNbr(Side::south)) {
-		y_transform     = FFTW_REDFT10;
-		y_transform_inv = FFTW_REDFT01;
-	} else if (!hasNbr(Side::south)) {
-		y_transform     = FFTW_REDFT11;
-		y_transform_inv = FFTW_REDFT11;
-	} else if (!hasNbr(Side::north)) {
-		y_transform     = FFTW_RODFT11;
-		y_transform_inv = FFTW_RODFT11;
-	}
-	plan1 = fftw_plan_r2r_2d(n, n, &f_copy[0], &tmp[0], y_transform, x_transform, FFTW_MEASURE);
-
-	plan2
-	= fftw_plan_r2r_2d(n, n, &tmp[0], &u[0], y_transform_inv, x_transform_inv, FFTW_MEASURE);
-
-	// create denom vector
-	if (!hasNbr(Side::north) && !hasNbr(Side::south)) {
-		for (int yi = 0; yi < n; yi++) {
-			denom[slice(yi * n, n, 1)] = -4 / (h_x * h_x) * pow(sin(yi * M_PI / (2 * n)), 2);
-		}
-	} else if (!hasNbr(Side::south) || !hasNbr(Side::north)) {
-		for (int yi = 0; yi < n; yi++) {
-			denom[slice(yi * n, n, 1)]
-			= -4 / (h_x * h_x) * pow(sin((yi + 0.5) * M_PI / (2 * n)), 2);
-		}
-	} else {
-		for (int yi = 0; yi < n; yi++) {
-			denom[slice(yi * n, n, 1)]
-			= -4 / (h_x * h_x) * pow(sin((yi + 1) * M_PI / (2 * n)), 2);
-		}
-	}
-
-	valarray<double> ones(n);
-	ones = 1;
-
-	if (!hasNbr(Side::east) && !hasNbr(Side::west)) {
-		for (int xi = 0; xi < n; xi++) {
-			denom[slice(xi, n, n)] -= 4 / (h_y * h_y) * pow(sin(xi * M_PI / (2 * n)), 2) * ones;
-		}
-	} else if (!hasNbr(Side::west) || !hasNbr(Side::east)) {
-		for (int xi = 0; xi < n; xi++) {
-			denom[slice(xi, n, n)]
-			-= 4 / (h_y * h_y) * pow(sin((xi + 0.5) * M_PI / (2 * n)), 2) * ones;
-		}
-	} else {
-		for (int xi = 0; xi < n; xi++) {
-			denom[slice(xi, n, n)]
-			-= 4 / (h_y * h_y) * pow(sin((xi + 1) * M_PI / (2 * n)), 2) * ones;
-		}
-	}
+    plan();
 }
 
 void Domain::solve()
 {
-	f_copy = f;
-	if (!hasNbr(Side::north) && neumann) {
-		f_copy[slice(n * (n - 1), n, 1)] -= 1 / h_y * boundary_north;
-	} else {
-		f_copy[slice(n * (n - 1), n, 1)] -= 2 / (h_y * h_y) * boundary_north;
-	}
-	if (!hasNbr(Side::east) && neumann) {
-		f_copy[slice((n - 1), n, n)] -= 1 / h_x * boundary_east;
-	} else {
-		f_copy[slice((n - 1), n, n)] -= 2 / (h_x * h_x) * boundary_east;
-	}
-	if (!hasNbr(Side::south) && neumann) {
-		f_copy[slice(0, n, 1)] += 1 / h_y * boundary_south;
-	} else {
-		f_copy[slice(0, n, 1)] -= 2 / (h_y * h_y) * boundary_south;
-	}
-	if (!hasNbr(Side::west) && neumann) {
-		f_copy[slice(0, n, n)] += 1 / h_x * boundary_west;
-	} else {
-		f_copy[slice(0, n, n)] -= 2 / (h_x * h_x) * boundary_west;
-	}
-
-	fftw_execute(plan1);
-
-	tmp /= denom;
-
-	if (neumann
-	    && !(hasNbr(Side::north) || hasNbr(Side::east) || hasNbr(Side::south)
-	         || hasNbr(Side::west))) {
-		tmp[0] = 0;
-	}
-
-	fftw_execute(plan2);
-
-	u /= 4 * n * n;
-
+    solver->solve();
 }
 
 void Domain::getFluxDiff(vector_type &flux){
@@ -251,7 +138,15 @@ void Domain::fillFluxVector(Side s, single_vector_type &diff)
 			diff_view(curr_i_center, 0) += diff_coarse[i];
 			curr_i_center++;
 		}
-	}
+	}else{
+		valarray<double> diff = getDiff(s);
+
+		int curr_i = index(s) * n;
+		for (int i = 0; i < n; i++) {
+			diff_view(curr_i, 0) += diff[i];
+			curr_i++;
+		}
+    }
 }
 void Domain::putGhostCells(vector_type &ghost)
 {

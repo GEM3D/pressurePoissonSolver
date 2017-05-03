@@ -272,18 +272,15 @@ RCP<RBMatrix> RBMatrix::invBlockDiag()
 			if (global_j == global_i) {
 				RCP<valarray<double>> blk_inv_ptr;
 				Block                 curr_block = p.second;
-				if (local_skip_i != -1 && local_skip_i <= start_i
-				    && start_i < local_skip_i + block_size) {
-					// modify the row of this block and invert
+				try {
+					blk_inv_ptr = computed.at(&(*curr_block.block)[0]);
+				} catch (const out_of_range &oor) {
+					// invert this block
 					blk_inv_ptr               = blkCopy(curr_block);
 					valarray<double> &blk_inv = *blk_inv_ptr;
-
-					// modify the row
-					int block_i = local_skip_i % block_size;
-					for (int j = 0; j < block_size; j++) {
-						blk_inv[block_i + block_size * j] = 0;
+                    for(int i=0;i<block_size;i++){
+						blk_inv[i + i * block_size] += 2;
 					}
-					blk_inv[block_i + block_size * block_i] = 1;
 
 					// compute inverse of block
 					valarray<int>    ipiv(block_size + 1);
@@ -293,29 +290,11 @@ RCP<RBMatrix> RBMatrix::invBlockDiag()
 					dgetrf_(&block_size, &block_size, &blk_inv[0], &block_size, &ipiv[0], &info);
 					dgetri_(&block_size, &blk_inv[0], &block_size, &ipiv[0], &work[0], &lwork,
 					        &info);
-				} else {
-					try {
-						blk_inv_ptr = computed.at(&(*curr_block.block)[0]);
-					} catch (const out_of_range &oor) {
-						// invert this block
-						blk_inv_ptr               = blkCopy(curr_block);
-						valarray<double> &blk_inv = *blk_inv_ptr;
 
-						// compute inverse of block
-						valarray<int>    ipiv(block_size + 1);
-						int              lwork = block_size * block_size;
-						valarray<double> work(lwork);
-						int              info;
-						dgetrf_(&block_size, &block_size, &blk_inv[0], &block_size, &ipiv[0],
-						        &info);
-						dgetri_(&block_size, &blk_inv[0], &block_size, &ipiv[0], &work[0], &lwork,
-						        &info);
-
-						// insert the block
-						computed[&(*curr_block.block)[0]] = blk_inv_ptr;
-					}
-					Inv->insertBlock(global_i / block_size, global_j / block_size, blk_inv_ptr);
+					// insert the block
+					computed[&(*curr_block.block)[0]] = blk_inv_ptr;
 				}
+				Inv->insertBlock(global_i / block_size, global_j / block_size, blk_inv_ptr);
 			}
 		}
 	}

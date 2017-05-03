@@ -3,18 +3,18 @@
 #include "DomainSignatureCollection.h"
 #include "MyTypeDefs.h"
 #include "Side.h"
+#include "Solver.h"
 #include <Teuchos_RCP.hpp>
 #include <Tpetra_Import_decl.hpp>
 #include <array>
 #include <cmath>
-#include <fftw3.h>
 #include <valarray>
 class Domain
 {
 	public:
+	Solver *               solver;
 	DomainSignature        ds;
 	std::valarray<double>  f;
-	std::valarray<double>  f_copy;
 	std::valarray<double>  f_comp;
 	std::valarray<double>  f_back;
 	std::valarray<double>  resid;
@@ -38,8 +38,6 @@ class Domain
 	std::array<int, 4> local_i        = {-1, -1, -1, -1};
 	std::array<int, 4> local_i_center = {-1, -1, -1, -1};
 	Teuchos::RCP<map_type> domain_map;
-	fftw_plan              plan1;
-	fftw_plan              plan2;
 	bool                   neumann = false;
 	double                 x_start  = 0;
 	double                 y_start  = 0;
@@ -50,6 +48,7 @@ class Domain
 	Domain(DomainSignature ds, int n);
 	~Domain();
 
+	void plan();
 	void planDirichlet();
 	void planNeumann();
 	void solve();

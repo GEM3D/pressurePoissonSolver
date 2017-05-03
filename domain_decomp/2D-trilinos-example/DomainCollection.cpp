@@ -366,7 +366,7 @@ void DomainCollection::solveWithInterface(const vector_type &gamma, vector_type 
 	for (auto &p : domains) {
         Domain&d = *p.second;
 		d.solveWithInterface(local_gamma);
-		usum += d.u.sum() * d.h_x * d.h_y;
+		usum += d.u.sum() / pow(d.ds.refine_level, 2);
 	}
 
     if(neumann){
@@ -374,7 +374,7 @@ void DomainCollection::solveWithInterface(const vector_type &gamma, vector_type 
 		double avg = usum / (num_global_domains * n * n);
 		for (auto &p : domains) {
 			Domain &d = *p.second;
-			d.u -= avg / (d.h_x * d.h_y);
+			d.u -= avg;
 		}
 	}
 	for (auto &p : domains) {
