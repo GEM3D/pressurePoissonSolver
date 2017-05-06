@@ -32,6 +32,7 @@
 //#include <mpi.h>
 #include <string>
 #include <unistd.h>
+# define M_PIl          3.141592653589793238462643383279502884L /* pi */
 
 using Teuchos::RCP;
 using Teuchos::rcp;
@@ -97,7 +98,6 @@ int main(int argc, char *argv[])
 	args::Flag f_pinv(parser, "wrapper", "compute using pseudoinverse", {"pinv"});
 	args::Flag f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
 	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
-	args::Flag f_oldgauss(parser, "gauss", "solve gaussian function", {"oldgauss"});
 	args::Flag f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
 	args::Flag f_precata(parser, "prec", "use block diagonal preconditioner", {"precata"});
 	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {"neumann"});
@@ -109,9 +109,11 @@ int main(int argc, char *argv[])
 	args::Flag f_bicg(parser, "gmres", "use BiCGStab for iterative solver", {"bicg"});
 	args::Flag f_nozero(parser, "nozero", "don't make the average of vector zero in CG solver",
 	                    {"nozero"});
+	args::Flag f_nozerou(parser, "zerou", "don't modify make so that it zeros the solution",
+	                    {"nozerou"});
 	args::Flag f_lu(parser, "lu", "use LU decomposition", {"lu"});
 	args::Flag f_ilu(parser, "ilu", "use incomplete LU preconditioner", {"ilu"});
-	args::ValueFlag<int> f_iter(parser, "iterative", "use iterative method", {"iterative"});
+	args::Flag f_iter(parser, "iterative", "use iterative method", {"iterative"});
 
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;
@@ -210,8 +212,12 @@ int main(int argc, char *argv[])
 		save_prec_file = args::get(f_p);
 	}
 
-    
 	// the functions that we are using
+	function<double(double, double)> ffun;
+	function<double(double, double)> gfun;
+	function<double(double, double)> nfunx;
+	function<double(double, double)> nfuny;
+
 	vector<double> xval
 	= {0.07768174089481361, 0.4208838472612919,  0.9473139111796449,  0.5089692183323905,
 	   0.9570464247595821,  0.15905126169737582, 0.11849894156700524, 0.40999270280625555,
@@ -232,100 +238,42 @@ int main(int argc, char *argv[])
 	79.61010770157222, 77.8956019831367,  76.6795489632914,  71.36011508633008, 99.5339946457969,
 	59.75741874591391, 77.37272321552643, 91.75611892120241, 85.7168895671343,  68.55489734818805};
 
-	function<double(double, double)> ffun;
-	function<double(double, double)> gfun;
-	function<double(double, double)> nfunx;
-	function<double(double, double)> nfuny;
-
-	if (f_oldgauss) {
-		ffun = [xval, yval, alpha](double x, double y) {
-			double retval = 0;
-			for (int i = 0; i < 20; i++) {
-				double xv = xval[i];
-				double yv = yval[i];
-				double a  = alpha[i];
-				double r2 = (xv - x) * (xv - x) + (yv - y) * (yv - y);
-				retval += 4 * a * (a * r2 - 1) * exp(-a * r2);
-			}
-			return retval;
-		};
-
-		gfun = [xval, yval, alpha](double x, double y) {
-			double retval = 0;
-			for (int i = 0; i < 20; i++) {
-				double xv = xval[i];
-				double yv = yval[i];
-				double a  = alpha[i];
-				double r2 = (xv - x) * (xv - x) + (yv - y) * (yv - y);
-				retval += exp(-a * r2);
-			}
-			return retval;
-		};
-
-		nfunx = [xval, yval, alpha](double x, double y) {
-			double retval = 0;
-			for (int i = 0; i < 20; i++) {
-				double xv = xval[i];
-				double yv = yval[i];
-				double a  = alpha[i];
-				double r2 = (xv - x) * (xv - x) + (yv - y) * (yv - y);
-				retval += 2 * a * (xv - x) * exp(-a * r2);
-			}
-			return retval;
-		};
-
-		nfuny = [xval, yval, alpha](double x, double y) {
-			double retval = 0;
-			for (int i = 0; i < 20; i++) {
-				double xv = xval[i];
-				double yv = yval[i];
-				double a  = alpha[i];
-				double r2 = (xv - x) * (xv - x) + (yv - y) * (yv - y);
-				retval += 2 * a * (yv - y) * exp(-a * r2);
-			}
-			return retval;
-		};
-	} else if (f_gauss) {
-		gfun = [](double x, double y) { return exp(cos(10 * M_PI * x)) - exp(cos(11 * M_PI * y)); };
+	if (f_gauss) {
+		gfun
+		= [](double x, double y) { return exp(cos(10 * M_PIl * x)) - exp(cos(11 * M_PIl * y)); };
 		ffun = [](double x, double y) {
-			return 100 * M_PI * M_PI * (pow(sin(10 * M_PI * x), 2) - cos(10 * M_PI * x))
-			       * exp(cos(10 * M_PI * x))
-			       + 121 * M_PI * M_PI * (cos(11 * M_PI * y) - pow(sin(11 * M_PI * y), 2))
-			         * exp(cos(11 * M_PI * y));
+			return 100 * M_PIl * M_PIl * (pow(sin(10 * M_PIl * x), 2) - cos(10 * M_PIl * x))
+			       * exp(cos(10 * M_PIl * x))
+			       + 121 * M_PIl * M_PIl * (cos(11 * M_PIl * y) - pow(sin(11 * M_PIl * y), 2))
+			         * exp(cos(11 * M_PIl * y));
 		};
 		nfunx = [](double x, double y) {
-			return -10 * M_PI * sin(10 * M_PI * x) * exp(cos(10 * M_PI * x));
+			return -10 * M_PIl * sin(10 * M_PIl * x) * exp(cos(10 * M_PIl * x));
 		};
 
 		nfuny = [](double x, double y) {
-			return 11 * M_PI * sin(11 * M_PI * y) * exp(cos(11 * M_PI * y));
+			return 11 * M_PIl * sin(11 * M_PIl * y) * exp(cos(11 * M_PIl * y));
 		};
 	} else {
 		ffun = [](double x, double y) {
-            x-=.3;
-			return -5 * M_PI * M_PI * sin(M_PI * y) * cos(2 * M_PI * x);
+			return -5 * M_PIl * M_PIl * sinl(M_PIl * y) * cosl(2 * M_PIl * x);
 		};
-		gfun = [](double x, double y) {
-            x-=.3;
-			return sin(M_PI * y) * cos(2 * M_PI * x);
-		};
-		nfunx = [](double x, double y) {
-            x-=.3;
-			return -2 * M_PI * sin(M_PI * y) * sin(2 * M_PI * x);
-		};
-		nfuny = [](double x, double y) {
-            x-=.3;
-			return M_PI * cos(M_PI * y) * cos(2 * M_PI * x);
-		};
+		gfun = [](double x, double y) { return sinl(M_PIl * y) * cosl(2 * M_PIl * x); };
+		nfunx
+		= [](double x, double y) { return -2 * M_PIl * sinl(M_PIl * y) * sinl(2 * M_PIl * x); };
+		nfuny = [](double x, double y) { return M_PIl * cosl(M_PIl * y) * cosl(2 * M_PIl * x); };
 	}
 
 	valarray<double> times(loop_count);
 	for (int loop = 0; loop < loop_count; loop++) {
 		comm->barrier();
-		
+
 		steady_clock::time_point domain_start = steady_clock::now();
 
 		DomainCollection dc(dsc, nx, comm);
+		if (f_neumann && !f_nozerou) {
+			dc.setZeroU();
+		}
 
 		ZeroSum zs;
 		if (f_neumann) {
@@ -362,6 +310,13 @@ int main(int argc, char *argv[])
 		RCP<Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>> problem;
 		RCP<Belos::SolverManager<scalar_type, vector_type, Tpetra::Operator<scalar_type>>> solver;
 		Teuchos::ParameterList belosList;
+
+		double fdiff = (dc.integrateBoundaryFlux() - dc.integrateF())/dc.area();
+		cout << "Fdiff: " << fdiff << endl;
+		for (auto &p : dc.domains) {
+			Domain &d = *p.second;
+            d.f+=fdiff;
+		}
 		if (dsc.num_global_domains != 1) {
 			// do iterative solve
 
@@ -382,6 +337,9 @@ int main(int argc, char *argv[])
 				steady_clock::time_point form_start = steady_clock::now();
 
 				RBA = dc.formRBMatrix(matrix_map, del);
+                if(f_neumann&&!f_nozerou){
+                    RBA->setZeroU();
+                }
 
 				comm->barrier();
 				duration<double> form_time = steady_clock::now() - form_start;
@@ -396,6 +354,9 @@ int main(int argc, char *argv[])
 					ofstream out_file(save_matrix_file);
 					out_file << *RBA;
 					out_file.close();
+
+					Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(
+					save_matrix_file + ".s", RBA->shift_vec, "", "");
 
 					comm->barrier();
 					duration<double> write_time = steady_clock::now() - write_start;
@@ -573,7 +534,7 @@ int main(int argc, char *argv[])
 		comm->barrier();
 		steady_clock::time_point solve_start = steady_clock::now();
 
-		dc.solveWithInterface(*gamma);
+		dc.solveWithInterface(*gamma, *diff);
 
 		comm->barrier();
 		duration<double> solve_time = steady_clock::now() - solve_start;
@@ -584,18 +545,23 @@ int main(int argc, char *argv[])
 		dc.residual();
 		double ausum2 = dc.integrateAU();
 		double fsum2  = dc.integrateF();
+		double bflux  = dc.integrateBoundaryFlux();
 		std::cout << u8"Σf-Au: " << fsum2 - ausum2 << endl;
 		std::cout << u8"Σf: " << fsum2 << endl;
 		std::cout << u8"ΣAu: " << ausum2 << endl;
+		if (f_neumann) {
+			std::cout << u8"∮ du/dn: " << bflux << endl;
+			std::cout << u8"∮ du/dn - Σf: " << bflux - fsum2 << endl;
+			std::cout << u8"∮ du/dn - ΣAu: " << bflux - ausum2 << endl;
+		}
 		if (f_iter) {
-			for (int i = 0; i < args::get(f_iter); i++) {
-				dc.residual();
-				dc.swapResidSol();
+			dc.residual();
+			dc.swapResidSol();
+			if (dsc.num_global_domains != 1) {
 				x->putScalar(0);
 				dc.solveWithInterface(*x, *r);
-        
+
 				solver->reset(Belos::ResetType::Problem);
-				Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile("rrr.mm", r, "", "");
 				if (f_wrapper) {
 					((FuncWrap *) op.getRawPtr())->setB(r);
 				}
@@ -604,14 +570,14 @@ int main(int argc, char *argv[])
 					RBA->apply(*r, *ATr);
 					problem->setProblem(x, ATr);
 					problem->setProblem(x, r);
-				}else{
+				} else {
 					problem->setProblem(x, r);
 				}
 				solver->setProblem(problem);
 				solver->solve();
-				dc.solveWithInterface(*x, *d);
-				dc.sumResidIntoSol();
 			}
+			dc.solveWithInterface(*x, *d);
+			dc.sumResidIntoSol();
 		}
 
 		// Calcuate error
@@ -620,14 +586,8 @@ int main(int argc, char *argv[])
 		Tpetra::Vector<> diff_norm(err_map);
 
 		if (f_neumann) {
-			double usum = dc.uSum();
-			double uavg;
-			Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &usum, &uavg);
-			uavg /= dc.getGlobalNumCells();
-			double esum = dc.exactSum();
-			double eavg;
-			Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &esum, &eavg);
-			eavg /= dc.getGlobalNumCells();
+			double uavg = dc.integrateU()/dc.area();
+			double eavg = dc.integrateExact()/dc.area();
 
 			if (my_global_rank == 0) {
 				cout << "Average of computed solution: " << uavg << endl;
@@ -660,6 +620,9 @@ int main(int argc, char *argv[])
 			std::cout << "Error: " << global_diff_norm / global_exact_norm << endl;
 			std::cout << "Residual: " << residual / fnorm << endl;
 			std::cout << u8"ΣAu-Σf: " << ausum-fsum << endl;
+			// if (f_neumann) {
+			//	std::cout << u8"∮ du/dn - ΣAu: " << dc.sumBoundaryFlux() - ausum << endl;
+			//}
 			cout << std::fixed;
 			cout.precision(2);
 		}

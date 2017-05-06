@@ -4,6 +4,7 @@
 # before reading this example; in particular, you should know how to
 # add C++ source files and header files to your project.
 #
+enable_language(Fortran)
 
 # You need CMake version >= 2.8 to use this example.
 cmake_minimum_required(VERSION 2.8)
@@ -60,6 +61,7 @@ IF(NOT CMAKE_C_COMPILER)
   SET(CMAKE_C_COMPILE ${Trilinos_C_COMPILER})
 ENDIF()
 
+set (CMAKE_Fortran_FLAGS "-fdefault-real-8 ${CMAKE_Fortran_FLAGS}")
 
 find_program(CCACHE_FOUND ccache)
 if(CCACHE_FOUND)
@@ -117,6 +119,9 @@ add_library(DomainSignatureCollection DomainSignatureCollection.cpp)
 add_library(Domain Domain.cpp)
 add_library(RBMatrix RBMatrix.cpp)
 add_library(FftwSolver FftwSolver.cpp)
+file(GLOB fishpack_SRC "fishpack/*.f")
+#add_library(FishpackSolver FishpackSolver.cpp)
+#add_library(Fishpack ${fishpack_SRC})
 
 #
 # EDIT HERE: Change trilinosExample to the name of the executable
@@ -156,6 +161,7 @@ target_link_libraries(DomainCollection
 )
 target_link_libraries(Domain
     FftwSolver
+    #    FishpackSolver
   ${Belos_TPL_LIBRARIES}
   ${Tpetra_TPL_LIBRARIES}
   ${FFTW_LIB}
@@ -163,9 +169,12 @@ target_link_libraries(Domain
   ${Tpetra_LIBRARIES} 
   ${MPI_CXX_LIBRARIES} 
 )
+#target_link_libraries(FishpackSolver
+#    Domain
+#    Fishpack
+#)
 target_link_libraries(FftwSolver
     Domain
-  ${FFTW_LIB}
 )
 target_link_libraries(DomainSignatureCollection
   ${Zoltan_TPL_LIBRARIES}

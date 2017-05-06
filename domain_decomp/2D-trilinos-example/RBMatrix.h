@@ -60,13 +60,14 @@ class RBMatrix : public Tpetra::Operator<scalar_type>
 	std::map<Block, LUP> dgetrf_cache;
 	std::map<Block, Teuchos::RCP<std::valarray<double>>> lsolve_cache;
     Teuchos::RCP<vector_type> ones;
-    Teuchos::RCP<single_vector_type> shift_vec;
 
 	int block_size;
 	int num_blocks;
     int nz = 0;
+	bool zero_u = false;
 
 	public:
+    Teuchos::RCP<single_vector_type> shift_vec;
 	std::vector<std::valarray<double>> shift;
 	int                                skip_index = -1;
 
@@ -78,6 +79,7 @@ class RBMatrix : public Tpetra::Operator<scalar_type>
 	void insertBlock(int i, int j, Teuchos::RCP<std::valarray<double>> block, bool flip_i = false,
 	                 bool flip_j = false, double scale = 1);
 	void                                createRangeMap();
+	void                                setZeroU() { zero_u = true; }
 	Teuchos::RCP<const map_type>        getDomainMap() const { return domain; }
 	Teuchos::RCP<const map_type>        getRangeMap() const { return range; }
 	Teuchos::RCP<RBMatrix>              invBlockDiag();

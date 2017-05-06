@@ -162,8 +162,10 @@ void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 	}
 	y.doExport(my_y, *exporter, Tpetra::CombineMode::ADD);
 	y.update(2, x, 1);
-    double dot = shift_vec->dot(*x.getVector(0));
-	y.update(dot, *ones, 1);
+	if (zero_u) {
+		double dot = shift_vec->dot(*x.getVector(0));
+		y.update(dot, *ones, 1);
+	}
 }
 void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_i, bool flip_j,
                            double scale)
@@ -723,10 +725,9 @@ ostream& operator<<(ostream& os, const RBMatrix& A) {
     int size= A.num_blocks*A.block_size;
     os.precision(15);
 	os << "%%MatrixMarket matrix coordinate real general\n";
-	os << size << ' ' << size << ' ' << A.block_size*A.num_blocks*A.block_size*A.num_blocks << '\n';
+	os << size << ' ' << size << ' ' << A.nz << '\n';
 	for (size_t index = 0; index < A.block_cols.size(); index++) {
 		int start_j = A.domain->getGlobalElement(index * A.block_size);
-        valarray<double> s = A.shift[index];
         for(int local_i=0;local_i<A.block_size*A.num_blocks;local_i+=A.block_size){
 			int start_i = A.range->getGlobalElement(local_i);
 			try {
@@ -746,25 +747,18 @@ ostream& operator<<(ostream& os, const RBMatrix& A) {
 						}
 						if (i == j) {
 							os << i + 1 << ' ' << j + 1 << ' '
-							   << (curr_blk[block_i + A.block_size * block_j] + s[jjj] + 2.0)
+							   << (curr_blk[block_i + A.block_size * block_j] + 2.0)
 							      * curr_block.scale
 							   << "\n";
 						} else {
 							os << i + 1 << ' ' << j + 1 << ' '
-							   << (curr_blk[block_i + A.block_size * block_j] + s[jjj])
+							   << (curr_blk[block_i + A.block_size * block_j])
 							      * curr_block.scale
 							   << "\n";
 						}
 					}
 				}
 			} catch (out_of_range oor) {
-				for (int iii = 0; iii < A.block_size; iii++) {
-					int i       = start_i + iii;
-					for (int jjj = 0; jjj < A.block_size; jjj++) {
-						int j       = start_j + jjj;
-						os << i + 1 << ' ' << j + 1 << ' ' << s[jjj] << "\n";
-					}
-				}
 			}
 		}
 	}

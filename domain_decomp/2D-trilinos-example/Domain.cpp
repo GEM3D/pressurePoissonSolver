@@ -2,6 +2,7 @@
 #include "Domain.h"
 #include "Iface.h"
 #include "FftwSolver.h"
+//#include "FishpackSolver.h"
 using namespace std;
 Domain::Domain(DomainSignature ds, int n)
 {
@@ -277,7 +278,77 @@ double Domain::residual(vector_type &ghost)
 	resid = f - f_comp;
 	return sqrt(pow(f - f_comp, 2).sum());
 }
+double Domain::residual()
+{
+	// integrate in x secton
+	double center, north, east, south, west;
+	// west
+	for (int j = 0; j < n; j++) {
+		west   = boundary_west[j];
+		center = u[j * n];
+		east   = u[j * n + 1];
+		if (neumann && !hasNbr(Side::west)) {
+			f_comp[j * n] = (-h_x * west - center + east) / (h_x * h_x);
+		} else {
+			f_comp[j * n] = (2 * west - 3 * center + east) / (h_x * h_x);
+		}
+	}
+	// middle
+	for (int i = 1; i < n - 1; i++) {
+		for (int j = 0; j < n; j++) {
+			east   = u[j * n + i - 1];
+			center = u[j * n + i];
+			west   = u[j * n + i + 1];
 
+			f_comp[j * n + i] = (west - 2 * center + east) / (h_x * h_x);
+		}
+	}
+	// east
+	for (int j = 0; j < n; j++) {
+		west   = u[j * n + n - 2];
+		center = u[j * n + n - 1];
+		east   = boundary_east[j];
+		if (neumann && !hasNbr(Side::east)) {
+			f_comp[j * n + n - 1] = (west - center + h_x * east) / (h_x * h_x);
+		} else {
+			f_comp[j * n + n - 1] = (west - 3 * center + 2 * east) / (h_x * h_x);
+		}
+	}
+	// south
+	for (int i = 0; i < n; i++) {
+		south  = boundary_south[i];
+		center = u[i];
+		north  = u[n + i];
+		if (neumann && !hasNbr(Side::south)) {
+			f_comp[i] += (-h_y * south - center + north) / (h_y * h_y);
+		} else {
+			f_comp[i] += (2 * south - 3 * center + north) / (h_y * h_y);
+		}
+	}
+	// middle
+	for (int i = 0; i < n; i++) {
+		for (int j = 1; j < n - 1; j++) {
+			south  = u[(j - 1) * n + i];
+			center = u[j * n + i];
+			north  = u[(j + 1) * n + i];
+
+			f_comp[j * n + i] += (south - 2 * center + north) / (h_y * h_y);
+		}
+	}
+	// north
+	for (int i = 0; i < n; i++) {
+		south  = u[(n - 2) * n + i];
+		center = u[(n - 1) * n + i];
+		north  = boundary_north[i];
+		if (neumann && !hasNbr(Side::north)) {
+			f_comp[(n - 1) * n + i] += (south - center + h_y * north) / (h_y * h_y);
+		} else {
+			f_comp[(n - 1) * n + i] += (south - 3 * center + 2 * north) / (h_y * h_y);
+		}
+	}
+	resid = f - f_comp;
+	return sqrt(pow(f - f_comp, 2).sum());
+}
 void Domain::solveWithInterface(const vector_type &gamma)
 {
 	auto vec_ptr  = gamma.getVector(0);
@@ -315,11 +386,11 @@ double Domain::diffNorm(double uavg, double eavg)
 	error = exact - u - eavg + uavg;
 	return sqrt(pow(exact - u - eavg + uavg, 2).sum());
 }
-double Domain::uSum() { return u.sum(); }
+double Domain::integrateU() { return u.sum() * h_x * h_y; }
 double Domain::exactNorm() { return sqrt((exact * exact).sum()); }
 double Domain::fNorm() { return sqrt((f * f).sum()); }
 double Domain::exactNorm(double eavg) { return sqrt(pow(exact - eavg, 2).sum()); }
-double                          Domain::exactSum() { return exact.sum(); }
+double                          Domain::integrateExact() { return exact.sum()*h_x*h_y; }
 valarray<double> Domain::getSide(const Side s) const
 {
 	valarray<double> retval(n);
@@ -739,6 +810,24 @@ void Domain::sumResidIntoSol()
 	boundary_west  = boundary_west_back;
 	f              = f_back;
 	u += u_back;
+}
+double Domain::area() { return x_length * y_length; }
+double Domain::integrateBoundaryFlux()
+{
+	double sum = 0;
+	if (!hasNbr(Side::north)) {
+		sum += boundary_north.sum() * h_x;
+	}
+	if (!hasNbr(Side::east)) {
+		sum -= boundary_east.sum() * h_y;
+	}
+	if (!hasNbr(Side::south)) {
+		sum -= boundary_south.sum() * h_x;
+	}
+	if (!hasNbr(Side::west)) {
+		sum += boundary_west.sum() * h_y;
+	}
+    return sum;
 }
 void Domain::outputClaw(std::ostream &os)
 {

@@ -19,10 +19,10 @@ class DomainCollection
 	private:
 
     bool neumann = false;
+    bool zero_u = false;
 	/**
 	 * @brief A map of domain ids to the domain objects.
 	 */
-	std::map<int, Teuchos::RCP<Domain>> domains;
 	/**
 	 * @brief The MPI communicator used.
 	 */
@@ -68,6 +68,7 @@ class DomainCollection
     std::set<Iface> ifaces;
 
 	public:
+	std::map<int, Teuchos::RCP<Domain>> domains;
 	bool amr = false;
 	double f_mean=0;
 	/**
@@ -151,7 +152,6 @@ class DomainCollection
 	 * @param diff the resulting difference
 	 */
 	void solveWithInterface(const vector_type &gamma, vector_type &diff);
-	void solveWithInterface(const vector_type &gamma);
 
     /**
      * @brief get the difference in flux on refined boundaries
@@ -205,12 +205,12 @@ class DomainCollection
 	/**
 	 * @return sum of computed solution
 	 */
-	double uSum();
+	double integrateU();
 
 	/**
 	 * @return sum of exact solution
 	 */
-	double exactSum();
+	double integrateExact();
 
 	/**
 	 * @return the residual
@@ -218,8 +218,10 @@ class DomainCollection
 	double residual();
 
 	double integrateF();
+	double integrateBoundaryFlux();
+	double area();
 	double integrateAU();
-
+	void   setZeroU() { zero_u = true; }
 	/**
 	 * @brief Form the Schur complement matrix using an RBMatrix
 	 *

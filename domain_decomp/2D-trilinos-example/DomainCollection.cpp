@@ -38,7 +38,7 @@ void DomainCollection::initNeumann(function<double(double, double)> ffun,
                                    function<double(double, double)> nfunx,
                                    function<double(double, double)> nfuny, bool amr)
 {
-    neumann = true;
+	neumann = true;
     this->amr = amr;
 	for (auto &p : domains) {
 		Domain &d        = *p.second;
@@ -362,16 +362,14 @@ void DomainCollection::solveWithInterface(const vector_type &gamma, vector_type 
 	local_gamma.doImport(gamma, importer, Tpetra::CombineMode::INSERT);
 
 	// solve over domains on this proc
-    double usum = 0;
 	for (auto &p : domains) {
         Domain&d = *p.second;
 		d.solveWithInterface(local_gamma);
-		usum += d.u.sum() / pow(d.ds.refine_level, 2);
 	}
 
-    if(neumann){
-        //make avarage of solution be zero
-		double avg = usum / (num_global_domains * n * n);
+	if (neumann && zero_u) {
+		//make avarage of solution be zero
+		double avg = integrateU() / area();
 		for (auto &p : domains) {
 			Domain &d = *p.second;
 			d.u -= avg;
@@ -395,21 +393,6 @@ void DomainCollection::solveWithInterface(const vector_type &gamma, vector_type 
 	// diff.update(-2, gamma, 1);
 	diff.scale(-1);
 }
-void DomainCollection::solveWithInterface(const vector_type &gamma)
-{
-	// auto out = Teuchos::getFancyOStream (Teuchos::rcpFromRef (std::cout));
-	// if(has_east)std::cout << "Gamma begin\n";
-	// gamma.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
-	Tpetra::Import<> importer(gamma.getMap(), collection_map);
-	vector_type      local_gamma(collection_map, 1);
-	local_gamma.doImport(gamma, importer, Tpetra::CombineMode::INSERT);
-
-	// solve over domains on this proc
-	for (auto &p : domains) {
-        Domain&d = *p.second;
-		d.solveWithInterface(local_gamma);
-	}
-}
 double DomainCollection::diffNorm()
 {
 	double result = 0;
@@ -425,14 +408,6 @@ double DomainCollection::diffNorm(double uavg, double eavg)
 		result += pow(p.second->diffNorm(uavg, eavg), 2);
 	}
 	return sqrt(result);
-}
-double DomainCollection::uSum()
-{
-	double result = 0;
-	for (auto &p : domains) {
-		result += p.second->uSum();
-	}
-	return result;
 }
 double DomainCollection::exactNorm()
 {
@@ -459,14 +434,6 @@ double DomainCollection::exactNorm(double eavg)
 		result += pow(p.second->exactNorm(eavg), 2);
 	}
 	return sqrt(result);
-}
-double DomainCollection::exactSum()
-{
-	double result = 0;
-	for (auto &p : domains) {
-		result += p.second->exactSum();
-	}
-	return result;
 }
 double DomainCollection::residual()
 {
@@ -503,6 +470,46 @@ double DomainCollection::integrateF()
 	double sum = 0;
 	for (auto &p : domains) {
 		sum += p.second->integrateF();
+	}
+	double retval;
+	Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &sum, &retval);
+	return retval;
+}
+double DomainCollection::integrateBoundaryFlux()
+{
+	double sum = 0;
+	for (auto &p : domains) {
+		sum += p.second->integrateBoundaryFlux();
+	}
+	double retval;
+	Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &sum, &retval);
+	return retval;
+}
+double DomainCollection::area()
+{
+	double sum = 0;
+	for (auto &p : domains) {
+		sum += p.second->area();
+	}
+	double retval;
+	Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &sum, &retval);
+	return retval;
+}
+double DomainCollection::integrateU()
+{
+	double sum = 0;
+	for (auto &p : domains) {
+		sum += p.second->integrateU();
+	}
+	double retval;
+	Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &sum, &retval);
+	return retval;
+}
+double DomainCollection::integrateExact()
+{
+	double sum = 0;
+	for (auto &p : domains) {
+		sum += p.second->integrateExact();
 	}
 	double retval;
 	Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &sum, &retval);

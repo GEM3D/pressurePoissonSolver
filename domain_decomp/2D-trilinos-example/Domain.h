@@ -54,16 +54,20 @@ class Domain
 	void solve();
 	void putGhostCells(vector_type &ghost);
 	double residual(vector_type &ghost);
+	double residual();
 	void solveWithInterface(const vector_type &gamma);
 	void getDiff(vector_type &diff);
 	double diffNorm();
 	double diffNorm(double uavg, double eavg);
-	double uSum();
+	double integrateU();
 	double exactNorm();
 	double fNorm();
 	double exactNorm(double eavg);
-	double exactSum();
+	double integrateExact();
 	double integrateF() { return f.sum() * h_x * h_y; }
+	double sumBoundaryFlux();
+	double integrateBoundaryFlux();
+	double area();
 	double integrateAU() { return f_comp.sum() * h_x * h_y; }
 	void   swapResidSol();
 	void   sumResidIntoSol();
