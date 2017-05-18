@@ -111,6 +111,8 @@ int main(int argc, char *argv[])
 	                    {"nozero"});
 	args::Flag f_nozerou(parser, "zerou", "don't modify make so that it zeros the solution",
 	                    {"nozerou"});
+	args::Flag f_nozerof(parser, "zerou", "don't modify make so that it zeros the solution",
+	                    {"nozerof"});
 	args::Flag f_lu(parser, "lu", "use LU decomposition", {"lu"});
 	args::Flag f_ilu(parser, "ilu", "use incomplete LU preconditioner", {"ilu"});
 	args::Flag f_iter(parser, "iterative", "use iterative method", {"iterative"});
@@ -218,26 +220,6 @@ int main(int argc, char *argv[])
 	function<double(double, double)> nfunx;
 	function<double(double, double)> nfuny;
 
-	vector<double> xval
-	= {0.07768174089481361, 0.4208838472612919,  0.9473139111796449,  0.5089692183323905,
-	   0.9570464247595821,  0.15905126169737582, 0.11849894156700524, 0.40999270280625555,
-	   0.255893751363913,   0.4596839214805539,  0.48802004339584437, 0.13220719550284032,
-	   0.15010376352950006, 0.6220357288995026,  0.5745530849579297,  0.19647252248155644,
-	   0.22117387776294362, 0.20684448971820446, 0.24214199341522935, 0.7996623718773789};
-
-	vector<double> yval
-	= {0.2626206022801887,  0.5901019591033256, 0.22507728085248468, 0.6589237056448219,
-	   0.16792176055765118, 0.7467770932376991, 0.586093747878745,   0.20084730007838192,
-	   0.2305544870010452,  0.6032035084811954, 0.7616342948448442,  0.07395053135567398,
-	   0.3145108689728848,  0.7994789501256063, 0.31702627032281594, 0.9410740272588111,
-	   0.4335486185679469,  0.8896958913102787, 0.8237038487836723,  0.5312785837478274};
-
-	vector<double> alpha = {
-	57.12450253383478, 99.4615147296493,  55.26433103539979, 92.3500405527951,  87.67509863441407,
-	76.12508998928006, 73.05691678209054, 84.58106997693446, 77.51740813583851, 89.11178685086824,
-	79.61010770157222, 77.8956019831367,  76.6795489632914,  71.36011508633008, 99.5339946457969,
-	59.75741874591391, 77.37272321552643, 91.75611892120241, 85.7168895671343,  68.55489734818805};
-
 	if (f_gauss) {
 		gfun
 		= [](double x, double y) { return exp(cos(10 * M_PIl * x)) - exp(cos(11 * M_PIl * y)); };
@@ -311,11 +293,13 @@ int main(int argc, char *argv[])
 		RCP<Belos::SolverManager<scalar_type, vector_type, Tpetra::Operator<scalar_type>>> solver;
 		Teuchos::ParameterList belosList;
 
-		double fdiff = (dc.integrateBoundaryFlux() - dc.integrateF())/dc.area();
-		cout << "Fdiff: " << fdiff << endl;
-		for (auto &p : dc.domains) {
-			Domain &d = *p.second;
-            d.f+=fdiff;
+		if (!f_nozerof) {
+			double fdiff = (dc.integrateBoundaryFlux() - dc.integrateF()) / dc.area();
+			cout << "Fdiff: " << fdiff << endl;
+			for (auto &p : dc.domains) {
+				Domain &d = *p.second;
+				d.f += fdiff;
+			}
 		}
 		if (dsc.num_global_domains != 1) {
 			// do iterative solve

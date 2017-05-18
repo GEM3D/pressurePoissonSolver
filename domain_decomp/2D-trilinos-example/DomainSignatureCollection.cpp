@@ -3,47 +3,51 @@
 #include <Teuchos_FancyOStream.hpp>
 using namespace std;
 DomainSignatureCollection::DomainSignatureCollection(string file_name, int rank){
-	num_global_interfaces = 0;
-	ifstream mesh(file_name);
-    while(!mesh.eof()){
-        DomainSignature ds;
-		int null, nl, nr, el, er, sl, sr, wl, wr;
-		mesh >> ds.id >> null >> wl >> wr >> er >> el >> sr >> sl >> nl >> nr;
+	this->rank = rank;
+	if (rank == 0) {
+		num_global_interfaces = 0;
+		ifstream mesh(file_name);
+		while (!mesh.eof()) {
+			DomainSignature ds;
+			int             null, nl, nr, el, er, sl, sr, wl, wr;
+			mesh >> ds.id >> null >> wl >> wr >> er >> el >> sr >> sl >> nl >> nr;
 
-        //north
-		ds.nbr(Side::north) = nl;
-		if (nl != nr) {
-			ds.nbrRight(Side::north) = nr;
-            ds.setHasFineNbr(Side::north);
-		}
+			// north
+			ds.nbr(Side::north) = nl;
+			if (nl != nr) {
+				ds.nbrRight(Side::north) = nr;
+				ds.setHasFineNbr(Side::north);
+			}
 
-        //east
-		ds.nbr(Side::east) = el;
-		if (el != er) {
-			ds.nbrRight(Side::east) = er;
-            ds.setHasFineNbr(Side::east);
-		}
+			// east
+			ds.nbr(Side::east) = el;
+			if (el != er) {
+				ds.nbrRight(Side::east) = er;
+				ds.setHasFineNbr(Side::east);
+			}
 
-        //south
-		ds.nbr(Side::south) = sl;
-		if (sl != sr) {
-			ds.nbrRight(Side::south) = sr;
-            ds.setHasFineNbr(Side::south);
-		}
+			// south
+			ds.nbr(Side::south) = sl;
+			if (sl != sr) {
+				ds.nbrRight(Side::south) = sr;
+				ds.setHasFineNbr(Side::south);
+			}
 
-        //west
-		ds.nbr(Side::west) = wl;
-		if (wl != wr) {
-			ds.nbrRight(Side::west) = wr;
-            ds.setHasFineNbr(Side::west);
+			// west
+			ds.nbr(Side::west) = wl;
+			if (wl != wr) {
+				ds.nbrRight(Side::west) = wr;
+				ds.setHasFineNbr(Side::west);
+			}
+			domains[ds.id] = ds;
 		}
-		domains[ds.id] = ds;
+		determineCoarseness();
+		determineAmrLevel();
+		determineXY();
+		num_global_domains = domains.size();
 	}
-    determineCoarseness();
-    determineAmrLevel();
-    determineXY();
-    num_global_domains=domains.size();
-    indexInterfacesBFS();
+		indexInterfacesBFS();
+	MPI_Bcast(&num_global_domains, 1, MPI_INT, 0, MPI_COMM_WORLD);
 }
 void DomainSignatureCollection::determineCoarseness(){
 	set<int>   visited;
@@ -53,7 +57,6 @@ void DomainSignatureCollection::determineCoarseness(){
 	queue.push_back(first);
 	enqueued.insert(first);
 	while (!queue.empty()) {
-        num_global_interfaces++;
 		int              curr = queue.front();
 		DomainSignature &d    = domains.at(curr);
 		queue.pop_front();
@@ -100,7 +103,6 @@ void DomainSignatureCollection::determineAmrLevel(){
 	enqueued.insert(first);
 	int min_level = 1;
 	while (!queue.empty()) {
-        num_global_interfaces++;
 		int              curr = queue.front();
 		DomainSignature &d    = domains.at(curr);
 		int              curr_level = d.refine_level;
@@ -165,7 +167,6 @@ void DomainSignatureCollection::determineXY(){
 	double x_max = 0;
 	double y_max = 0;
 	while (!queue.empty()) {
-		num_global_interfaces++;
 		int              curr = queue.front();
 		DomainSignature &d    = domains.at(curr);
 		queue.pop_front();
@@ -333,6 +334,7 @@ void DomainSignatureCollection::determineXY(){
 }
 DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank)
 {
+	this->rank            = rank;
 	num_global_domains    = d_x * d_y;
 	num_global_interfaces = 0;
 	if (rank == 0) {
@@ -365,11 +367,12 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank)
 			}
 		}
 	}
-    indexInterfacesBFS();
+		indexInterfacesBFS();
 }
 
-DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank,bool amr)
+DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank, bool amr)
 {
+	this->rank            = rank;
 	num_global_domains    = d_x * d_y*5;
 	num_global_interfaces = 0;
 	if (rank == 0) {
@@ -446,19 +449,19 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank,
 			high_nbr.left_of_coarse[3] = true;
 		}
 	}
-    indexInterfacesBFS();
+		indexInterfacesBFS();
 }
 void DomainSignatureCollection::indexInterfacesBFS()
 {
+	int curr_i = 0;
+    if(domains.size()!=0){
 	set<int>   visited;
 	set<int>   enqueued;
 	deque<int> queue;
 	int        first = domains.begin()->first;
 	queue.push_back(first);
 	enqueued.insert(first);
-	int curr_i = 0;
 	while (!queue.empty()) {
-        num_global_interfaces++;
 		int              curr = queue.front();
 		DomainSignature &d    = domains.at(curr);
 		queue.pop_front();
@@ -555,9 +558,19 @@ void DomainSignatureCollection::indexInterfacesBFS()
 			s++;
 		} while (s != Side::north);
 	}
+	}
+	num_global_interfaces = curr_i;
+	matrix_j_low          = 0;
+	matrix_j_high         = num_global_interfaces;
+	MPI_Bcast(&num_global_interfaces, 1, MPI_INT, 0, MPI_COMM_WORLD);
 }
 void DomainSignatureCollection::zoltanBalance()
 {
+	int size;
+    MPI_Comm_size(MPI_COMM_WORLD,&size);
+	matrix_j_low = num_global_interfaces * rank / size;
+	matrix_j_high = num_global_interfaces * (rank + 1) / size;
+    cerr << matrix_j_low << "," << matrix_j_high << "," << rank<<","<<size<< endl;
 	Zoltan *zz = new Zoltan(MPI_COMM_WORLD);
 
 	// parameters

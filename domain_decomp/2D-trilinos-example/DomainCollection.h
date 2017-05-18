@@ -87,6 +87,7 @@ class DomainCollection
 	 * @brief Tpetra map use for interface information.
 	 */
 	Teuchos::RCP<map_type> iface_map;
+	DomainSignatureCollection dsc;
 
 	/**
 	 * @brief Create a DomainCollection from a given DomainSignatureCollection

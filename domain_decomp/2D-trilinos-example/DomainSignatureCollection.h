@@ -72,6 +72,9 @@ struct DomainSignature {
 class DomainSignatureCollection
 {
 	public:
+	int rank;
+	int matrix_j_low;
+	int matrix_j_high;
 	/**
 	 * @brief Number of total domains.
 	 */

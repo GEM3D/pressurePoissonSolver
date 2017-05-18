@@ -22,6 +22,7 @@ DomainCollection::DomainCollection(DomainSignatureCollection dsc, int n,
 	// cerr<< "High: " << high << "\n";
 	this->comm         = comm;
 	this->n            = n;
+    this->dsc = dsc;
 	num_global_domains = dsc.num_global_domains;
 	for (auto p : dsc.domains) {
 		DomainSignature ds       = p.second;
@@ -131,9 +132,7 @@ void DomainCollection::generateMaps()
 	int &       curr_i = num_cols;
 	vector<int> c_iface_global;
 	int         curr_c_i = 0;
-	vector<int> matrix_global;
 	int         curr_matrix_i = 0;
-	vector<int> iface_global;
 	global.reserve(domains.size() * (2 * n + 2 * n));
 	while (!not_visited.empty()) {
 		int first = *not_visited.begin();
@@ -150,14 +149,13 @@ void DomainCollection::generateMaps()
 				if (d.hasNbr(s) && d.index(s) == -1) {
 					// a new edge that we have not assigned an index to
 					d.index(s) = curr_i;
+                    int global_i = d.globalIndex(s);
 					for (int i = 0; i < Iface::size; i++) {
-						c_iface_global.push_back(curr_i*Iface::size + i);
-						iface_global.push_back(curr_i*Iface::size + i);
+						c_iface_global.push_back(global_i*Iface::size + i);
 						curr_c_i++;
 					}
 					for (int i = 0; i < n; i++) {
-						global.push_back(curr_i*n + i);
-						matrix_global.push_back(curr_i*n + i);
+						global.push_back(global_i*n + i);
 						curr_matrix_i++;
 					}
 					curr_i++;
@@ -175,24 +173,20 @@ void DomainCollection::generateMaps()
 						nbr_left.index(!s) = curr_i;
 						for (int i = 0; i < Iface::size; i++) {
 							c_iface_global.push_back(curr_i * Iface::size + i);
-							iface_global.push_back(curr_i * Iface::size + i);
 							curr_c_i++;
 						}
 						for (int i = 0; i < n; i++) {
 							global.push_back(curr_i * n + i);
-							matrix_global.push_back(curr_i * n + i);
 							curr_matrix_i++;
 						}
 						curr_i++;
 						nbr_right.index(!s) = curr_i;
 						for (int i = 0; i < Iface::size; i++) {
 							c_iface_global.push_back(curr_i * Iface::size + i);
-							iface_global.push_back(curr_i * Iface::size + i);
 							curr_c_i++;
 						}
 						for (int i = 0; i < n; i++) {
 							global.push_back(curr_i * n + i);
-							matrix_global.push_back(curr_i * n + i);
 							curr_matrix_i++;
 						}
 						curr_i++;
@@ -213,7 +207,7 @@ void DomainCollection::generateMaps()
 						int buddy_id         = -1;
 						if (d.ds.leftOfCoarse(s)) {
 							Domain &buddy = *domains.at(nbr.nbrRight(!s));
-							buddy_id               = buddy.ds.id;
+							buddy_id      = buddy.ds.id;
 
 							nbr.indexRefinedLeft(!s) = d.index(s);
 
@@ -221,12 +215,10 @@ void DomainCollection::generateMaps()
 							buddy.index(s)            = curr_i;
 							for (int i = 0; i < Iface::size; i++) {
 								c_iface_global.push_back(curr_i * Iface::size + i);
-								iface_global.push_back(curr_i * Iface::size + i);
 								curr_c_i++;
 							}
 							for (int i = 0; i < n; i++) {
 								global.push_back(curr_i * n + i);
-								matrix_global.push_back(curr_i * n + i);
 								curr_matrix_i++;
 							}
 							curr_i++;
@@ -236,12 +228,10 @@ void DomainCollection::generateMaps()
 							buddy.indexCenter(s) = curr_i;
 							for (int i = 0; i < Iface::size; i++) {
 								c_iface_global.push_back(curr_i * Iface::size + i);
-								iface_global.push_back(curr_i * Iface::size + i);
 								curr_c_i++;
 							}
 							for (int i = 0; i < n; i++) {
 								global.push_back(curr_i * n + i);
-								matrix_global.push_back(curr_i * n + i);
 								curr_matrix_i++;
 							}
 							curr_i++;
@@ -255,12 +245,10 @@ void DomainCollection::generateMaps()
 							buddy.index(s)           = curr_i;
 							for (int i = 0; i < Iface::size; i++) {
 								c_iface_global.push_back(curr_i * Iface::size + i);
-								iface_global.push_back(curr_i * Iface::size + i);
 								curr_c_i++;
 							}
 							for (int i = 0; i < n; i++) {
 								global.push_back(curr_i * n + i);
-								matrix_global.push_back(curr_i * n + i);
 								curr_matrix_i++;
 							}
 							curr_i++;
@@ -270,12 +258,10 @@ void DomainCollection::generateMaps()
 							buddy.indexCenter(s) = curr_i;
 							for (int i = 0; i < Iface::size; i++) {
 								c_iface_global.push_back(curr_i * Iface::size + i);
-								iface_global.push_back(curr_i * Iface::size + i);
 								curr_c_i++;
 							}
 							for (int i = 0; i < n; i++) {
 								global.push_back(curr_i * n + i);
-								matrix_global.push_back(curr_i * n + i);
 								curr_matrix_i++;
 							}
 							curr_i++;
@@ -293,12 +279,16 @@ void DomainCollection::generateMaps()
 
 						// normal case
 					} else {
-						Domain &nbr = *domains.at(d.nbr(s));
-						nbr.index(!s)        = d.index(s);
-						// enqueue domain
-						if (enqueued.count(d.nbr(s)) == 0) {
-							queue.push_back(d.nbr(s));
-							enqueued.insert(d.nbr(s));
+						try {
+							Domain &nbr   = *domains.at(d.nbr(s));
+							nbr.index(!s) = d.index(s);
+							// enqueue domain
+							if (enqueued.count(d.nbr(s)) == 0) {
+								queue.push_back(d.nbr(s));
+								enqueued.insert(d.nbr(s));
+							}
+						} catch (out_of_range &oor) {
+                            // do nothing
 						}
 					}
 				}
@@ -306,6 +296,16 @@ void DomainCollection::generateMaps()
 			} while (s != Side::north);
 		}
 	}
+
+	vector<int> matrix_global;
+	vector<int> iface_global;
+	for (int i = n * dsc.matrix_j_low; i < n * dsc.matrix_j_high; i++) {
+		matrix_global.push_back(i);
+	}
+	for (int i = Iface::size * dsc.matrix_j_low; i < Iface::size * dsc.matrix_j_high; i++) {
+		iface_global.push_back(i);
+	}
+
 	// Now that the global indices have been calculated, we can create a map for the interface
 	// points
 	if (num_global_domains == 1) {
@@ -323,6 +323,11 @@ void DomainCollection::generateMaps()
 		iface_map
 		= Teuchos::rcp(new map_type(-1, &iface_global[0], iface_global.size(), 0, this->comm));
 	}
+#ifdef DNDEBUG
+    auto out = Teuchos::getFancyOStream (Teuchos::rcpFromRef (std::cerr));
+    matrix_map->describe(*out);
+    collection_map->describe(*out);
+#endif
 }
 void DomainCollection::distributeIfaceInfo()
 {
