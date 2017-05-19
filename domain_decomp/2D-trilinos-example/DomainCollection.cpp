@@ -134,6 +134,19 @@ void DomainCollection::generateMaps()
 	int         curr_c_i = 0;
 	int         curr_matrix_i = 0;
 	global.reserve(domains.size() * (2 * n + 2 * n));
+	auto addToMap = [&](int curr_i, int global_i) {
+        if(global_i==-1){
+            cerr << "neg global i"<<endl;
+        }
+		for (int i = 0; i < Iface::size; i++) {
+			c_iface_global.push_back(global_i * Iface::size + i);
+			curr_c_i++;
+		}
+		for (int i = 0; i < n; i++) {
+			global.push_back(global_i * n + i);
+			curr_matrix_i++;
+		}
+	};
 	while (!not_visited.empty()) {
 		int first = *not_visited.begin();
 		queue.push_back(first);
@@ -148,135 +161,94 @@ void DomainCollection::generateMaps()
             do{
 				if (d.hasNbr(s) && d.index(s) == -1) {
 					// a new edge that we have not assigned an index to
-					d.index(s) = curr_i;
-                    int global_i = d.globalIndex(s);
-					for (int i = 0; i < Iface::size; i++) {
-						c_iface_global.push_back(global_i*Iface::size + i);
-						curr_c_i++;
-					}
-					for (int i = 0; i < n; i++) {
-						global.push_back(global_i*n + i);
-						curr_matrix_i++;
-					}
-					curr_i++;
+					d.index(s) = curr_i++;
+					addToMap(d.index(s), d.globalIndex(s));
 
 					// fine case
 					if (d.hasFineNbr(s)) {
-						Domain &nbr_left  = *domains.at(d.nbr(s));
-						Domain &nbr_right = *domains.at(d.nbrRight(s));
+						d.indexRefinedLeft(s)  = curr_i++;
+						d.indexRefinedRight(s) = curr_i++;
+						addToMap(d.indexRefinedLeft(s), d.globalIndexRefinedLeft(s));
+						addToMap(d.indexRefinedRight(s), d.globalIndexRefinedRight(s));
 
-						// set center indexes
-						nbr_left.indexCenter(!s)  = d.index(s);
-						nbr_right.indexCenter(!s) = d.index(s);
+						// left
+						try {
+							Domain &nbr_left         = *domains.at(d.nbr(s));
+							nbr_left.index(!s)       = d.indexRefinedLeft(s);
+							nbr_left.indexCenter(!s) = d.index(s);
+							if (enqueued.count(d.nbr(s)) == 0) {
+								queue.push_back(d.nbr(s));
+								enqueued.insert(d.nbr(s));
+							}
+						} catch (out_of_range &oor) {
+							// do nothing
+						}
 
-						// set left and right indexes index
-						nbr_left.index(!s) = curr_i;
-						for (int i = 0; i < Iface::size; i++) {
-							c_iface_global.push_back(curr_i * Iface::size + i);
-							curr_c_i++;
-						}
-						for (int i = 0; i < n; i++) {
-							global.push_back(curr_i * n + i);
-							curr_matrix_i++;
-						}
-						curr_i++;
-						nbr_right.index(!s) = curr_i;
-						for (int i = 0; i < Iface::size; i++) {
-							c_iface_global.push_back(curr_i * Iface::size + i);
-							curr_c_i++;
-						}
-						for (int i = 0; i < n; i++) {
-							global.push_back(curr_i * n + i);
-							curr_matrix_i++;
-						}
-						curr_i++;
-
-						// enqueue domains
-						if (enqueued.count(d.nbr(s)) == 0) {
-							queue.push_back(d.nbr(s));
-							enqueued.insert(d.nbr(s));
-						}
-						if (enqueued.count(d.nbrRight(s)) == 0) {
-							queue.push_back(d.nbrRight(s));
-							enqueued.insert(d.nbrRight(s));
+						// right
+						try {
+							Domain &nbr_right         = *domains.at(d.nbrRight(s));
+							nbr_right.index(!s)       = d.indexRefinedRight(s);
+							nbr_right.indexCenter(!s) = d.index(s);
+							if (enqueued.count(d.nbrRight(s)) == 0) {
+								queue.push_back(d.nbrRight(s));
+								enqueued.insert(d.nbrRight(s));
+							}
+						} catch (out_of_range &oor) {
+							// do nothing
 						}
 						// coarse case
 					} else if (d.hasCoarseNbr(s)) {
-						Domain &nbr = *domains.at(d.nbr(s));
-						nbr.index(!s)        = d.index(s);
-						int buddy_id         = -1;
-						if (d.ds.leftOfCoarse(s)) {
-							Domain &buddy = *domains.at(nbr.nbrRight(!s));
-							buddy_id      = buddy.ds.id;
+						d.indexCenter(s) = curr_i++;
+						addToMap(d.indexCenter(s), d.globalIndexCenter(s));
+                        int other_i = -1;
+						try {
+							Domain &nbr = *domains.at(d.nbr(s));
+							other_i     = curr_i++;
+							if (d.isCoarseLeft(s)) {
+								nbr.indexRefinedLeft(!s)  = d.index(s);
+								nbr.indexRefinedRight(!s) = other_i;
+								addToMap(nbr.indexRefinedRight(!s), nbr.globalIndexRefinedRight(!s));
+							} else {
+								nbr.indexRefinedRight(!s) = d.index(s);
+								nbr.indexRefinedLeft(!s)  = other_i;
+								addToMap(nbr.indexRefinedLeft(!s), nbr.globalIndexRefinedLeft(!s));
+							}
+							nbr.index(!s) = d.indexCenter(s);
 
-							nbr.indexRefinedLeft(!s) = d.index(s);
-
-							nbr.indexRefinedRight(!s) = curr_i;
-							buddy.index(s)            = curr_i;
-							for (int i = 0; i < Iface::size; i++) {
-								c_iface_global.push_back(curr_i * Iface::size + i);
-								curr_c_i++;
+							// enqueue domains
+							if (enqueued.count(nbr.ds.id) == 0) {
+								queue.push_back(nbr.ds.id);
+								enqueued.insert(nbr.ds.id);
 							}
-							for (int i = 0; i < n; i++) {
-								global.push_back(curr_i * n + i);
-								curr_matrix_i++;
-							}
-							curr_i++;
-
-							d.indexCenter(s)     = curr_i;
-							nbr.index(!s)        = curr_i;
-							buddy.indexCenter(s) = curr_i;
-							for (int i = 0; i < Iface::size; i++) {
-								c_iface_global.push_back(curr_i * Iface::size + i);
-								curr_c_i++;
-							}
-							for (int i = 0; i < n; i++) {
-								global.push_back(curr_i * n + i);
-								curr_matrix_i++;
-							}
-							curr_i++;
-						} else {
-							Domain &buddy = *domains.at(nbr.nbr(!s));
-							buddy_id               = buddy.ds.id;
-
-							nbr.indexRefinedRight(!s) = d.index(s);
-
-							nbr.indexRefinedLeft(!s) = curr_i;
-							buddy.index(s)           = curr_i;
-							for (int i = 0; i < Iface::size; i++) {
-								c_iface_global.push_back(curr_i * Iface::size + i);
-								curr_c_i++;
-							}
-							for (int i = 0; i < n; i++) {
-								global.push_back(curr_i * n + i);
-								curr_matrix_i++;
-							}
-							curr_i++;
-
-							d.indexCenter(s)     = curr_i;
-							nbr.index(!s)        = curr_i;
-							buddy.indexCenter(s) = curr_i;
-							for (int i = 0; i < Iface::size; i++) {
-								c_iface_global.push_back(curr_i * Iface::size + i);
-								curr_c_i++;
-							}
-							for (int i = 0; i < n; i++) {
-								global.push_back(curr_i * n + i);
-								curr_matrix_i++;
-							}
-							curr_i++;
+						} catch (out_of_range &oor) {
+							// do nothing
 						}
-
-						// enqueue domains
-						if (enqueued.count(nbr.ds.id) == 0) {
-							queue.push_back(nbr.ds.id);
-							enqueued.insert(nbr.ds.id);
+						try {
+							int nbr_id = -1;
+							if (d.isCoarseLeft(s)) {
+								Side nbr_s = s;
+								nbr_s--;
+								nbr_id = d.nbr(nbr_s);
+							} else {
+								Side nbr_s = s;
+								nbr_s++;
+								nbr_id = d.nbr(nbr_s);
+							}
+							Domain &buddy        = *domains.at(nbr_id);
+							buddy.indexCenter(s) = d.indexCenter(s);
+							if (other_i == -1) {
+								other_i = curr_i++;
+								addToMap(other_i, buddy.globalIndex(s));
+							}
+							buddy.index(s) = other_i;
+							// enqueue domains
+							if (enqueued.count(buddy.ds.id) == 0) {
+								queue.push_back(buddy.ds.id);
+								enqueued.insert(buddy.ds.id);
+							}
+						} catch (out_of_range &oor) {
+							// do nothing
 						}
-						if (enqueued.count(buddy_id) == 0) {
-							queue.push_back(buddy_id);
-							enqueued.insert(buddy_id);
-						}
-
 						// normal case
 					} else {
 						try {
@@ -542,8 +514,8 @@ double DomainCollection::integrateAU()
 }
 RCP<RBMatrix> DomainCollection::formRBMatrix(RCP<map_type> map, int delete_row)
 {
-	RCP<RBMatrix> A = rcp(new RBMatrix(map, n, num_cols));
-    A->skip_index=delete_row;
+	RCP<RBMatrix> A = rcp(new RBMatrix(map, n, dsc.matrix_j_high - dsc.matrix_j_low));
+	A->skip_index=delete_row;
 #if NDEBUG
 	for (Iface i : ifaces) {
 		cerr << i << endl;

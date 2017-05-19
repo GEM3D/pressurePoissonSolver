@@ -37,6 +37,8 @@ class Domain
 	std::valarray<double>  boundary_west_back;
 	std::array<int, 4> local_i        = {-1, -1, -1, -1};
 	std::array<int, 4> local_i_center = {-1, -1, -1, -1};
+	std::array<int, 4> local_i_left = {-1, -1, -1, -1};
+	std::array<int, 4> local_i_right = {-1, -1, -1, -1};
 	Teuchos::RCP<map_type> domain_map;
 	bool                   neumann = false;
 	double                 x_start  = 0;
@@ -124,10 +126,12 @@ class Domain
 		return local_i[static_cast<int>(s)];
 	}
 	inline int &indexCenter(Side s) { return local_i_center[static_cast<int>(s)]; }
-	inline int &indexRefinedLeft(Side s) { return ds.indexRefinedLeft(s); }
-	inline int &indexRefinedRight(Side s) { return ds.indexRefinedRight(s); }
+	inline int &indexRefinedLeft(Side s) { return local_i_left[static_cast<int>(s)]; }
+	inline int &indexRefinedRight(Side s) { return local_i_right[static_cast<int>(s)]; }
 	inline int &globalIndex(Side s) { return ds.index(s); }
 	inline int &globalIndexCenter(Side s) { return ds.indexCenter(s); }
+	inline int &globalIndexRefinedLeft(Side s) { return ds.indexRefinedLeft(s); }
+	inline int &globalIndexRefinedRight(Side s) { return ds.indexRefinedRight(s); }
 	inline int nbr(Side s) { return ds.nbr(s); }
 	inline int nbrRight(Side      s) { return ds.nbrRight(s); }
 	inline std::valarray<double> *getBoundaryPtr(Side s)
@@ -169,7 +173,7 @@ class Domain
 	inline bool hasNbr(Side s) const { return ds.hasNbr(s); }
 	inline bool hasFineNbr(Side s) const { return ds.hasFineNbr(s); }
 	inline bool hasCoarseNbr(Side s) const { return ds.hasCoarseNbr(s); }
-	inline bool isCoarseLeft(const Side s) const { return ds.left_of_coarse[static_cast<int>(s)]; }
+	inline bool isCoarseLeft(const Side s) const { return ds.leftOfCoarse(s); }
 	inline bool leftToRight(Side s)
 	{
 		bool retval = (s == Side::north || s == Side::west);

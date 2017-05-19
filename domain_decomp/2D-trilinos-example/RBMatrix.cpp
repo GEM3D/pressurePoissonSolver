@@ -177,11 +177,9 @@ void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_
 	try{
 		local_i = range_map.at(i);
 	} catch (const out_of_range &oor) {
-		// do nothing
-		// cerr << i << " is mapped to " << curr_local_i << "\n";
 		local_i = curr_local_i;
-		for (int x = i; x <i+ block_size; x++) {
-			global_i.push_back(x);
+		for (int x = 0; x < block_size; ++x) {
+			global_i.push_back(i+x);
 		}
 		curr_local_i += block_size;
 		range_map[i] = local_i;
@@ -247,10 +245,6 @@ void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_
 void RBMatrix::createRangeMap()
 {
 	range = Teuchos::rcp(new map_type(-1, &global_i[0], global_i.size(), 0, domain->getComm()));
-	if (skip_index != -1) {
-		local_skip_i = range->getLocalElement(skip_index);
-		local_skip_j = domain->getLocalElement(skip_index);
-	}
 	auto shift_view = shift_vec->getLocalView<Kokkos::HostSpace>();
 	for (int index = 0; index < num_blocks; index++) {
         valarray<double> s = shift[index];

@@ -293,9 +293,9 @@ int main(int argc, char *argv[])
 		RCP<Belos::SolverManager<scalar_type, vector_type, Tpetra::Operator<scalar_type>>> solver;
 		Teuchos::ParameterList belosList;
 
-		if (!f_nozerof) {
+		if (f_neumann && !f_nozerof) {
 			double fdiff = (dc.integrateBoundaryFlux() - dc.integrateF()) / dc.area();
-			cout << "Fdiff: " << fdiff << endl;
+			if (my_global_rank == 0) cout << "Fdiff: " << fdiff << endl;
 			for (auto &p : dc.domains) {
 				Domain &d = *p.second;
 				d.f += fdiff;
@@ -321,8 +321,8 @@ int main(int argc, char *argv[])
 				steady_clock::time_point form_start = steady_clock::now();
 
 				RBA = dc.formRBMatrix(matrix_map, del);
-                if(f_neumann&&!f_nozerou){
-                    RBA->setZeroU();
+				if (f_neumann && !f_nozerou) {
+					RBA->setZeroU();
                 }
 
 				comm->barrier();
@@ -530,13 +530,15 @@ int main(int argc, char *argv[])
 		double ausum2 = dc.integrateAU();
 		double fsum2  = dc.integrateF();
 		double bflux  = dc.integrateBoundaryFlux();
-		std::cout << u8"Σf-Au: " << fsum2 - ausum2 << endl;
-		std::cout << u8"Σf: " << fsum2 << endl;
-		std::cout << u8"ΣAu: " << ausum2 << endl;
-		if (f_neumann) {
-			std::cout << u8"∮ du/dn: " << bflux << endl;
-			std::cout << u8"∮ du/dn - Σf: " << bflux - fsum2 << endl;
-			std::cout << u8"∮ du/dn - ΣAu: " << bflux - ausum2 << endl;
+		if (my_global_rank == 0) {
+			std::cout << u8"Σf-Au: " << fsum2 - ausum2 << endl;
+			std::cout << u8"Σf: " << fsum2 << endl;
+			std::cout << u8"ΣAu: " << ausum2 << endl;
+			if (f_neumann) {
+				std::cout << u8"∮ du/dn: " << bflux << endl;
+				std::cout << u8"∮ du/dn - Σf: " << bflux - fsum2 << endl;
+				std::cout << u8"∮ du/dn - ΣAu: " << bflux - ausum2 << endl;
+			}
 		}
 		if (f_iter) {
 			dc.residual();

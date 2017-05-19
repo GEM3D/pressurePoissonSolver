@@ -39,12 +39,12 @@ FftwSolver::FftwSolver(Domain *dom)
 	= fftw_plan_r2r_2d(d->n, d->n, &tmp[0], &u[0], y_transform_inv, x_transform_inv, FFTW_MEASURE);
 
 	// create denom vector
-	if (!d->neumann || (!d->hasNbr(Side::north) && !d->hasNbr(Side::south))) {
+	if (d->neumann && (!d->hasNbr(Side::north) && !d->hasNbr(Side::south))) {
 		for (int yi = 0; yi < d->n; yi++) {
 			denom[slice(yi * d->n, d->n, 1)]
 			= -4 / (d->h_x * d->h_x) * pow(sin(yi * M_PI / (2 * d->n)), 2);
 		}
-	} else if (!d->hasNbr(Side::south) || !d->hasNbr(Side::north)) {
+	} else if (d->neumann && (!d->hasNbr(Side::south) || !d->hasNbr(Side::north))) {
 		for (int yi = 0; yi < d->n; yi++) {
 			denom[slice(yi * d->n, d->n, 1)]
 			= -4 / (d->h_x * d->h_x) * pow(sin((yi + 0.5) * M_PI / (2 * d->n)), 2);
@@ -59,12 +59,12 @@ FftwSolver::FftwSolver(Domain *dom)
 	valarray<double> ones(d->n);
 	ones = 1;
 
-	if (!d->neumann || (!d->hasNbr(Side::east) && !d->hasNbr(Side::west))) {
+	if (d->neumann && (!d->hasNbr(Side::east) && !d->hasNbr(Side::west))) {
 		for (int xi = 0; xi < d->n; xi++) {
 			denom[slice(xi, d->n, d->n)]
 			-= 4 / (d->h_y * d->h_y) * pow(sin(xi * M_PI / (2 * d->n)), 2) * ones;
 		}
-	} else if (!d->hasNbr(Side::west) || !d->hasNbr(Side::east)) {
+	} else if (d->neumann && (!d->hasNbr(Side::west) || !d->hasNbr(Side::east))) {
 		for (int xi = 0; xi < d->n; xi++) {
 			denom[slice(xi, d->n, d->n)]
 			-= 4 / (d->h_y * d->h_y) * pow(sin((xi + 0.5) * M_PI / (2 * d->n)), 2) * ones;

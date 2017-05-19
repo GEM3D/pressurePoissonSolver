@@ -134,8 +134,8 @@ class Iface
 						dist_view(iface_i + i + 2, 0) = d.hasFineNbr(s);
 						dist_view(iface_i + i + 3, 0) = d.hasCoarseNbr(s);
 						dist_view(iface_i + i + 4, 0) = d.isCoarseLeft(s);
-						dist_view(iface_i + i + 5, 0) = d.indexRefinedLeft(s);
-						dist_view(iface_i + i + 6, 0) = d.indexRefinedRight(s);
+						dist_view(iface_i + i + 5, 0) = d.globalIndexRefinedLeft(s);
+						dist_view(iface_i + i + 6, 0) = d.globalIndexRefinedRight(s);
 						i += Iface::side_size;
 						s++;
 					} while (s != iface_s);
@@ -155,8 +155,8 @@ class Iface
 						dist_view(iface_i + left_offset + 2, 0) = d.hasFineNbr(iface_s);
 						dist_view(iface_i + left_offset + 3, 0) = d.hasCoarseNbr(iface_s);
 						dist_view(iface_i + left_offset + 4, 0) = d.isCoarseLeft(iface_s);
-						dist_view(iface_i + left_offset + 5, 0) = d.indexRefinedLeft(iface_s);
-						dist_view(iface_i + left_offset + 6, 0) = d.indexRefinedRight(iface_s);
+						dist_view(iface_i + left_offset + 5, 0) = d.globalIndexRefinedLeft(iface_s);
+						dist_view(iface_i + left_offset + 6, 0) = d.globalIndexRefinedRight(iface_s);
 					}
 					Side s = iface_s;
 					s++;
@@ -167,8 +167,8 @@ class Iface
 						dist_view(iface_i + i + 2, 0) = d.hasFineNbr(s);
 						dist_view(iface_i + i + 3, 0) = d.hasCoarseNbr(s);
 						dist_view(iface_i + i + 4, 0) = d.isCoarseLeft(s);
-						dist_view(iface_i + i + 5, 0) = d.indexRefinedLeft(s);
-						dist_view(iface_i + i + 6, 0) = d.indexRefinedRight(s);
+						dist_view(iface_i + i + 5, 0) = d.globalIndexRefinedLeft(s);
+						dist_view(iface_i + i + 6, 0) = d.globalIndexRefinedRight(s);
 						i += Iface::side_size;
 						s++;
 					} while (s != iface_s);
