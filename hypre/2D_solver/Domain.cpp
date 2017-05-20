@@ -218,21 +218,21 @@ void Domain::setMatrixCoeffs(HYPRE_SStructMatrix &A) {
 	vector<array<double, 5>> coeffs;
 	for (int yi = 0; yi < n; yi++) {
 		for (int xi = 0; xi < n; xi++) {
-			if (xi == n - 1 && yi == n - 1) {
+			if (!hasNbr(Side::north)&&!hasNbr(Side::east)&&xi == n - 1 && yi == n - 1) {
 				coeffs.push_back(ne_coeffs);
-			} else if (xi == n - 1 && yi == 0) {
+			} else if (!hasNbr(Side::south)&&!hasNbr(Side::east)&&xi == n - 1 && yi == 0) {
 				coeffs.push_back(se_coeffs);
-			} else if (xi == 0 && yi == 0) {
+			} else if (!hasNbr(Side::south)&&!hasNbr(Side::west)&&xi == 0 && yi == 0) {
 				coeffs.push_back(sw_coeffs);
-			} else if (xi == 0 && yi == n-1) {
+			} else if (!hasNbr(Side::north)&&!hasNbr(Side::west)&&xi == 0 && yi == n-1) {
 				coeffs.push_back(nw_coeffs);
-            }else if(xi==0){
+            }else if(!hasNbr(Side::west)&&xi==0){
 				coeffs.push_back(w_coeffs);
-            }else if(xi==n-1){
+            }else if(!hasNbr(Side::east)&&xi==n-1){
 				coeffs.push_back(e_coeffs);
-            }else if(yi==0){
+            }else if(!hasNbr(Side::south)&&yi==0){
 				coeffs.push_back(s_coeffs);
-            }else if(yi==n-1){
+            }else if(!hasNbr(Side::north)&&yi==n-1){
 				coeffs.push_back(n_coeffs);
 			} else {
 				coeffs.push_back(middle_coeffs);
@@ -246,25 +246,33 @@ void Domain::setMatrixCoeffs(HYPRE_SStructMatrix &A) {
 }
 void Domain::fillRHS(HYPRE_SStructVector &b) {
 	valarray<double> f_copy = f;
-	if (!hasNbr(Side::north) && neumann) {
-		f_copy[slice(n * (n - 1), n, 1)] -= 1 / h_y * boundary_north;
-	} else {
-		f_copy[slice(n * (n - 1), n, 1)] -= 2 / (h_y * h_y) * boundary_north;
+	if (!hasNbr(Side::north)) {
+		if (neumann) {
+			f_copy[slice(n * (n - 1), n, 1)] -= 1 / h_y * boundary_north;
+		} else {
+			f_copy[slice(n * (n - 1), n, 1)] -= 2 / (h_y * h_y) * boundary_north;
+		}
 	}
-	if (!hasNbr(Side::east) && neumann) {
-		f_copy[slice((n - 1), n, n)] -= 1 / h_x * boundary_east;
-	} else {
-		f_copy[slice((n - 1), n, n)] -= 2 / (h_x * h_x) * boundary_east;
+	if (!hasNbr(Side::east)) {
+		if (neumann) {
+			f_copy[slice((n - 1), n, n)] -= 1 / h_x * boundary_east;
+		} else {
+			f_copy[slice((n - 1), n, n)] -= 2 / (h_x * h_x) * boundary_east;
+		}
 	}
-	if (!hasNbr(Side::south) && neumann) {
-		f_copy[slice(0, n, 1)] += 1 / h_y * boundary_south;
-	} else {
-		f_copy[slice(0, n, 1)] -= 2 / (h_y * h_y) * boundary_south;
+	if (!hasNbr(Side::south)) {
+		if (neumann) {
+			f_copy[slice(0, n, 1)] += 1 / h_y * boundary_south;
+		} else {
+			f_copy[slice(0, n, 1)] -= 2 / (h_y * h_y) * boundary_south;
+		}
 	}
-	if (!hasNbr(Side::west) && neumann) {
-		f_copy[slice(0, n, n)] += 1 / h_x * boundary_west;
-	} else {
-		f_copy[slice(0, n, n)] -= 2 / (h_x * h_x) * boundary_west;
+	if (!hasNbr(Side::west)) {
+		if (neumann) {
+			f_copy[slice(0, n, n)] += 1 / h_x * boundary_west;
+		} else {
+			f_copy[slice(0, n, n)] -= 2 / (h_x * h_x) * boundary_west;
+		}
 	}
     int lower[2]={0,0};
     int upper[2]={n-1,n-1};
