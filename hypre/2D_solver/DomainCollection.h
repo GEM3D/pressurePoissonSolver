@@ -23,11 +23,11 @@ class DomainCollection
 	HYPRE_SStructVariable vartypes[1] = {HYPRE_SSTRUCT_VARIABLE_CELL};
 	HYPRE_SStructGraph    graph;
 	HYPRE_SStructStencil  stencil_5pt;
+
+	public:
 	HYPRE_SStructMatrix   A;
 	HYPRE_SStructVector   b;
 	HYPRE_SStructVector   x;
-
-	public:
 	std::map<int, Domain> domains;
 	bool amr = false;
 	double f_mean=0;
@@ -95,7 +95,7 @@ class DomainCollection
 	 * @param gamma the interface values to use
 	 * @param diff the resulting difference
 	 */
-	void solve();
+	void saveResult();
 	void initVectors();
 
 	/**

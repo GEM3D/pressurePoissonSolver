@@ -54,6 +54,7 @@ class Domain
 	double exactNorm(double eavg);
 	double integrateExact();
 	double integrateF() { return f.sum() * h_x * h_y; }
+	double residual();
 	double sumBoundaryFlux();
 	double integrateBoundaryFlux();
 	double area();
@@ -126,5 +127,7 @@ class Domain
 	void fillRHS(HYPRE_SStructVector &b);
 	void fillLHS(HYPRE_SStructVector &x);
 	void saveLHS(HYPRE_SStructVector &x);
+	void saveResid(HYPRE_SStructVector &r);
+	void saveAU(HYPRE_SStructVector &b);
 };
 #endif

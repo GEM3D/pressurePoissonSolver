@@ -1,5 +1,4 @@
 #include "DomainCollection.h"
-#include <HYPRE_krylov.h>
 #include <array>
 #include <fstream>
 #include <tuple>
@@ -150,35 +149,28 @@ void DomainCollection::initVectors()
 	for (auto &p : domains) {
 		Domain &d = p.second;
 		d.fillRHS(b);
-		d.fillLHS(x);
+		//d.fillLHS(x);
 	}
 	HYPRE_SStructVectorAssemble(b);
 	HYPRE_SStructVectorAssemble(x);
 }
-void DomainCollection::solve()
+void DomainCollection::saveResult()
 {
-	HYPRE_SStructSolver solver;
-
-	HYPRE_SStructBiCGSTABCreate(MPI_COMM_WORLD, &solver);
-	HYPRE_BiCGSTABSetMaxIter((HYPRE_Solver) solver, 5000);
-	HYPRE_BiCGSTABSetAbsoluteTol((HYPRE_Solver) solver, 1e-10);
-	HYPRE_BiCGSTABSetPrintLevel((HYPRE_Solver) solver, 3);
-	HYPRE_BiCGSTABSetLogging((HYPRE_Solver) solver, 1);
-
-	HYPRE_SStructBiCGSTABSetup(solver, A, b, x);
-	HYPRE_SStructBiCGSTABSolve(solver, A, b, x);
-
 	for (auto &p : domains) {
 		Domain &d = p.second;
 		d.saveLHS(x);
 	}
 
-	int    num_iterations;
-	double final_res_norm;
-	HYPRE_SStructBiCGSTABGetNumIterations(solver, &num_iterations);
-	HYPRE_SStructBiCGSTABGetFinalRelativeResidualNorm(solver, &final_res_norm);
-
-	HYPRE_SStructBiCGSTABDestroy(solver);
+	HYPRE_SStructMatrixMatvec(-1, A, x, 1, b);
+	for (auto &p : domains) {
+		Domain &d = p.second;
+		d.saveResid(b);
+	}
+	HYPRE_SStructMatrixMatvec(1, A, x, 0, b);
+	for (auto &p : domains) {
+		Domain &d = p.second;
+		d.saveAU(b);
+	}
 }
 double DomainCollection::diffNorm()
 {
@@ -222,8 +214,11 @@ double DomainCollection::exactNorm(double eavg)
 }
 double DomainCollection::residual()
 {
-	// TODO
-	return 0;
+	double result = 0;
+	for (auto &p : domains) {
+		result += pow(p.second.residual(), 2);
+	}
+	return sqrt(result);
 }
 double DomainCollection::integrateF()
 {

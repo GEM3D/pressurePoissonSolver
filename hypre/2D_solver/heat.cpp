@@ -1,6 +1,7 @@
 #include "DomainCollection.h"
 #include "DomainSignatureCollection.h"
 #include "args.h"
+#include <HYPRE_krylov.h>
 #include <chrono>
 #include <cmath>
 #include <iostream>
@@ -74,9 +75,9 @@ int main(int argc, char *argv[])
 	args::Flag f_precata(parser, "prec", "use block diagonal preconditioner", {"precata"});
 	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {"neumann"});
 	args::Flag f_cg(parser, "gmres", "use CG for iterative solver", {"cg"});
-	args::Flag f_gmres(parser, "gmres", "use GMRES for iterative solver", {"gmres"});
-	args::Flag f_lsqr(parser, "gmres", "use GMRES for iterative solver", {"lsqr"});
-	args::Flag f_rgmres(parser, "rgmres", "use GCRO-DR (Recycling GMRES) for iterative solver",
+	args::Flag f_gmres(parser, "gmres", "use BiCGSTAB for iterative solver", {"gmres"});
+	args::Flag f_lsqr(parser, "gmres", "use BiCGSTAB for iterative solver", {"lsqr"});
+	args::Flag f_rgmres(parser, "rgmres", "use GCRO-DR (Recycling BiCGSTAB) for iterative solver",
 	                    {"rgmres"});
 	args::Flag f_bicg(parser, "gmres", "use BiCGStab for iterative solver", {"bicg"});
 	args::Flag f_nozero(parser, "nozero", "don't make the average of vector zero in CG solver",
@@ -228,7 +229,6 @@ int main(int argc, char *argv[])
             dc.amr = f_amr;
 		}
 
-        dc.initVectors();
 
         MPI_Barrier(MPI_COMM_WORLD);
 		steady_clock::time_point domain_stop = steady_clock::now();
@@ -246,8 +246,32 @@ int main(int argc, char *argv[])
 			}
 		}
 
-        dc.solve();
-		dc.residual();
+		//************
+		// SOLVE
+		//************
+		// initialize the x and b vectors
+		dc.initVectors();
+		HYPRE_SStructSolver solver;
+
+		HYPRE_SStructBiCGSTABCreate(MPI_COMM_WORLD, &solver);
+		HYPRE_SStructBiCGSTABSetMaxIter(solver, 5000);
+		HYPRE_SStructBiCGSTABSetTol(solver, tol);
+		HYPRE_SStructBiCGSTABSetPrintLevel(solver, 3);
+		HYPRE_SStructBiCGSTABSetLogging(solver, 1);
+
+		// A, x, and b are stored in the DomainCollection object
+		HYPRE_SStructBiCGSTABSetup(solver, dc.A, dc.b, dc.x);
+		HYPRE_SStructBiCGSTABSolve(solver, dc.A, dc.b, dc.x);
+
+		int    num_iterations;
+		double final_res_norm;
+		HYPRE_SStructBiCGSTABGetNumIterations(solver, &num_iterations);
+		HYPRE_SStructBiCGSTABGetFinalRelativeResidualNorm(solver, &final_res_norm);
+
+		HYPRE_SStructBiCGSTABDestroy(solver);
+
+		// save the result into the domain objects
+		dc.saveResult();
 		double ausum2 = dc.integrateAU();
 		double fsum2  = dc.integrateF();
 		double bflux  = dc.integrateBoundaryFlux();

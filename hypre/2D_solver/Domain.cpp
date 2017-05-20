@@ -42,6 +42,7 @@ Domain::Domain(DomainSignature ds, int n)
 	u      = valarray<double>(n * n);
 	u_back = valarray<double>(n * n);
 	denom  = valarray<double>(n * n);
+	resid  = valarray<double>(n * n);
 
 	boundary_north = valarray<double>(n);
 	boundary_south = valarray<double>(n);
@@ -104,6 +105,7 @@ double Domain::diffNorm(double uavg, double eavg)
 double Domain::integrateU() { return u.sum() * h_x * h_y; }
 double Domain::exactNorm() { return sqrt((exact * exact).sum()); }
 double Domain::fNorm() { return sqrt((f * f).sum()); }
+double Domain::residual() { return sqrt((resid*resid).sum()); }
 double Domain::exactNorm(double eavg) { return sqrt(pow(exact - eavg, 2).sum()); }
 double                          Domain::integrateExact() { return exact.sum()*h_x*h_y; }
 double Domain::area() { return x_length * y_length; }
@@ -154,44 +156,32 @@ void Domain::setGridNbrs(HYPRE_SStructGrid &grid) {
 		int iupper[2]     = {n - 1, n};
 		int nbr_ilower[2] = {0, 0};
 		int nbr_iupper[2] = {n - 1, 0};
-		int ret = HYPRE_SStructGridSetNeighborPart(grid, ds.id, ilower, iupper, nbr(Side::north),
-		                                           nbr_ilower, nbr_iupper, index_map, index_dir);
-		if (ret != 0) {
-			throw std::runtime_error{"HYPRE_SStructGridSetNeighborPart returned: " + ret};
-		}
+		HYPRE_SStructGridSetNeighborPart(grid, ds.id, ilower, iupper, nbr(Side::north), nbr_ilower,
+		                                 nbr_iupper, index_map, index_dir);
 	}
 	if (hasNbr(Side::east)) {
 		int ilower[2]     = {n, 0};
 		int iupper[2]     = {n, n - 1};
 		int nbr_ilower[2] = {0, 0};
 		int nbr_iupper[2] = {0, n - 1};
-		int ret = HYPRE_SStructGridSetNeighborPart(grid, ds.id, ilower, iupper, nbr(Side::east),
-		                                           nbr_ilower, nbr_iupper, index_map, index_dir);
-		if (ret != 0) {
-			throw std::runtime_error{"HYPRE_SStructGridSetNeighborPart returned: " + ret};
-		}
+		HYPRE_SStructGridSetNeighborPart(grid, ds.id, ilower, iupper, nbr(Side::east), nbr_ilower,
+		                                 nbr_iupper, index_map, index_dir);
 	}
 	if (hasNbr(Side::south)) {
 		int ilower[2]     = {0, -1};
 		int iupper[2]     = {n - 1, -1};
 		int nbr_ilower[2] = {0, n - 1};
 		int nbr_iupper[2] = {n - 1, n - 1};
-		int ret = HYPRE_SStructGridSetNeighborPart(grid, ds.id, ilower, iupper, nbr(Side::south),
-		                                           nbr_ilower, nbr_iupper, index_map, index_dir);
-		if (ret != 0) {
-			throw std::runtime_error{"HYPRE_SStructGridSetNeighborPart returned: " + ret};
-		}
+		HYPRE_SStructGridSetNeighborPart(grid, ds.id, ilower, iupper, nbr(Side::south), nbr_ilower,
+		                                 nbr_iupper, index_map, index_dir);
 	}
 	if (hasNbr(Side::west)) {
 		int ilower[2]     = {-1, 0};
 		int iupper[2]     = {-1, n - 1};
 		int nbr_ilower[2] = {n - 1, 0};
 		int nbr_iupper[2] = {n - 1, n - 1};
-		int ret = HYPRE_SStructGridSetNeighborPart(grid, ds.id, ilower, iupper, nbr(Side::west), nbr_ilower,
+		HYPRE_SStructGridSetNeighborPart(grid, ds.id, ilower, iupper, nbr(Side::west), nbr_ilower,
 		                                 nbr_iupper, index_map, index_dir);
-		if (ret != 0) {
-			throw std::runtime_error{"HYPRE_SStructGridSetNeighborPart returned: " + ret};
-        }
 	}
 }
 void Domain::setMatrixCoeffs(HYPRE_SStructMatrix &A) {
@@ -288,4 +278,16 @@ void Domain::saveLHS(HYPRE_SStructVector &x)
 	int lower[2] = {0, 0};
 	int upper[2] = {n-1, n-1};
 	HYPRE_SStructVectorGetBoxValues(x, ds.id, lower, upper, 0, &u[0]);
+}
+void Domain::saveResid(HYPRE_SStructVector &r)
+{
+	int lower[2] = {0, 0};
+	int upper[2] = {n-1, n-1};
+	HYPRE_SStructVectorGetBoxValues(r, ds.id, lower, upper, 0, &resid[0]);
+}
+void Domain::saveAU(HYPRE_SStructVector &b)
+{
+	int lower[2] = {0, 0};
+	int upper[2] = {n-1, n-1};
+	HYPRE_SStructVectorGetBoxValues(b, ds.id, lower, upper, 0, &f_comp[0]);
 }
