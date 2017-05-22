@@ -256,27 +256,39 @@ int main(int argc, char *argv[])
 		// SOLVE
 		//************
 		// initialize the x and b vectors
-        //dc.setSStruct();
+        dc.setParCSR();
         dc.formMatrix();
 		dc.initVectors();
-		HYPRE_SStructSolver solver;
+		HYPRE_Solver solver;
 
-		HYPRE_SStructGMRESCreate(MPI_COMM_WORLD, &solver);
-		HYPRE_SStructGMRESSetMaxIter(solver, maxiter);
-		HYPRE_SStructGMRESSetTol(solver, tol);
-		HYPRE_SStructGMRESSetPrintLevel(solver, 3);
-		HYPRE_SStructGMRESSetLogging(solver, 1);
+		HYPRE_ParCSRGMRESCreate(MPI_COMM_WORLD, &solver);
+		HYPRE_ParCSRGMRESSetMaxIter(solver, maxiter);
+		HYPRE_ParCSRGMRESSetTol(solver, tol);
+		HYPRE_ParCSRGMRESSetPrintLevel(solver, 3);
+		HYPRE_ParCSRGMRESSetLogging(solver, 1);
+
+		// Set the AMG preconditioner parameters
+		HYPRE_Solver precond;
+		HYPRE_BoomerAMGCreate(&precond);
+		HYPRE_BoomerAMGSetStrongThreshold(precond, .25);
+		HYPRE_BoomerAMGSetCoarsenType(precond, 6);
+		HYPRE_BoomerAMGSetTol(precond, 0.0);
+		// HYPRE_BoomerAMGSetPrintLevel(precond, 1);
+		HYPRE_BoomerAMGSetMaxIter(precond, 1);
+
+		// set preconditioner
+		HYPRE_ParCSRGMRESSetPrecond(solver, HYPRE_BoomerAMGSolve, HYPRE_BoomerAMGSetup, precond);
 
 		// A, x, and b are stored in the DomainCollection object
-		HYPRE_SStructGMRESSetup(solver, dc.A, dc.b, dc.x);
-		HYPRE_SStructGMRESSolve(solver, dc.A, dc.b, dc.x);
+		HYPRE_ParCSRGMRESSetup(solver, dc.par_A, dc.par_b, dc.par_x);
+		HYPRE_ParCSRGMRESSolve(solver, dc.par_A, dc.par_b, dc.par_x);
 
 		int    num_iterations;
 		double final_res_norm;
-		HYPRE_SStructGMRESGetNumIterations(solver, &num_iterations);
-		HYPRE_SStructGMRESGetFinalRelativeResidualNorm(solver, &final_res_norm);
+		HYPRE_ParCSRGMRESGetNumIterations(solver, &num_iterations);
+		HYPRE_ParCSRGMRESGetFinalRelativeResidualNorm(solver, &final_res_norm);
 
-		HYPRE_SStructGMRESDestroy(solver);
+		HYPRE_ParCSRGMRESDestroy(solver);
 
 		// save the result into the domain objects
 		dc.saveResult();

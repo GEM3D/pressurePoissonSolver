@@ -187,18 +187,21 @@ void DomainCollection::saveResult()
 		//d.fillExact(x);
 		// d.fillLHS(x);
 	}
-	HYPRE_SStructVectorAssemble(x);
+	///HYPRE_SStructVectorAssemble(x);
 	for (auto &p : domains) {
 		Domain &d = p.second;
 		d.saveLHS(x);
 	}
 
 	HYPRE_SStructMatrixMatvec(-1, A, x, 1, b);
+	HYPRE_SStructVectorGather(b);
+	HYPRE_SStructVectorGather(x);
 	for (auto &p : domains) {
 		Domain &d = p.second;
 		d.saveResid(b);
 	}
 	HYPRE_SStructMatrixMatvec(1, A, x, 0, b);
+	HYPRE_SStructVectorGather(b);
 	for (auto &p : domains) {
 		Domain &d = p.second;
 		d.saveAU(b);
