@@ -151,7 +151,7 @@ void Domain::outputClaw(std::ostream &os)
 void Domain::setGridNbrs(HYPRE_SStructGrid &grid) {
 	int index_map[2] = {0, 1};
 	int index_dir[2] = {1, 1};
-	if (hasNbr(Side::north)) {
+	if (hasNonRefinedNbr(Side::north)) {
 		int ilower[2]     = {0, n};
 		int iupper[2]     = {n - 1, n};
 		int nbr_ilower[2] = {0, 0};
@@ -159,7 +159,7 @@ void Domain::setGridNbrs(HYPRE_SStructGrid &grid) {
 		HYPRE_SStructGridSetNeighborPart(grid, ds.id, ilower, iupper, nbr(Side::north), nbr_ilower,
 		                                 nbr_iupper, index_map, index_dir);
 	}
-	if (hasNbr(Side::east)) {
+	if (hasNonRefinedNbr(Side::east)) {
 		int ilower[2]     = {n, 0};
 		int iupper[2]     = {n, n - 1};
 		int nbr_ilower[2] = {0, 0};
@@ -167,7 +167,7 @@ void Domain::setGridNbrs(HYPRE_SStructGrid &grid) {
 		HYPRE_SStructGridSetNeighborPart(grid, ds.id, ilower, iupper, nbr(Side::east), nbr_ilower,
 		                                 nbr_iupper, index_map, index_dir);
 	}
-	if (hasNbr(Side::south)) {
+	if (hasNonRefinedNbr(Side::south)) {
 		int ilower[2]     = {0, -1};
 		int iupper[2]     = {n - 1, -1};
 		int nbr_ilower[2] = {0, n - 1};
@@ -175,7 +175,7 @@ void Domain::setGridNbrs(HYPRE_SStructGrid &grid) {
 		HYPRE_SStructGridSetNeighborPart(grid, ds.id, ilower, iupper, nbr(Side::south), nbr_ilower,
 		                                 nbr_iupper, index_map, index_dir);
 	}
-	if (hasNbr(Side::west)) {
+	if (hasNonRefinedNbr(Side::west)) {
 		int ilower[2]     = {-1, 0};
 		int iupper[2]     = {-1, n - 1};
 		int nbr_ilower[2] = {n - 1, 0};
@@ -184,57 +184,423 @@ void Domain::setGridNbrs(HYPRE_SStructGrid &grid) {
 		                                 nbr_iupper, index_map, index_dir);
 	}
 }
-void Domain::setMatrixCoeffs(HYPRE_SStructMatrix &A) {
-	// int offsets[][2] = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}};
-	int stencil_indeces[5] = {0, 1, 2, 3, 4};
-	array<double, 5> middle_coeffs = {-2.0 / (h_x * h_x) - 2.0 / (h_y * h_y), 1.0 / (h_x * h_x),
-	                                  1.0 / (h_x * h_x), 1.0 / (h_y * h_y), 1.0 / (h_y * h_y)};
-	array<double, 5> n_coeffs = {-2.0 / (h_x * h_x) - 3.0 / (h_y * h_y), 1.0 / (h_x * h_x),
-	                             1.0 / (h_x * h_x), 1.0 / (h_y * h_y), 0 / (h_y * h_y)};
-	array<double, 5> e_coeffs = {-3.0 / (h_x * h_x) - 2.0 / (h_y * h_y), 1.0 / (h_x * h_x),
-	                             0 / (h_x * h_x), 1.0 / (h_y * h_y), 1.0 / (h_y * h_y)};
-	array<double, 5> s_coeffs = {-2.0 / (h_x * h_x) - 3.0 / (h_y * h_y), 1.0 / (h_x * h_x),
-	                             1.0 / (h_x * h_x), 0 / (h_y * h_y), 1.0 / (h_y * h_y)};
-	array<double, 5> w_coeffs = {-3.0 / (h_x * h_x) - 2.0 / (h_y * h_y), 0 / (h_x * h_x),
-	                             1.0 / (h_x * h_x), 1.0 / (h_y * h_y), 1.0 / (h_y * h_y)};
-	array<double, 5> ne_coeffs = {-3.0 / (h_x * h_x) - 3.0 / (h_y * h_y), 1.0 / (h_x * h_x),
-	                             1.0 / (h_x * h_x), 0 / (h_y * h_y), 0 / (h_y * h_y)};
-	array<double, 5> se_coeffs = {-3.0 / (h_x * h_x) - 3.0 / (h_y * h_y), 1.0 / (h_x * h_x),
-	                             0 / (h_x * h_x), 0 / (h_y * h_y), 1.0 / (h_y * h_y)};
-	array<double, 5> sw_coeffs = {-3.0 / (h_x * h_x) - 3.0 / (h_y * h_y), 0 / (h_x * h_x),
-	                             1.0 / (h_x * h_x), 0 / (h_y * h_y), 1.0 / (h_y * h_y)};
-	array<double, 5> nw_coeffs = {-3.0 / (h_x * h_x) - 3.0 / (h_y * h_y), 0 / (h_x * h_x),
-	                             1.0 / (h_x * h_x), 1.0 / (h_y * h_y), 0 / (h_y * h_y)};
-	vector<array<double, 5>> coeffs;
-	for (int yi = 0; yi < n; yi++) {
-		for (int xi = 0; xi < n; xi++) {
-			if (!hasNbr(Side::north)&&!hasNbr(Side::east)&&xi == n - 1 && yi == n - 1) {
-				coeffs.push_back(ne_coeffs);
-			} else if (!hasNbr(Side::south)&&!hasNbr(Side::east)&&xi == n - 1 && yi == 0) {
-				coeffs.push_back(se_coeffs);
-			} else if (!hasNbr(Side::south)&&!hasNbr(Side::west)&&xi == 0 && yi == 0) {
-				coeffs.push_back(sw_coeffs);
-			} else if (!hasNbr(Side::north)&&!hasNbr(Side::west)&&xi == 0 && yi == n-1) {
-				coeffs.push_back(nw_coeffs);
-            }else if(!hasNbr(Side::west)&&xi==0){
-				coeffs.push_back(w_coeffs);
-            }else if(!hasNbr(Side::east)&&xi==n-1){
-				coeffs.push_back(e_coeffs);
-            }else if(!hasNbr(Side::south)&&yi==0){
-				coeffs.push_back(s_coeffs);
-            }else if(!hasNbr(Side::north)&&yi==n-1){
-				coeffs.push_back(n_coeffs);
-			} else {
-				coeffs.push_back(middle_coeffs);
+void Domain::setAmrStencil(HYPRE_SStructGraph &graph) {
+	if (hasCoarseNbr(Side::west)) {
+        Side s = Side::west;
+        if(isCoarseLeft(s)){
+			// first stencil is special
+			int curr_idx[2] = {0, n - 1};
+			int nbr_idx1[2] = {n - 1, n-3};
+			int nbr_idx2[2] = {n - 1, n-2};
+			int nbr_idx3[2] = {n - 1, n-1};
+			// right
+			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx1, 0);
+			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx2, 0);
+			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx3, 0);
+			curr_idx[1] = n - 2;
+			// left
+			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx1, 0);
+			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx2, 0);
+			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx3, 0);
+			// set rest of entries
+			for (int i = 0; i < n - 2; i++) {
+				curr_idx[1] = i;
+				nbr_idx1[1] = n / 2 + i / 2 - 1;
+				nbr_idx2[1] = n / 2 + i / 2;
+				nbr_idx3[1] = n / 2 + i / 2 + 1;
+				HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx1, 0);
+				HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx2, 0);
+				HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx3, 0);
+
+			}
+        }else{
+			// first stencil is special
+			int curr_idx[2] = {0, 0};
+			int nbr_idx1[2] = {n - 1, 0};
+			int nbr_idx2[2] = {n - 1, 1};
+			int nbr_idx3[2] = {n - 1, 2};
+			// left
+			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx1, 0);
+			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx2, 0);
+			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx3, 0);
+			curr_idx[1] = 1;
+			// right
+			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx1, 0);
+			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx2, 0);
+			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx3, 0);
+			// set rest of entries
+			for (int i = 2; i < n; i++) {
+				curr_idx[1] = i;
+				nbr_idx1[1] = i / 2 - 1;
+				nbr_idx2[1] = i / 2;
+				nbr_idx3[1] = i / 2 + 1;
+				HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx1, 0);
+				HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx2, 0);
+				HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx3, 0);
+
 			}
 		}
 	}
-    int lower[2]={0,0};
-    int upper[2]={n-1,n-1};
-    cerr << coeffs.size() << endl;
-	HYPRE_SStructMatrixSetBoxValues(A, ds.id, lower, upper, 0, 5, stencil_indeces, &coeffs[0][0]);
+	if (hasFineNbr(Side::east)) {
+		Side      s           = Side::east;
+		int       curr_idx[2] = {n - 1, n - 1};
+		int       nbr_idx1[2] = {0, n - 1};
+		int       nbr_idx2[2] = {1, n - 1};
+		const int start_i     = n - 1;
+		for (int i = 0; i < n; i++) {
+			curr_idx[1] = start_i - i / 2;
+			nbr_idx1[1] = start_i - i;
+			nbr_idx2[1] = start_i - i;
+			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx1, 0);
+			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx2, 0);
+		}
+		for (int i = 0; i < n; i++) {
+			curr_idx[1] = start_i - n / 2 - i / 2;
+			nbr_idx1[1] = start_i - i;
+			nbr_idx2[1] = start_i - i;
+			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbrRight(s), nbr_idx1, 0);
+			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbrRight(s), nbr_idx2, 0);
+		}
+		int this_idx[2] = {n - 1, n - 3};
+		curr_idx[1]     = n - 1;
+		// HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, ds.id, this_idx, 0);
+		this_idx[1] = 2;
+		curr_idx[1] = 0;
+		// HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, ds.id, this_idx, 0);
+	}
 }
-void Domain::fillRHS(HYPRE_SStructVector &b) {
+void Domain::setMatrixCoeffs(HYPRE_SStructMatrix &A) {
+	// south
+	{
+		// int offsets[][2] = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+		int stencil_indeces[3] = {0, 3, 4};
+		vector<array<double, 3>> coeffs;
+		array<double, 3>         this_coeffs;
+		if (hasNbr(Side::south)) {
+			this_coeffs[0] = -2.0 / (h_y * h_y);
+			this_coeffs[1] = 1.0 / (h_y * h_y);
+			this_coeffs[2] = 1.0 / (h_y * h_y);
+		} else {
+			this_coeffs[0] = -3.0 / (h_y * h_y);
+			this_coeffs[1] = 0;
+			this_coeffs[2] = 1.0 / (h_y * h_y);
+		}
+		for (int xi = 0; xi < n; xi++) {
+			coeffs.push_back(this_coeffs);
+		}
+		int lower[2] = {0, 0};
+		int upper[2] = {n - 1, 0};
+		HYPRE_SStructMatrixAddToBoxValues(A, ds.id, lower, upper, 0, 3, stencil_indeces,
+		                                  &coeffs[0][0]);
+	}
+	//middle
+	{
+		// int offsets[][2] = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+		int stencil_indeces[3] = {0, 3, 4};
+		vector<array<double, 3>> coeffs;
+		array<double, 3>         this_coeffs;
+		this_coeffs[0] = -2.0 / (h_y * h_y);
+		this_coeffs[1] = 1.0 / (h_y * h_y);
+		this_coeffs[2] = 1.0 / (h_y * h_y);
+		for (int yi = 1; yi < n - 1; yi++) {
+			for (int xi = 0; xi < n; xi++) {
+				coeffs.push_back(this_coeffs);
+			}
+		}
+		int lower[2] = {0, 1};
+		int upper[2] = {n - 1, n - 2};
+		HYPRE_SStructMatrixAddToBoxValues(A, ds.id, lower, upper, 0, 3, stencil_indeces,
+		                                  &coeffs[0][0]);
+	}
+	// north
+	{
+		// int offsets[][2] = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+		int stencil_indeces[3] = {0, 3, 4};
+		vector<array<double, 3>> coeffs;
+		array<double, 3>         this_coeffs;
+		if (hasNbr(Side::north)) {
+			this_coeffs[0] = -2.0 / (h_y * h_y);
+			this_coeffs[1] = 1.0 / (h_y * h_y);
+			this_coeffs[2] = 1.0 / (h_y * h_y);
+		} else {
+			this_coeffs[0] = -3.0 / (h_y * h_y);
+			this_coeffs[1] = 1.0 / (h_y * h_y);
+			this_coeffs[2] = 0;
+		}
+		for (int xi = 0; xi < n; xi++) {
+			coeffs.push_back(this_coeffs);
+		}
+		int lower[2] = {0, n-1};
+		int upper[2] = {n - 1, n-1};
+		HYPRE_SStructMatrixAddToBoxValues(A, ds.id, lower, upper, 0, 3, stencil_indeces,
+		                                  &coeffs[0][0]);
+	}
+	// west
+	{
+		// int offsets[][2] = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+		if (hasCoarseNbr(Side::west)) {
+			if (isCoarseLeft(Side::west)) {
+				int stencil_indeces[3] = {0, 1, 2};
+				int off_stencil_indeces[3] = {5, 6, 7};
+				vector<array<double, 3>> coeffs;
+				vector<array<double, 3>> off_coeffs;
+				array<double, 3>         this_coeffs_l;
+				array<double, 3>         off_this_coeffs_l;
+				this_coeffs_l[0] = -4.0 / 3.0 / (h_x * h_x);
+				this_coeffs_l[1] = 0;
+				this_coeffs_l[2] =4.0 / 5.0 / (h_x * h_x);
+				off_this_coeffs_l[0] = 1.0 / 12.0 / (h_x * h_x);
+				off_this_coeffs_l[1] = 1.0 / 2.0 / (h_x * h_x);
+				off_this_coeffs_l[2] = -1.0 / 20.0 / (h_x * h_x);
+				array<double, 3> this_coeffs_r;
+				array<double, 3> off_this_coeffs_r;
+				this_coeffs_r[0] = -4.0 / 3.0 / (h_x * h_x);
+				this_coeffs_r[1] = 0;
+				this_coeffs_r[2] = 4.0 / 5.0 / (h_x * h_x);
+				off_this_coeffs_r[0] = -1.0 / 20.0 / (h_x * h_x);
+				off_this_coeffs_r[1] = 1.0 / 2.0 / (h_x * h_x);
+				off_this_coeffs_r[2] = 1.0 / 12.0 / (h_x * h_x);
+				for (int yi = 0; yi < n/2; yi++) {
+					coeffs.push_back(this_coeffs_l);
+					coeffs.push_back(this_coeffs_r);
+					off_coeffs.push_back(off_this_coeffs_l);
+					off_coeffs.push_back(off_this_coeffs_r);
+				}
+				int lower[2] = {0, 0};
+				int upper[2] = {0, n - 3};
+				HYPRE_SStructMatrixAddToBoxValues(A, ds.id, lower, upper, 0, 3, stencil_indeces,
+				                                  &coeffs[0][0]);
+				HYPRE_SStructMatrixAddToBoxValues(A, ds.id, lower, upper, 0, 3, off_stencil_indeces,
+				                                  &off_coeffs[0][0]);
+				array<double, 3> this_coeffs_uu;
+				array<double, 3> off_this_coeffs_uu;
+				this_coeffs_uu[0] = -4.0 / 3.0 / (h_x * h_x);
+				this_coeffs_uu[1] = 0;
+				this_coeffs_uu[2] = 4.0 / 5.0 / (h_x * h_x);
+				off_this_coeffs_uu[0] = 7.0 / 20.0 / (h_x * h_x);
+				off_this_coeffs_uu[1] = 7.0 / 30.0 / (h_x * h_x);
+				off_this_coeffs_uu[2] = -1.0 / 20.0 / (h_x * h_x);
+				int uu_idx[2]     = {0, n - 1};
+				HYPRE_SStructMatrixAddToValues(A, ds.id, uu_idx, 0, 3, stencil_indeces,
+				                               &this_coeffs_uu[0]);
+				HYPRE_SStructMatrixAddToValues(A, ds.id, uu_idx, 0, 3, off_stencil_indeces,
+				                               &off_this_coeffs_uu[0]);
+				array<double, 3> this_coeffs_ul;
+				array<double, 3> off_this_coeffs_ul;
+				this_coeffs_ul[0] = -4.0 / 3.0 / (h_x * h_x);
+				this_coeffs_ul[1] = 4.0 / 5.0 / (h_x * h_x);
+				this_coeffs_ul[2] = 0;
+				off_this_coeffs_ul[0] = 3.0 / 4.0 / (h_x * h_x);
+				off_this_coeffs_ul[1] = -3.0 / 10.0 / (h_x * h_x);
+				off_this_coeffs_ul[2] = 1.0 / 12.0 / (h_x * h_x);
+				int ul_idx[2]     = {0, n - 2};
+				HYPRE_SStructMatrixAddToValues(A, ds.id, ul_idx, 0, 3, stencil_indeces,
+				                               &this_coeffs_ul[0]);
+				HYPRE_SStructMatrixAddToValues(A, ds.id, ul_idx, 0, 3, off_stencil_indeces,
+				                               &off_this_coeffs_ul[0]);
+
+			} else {
+                //stencil
+				{
+					// int offsets[][2] = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+					int stencil_indeces[3] = {0, 1, 2};
+					vector<array<double, 3>> coeffs;
+					array<double, 3>         this_coeffs_l;
+					this_coeffs_l[0] = -4.0 / 3.0 / (h_x * h_x);
+					this_coeffs_l[1] = 0;
+					this_coeffs_l[2] = 4.0 / 5.0 / (h_x * h_x);
+					array<double, 3> this_coeffs_r;
+					this_coeffs_r[0] = -4.0 / 3.0 / (h_x * h_x);
+					this_coeffs_r[1] = 0;
+					this_coeffs_r[2] = 4.0 / 5.0 / (h_x * h_x);
+					for (int yi = 0; yi < n / 2; yi++) {
+						coeffs.push_back(this_coeffs_l);
+						coeffs.push_back(this_coeffs_r);
+					}
+					int lower[2] = {0, 2};
+					int upper[2] = {0, n - 1};
+					HYPRE_SStructMatrixAddToBoxValues(A, ds.id, lower, upper, 0, 3, stencil_indeces,
+					                                  &coeffs[0][0]);
+					array<double, 3> this_coeffs_lu;
+					this_coeffs_lu[0] = -4.0 / 3.0 / (h_x * h_x);
+					this_coeffs_lu[1] = 0;
+					this_coeffs_lu[2] = 4.0 / 5.0 / (h_x * h_x);
+					int lu_idx[2]     = {0, 1};
+					HYPRE_SStructMatrixAddToValues(A, ds.id, lu_idx, 0, 3, stencil_indeces,
+					                               &this_coeffs_lu[0]);
+					array<double, 3> this_coeffs_ll;
+					this_coeffs_ll[0] = -4.0 / 3.0 / (h_x * h_x);
+					this_coeffs_ll[1] = 0;
+					this_coeffs_ll[2] = 4.0 / 5.0 / (h_x * h_x);
+					int ll_idx[2]     = {0, 0};
+					HYPRE_SStructMatrixAddToValues(A, ds.id, ll_idx, 0, 3, stencil_indeces,
+					                               &this_coeffs_ll[0]);
+				}
+                //off stencil
+				{
+					// int offsets[][2] = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+					int stencil_indeces[3] = {5, 6, 7};
+					vector<array<double, 3>> coeffs;
+					array<double, 3>         this_coeffs_l;
+					this_coeffs_l[0] = 1.0 / 12.0 / (h_x * h_x);
+					this_coeffs_l[1] = 1.0 / 2.0 / (h_x * h_x);
+					this_coeffs_l[2] = -1.0 / 20.0 / (h_x * h_x);
+					array<double, 3> this_coeffs_r;
+					this_coeffs_r[0] = -1.0 / 20.0 / (h_x * h_x);
+					this_coeffs_r[1] = 1.0 / 2.0 / (h_x * h_x);
+					this_coeffs_r[2] = 1.0 / 12.0 / (h_x * h_x);
+					for (int yi = 0; yi < n / 2; yi++) {
+						coeffs.push_back(this_coeffs_l);
+						coeffs.push_back(this_coeffs_r);
+					}
+					int lower[2] = {0, 2};
+					int upper[2] = {0, n - 1};
+					HYPRE_SStructMatrixAddToBoxValues(A, ds.id, lower, upper, 0, 3, stencil_indeces,
+					                                  &coeffs[0][0]);
+					array<double, 3> this_coeffs_lu;
+					this_coeffs_lu[1] = 7.0 / 20.0 / (h_x * h_x);
+					this_coeffs_lu[2] = 7.0 / 30.0 / (h_x * h_x);
+					this_coeffs_lu[3] = -1.0 / 20.0 / (h_x * h_x);
+					int lu_idx[2]     = {0, 1};
+					HYPRE_SStructMatrixAddToValues(A, ds.id, lu_idx, 0, 3, stencil_indeces,
+					                               &this_coeffs_lu[0]);
+					array<double, 3> this_coeffs_ll;
+					this_coeffs_ll[1] = 3.0 / 4.0 / (h_x * h_x);
+					this_coeffs_ll[2] = -3.0 / 10.0 / (h_x * h_x);
+					this_coeffs_ll[3] = 1.0 / 12.0 / (h_x * h_x);
+					int ll_idx[2]     = {0, 0};
+					HYPRE_SStructMatrixAddToValues(A, ds.id, ll_idx, 0, 3, stencil_indeces,
+					                               &this_coeffs_ll[0]);
+                }
+			}
+		} else {
+			int stencil_indeces[3] = {0, 1, 2};
+			vector<array<double, 3>> coeffs;
+			array<double, 3>         this_coeffs;
+			if (hasCoarseNbr(Side::west)) {
+				this_coeffs[0] = -1.0 / (h_x * h_x);
+				this_coeffs[1] = 0;
+				this_coeffs[2] = 1.0 / (h_x * h_x);
+			} else if (hasNbr(Side::west)) {
+				this_coeffs[0] = -2.0 / (h_x * h_x);
+				this_coeffs[1] = 1.0 / (h_x * h_x);
+				this_coeffs[2] = 1.0 / (h_x * h_x);
+			} else {
+				this_coeffs[0] = -3.0 / (h_x * h_x);
+				this_coeffs[1] = 0;
+				this_coeffs[2] = 1.0 / (h_x * h_x);
+			}
+			for (int yi = 0; yi < n; yi++) {
+				coeffs.push_back(this_coeffs);
+			}
+			int lower[2] = {0, 0};
+			int upper[2] = {0, n - 1};
+			HYPRE_SStructMatrixAddToBoxValues(A, ds.id, lower, upper, 0, 3, stencil_indeces,
+			                                  &coeffs[0][0]);
+		}
+	}
+	// middle
+	{
+		// int offsets[][2] = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+		int stencil_indeces[3] = {0, 1, 2};
+		vector<array<double, 3>> coeffs;
+		array<double, 3>         this_coeffs;
+		this_coeffs[0] = -2.0 / (h_x * h_x);
+		this_coeffs[1] = 1.0 / (h_x * h_x);
+		this_coeffs[2] = 1.0 / (h_x * h_x);
+		for (int yi = 0; yi < n; yi++) {
+			for (int xi = 1; xi < n - 1; xi++) {
+				coeffs.push_back(this_coeffs);
+			}
+		}
+		int lower[2] = {1, 0};
+		int upper[2] = {n - 2, n - 1};
+		HYPRE_SStructMatrixAddToBoxValues(A, ds.id, lower, upper, 0, 3, stencil_indeces,
+		                                  &coeffs[0][0]);
+	}
+	// east
+	{
+		// int offsets[][2] = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+		if (hasFineNbr(Side::east)) {
+			int stencil_indeces[5] = {0, 1, 2, 3, 4};
+			int off_stencil_indeces[4] = {5, 6, 7, 8};
+			vector<array<double, 5>> coeffs;
+			vector<array<double, 4>> off_coeffs;
+			array<double, 5> this_coeffs;
+			array<double, 4> off_this_coeffs;
+			this_coeffs[0] = -2.0 / (h_x * h_x);
+			this_coeffs[1] = 1.0 / (h_x * h_x);
+			this_coeffs[2] = 0;
+			this_coeffs[3] = -1.0 / 30.0 / (h_x * h_x);
+			this_coeffs[4] = -1.0 / 30.0 / (h_x * h_x);
+			off_this_coeffs[0] = 1.0 / 3.0 / (h_x * h_x);
+			off_this_coeffs[1] = 1.0 / 5.0 / (h_x * h_x);
+			off_this_coeffs[2] = 1.0 / 3.0 / (h_x * h_x);
+			off_this_coeffs[3] = 1.0 / 5.0 / (h_x * h_x);
+			for (int yi = 0; yi < n; yi++) {
+				coeffs.push_back(this_coeffs);
+				off_coeffs.push_back(off_this_coeffs);
+            }
+			int lower[2] = {n - 1, 0};
+			int upper[2] = {n - 1, n - 1};
+			HYPRE_SStructMatrixAddToBoxValues(A, ds.id, lower, upper, 0, 5, stencil_indeces,
+			                                  &coeffs[0][0]);
+			HYPRE_SStructMatrixAddToBoxValues(A, ds.id, lower, upper, 0, 4, off_stencil_indeces,
+			                                  &off_coeffs[0][0]);
+			/*int left_idx[2]    = {n - 1, n - 1};
+			stencil_indeces[3] = 3;
+			stencil_indeces[4] = 9;
+			HYPRE_SStructMatrixAddToValues(A, ds.id, left_idx, 0, 9, stencil_indeces,
+			                               &this_coeffs[0]);
+			stencil_indeces[3] = 4;
+			stencil_indeces[4] = 9;
+			array<double, 9> this_coeffs_r;
+			int stencil_indeces_r[8] = {0, 4, 9, 5, 6, 7, 8, 1};
+			this_coeffs_r[0] = -11.0 / 10.0 / (h_x * h_x);
+			this_coeffs_r[1] = -14.0/15.0 / (h_x * h_x);
+			this_coeffs_r[2] = 0;
+			this_coeffs_r[3] = -1.0 / 30.0 / (h_x * h_x);
+			this_coeffs_r[4]         = 7.0 / 3.0 / (h_x * h_x);
+			this_coeffs_r[5] = -4.0 / 5.0 / (h_x * h_x);
+			this_coeffs_r[6] = 7.0 / 3.0 / (h_x * h_x);
+			this_coeffs_r[7] = -4.0 / 5.0 / (h_x * h_x);
+			this_coeffs_r[8] = 1.0 / (h_x * h_x);
+
+			int right_idx[2]   = {n - 1, 0};
+			HYPRE_SStructMatrixAddToValues(A, ds.id, right_idx, 0, 9, stencil_indeces_r,
+			                               &this_coeffs_r[0]);
+                                           */
+
+		} else {
+			int stencil_indeces[3] = {0, 1, 2};
+			vector<array<double, 3>> coeffs;
+			array<double, 3>         this_coeffs;
+			if (hasFineNbr(Side::east)) {
+				this_coeffs[0] = -1.0 / (h_x * h_x);
+				this_coeffs[1] = 1.0 / (h_x * h_x);
+				this_coeffs[2] = 0;
+            }else
+			if (hasNbr(Side::east)) {
+				this_coeffs[0] = -2.0 / (h_x * h_x);
+				this_coeffs[1] = 1.0 / (h_x * h_x);
+				this_coeffs[2] = 1.0 / (h_x * h_x);
+			} else {
+				this_coeffs[0] = -3.0 / (h_x * h_x);
+				this_coeffs[1] = 1.0 / (h_x * h_x);
+				this_coeffs[2] = 0;
+			}
+			for (int yi = 0; yi < n; yi++) {
+				coeffs.push_back(this_coeffs);
+			}
+			int lower[2] = {n - 1, 0};
+			int upper[2] = {n - 1, n - 1};
+			HYPRE_SStructMatrixAddToBoxValues(A, ds.id, lower, upper, 0, 3, stencil_indeces,
+			                                  &coeffs[0][0]);
+		}
+	}
+}
+void Domain::fillRHS(HYPRE_SStructVector &b)
+{
 	valarray<double> f_copy = f;
 	if (!hasNbr(Side::north)) {
 		if (neumann) {
@@ -272,6 +638,11 @@ void Domain::fillLHS(HYPRE_SStructVector &x) {
 	int lower[2] = {0, 0};
 	int upper[2] = {n-1, n-1};
 	HYPRE_SStructVectorSetBoxValues(x, ds.id, lower, upper, 0, &u[0]);
+}
+void Domain::fillExact(HYPRE_SStructVector &x) {
+	int lower[2] = {0, 0};
+	int upper[2] = {n-1, n-1};
+	HYPRE_SStructVectorSetBoxValues(x, ds.id, lower, upper, 0, &exact[0]);
 }
 void Domain::saveLHS(HYPRE_SStructVector &x)
 {

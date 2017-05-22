@@ -112,6 +112,10 @@ class Domain
 		return retval;
 	}
 	inline bool hasNbr(Side s) const { return ds.hasNbr(s); }
+	inline bool hasNonRefinedNbr(Side s) const
+	{
+		return ds.hasNbr(s) && !hasCoarseNbr(s) && !hasFineNbr(s);
+	}
 	inline bool hasFineNbr(Side s) const { return ds.hasFineNbr(s); }
 	inline bool hasCoarseNbr(Side s) const { return ds.hasCoarseNbr(s); }
 	inline bool isCoarseLeft(const Side s) const { return ds.leftOfCoarse(s); }
@@ -123,9 +127,11 @@ class Domain
 	void outputClaw(std::ostream &os);
 	void setGridNbrs(HYPRE_SStructGrid &grid);
 	void setStencils(HYPRE_SStructMatrix &A);
+	void setAmrStencil(HYPRE_SStructGraph &graph);
 	void setMatrixCoeffs(HYPRE_SStructMatrix &A);
 	void fillRHS(HYPRE_SStructVector &b);
 	void fillLHS(HYPRE_SStructVector &x);
+	void fillExact(HYPRE_SStructVector &x);
 	void saveLHS(HYPRE_SStructVector &x);
 	void saveResid(HYPRE_SStructVector &r);
 	void saveAU(HYPRE_SStructVector &b);

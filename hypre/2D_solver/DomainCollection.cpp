@@ -48,22 +48,6 @@ DomainCollection::DomainCollection(DomainSignatureCollection dsc, int n)
 	for (int entry = 0; entry < 5; ++entry) {
 		HYPRE_SStructStencilSetEntry(stencil_5pt, entry, offsets[entry],0);
 	}
-
-	// graph
-	HYPRE_SStructGraphCreate(MPI_COMM_WORLD, grid, &graph);
-	for (int i = 0; i < num_global_domains; i++) {
-		HYPRE_SStructGraphSetStencil(graph, i, 0, stencil_5pt);
-	}
-	HYPRE_SStructGraphAssemble(graph);
-    
-    //Matrix
-    HYPRE_SStructMatrixCreate(MPI_COMM_WORLD,graph,&A);
-    HYPRE_SStructMatrixInitialize(A);
-	for (auto &p : domains) {
-		Domain &d = p.second;
-		d.setMatrixCoeffs(A);
-	}
-	HYPRE_SStructMatrixAssemble(A);
 }
 
 void DomainCollection::initNeumann(function<double(double, double)> ffun,
@@ -140,10 +124,46 @@ void DomainCollection::initDirichlet(function<double(double, double)> ffun,
 		}
 	}
 }
+void DomainCollection::formMatrix()
+{
+	// graph
+	HYPRE_SStructGraphCreate(MPI_COMM_WORLD, grid, &graph);
+	if (use_parcsr) {
+		HYPRE_SStructGraphSetObjectType(graph, HYPRE_PARCSR);
+	}
+	for (int i = 0; i < num_global_domains; i++) {
+		HYPRE_SStructGraphSetStencil(graph, i, 0, stencil_5pt);
+	}
+    // add amr stencil entries
+	for (auto &p : domains) {
+		Domain &d        = p.second;
+        d.setAmrStencil(graph);
+    }
+	HYPRE_SStructGraphAssemble(graph);
+
+
+	HYPRE_SStructMatrixCreate(MPI_COMM_WORLD, graph, &A);
+	if (use_parcsr) {
+		HYPRE_SStructMatrixSetObjectType(A, HYPRE_PARCSR);
+	}
+	HYPRE_SStructMatrixInitialize(A);
+	for (auto &p : domains) {
+		Domain &d = p.second;
+		d.setMatrixCoeffs(A);
+	}
+	HYPRE_SStructMatrixAssemble(A);
+	if (use_parcsr) {
+		HYPRE_SStructMatrixGetObject(A, (void **) &par_A);
+	}
+}
 void DomainCollection::initVectors()
 {
 	HYPRE_SStructVectorCreate(MPI_COMM_WORLD, grid, &b);
 	HYPRE_SStructVectorCreate(MPI_COMM_WORLD, grid, &x);
+	if (use_parcsr) {
+		HYPRE_SStructVectorSetObjectType(b, HYPRE_PARCSR);
+		HYPRE_SStructVectorSetObjectType(x, HYPRE_PARCSR);
+	}
 	HYPRE_SStructVectorInitialize(b);
 	HYPRE_SStructVectorInitialize(x);
 	for (auto &p : domains) {
@@ -153,9 +173,19 @@ void DomainCollection::initVectors()
 	}
 	HYPRE_SStructVectorAssemble(b);
 	HYPRE_SStructVectorAssemble(x);
+	if (use_parcsr) {
+		HYPRE_SStructVectorGetObject(b, (void **) &par_b);
+		HYPRE_SStructVectorGetObject(x, (void **) &par_x);
+	}
 }
 void DomainCollection::saveResult()
 {
+	for (auto &p : domains) {
+		Domain &d = p.second;
+		//d.fillExact(x);
+		// d.fillLHS(x);
+	}
+	HYPRE_SStructVectorAssemble(x);
 	for (auto &p : domains) {
 		Domain &d = p.second;
 		d.saveLHS(x);

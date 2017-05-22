@@ -18,7 +18,8 @@ class DomainCollection
 	private:
 	int                   n;
 	int                   num_global_domains;
-	bool                  neumann;
+	bool                  neumann    = false;
+	bool                  use_parcsr = false;
 	HYPRE_SStructGrid     grid;
 	HYPRE_SStructVariable vartypes[1] = {HYPRE_SSTRUCT_VARIABLE_CELL};
 	HYPRE_SStructGraph    graph;
@@ -28,6 +29,9 @@ class DomainCollection
 	HYPRE_SStructMatrix   A;
 	HYPRE_SStructVector   b;
 	HYPRE_SStructVector   x;
+	HYPRE_ParCSRMatrix    par_A;
+	HYPRE_ParVector       par_b;
+	HYPRE_ParVector       par_x;
 	std::map<int, Domain> domains;
 	bool amr = false;
 	double f_mean=0;
@@ -97,6 +101,7 @@ class DomainCollection
 	 */
 	void saveResult();
 	void initVectors();
+	void formMatrix();
 
 	/**
 	 * @return norm of difference of exact and computed solution
@@ -164,5 +169,6 @@ class DomainCollection
     }
 	void outputClaw();
 	int  getGlobalNumCells() { return num_global_domains * n * n; }
+	void setParCSR() { use_parcsr = true; }
 };
 #endif

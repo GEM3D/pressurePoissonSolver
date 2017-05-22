@@ -35,6 +35,8 @@ int main(int argc, char *argv[])
 
 	args::ValueFlag<int> f_n(parser, "n", "number of cells in the x direction, in each domain",
 	                          {'n'});
+	args::ValueFlag<int> f_maxiter(
+	parser, "maxiter", "number of cells in the x direction, in each domain", {"maxiter"});
 	args::ValueFlag<string> f_mesh(parser, "file_name", "read in a mesh", {"mesh"});
 	args::ValueFlag<int> f_square(
 	parser, "num_domains", "create a num_domains x num_domains square of grids", {"square"});
@@ -75,9 +77,9 @@ int main(int argc, char *argv[])
 	args::Flag f_precata(parser, "prec", "use block diagonal preconditioner", {"precata"});
 	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {"neumann"});
 	args::Flag f_cg(parser, "gmres", "use CG for iterative solver", {"cg"});
-	args::Flag f_gmres(parser, "gmres", "use BiCGSTAB for iterative solver", {"gmres"});
-	args::Flag f_lsqr(parser, "gmres", "use BiCGSTAB for iterative solver", {"lsqr"});
-	args::Flag f_rgmres(parser, "rgmres", "use GCRO-DR (Recycling BiCGSTAB) for iterative solver",
+	args::Flag f_gmres(parser, "gmres", "use GMRES for iterative solver", {"gmres"});
+	args::Flag f_lsqr(parser, "gmres", "use GMRES for iterative solver", {"lsqr"});
+	args::Flag f_rgmres(parser, "rgmres", "use GCRO-DR (Recycling GMRES) for iterative solver",
 	                    {"rgmres"});
 	args::Flag f_bicg(parser, "gmres", "use BiCGStab for iterative solver", {"bicg"});
 	args::Flag f_nozero(parser, "nozero", "don't make the average of vector zero in CG solver",
@@ -139,7 +141,11 @@ int main(int argc, char *argv[])
 	if (f_t) {
 		tol = args::get(f_t);
 	}
-
+	int maxiter = 5000;
+	if (f_maxiter) {
+		maxiter = args::get(f_maxiter);
+	}
+    
 	int loop_count = 1;
 	if (f_l) {
 		loop_count = args::get(f_l);
@@ -250,25 +256,27 @@ int main(int argc, char *argv[])
 		// SOLVE
 		//************
 		// initialize the x and b vectors
+        //dc.setSStruct();
+        dc.formMatrix();
 		dc.initVectors();
 		HYPRE_SStructSolver solver;
 
-		HYPRE_SStructBiCGSTABCreate(MPI_COMM_WORLD, &solver);
-		HYPRE_SStructBiCGSTABSetMaxIter(solver, 5000);
-		HYPRE_SStructBiCGSTABSetTol(solver, tol);
-		HYPRE_SStructBiCGSTABSetPrintLevel(solver, 3);
-		HYPRE_SStructBiCGSTABSetLogging(solver, 1);
+		HYPRE_SStructGMRESCreate(MPI_COMM_WORLD, &solver);
+		HYPRE_SStructGMRESSetMaxIter(solver, maxiter);
+		HYPRE_SStructGMRESSetTol(solver, tol);
+		HYPRE_SStructGMRESSetPrintLevel(solver, 3);
+		HYPRE_SStructGMRESSetLogging(solver, 1);
 
 		// A, x, and b are stored in the DomainCollection object
-		HYPRE_SStructBiCGSTABSetup(solver, dc.A, dc.b, dc.x);
-		HYPRE_SStructBiCGSTABSolve(solver, dc.A, dc.b, dc.x);
+		HYPRE_SStructGMRESSetup(solver, dc.A, dc.b, dc.x);
+		HYPRE_SStructGMRESSolve(solver, dc.A, dc.b, dc.x);
 
 		int    num_iterations;
 		double final_res_norm;
-		HYPRE_SStructBiCGSTABGetNumIterations(solver, &num_iterations);
-		HYPRE_SStructBiCGSTABGetFinalRelativeResidualNorm(solver, &final_res_norm);
+		HYPRE_SStructGMRESGetNumIterations(solver, &num_iterations);
+		HYPRE_SStructGMRESGetFinalRelativeResidualNorm(solver, &final_res_norm);
 
-		HYPRE_SStructBiCGSTABDestroy(solver);
+		HYPRE_SStructGMRESDestroy(solver);
 
 		// save the result into the domain objects
 		dc.saveResult();
@@ -337,6 +345,9 @@ int main(int argc, char *argv[])
 				dc.outputSolutionRefined(out_file);
 				out_file.close();
 			}
+		}
+		if (save_matrix_file != "") {
+            HYPRE_SStructMatrixPrint(save_matrix_file.c_str(),dc.A,0);
 		}
 		if (save_residual_file != "") {
 			ofstream out_file(save_residual_file);
