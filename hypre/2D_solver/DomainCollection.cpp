@@ -180,6 +180,8 @@ void DomainCollection::initVectors()
 }
 void DomainCollection::saveResult()
 {
+	HYPRE_SStructVectorGather(b);
+	HYPRE_SStructVectorGather(x);
 	for (auto &p : domains) {
 		Domain &d = p.second;
 		//d.fillExact(x);
