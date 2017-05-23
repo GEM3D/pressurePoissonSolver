@@ -16,6 +16,7 @@ cmake_minimum_required(VERSION 2.8)
 find_package(Belos PATHS $ENV{TRILINOS_DIR}/lib/cmake/Belos $ENV{TRILINOS_DIR})
 find_package(Tpetra PATHS $ENV{TRILINOS_DIR}/lib/cmake/Tpetra $ENV{TRILINOS_DIR})
 find_package(Zoltan PATHS $ENV{TRILINOS_DIR}/lib/cmake/Zoltan $ENV{TRILINOS_DIR})
+find_package(MueLu PATHS $ENV{TRILINOS_DIR}/lib/cmake/MueLu $ENV{TRILINOS_DIR})
 
 # If FIND_PACKAGE successfully found your Trilinos install, it will
 # set the Boolean flag Trilinos_FOUND.  The following IF statement
@@ -118,6 +119,7 @@ add_library(DomainCollection DomainCollection.cpp)
 add_library(DomainSignatureCollection DomainSignatureCollection.cpp)
 add_library(Domain Domain.cpp)
 add_library(RBMatrix RBMatrix.cpp)
+add_library(Factory Factory.cpp)
 add_library(FftwSolver FftwSolver.cpp)
 file(GLOB fishpack_SRC "fishpack/*.f")
 #add_library(FishpackSolver FishpackSolver.cpp)
@@ -134,11 +136,23 @@ target_link_libraries(heat
     DomainSignatureCollection
     RBMatrix
     Domain
+    Factory
   ${Belos_TPL_LIBRARIES}
   ${Tpetra_TPL_LIBRARIES}
+  ${MueLu_TPL_LIBRARIES}
   ${FFTW_LIB}
   ${Belos_LIBRARIES} 
   ${Tpetra_LIBRARIES} 
+  ${MueLu_LIBRARIES} 
+  ${MPI_CXX_LIBRARIES} 
+)
+target_link_libraries(Factory
+  ${Belos_TPL_LIBRARIES}
+  ${Tpetra_TPL_LIBRARIES}
+  ${MueLu_TPL_LIBRARIES}
+  ${Belos_LIBRARIES} 
+  ${Tpetra_LIBRARIES} 
+  ${MueLu_LIBRARIES} 
   ${MPI_CXX_LIBRARIES} 
 )
 target_link_libraries(RBMatrix

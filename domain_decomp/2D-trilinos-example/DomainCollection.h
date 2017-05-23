@@ -231,8 +231,11 @@ class DomainCollection
 	 * @return the formed matrix
 	 */
 	Teuchos::RCP<RBMatrix> formRBMatrix(Teuchos::RCP<map_type> map, int delete_row = -1);
+	Teuchos::RCP<block_matrix_type> formBlockCrsMatrix();
+	Teuchos::RCP<matrix_type> formCrsMatrix();
 
-	void swapResidSol(){
+	void swapResidSol()
+	{
 		for (auto &p : domains) {
 			p.second->swapResidSol();
 		}

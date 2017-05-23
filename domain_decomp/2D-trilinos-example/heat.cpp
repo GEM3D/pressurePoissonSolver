@@ -1,6 +1,8 @@
 #include "BelosCGIter.hpp"
 #include "BelosOutputManager.hpp"
 #include "DomainSignatureCollection.h"
+
+#include "Factory.h"
 #include "FunctionWrapper.h"
 #include "MyTypeDefs.h"
 #include "OpATA.h"
@@ -10,10 +12,11 @@
 //#include <Amesos2_Version.hpp>
 #include <BelosBiCGStabSolMgr.hpp>
 #include <BelosBlockCGSolMgr.hpp>
-#include <BelosGCRODRSolMgr.hpp>
-#include <BelosLSQRSolMgr.hpp>
 #include <BelosBlockGmresSolMgr.hpp>
 #include <BelosConfigDefs.hpp>
+#include <BelosGCRODRSolMgr.hpp>
+#include <BelosLSQRSolMgr.hpp>
+#include <BelosLSQRSolMgr.hpp>
 #include <BelosLinearProblem.hpp>
 #include <BelosTpetraAdapter.hpp>
 #include <MatrixMarket_Tpetra.hpp>
@@ -24,7 +27,8 @@
 #include <Teuchos_Tuple.hpp>
 #include <Teuchos_VerboseObject.hpp>
 #include <Teuchos_oblackholestream.hpp>
-#include <BelosLSQRSolMgr.hpp>
+#include <Tpetra_Experimental_BlockCrsMatrix_Helpers.hpp>
+#include <Xpetra_TpetraBlockCrsMatrix.hpp>
 #include <chrono>
 #include <cmath>
 #include <iostream>
@@ -97,9 +101,11 @@ int main(int argc, char *argv[])
 	{'z'});
 	args::Flag f_pinv(parser, "wrapper", "compute using pseudoinverse", {"pinv"});
 	args::Flag f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
+	args::Flag f_blockcrs(parser, "wrapper", "use a function wrapper", {"blockcrs"});
+	args::Flag f_crs(parser, "wrapper", "use a function wrapper", {"crs"});
 	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
 	args::Flag f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
-	args::Flag f_precata(parser, "prec", "use block diagonal preconditioner", {"precata"});
+	args::Flag f_precamg(parser, "prec", "use AMG preconditioner", {"precamg"});
 	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {"neumann"});
 	args::Flag f_cg(parser, "gmres", "use CG for iterative solver", {"cg"});
 	args::Flag f_gmres(parser, "gmres", "use GMRES for iterative solver", {"gmres"});
@@ -312,7 +318,46 @@ int main(int argc, char *argv[])
 				Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_rhs_file, b, "", "");
 			}
 
-			if (f_wrapper) {
+			if (f_crs) {
+				// start time
+				comm->barrier();
+				steady_clock::time_point form_start = steady_clock::now();
+				RCP<matrix_type> A = dc.formCrsMatrix();
+
+				// stop time
+				comm->barrier();
+				duration<double> form_time = steady_clock::now() - form_start;
+
+				if (my_global_rank == 0)
+					cout << "Matrix Formation Time: " << form_time.count() << endl;
+
+				op = A;
+
+				if (save_matrix_file != "")
+					Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file,
+					                                                          A, "", "");
+
+
+            }else if (f_blockcrs) {
+				// start time
+				comm->barrier();
+				steady_clock::time_point form_start = steady_clock::now();
+				RCP<block_matrix_type> A = dc.formBlockCrsMatrix();
+
+				// stop time
+				comm->barrier();
+				duration<double> form_time = steady_clock::now() - form_start;
+
+				if (my_global_rank == 0)
+					cout << "Matrix Formation Time: " << form_time.count() << endl;
+
+				op = A;
+
+				if (save_matrix_file != "") {
+					Tpetra::Experimental::blockCrsMatrixWriter<>(*A, save_matrix_file);
+				}
+
+			} else if (f_wrapper) {
 				// Create a function wrapper
 				op = rcp(new FuncWrap(b, &dc));
 			} else { // if (f_rbmatrix || f_lu) {
@@ -323,7 +368,7 @@ int main(int argc, char *argv[])
 				RBA = dc.formRBMatrix(matrix_map, del);
 				if (f_neumann && !f_nozerou) {
 					RBA->setZeroU();
-                }
+				}
 
 				comm->barrier();
 				duration<double> form_time = steady_clock::now() - form_start;
@@ -390,6 +435,7 @@ int main(int argc, char *argv[])
 				comm->barrier();
 				steady_clock::time_point prec_start = steady_clock::now();
 
+
 				RCP<RBMatrix> P = RBA->invBlockDiag();
 				problem->setRightPrec(P);
 
@@ -413,33 +459,19 @@ int main(int argc, char *argv[])
 						cout << "Time to write preconditioner to file: " << write_time.count()
 						     << endl;
 				}
-			} else if (f_precata) {
+			} else if (f_precamg) {
 				comm->barrier();
 				steady_clock::time_point prec_start = steady_clock::now();
 
-				RCP<RBMatrix> P = RBA->invBlockDiagATA();
-				problem->setRightPrec(P);
+				Teuchos::RCP<Tpetra::Operator<scalar_type>> P
+				= Factory::getAmgPreconditioner(op);
+				problem->setLeftPrec(P);
 
 				comm->barrier();
 				duration<double> prec_time = steady_clock::now() - prec_start;
 
 				if (my_global_rank == 0)
 					cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
-
-				if (save_prec_file != "") {
-					comm->barrier();
-					steady_clock::time_point write_start = steady_clock::now();
-
-					ofstream out_file(save_prec_file);
-					out_file << *P;
-					out_file.close();
-
-					comm->barrier();
-					duration<double> write_time = steady_clock::now() - write_start;
-					if (my_global_rank == 0)
-						cout << "Time to write preconditioner to file: " << write_time.count()
-						     << endl;
-				}
 
 			}
 
@@ -484,11 +516,7 @@ int main(int argc, char *argv[])
                 belosList.set("Rel Mat Err",0.0);
 
 				// Create solver and solve
-				if (f_lsqr) {
-					solver = rcp(new Belos::LSQRSolMgr<scalar_type, vector_type,
-					                                     Tpetra::Operator<scalar_type>>(
-					problem, rcp(&belosList, false)));
-				} else if (f_rgmres) {
+				if (f_rgmres) {
 					solver = rcp(new Belos::GCRODRSolMgr<scalar_type, vector_type,
 					                                     Tpetra::Operator<scalar_type>>(
 					problem, rcp(&belosList, false)));
