@@ -1,4 +1,5 @@
 #include "Domain.h"
+#include "StencilHelper.h"
 #include <array>
 #include <ostream>
 #include <valarray>
@@ -184,89 +185,46 @@ void Domain::setGridNbrs(HYPRE_SStructGrid &grid) {
 		                                 nbr_iupper, index_map, index_dir);
 	}
 }
+
 void Domain::setAmrStencil(HYPRE_SStructGraph &graph) {
-	if (hasCoarseNbr(Side::west)) {
+    	if (hasCoarseNbr(Side::west)) {
         Side s = Side::west;
-        if(isCoarseLeft(s)){
-			// first stencil is special
-			int curr_idx[2] = {0, n - 1};
-			int nbr_idx1[2] = {n - 1, n-3};
-			int nbr_idx2[2] = {n - 1, n-2};
-			int nbr_idx3[2] = {n - 1, n-1};
-			// right
-			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx1, 0);
-			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx2, 0);
-			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx3, 0);
-			curr_idx[1] = n - 2;
-			// left
-			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx1, 0);
-			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx2, 0);
-			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx3, 0);
-			// set rest of entries
-			for (int i = 0; i < n - 2; i++) {
-				curr_idx[1] = i;
-				nbr_idx1[1] = n / 2 + i / 2 - 1;
-				nbr_idx2[1] = n / 2 + i / 2;
-				nbr_idx3[1] = n / 2 + i / 2 + 1;
-				HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx1, 0);
-				HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx2, 0);
-				HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx3, 0);
-
-			}
-        }else{
-			// first stencil is special
-			int curr_idx[2] = {0, 0};
-			int nbr_idx1[2] = {n - 1, 0};
-			int nbr_idx2[2] = {n - 1, 1};
-			int nbr_idx3[2] = {n - 1, 2};
-			// left
-			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx1, 0);
-			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx2, 0);
-			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx3, 0);
-			curr_idx[1] = 1;
-			// right
-			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx1, 0);
-			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx2, 0);
-			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx3, 0);
-			// set rest of entries
-			for (int i = 2; i < n; i++) {
-				curr_idx[1] = i;
-				nbr_idx1[1] = i / 2 - 1;
-				nbr_idx2[1] = i / 2;
-				nbr_idx3[1] = i / 2 + 1;
-				HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx1, 0);
-				HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx2, 0);
-				HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx3, 0);
-
-			}
+		CoarseStencilHelper* sh= new WestCSH(this);
+		while (!sh->done()) {
+			HYPRE_SStructGraphAddEntries(graph, ds.id, sh->currIndex, 0, sh->nbr(),
+			                             sh->nbrIndexCoarseLeft, 0);
+			HYPRE_SStructGraphAddEntries(graph, ds.id, sh->currIndex, 0, sh->nbr(),
+			                             sh->nbrIndexCoarseCenter, 0);
+			HYPRE_SStructGraphAddEntries(graph, ds.id, sh->currIndex, 0, sh->nbr(),
+			                             sh->nbrIndexCoarseRight, 0);
+			cerr << sh->nbr() << "," << sh->currIndex[1] << "," << sh->nbrIndexCoarseLeft[1]
+			     << endl;
+			++(*sh);
 		}
+		delete sh;
 	}
+
+
 	if (hasFineNbr(Side::east)) {
-		Side      s           = Side::east;
-		int       curr_idx[2] = {n - 1, n - 1};
-		int       nbr_idx1[2] = {0, n - 1};
-		int       nbr_idx2[2] = {1, n - 1};
-		const int start_i     = n - 1;
-		for (int i = 0; i < n; i++) {
-			curr_idx[1] = start_i - i / 2;
-			nbr_idx1[1] = start_i - i;
-			nbr_idx2[1] = start_i - i;
-			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx1, 0);
-			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbr(s), nbr_idx2, 0);
+		Side          s = Side::east;
+		FineStencilHelper* sh= new EastFSH(this);
+		HYPRE_SStructGraphAddEntries(graph, ds.id, sh->currIndex, 0, ds.id,
+		                             sh->nbrIndexFineOtherLeft, 0);
+		while (!sh->done()) {
+			HYPRE_SStructGraphAddEntries(graph, ds.id, sh->currIndex, 0, sh->nbr(),
+			                             sh->nbrIndexFineLeftIn, 0);
+			HYPRE_SStructGraphAddEntries(graph, ds.id, sh->currIndex, 0, sh->nbr(),
+			                             sh->nbrIndexFineLeftOut, 0);
+			HYPRE_SStructGraphAddEntries(graph, ds.id, sh->currIndex, 0, sh->nbr(),
+			                             sh->nbrIndexFineRightIn, 0);
+			HYPRE_SStructGraphAddEntries(graph, ds.id, sh->currIndex, 0, sh->nbr(),
+			                             sh->nbrIndexFineRightOut, 0);
+			cerr << sh->nbr() << "," << sh->currIndex[1] << endl;
+			++(*sh);
 		}
-		for (int i = 0; i < n; i++) {
-			curr_idx[1] = start_i - n / 2 - i / 2;
-			nbr_idx1[1] = start_i - i;
-			nbr_idx2[1] = start_i - i;
-			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbrRight(s), nbr_idx1, 0);
-			HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, nbrRight(s), nbr_idx2, 0);
-		}
-		int this_idx[2] = {n - 1, n - 3};
-		curr_idx[1]     = n - 1;
-		HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, ds.id, this_idx, 0);
-		this_idx[1] = 2;
-		curr_idx[1] = 0;
-		HYPRE_SStructGraphAddEntries(graph, ds.id, curr_idx, 0, ds.id, this_idx, 0);
+		HYPRE_SStructGraphAddEntries(graph, ds.id, sh->currIndex, 0, ds.id,
+		                             sh->nbrIndexFineOtherRight, 0);
+		delete sh;
 	}
 }
 void Domain::setMatrixCoeffs(HYPRE_SStructMatrix &A) {

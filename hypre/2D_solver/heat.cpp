@@ -223,7 +223,6 @@ int main(int argc, char *argv[])
 	valarray<double> times(loop_count);
 	for (int loop = 0; loop < loop_count; loop++) {
         MPI_Barrier(MPI_COMM_WORLD);
-
 		steady_clock::time_point domain_start = steady_clock::now();
 
 		DomainCollection dc(dsc, nx);
@@ -281,7 +280,19 @@ int main(int argc, char *argv[])
 
 		// A, x, and b are stored in the DomainCollection object
 		HYPRE_ParCSRGMRESSetup(solver, dc.par_A, dc.par_b, dc.par_x);
+
+        MPI_Barrier(MPI_COMM_WORLD);
+		steady_clock::time_point solve_start = steady_clock::now();
+
 		HYPRE_ParCSRGMRESSolve(solver, dc.par_A, dc.par_b, dc.par_x);
+
+
+        MPI_Barrier(MPI_COMM_WORLD);
+		steady_clock::time_point solve_stop = steady_clock::now();
+		duration<double>         solve_time = solve_stop - solve_start;
+
+		if (my_global_rank == 0)
+			cout << "System Solve Time: " << solve_time.count() << endl;
 
 		int    num_iterations;
 		double final_res_norm;
