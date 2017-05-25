@@ -12,6 +12,7 @@ DomainCollection::DomainCollection(DomainSignatureCollection dsc, int n)
 	this->n            = n;
     this->dsc = dsc;
 	num_global_domains = dsc.num_global_domains;
+	HYPRE_SStructGridCreate(MPI_COMM_WORLD, 2, num_global_domains, &grid);
 	for (auto p : dsc.domains) {
         //TODO change to shared ptr
 		DomainSignature ds       = p.second;
@@ -19,16 +20,11 @@ DomainCollection::DomainCollection(DomainSignatureCollection dsc, int n)
 
 		// create a domain
 		domains[i]        =  Domain(ds, n);
-	}
-	// initialize hypre stuff
-	HYPRE_SStructGridCreate(MPI_COMM_WORLD, 2, num_global_domains, &grid);
-	for (int i = 0; i < num_global_domains; i++) {
-		int low[2]  = {0, 0};
-		int high[2] = {n-1, n-1};
-		int ret = HYPRE_SStructGridSetExtents(grid, i, low, high);
-		if (ret != 0) {
-			throw std::runtime_error{"HYPRE_SStructGridSetExtents returned: " + ret};
-        }
+
+		// initialize hypre stuff
+		int low[2]        = {0, 0};
+		int high[2]       = {n - 1, n - 1};
+		HYPRE_SStructGridSetExtents(grid, i, low, high);
 	}
     for(int i=0;i<num_global_domains;i++){
 		int ret = HYPRE_SStructGridSetVariables(grid, i, 1, vartypes);
@@ -208,7 +204,9 @@ double DomainCollection::diffNorm()
 	for (auto &p : domains) {
 		result += pow(p.second.diffNorm(), 2);
 	}
-	return sqrt(result);
+    double gresult;
+	MPI_Allreduce(&result, &gresult, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	return sqrt(gresult);
 }
 double DomainCollection::diffNorm(double uavg, double eavg)
 {
@@ -216,7 +214,9 @@ double DomainCollection::diffNorm(double uavg, double eavg)
 	for (auto &p : domains) {
 		result += pow(p.second.diffNorm(uavg, eavg), 2);
 	}
-	return sqrt(result);
+    double gresult;
+	MPI_Allreduce(&result, &gresult, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	return sqrt(gresult);
 }
 double DomainCollection::exactNorm()
 {
@@ -224,7 +224,9 @@ double DomainCollection::exactNorm()
 	for (auto &p : domains) {
 		result += pow(p.second.exactNorm(), 2);
 	}
-	return sqrt(result);
+    double gresult;
+	MPI_Allreduce(&result, &gresult, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	return sqrt(gresult);
 }
 double DomainCollection::fNorm()
 {
@@ -232,7 +234,9 @@ double DomainCollection::fNorm()
 	for (auto &p : domains) {
 		result += pow(p.second.fNorm(), 2);
 	}
-	return sqrt(result);
+    double gresult;
+	MPI_Allreduce(&result, &gresult, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	return sqrt(gresult);
 }
 double DomainCollection::exactNorm(double eavg)
 {
@@ -240,7 +244,9 @@ double DomainCollection::exactNorm(double eavg)
 	for (auto &p : domains) {
 		result += pow(p.second.exactNorm(eavg), 2);
 	}
-	return sqrt(result);
+    double gresult;
+	MPI_Allreduce(&result, &gresult, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	return sqrt(gresult);
 }
 double DomainCollection::residual()
 {
@@ -248,7 +254,9 @@ double DomainCollection::residual()
 	for (auto &p : domains) {
 		result += pow(p.second.residual(), 2);
 	}
-	return sqrt(result);
+    double gresult;
+	MPI_Allreduce(&result, &gresult, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	return sqrt(gresult);
 }
 double DomainCollection::integrateF()
 {
@@ -256,7 +264,9 @@ double DomainCollection::integrateF()
 	for (auto &p : domains) {
 		sum += p.second.integrateF();
 	}
-	return sum;
+    double gsum;
+	MPI_Allreduce(&sum, &gsum, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	return gsum;
 }
 double DomainCollection::integrateBoundaryFlux()
 {
@@ -264,7 +274,9 @@ double DomainCollection::integrateBoundaryFlux()
 	for (auto &p : domains) {
 		sum += p.second.integrateBoundaryFlux();
 	}
-	return sum;
+    double gsum;
+	MPI_Allreduce(&sum, &gsum, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	return gsum;
 }
 double DomainCollection::area()
 {
@@ -272,7 +284,9 @@ double DomainCollection::area()
 	for (auto &p : domains) {
 		sum += p.second.area();
 	}
-	return sum;
+    double gsum;
+	MPI_Allreduce(&sum, &gsum, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	return gsum;
 }
 double DomainCollection::integrateU()
 {
@@ -280,7 +294,9 @@ double DomainCollection::integrateU()
 	for (auto &p : domains) {
 		sum += p.second.integrateU();
 	}
-	return sum;
+    double gsum;
+	MPI_Allreduce(&sum, &gsum, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	return gsum;
 }
 double DomainCollection::integrateExact()
 {
@@ -288,7 +304,9 @@ double DomainCollection::integrateExact()
 	for (auto &p : domains) {
 		sum += p.second.integrateExact();
 	}
-	return sum;
+    double gsum;
+	MPI_Allreduce(&sum, &gsum, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	return gsum;
 }
 double DomainCollection::integrateAU()
 {
@@ -296,7 +314,9 @@ double DomainCollection::integrateAU()
 	for (auto &p : domains) {
 		sum += p.second.integrateAU();
 	}
-	return sum;
+    double gsum;
+	MPI_Allreduce(&sum, &gsum, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	return gsum;
 }
 
 void DomainCollection::outputSolution(std::ostream &os)

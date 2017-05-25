@@ -137,6 +137,11 @@ int main(int argc, char *argv[])
 		std::cerr << "number of domains must be greater than or equal to the number of processes\n";
 		return 1;
 	}
+	// partition domains
+	if (num_procs > 1) {
+		dsc.zoltanBalance();
+	}
+
 	double tol = 1e-10;
 	if (f_t) {
 		tol = args::get(f_t);
@@ -414,5 +419,6 @@ int main(int argc, char *argv[])
 		cout << "Average: " << times.sum() / times.size() << endl;
 	}
 
+	MPI_Finalize();
 	return 0;
 }

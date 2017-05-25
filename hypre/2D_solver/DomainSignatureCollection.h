@@ -5,8 +5,7 @@
 #include <bitset>
 #include <map>
 #include <string>
-#include <set>
-#include <deque>
+#include <zoltan_cpp.h>
 /**
  * @brief A structure that represents a domain and its relation to other domains.
  */
@@ -74,6 +73,8 @@ class DomainSignatureCollection
 {
 	public:
 	int rank;
+	int matrix_j_low;
+	int matrix_j_high;
 	/**
 	 * @brief Number of total domains.
 	 */
@@ -105,5 +106,37 @@ class DomainSignatureCollection
 	 */
 	DomainSignatureCollection(int d_x, int d_y, int rank);
 	DomainSignatureCollection(int d_x, int d_y, int rank, bool amr);
+	/**
+     * @brief Balance the domains over processors using Zoltan
+     */
+	void zoltanBalance();
+    /**
+     * @brief Index the interfaces using a Breadth First Search.
+     */
+	void indexInterfacesBFS();
+
+	// query functions that respond to requests from Zoltan
+	static int get_number_of_objects(void *data, int *ierr);
+	//	static void coord(void *data, int num_gid_entries, int num_lid_entries, ZOLTAN_ID_PTR
+	//global_id,
+	//	                  ZOLTAN_ID_PTR local_id, double *geom_vec, int *ierr);
+	static void get_object_list(void *data, int sizeGID, int sizeLID, ZOLTAN_ID_PTR globalID,
+	                            ZOLTAN_ID_PTR localID, int wgt_dim, float *obj_wgts, int *ierr);
+	static void object_sizes(void *data, int num_gid_entries, int num_lid_entries, int num_ids,
+	                         ZOLTAN_ID_PTR global_ids, ZOLTAN_ID_PTR local_ids, int *sizes,
+	                         int *ierr);
+	static void pack_objects(void *data, int num_gid_entries, int num_lid_entries, int num_ids,
+	                         ZOLTAN_ID_PTR global_ids, ZOLTAN_ID_PTR local_ids, int *dest,
+	                         int *sizes, int *idx, char *buf, int *ierr);
+	static void unpack_objects(void *data, int num_gid_entries, int num_ids,
+	                           ZOLTAN_ID_PTR global_ids, int *sizes, int *idx, char *buf,
+	                           int *ierr);
+	static int numInterfaces(void *data, int num_gid_entries, int num_lid_entries,
+	                         ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id, int *ierr);
+	static void interfaceList(void *data, int num_gid_entries, int num_lid_entries,
+	                          ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id,
+	                          ZOLTAN_ID_PTR nbor_global_id, int *nbor_procs, int wgt_dim,
+	                          float *ewgts, int *ierr);
+	//	static int dimensions(void *data, int *ierr);
 };
 #endif

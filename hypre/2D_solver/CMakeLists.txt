@@ -13,6 +13,7 @@ cmake_minimum_required(VERSION 2.8)
 # TRILINOS_PATH to the path to your Trilinos install.
 # You do _not_ need to edit this line.
 #find_package(Trilinos PATHS $ENV{TRILINOS_PATH}/lib/cmake/Trilinos $ENV{TRILINOS_PATH})
+find_package(Zoltan PATHS $ENV{TRILINOS_DIR}/lib/cmake/Zoltan $ENV{TRILINOS_DIR})
 
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
@@ -70,11 +71,15 @@ set(SOURCES
 include_directories(".")
 include_directories(${MPI_CXX_INCLUDE_PATH})
 include_directories(${HYPRE_INCLUDES})
+include_directories(${Zoltan_INCLUDE_DIRS})
+include_directories(${Zoltan_TPL_INCLUDE_DIRS})
 
 # Add to the library path Trilinos' library path, and the library
 # paths of the third-party libraries (TPLs) with which Trilinos was
 # built.  
 link_directories("${HYPRE_DIR}/lib")
+link_directories(${Zoltan_TPL_INCLUDE_DIRS})
+link_directories(${Zoltan_INCLUDE_DIRS})
 
 # 
 # EDIT HERE: Change trilinosExample to the name of the executable
@@ -102,10 +107,12 @@ target_link_libraries(heat
 target_link_libraries(DomainCollection
     Domain
     ${HYPRE_LIBRARIES}
+    ${Zoltan_LIBRARIES}
 )
 target_link_libraries(Domain
     ${HYPRE_LIBRARIES}
 )
-#target_link_libraries(DomainSignatureCollection
-#  ${Zoltan_LIBRARIES} 
-#)
+target_link_libraries(DomainSignatureCollection
+  ${Zoltan_LIBRARIES} 
+    ${Zoltan_TPL_LIBRARIES}
+)
