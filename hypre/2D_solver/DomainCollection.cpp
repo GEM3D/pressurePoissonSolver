@@ -182,12 +182,7 @@ void DomainCollection::saveResult()
 {
 	HYPRE_SStructVectorGather(b);
 	HYPRE_SStructVectorGather(x);
-	for (auto &p : domains) {
-		Domain &d = p.second;
-		//d.fillExact(x);
-		// d.fillLHS(x);
-	}
-	///HYPRE_SStructVectorAssemble(x);
+
 	for (auto &p : domains) {
 		Domain &d = p.second;
 		d.saveLHS(x);
