@@ -219,6 +219,10 @@ int main(int argc, char *argv[])
 		//************
 		// SOLVE
 		//************
+		// start setup timer
+		MPI_Barrier(MPI_COMM_WORLD);
+		steady_clock::time_point setup_start = steady_clock::now();
+
 		// initialize the x and b vectors
         dc.setParCSR();
         dc.formMatrix();
@@ -246,15 +250,37 @@ int main(int argc, char *argv[])
 		// A, x, and b are stored in the DomainCollection object
 		HYPRE_ParCSRGMRESSetup(solver, dc.par_A, dc.par_b, dc.par_x);
 
+        // stop setup timer
+        MPI_Barrier(MPI_COMM_WORLD);
+		steady_clock::time_point setup_stop = steady_clock::now();
+		duration<double>         setup_time = setup_stop - setup_start;
+		setup_times[loop] = setup_time.count();
+
+		if (my_global_rank == 0)
+			cout << "System Setup Time: " << setup_time.count() << endl;
+
+        // start solve timer
         MPI_Barrier(MPI_COMM_WORLD);
 		steady_clock::time_point solve_start = steady_clock::now();
 
 		HYPRE_ParCSRGMRESSolve(solver, dc.par_A, dc.par_b, dc.par_x);
 
+        if(f_iter){
+			dc.saveResult();
+			dc.swapResidSol();
+			dc.fillVectors();
+			HYPRE_ParCSRGMRESSolve(solver, dc.par_A, dc.par_b, dc.par_x);
+			dc.saveResult();
+			dc.sumResidIntoSol();
+			dc.fillVectors();
+			dc.saveResult();
+		}
 
+        // stop solve timer
         MPI_Barrier(MPI_COMM_WORLD);
 		steady_clock::time_point solve_stop = steady_clock::now();
 		duration<double>         solve_time = solve_stop - solve_start;
+		solve_times[loop] = solve_time.count();
 
 		if (my_global_rank == 0)
 			cout << "System Solve Time: " << solve_time.count() << endl;
@@ -322,7 +348,6 @@ int main(int argc, char *argv[])
 			//	std::cout << u8"∮ du/dn - ΣAu: " << dc.sumBoundaryFlux() - ausum << endl;
 			//}
 		}
-		solve_times[loop] = solve_time.count();
 		if (save_solution_file != "") {
 			ofstream out_file(save_solution_file);
 			dc.outputSolution(out_file);
@@ -362,7 +387,13 @@ int main(int argc, char *argv[])
 	}
 
 	if (loop_count > 1 && my_global_rank == 0) {
-		std::cout << "Times: ";
+		std::cout << "Setup Times: ";
+		for (double t : setup_times) {
+			cout << t << " ";
+		}
+		cout << endl;
+		cout << "Average: " << setup_times.sum() / setup_times.size() << endl;
+		std::cout << "Solve Times: ";
 		for (double t : solve_times) {
 			cout << t << " ";
 		}

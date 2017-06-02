@@ -170,13 +170,20 @@ void DomainCollection::initVectors()
 	for (auto &p : domains) {
 		Domain &d = p.second;
 		d.fillRHS(b);
-		//d.fillLHS(x);
 	}
 	HYPRE_SStructVectorAssemble(b);
 	HYPRE_SStructVectorAssemble(x);
 	if (use_parcsr) {
 		HYPRE_SStructVectorGetObject(b, (void **) &par_b);
 		HYPRE_SStructVectorGetObject(x, (void **) &par_x);
+	}
+}
+void DomainCollection::fillVectors()
+{
+	for (auto &p : domains) {
+		Domain &d = p.second;
+		d.fillRHS(b);
+		d.fillLHS(x);
 	}
 }
 void DomainCollection::saveResult()

@@ -32,6 +32,10 @@ class DomainCollection
 	HYPRE_ParCSRMatrix    par_A;
 	HYPRE_ParVector       par_b;
 	HYPRE_ParVector       par_x;
+	HYPRE_SStructVector   e;
+	HYPRE_SStructVector   r;
+	HYPRE_ParVector       par_e;
+	HYPRE_ParVector       par_r;
 	std::map<int, Domain> domains;
 	bool amr = false;
 	double f_mean=0;
@@ -103,6 +107,7 @@ class DomainCollection
 	 */
 	void saveResult();
 	void initVectors();
+	void fillVectors();
 	void formMatrix();
 
 	/**

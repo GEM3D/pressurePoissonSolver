@@ -412,3 +412,27 @@ void Domain::saveAU(HYPRE_SStructVector &b)
 		}
 	}
 }
+void Domain::swapResidSol()
+{
+	boundary_north_back = boundary_north;
+	boundary_east_back  = boundary_east;
+	boundary_south_back = boundary_south;
+	boundary_west_back  = boundary_west;
+	boundary_north      = 0;
+	boundary_east       = 0;
+	boundary_south      = 0;
+	boundary_west       = 0;
+	u_back              = u;
+	f_back              = f;
+	u                   = 0;
+	f                   = resid;
+}
+void Domain::sumResidIntoSol()
+{
+	boundary_north = boundary_north_back;
+	boundary_east  = boundary_east_back;
+	boundary_south = boundary_south_back;
+	boundary_west  = boundary_west_back;
+	f              = f_back;
+	u += u_back;
+}
