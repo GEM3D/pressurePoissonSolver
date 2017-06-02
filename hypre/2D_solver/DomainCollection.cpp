@@ -46,6 +46,11 @@ DomainCollection::DomainCollection(DomainSignatureCollection dsc, int n)
 	}
 }
 
+DomainCollection::~DomainCollection(){
+    HYPRE_SStructMatrixDestroy(A);
+    HYPRE_SStructVectorDestroy(b);
+    HYPRE_SStructVectorDestroy(x);
+}
 void DomainCollection::initNeumann(function<double(double, double)> ffun,
                                    function<double(double, double)> efun,
                                    function<double(double, double)> nfunx,

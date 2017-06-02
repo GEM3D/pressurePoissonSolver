@@ -48,6 +48,8 @@ class DomainCollection
 	 */
 	DomainCollection(DomainSignatureCollection dsc, int n);
 
+	~DomainCollection();
+
 	/**
 	 * @brief Initialize domains using Dirichlet boundary conditions.
 	 *

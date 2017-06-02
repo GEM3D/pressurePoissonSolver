@@ -265,6 +265,7 @@ int main(int argc, char *argv[])
 		HYPRE_ParCSRGMRESGetFinalRelativeResidualNorm(solver, &final_res_norm);
 
 		HYPRE_ParCSRGMRESDestroy(solver);
+		HYPRE_BoomerAMGDestroy(precond);
 
 		// save the result into the domain objects
 		dc.saveResult();
