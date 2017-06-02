@@ -528,22 +528,21 @@ RCP<matrix_type> DomainCollection::formCrsMatrix()
     
 	rows.erase(-1);
 	vector<int> cols_array;
-	vector<int> rows_array;
 	for (int j : cols) {
+        rows.erase(j);
 		for (int q = 0; q < n; q++)
 			cols_array.push_back(j * n + q);
 	}
+	vector<int> rows_array(cols_array);
 	for (int i : rows) {
 		for (int q = 0; q < n; q++)
 			rows_array.push_back(i * n + q);
 	}
-	RCP<map_type> row_map
-	= rcp(new map_type(-1, &rows_array[0], rows_array.size(), 0, this->comm));
-	RCP<map_type> col_map
-	= rcp(new map_type(-1, &cols_array[0], cols_array.size(), 0, this->comm));
-	RCP<matrix_type> A = rcp(new matrix_type(row_map, col_map, 5*n));
+	RCP<map_type> row_map = rcp(new map_type(-1, &rows_array[0], rows_array.size(), 0, this->comm));
+	RCP<map_type> col_map = rcp(new map_type(-1, &cols_array[0], cols_array.size(), 0, this->comm));
+	RCP<matrix_type> A    = rcp(new matrix_type(row_map, col_map, 5 * n));
 
-    set<pair<int,int>> inserted;
+	set<pair<int, int>> inserted;
 	auto insertBlock = [&](int i, int j, RCP<valarray<double>> block, bool flip_i, bool flip_j) {
 		int local_i = A->getRowMap()->getLocalElement(i * n);
 		int local_j = A->getColMap()->getLocalElement(j * n);
@@ -568,14 +567,14 @@ RCP<matrix_type> DomainCollection::formCrsMatrix()
 			inds[q] = local_j + q;
 		}
         if(inserted.count(make_pair(i,j))==0){
-		for (int q = 0; q < n; q++) {
-			A->insertLocalValues(local_i + q, n, &copy[q * n], &inds[0]);
-		}
+			for (int q = 0; q < n; q++) {
+				A->insertLocalValues(local_i + q, n, &copy[q * n], &inds[0]);
+			}
         }else{
             inserted.insert(make_pair(i,j));
-		for (int q = 0; q < n; q++) {
-			A->sumIntoLocalValues(local_i + q, n, &copy[q * n], &inds[0]);
-		}
+			for (int q = 0; q < n; q++) {
+				A->sumIntoLocalValues(local_i + q, n, &copy[q * n], &inds[0]);
+			}
         }
 	};
 
@@ -704,47 +703,46 @@ RCP<matrix_type> DomainCollection::formCrsMatrix()
 			shift_rev[n - 1 - i] = shift[i];
 
 			// fill the blocks
-			n_b[slice(i , n, n)] = d.getDiff(Side::north);
-			e_b[slice(i , n, n)] = d.getDiff(Side::east);
-			s_b[slice(i , n, n)] = d.getDiff(Side::south);
-			w_b[slice(i , n, n)] = d.getDiff(Side::west);
+			n_b[slice(i, n, n)] = d.getDiff(Side::north);
+			e_b[slice(i, n, n)] = d.getDiff(Side::east);
+			s_b[slice(i, n, n)] = d.getDiff(Side::south);
+			w_b[slice(i, n, n)] = d.getDiff(Side::west);
 
-			nf_b[slice(i , n, n)] = d.getDiffFine(Side::north);
-			ef_b[slice(i , n, n)] = d.getDiffFine(Side::east);
-			sf_b[slice(i , n, n)] = d.getDiffFine(Side::south);
-			wf_b[slice(i , n, n)] = d.getDiffFine(Side::west);
+			nf_b[slice(i, n, n)] = d.getDiffFine(Side::north);
+			ef_b[slice(i, n, n)] = d.getDiffFine(Side::east);
+			sf_b[slice(i, n, n)] = d.getDiffFine(Side::south);
+			wf_b[slice(i, n, n)] = d.getDiffFine(Side::west);
 
-			nfl_b[slice(i , n, n)] = d.getDiffFineToCoarseLeft(Side::north);
-			efl_b[slice(i , n, n)] = d.getDiffFineToCoarseLeft(Side::east);
-			sfl_b[slice(i , n, n)] = d.getDiffFineToCoarseLeft(Side::south);
-			wfl_b[slice(i , n, n)] = d.getDiffFineToCoarseLeft(Side::west);
+			nfl_b[slice(i, n, n)] = d.getDiffFineToCoarseLeft(Side::north);
+			efl_b[slice(i, n, n)] = d.getDiffFineToCoarseLeft(Side::east);
+			sfl_b[slice(i, n, n)] = d.getDiffFineToCoarseLeft(Side::south);
+			wfl_b[slice(i, n, n)] = d.getDiffFineToCoarseLeft(Side::west);
 
-			nfr_b[slice(i , n, n)] = d.getDiffFineToCoarseRight(Side::north);
-			efr_b[slice(i , n, n)] = d.getDiffFineToCoarseRight(Side::east);
-			sfr_b[slice(i , n, n)] = d.getDiffFineToCoarseRight(Side::south);
-			wfr_b[slice(i , n, n)] = d.getDiffFineToCoarseRight(Side::west);
+			nfr_b[slice(i, n, n)] = d.getDiffFineToCoarseRight(Side::north);
+			efr_b[slice(i, n, n)] = d.getDiffFineToCoarseRight(Side::east);
+			sfr_b[slice(i, n, n)] = d.getDiffFineToCoarseRight(Side::south);
+			wfr_b[slice(i, n, n)] = d.getDiffFineToCoarseRight(Side::west);
 
-			nc_b[slice(i , n, n)] = d.getDiffCoarse(Side::north);
-			ec_b[slice(i , n, n)] = d.getDiffCoarse(Side::east);
-			sc_b[slice(i , n, n)] = d.getDiffCoarse(Side::south);
-			wc_b[slice(i , n, n)] = d.getDiffCoarse(Side::west);
+			nc_b[slice(i, n, n)] = d.getDiffCoarse(Side::north);
+			ec_b[slice(i, n, n)] = d.getDiffCoarse(Side::east);
+			sc_b[slice(i, n, n)] = d.getDiffCoarse(Side::south);
+			wc_b[slice(i, n, n)] = d.getDiffCoarse(Side::west);
 
-			ncl_b[slice(i , n, n)] = d.getDiffCoarseToFineLeft(Side::north);
-			ecl_b[slice(i , n, n)] = d.getDiffCoarseToFineLeft(Side::east);
-			scl_b[slice(i , n, n)] = d.getDiffCoarseToFineLeft(Side::south);
-			wcl_b[slice(i , n, n)] = d.getDiffCoarseToFineLeft(Side::west);
+			ncl_b[slice(i, n, n)] = d.getDiffCoarseToFineLeft(Side::north);
+			ecl_b[slice(i, n, n)] = d.getDiffCoarseToFineLeft(Side::east);
+			scl_b[slice(i, n, n)] = d.getDiffCoarseToFineLeft(Side::south);
+			wcl_b[slice(i, n, n)] = d.getDiffCoarseToFineLeft(Side::west);
 
-			ncr_b[slice(i , n, n)] = d.getDiffCoarseToFineRight(Side::north);
-			ecr_b[slice(i , n, n)] = d.getDiffCoarseToFineRight(Side::east);
-			scr_b[slice(i , n, n)] = d.getDiffCoarseToFineRight(Side::south);
-			wcr_b[slice(i , n, n)] = d.getDiffCoarseToFineRight(Side::west);
+			ncr_b[slice(i, n, n)] = d.getDiffCoarseToFineRight(Side::north);
+			ecr_b[slice(i, n, n)] = d.getDiffCoarseToFineRight(Side::east);
+			scr_b[slice(i, n, n)] = d.getDiffCoarseToFineRight(Side::south);
+			wcr_b[slice(i, n, n)] = d.getDiffCoarseToFineRight(Side::west);
 
 			d.boundary_north[i] = 0;
 		}
 
 		// now insert these results into the matrix for each interface
 		for (Iface iface : todo) {
-
 			bool reverse_x
 			= (iface.axis == X_AXIS && iface.right) || (iface.axis == Y_AXIS && !iface.right);
 			bool reverse_y = iface.right;
@@ -817,7 +815,7 @@ RCP<matrix_type> DomainCollection::formCrsMatrix()
 		}
 	}
 
-    A->fillComplete();
+	A->fillComplete(matrix_map, matrix_map);
 	return A;
 }
 RCP<block_matrix_type> DomainCollection::formBlockCrsMatrix()
@@ -833,7 +831,7 @@ RCP<block_matrix_type> DomainCollection::formBlockCrsMatrix()
 			rows.insert(i.refined_right[q]);
 		}
 	}
-    
+
 	rows.erase(-1);
 	vector<int> cols_array;
 	vector<int> rows_array;

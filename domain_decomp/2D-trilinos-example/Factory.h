@@ -20,5 +20,6 @@ class Factory
 {
 	public:
 	static Teuchos::RCP<op_type> getAmgPreconditioner(Teuchos::RCP<op_type> A);
+	static Teuchos::RCP<matrix_type> blockInverse(Teuchos::RCP<matrix_type> A, int n);
 };
 #endif

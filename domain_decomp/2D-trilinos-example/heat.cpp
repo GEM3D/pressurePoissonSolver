@@ -20,6 +20,7 @@
 #include <BelosLinearProblem.hpp>
 #include <BelosTpetraAdapter.hpp>
 #include <MatrixMarket_Tpetra.hpp>
+#include <Ifpack2_Factory.hpp>
 #include <Teuchos_Comm.hpp>
 #include <Teuchos_GlobalMPISession.hpp>
 #include <Teuchos_ParameterList.hpp>
@@ -121,6 +122,7 @@ int main(int argc, char *argv[])
 	                    {"nozerof"});
 	args::Flag f_lu(parser, "lu", "use LU decomposition", {"lu"});
 	args::Flag f_ilu(parser, "ilu", "use incomplete LU preconditioner", {"ilu"});
+	args::Flag f_riluk(parser, "ilu", "use RILUK preconditioner", {"riluk"});
 	args::Flag f_iter(parser, "iterative", "use iterative method", {"iterative"});
 
 	if (argc < 5) {
@@ -293,6 +295,7 @@ int main(int argc, char *argv[])
 		RCP<vector_type> diff  = rcp(new vector_type(matrix_map, 1));
 		RCP<RBMatrix>    RBA;
 		RCP<Tpetra::Operator<scalar_type>> op;
+		RCP<const Tpetra::RowMatrix<>> rm;
 
 		// Create linear problem for the Belos solver
 		RCP<Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>> problem;
@@ -332,6 +335,7 @@ int main(int argc, char *argv[])
 					cout << "Matrix Formation Time: " << form_time.count() << endl;
 
 				op = A;
+                rm = A;
 
 				if (save_matrix_file != "")
 					Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file,
@@ -352,6 +356,7 @@ int main(int argc, char *argv[])
 					cout << "Matrix Formation Time: " << form_time.count() << endl;
 
 				op = A;
+				rm = A;
 
 				if (save_matrix_file != "") {
 					Tpetra::Experimental::blockCrsMatrixWriter<>(*A, save_matrix_file);
@@ -409,15 +414,15 @@ int main(int argc, char *argv[])
 				new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(op, gamma, b));
 			}
 
-			if (f_ilu) {
+			if (f_riluk) {
 				comm->barrier();
 				steady_clock::time_point prec_start = steady_clock::now();
 
-				RCP<RBMatrix> L, U;
-				RBMatrix      Copy = *RBA;
-				Copy.ilu(L, U);
-				RCP<LUSolver> solver = rcp(new LUSolver(L, U));
-				problem->setLeftPrec(solver);
+				Teuchos::RCP<Ifpack2::RILUK<Tpetra::RowMatrix<>>> P
+				= rcp(new Ifpack2::RILUK<Tpetra::RowMatrix<>>(rm));
+                P->compute();
+
+				problem->setLeftPrec(P);
 
 				comm->barrier();
 				duration<double> prec_time = steady_clock::now() - prec_start;
@@ -425,12 +430,27 @@ int main(int argc, char *argv[])
 				if (my_global_rank == 0)
 					cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
 
-				// ofstream out_file("L.mm");
-				// out_file << *L;
-				// out_file.close();
-				// out_file = ofstream("U.mm");
-				// out_file << *U;
-				// out_file.close();
+			} else if (f_ilu) {
+				comm->barrier();
+				steady_clock::time_point prec_start = steady_clock::now();
+
+				Teuchos::RCP<Ifpack2::ILUT<Tpetra::RowMatrix<>>> P
+				= rcp(new Ifpack2::ILUT<Tpetra::RowMatrix<>>(rm));
+				Teuchos::ParameterList params;
+				params.set("fact: ilut level-of-fill", 1);
+				params.set("fact: drop tolerance", 0.0);
+				params.set("fact: absolute threshold", 0.1);
+                //P->setParameters(params);
+
+                P->compute();
+				problem->setLeftPrec(P);
+
+				comm->barrier();
+				duration<double> prec_time = steady_clock::now() - prec_start;
+
+				if (my_global_rank == 0)
+					cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
+
 			} else if (f_prec) {
 				comm->barrier();
 				steady_clock::time_point prec_start = steady_clock::now();
