@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
 	args::ArgumentParser  parser("");
 	args::HelpFlag        help(parser, "help", "Display this help menu", {'h', "help"});
 
-	args::ValueFlag<int> f_n(parser, "n", "number of cells in the x direction, in each domain",
+	args::ValueFlag<int> f_n(parser, "n", "number of cells in the each direction, in each domain",
 	                          {'n'});
 	args::ValueFlag<int> f_maxiter(
 	parser, "maxiter", "number of cells in the x direction, in each domain", {"maxiter"});
@@ -55,41 +55,13 @@ int main(int argc, char *argv[])
 	                                "the file to write the residual to", {"residual"});
 	args::ValueFlag<string> f_error(parser, "error filename",
 	                                "the file to write the error to", {"error"});
-	args::ValueFlag<string> f_r(parser, "rhs filename", "the file to write the rhs vector to",
-	                            {'r'});
-	args::ValueFlag<string> f_g(parser, "gamma filename", "the file to write the gamma vector to",
-	                            {'g'});
-	args::ValueFlag<string> f_read_gamma(parser, "gamma filename",
-	                                     "the file to read gamma vector from", {"readgamma"});
-	args::ValueFlag<string> f_flux(parser, "flux filename", "the file to write flux difference to",
-	                            {"flux"});
-	args::ValueFlag<string> f_p(parser, "preconditioner filename",
-	                            "the file to write the preconditioner to", {'p'});
 	args::ValueFlag<double> f_t(
 	parser, "tolerance", "set the tolerance of the iterative solver (default is 1e-10)", {'t'});
-    args::ValueFlag<int> f_d(
-	parser, "row", "pin gamma value to zero (by modifying that row of the schur compliment matrix)",
-	{'z'});
-	args::Flag f_pinv(parser, "wrapper", "compute using pseudoinverse", {"pinv"});
-	args::Flag f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
+	args::ValueFlag<double> f_div(parser, "divide", "use iterative method", {"divide"});
 	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
-	args::Flag f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
-	args::Flag f_precata(parser, "prec", "use block diagonal preconditioner", {"precata"});
 	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {"neumann"});
-	args::Flag f_cg(parser, "gmres", "use CG for iterative solver", {"cg"});
-	args::Flag f_gmres(parser, "gmres", "use GMRES for iterative solver", {"gmres"});
-	args::Flag f_lsqr(parser, "gmres", "use GMRES for iterative solver", {"lsqr"});
-	args::Flag f_rgmres(parser, "rgmres", "use GCRO-DR (Recycling GMRES) for iterative solver",
-	                    {"rgmres"});
-	args::Flag f_bicg(parser, "gmres", "use BiCGStab for iterative solver", {"bicg"});
-	args::Flag f_nozero(parser, "nozero", "don't make the average of vector zero in CG solver",
-	                    {"nozero"});
-	args::Flag f_nozerou(parser, "zerou", "don't modify make so that it zeros the solution",
-	                    {"nozerou"});
 	args::Flag f_nozerof(parser, "zerou", "don't modify make so that it zeros the solution",
 	                    {"nozerof"});
-	args::Flag f_lu(parser, "lu", "use LU decomposition", {"lu"});
-	args::Flag f_ilu(parser, "ilu", "use incomplete LU preconditioner", {"ilu"});
 	args::Flag f_iter(parser, "iterative", "use iterative method", {"iterative"});
 
 	if (argc < 5) {
@@ -125,6 +97,11 @@ int main(int argc, char *argv[])
         int d = args::get(f_square);
 		dsc = DomainSignatureCollection(d, d, my_global_rank);
 	}
+    if(f_div){
+		for (int i = 0; i < args::get(f_div); i++) {
+            dsc.divide();
+		}
+	}
 	// Set the number of discretization points in the x and y direction.
 	int    nx            = args::get(f_n);
 	int    ny            = args::get(f_n);
@@ -156,11 +133,6 @@ int main(int argc, char *argv[])
 		loop_count = args::get(f_l);
 	}
 
-    int del = -1;
-	if (f_d) {
-		del = args::get(f_d);
-	}
-
 	string save_matrix_file = "";
 	if (f_m) {
 		save_matrix_file = args::get(f_m);
@@ -178,19 +150,6 @@ int main(int argc, char *argv[])
 	string save_error_file = "";
 	if (f_error) {
 		save_error_file = args::get(f_error);
-	}
-	string save_rhs_file = "";
-	if (f_r) {
-		save_rhs_file = args::get(f_r);
-	}
-	string save_gamma_file = "";
-	if (f_g) {
-		save_gamma_file = args::get(f_g);
-	}
-
-	string save_prec_file = "";
-	if (f_p) {
-		save_prec_file = args::get(f_p);
 	}
 
 	// the functions that we are using
@@ -225,7 +184,8 @@ int main(int argc, char *argv[])
 		nfuny = [](double x, double y) { return M_PIl * cosl(M_PIl * y) * cosl(2 * M_PIl * x); };
 	}
 
-	valarray<double> times(loop_count);
+	valarray<double> setup_times(loop_count);
+	valarray<double> solve_times(loop_count);
 	for (int loop = 0; loop < loop_count; loop++) {
         MPI_Barrier(MPI_COMM_WORLD);
 		steady_clock::time_point domain_start = steady_clock::now();
@@ -277,7 +237,7 @@ int main(int argc, char *argv[])
 		HYPRE_BoomerAMGSetStrongThreshold(precond, .25);
 		HYPRE_BoomerAMGSetCoarsenType(precond, 6);
 		HYPRE_BoomerAMGSetTol(precond, 0.0);
-		// HYPRE_BoomerAMGSetPrintLevel(precond, 1);
+		HYPRE_BoomerAMGSetPrintLevel(precond, 1);
 		HYPRE_BoomerAMGSetMaxIter(precond, 1);
 
 		// set preconditioner
@@ -360,10 +320,8 @@ int main(int argc, char *argv[])
 			// if (f_neumann) {
 			//	std::cout << u8"∮ du/dn - ΣAu: " << dc.sumBoundaryFlux() - ausum << endl;
 			//}
-			cout << std::fixed;
-			cout.precision(2);
 		}
-		times[loop] = total_time.count();
+		solve_times[loop] = solve_time.count();
 		if (save_solution_file != "") {
 			ofstream out_file(save_solution_file);
 			dc.outputSolution(out_file);
@@ -397,26 +355,18 @@ int main(int argc, char *argv[])
 				out_file.close();
 			}
 		}
-		if (save_gamma_file != "") {
-            //TODO
-		}
-        if (f_flux){
-            //TODO
-		}
 		if (f_outclaw) {
 			dc.outputClaw();
 		}
 	}
 
 	if (loop_count > 1 && my_global_rank == 0) {
-		cout << std::fixed;
-		cout.precision(2);
 		std::cout << "Times: ";
-		for (double t : times) {
+		for (double t : solve_times) {
 			cout << t << " ";
 		}
 		cout << endl;
-		cout << "Average: " << times.sum() / times.size() << endl;
+		cout << "Average: " << solve_times.sum() / solve_times.size() << endl;
 	}
 
 	MPI_Finalize();

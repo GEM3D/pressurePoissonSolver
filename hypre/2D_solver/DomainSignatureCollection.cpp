@@ -4,7 +4,8 @@
 #include <set>
 #include <fstream>
 using namespace std;
-DomainSignatureCollection::DomainSignatureCollection(string file_name, int rank){
+DomainSignatureCollection::DomainSignatureCollection(string file_name, int rank)
+{
 	this->rank = rank;
 	if (rank == 0) {
 		num_global_interfaces = 0;
@@ -48,10 +49,150 @@ DomainSignatureCollection::DomainSignatureCollection(string file_name, int rank)
 		determineXY();
 		num_global_domains = domains.size();
 	}
-		indexInterfacesBFS();
+	indexInterfacesBFS();
 	MPI_Bcast(&num_global_domains, 1, MPI_INT, 0, MPI_COMM_WORLD);
 }
-void DomainSignatureCollection::determineCoarseness(){
+void DomainSignatureCollection::divide()
+{
+	if (rank == 0) {
+		std::map<int, DomainSignature> new_domains;
+		for (auto p : domains) {
+			DomainSignature &z = p.second;
+			DomainSignature  a, b, c, d;
+			a.id = z.id * 4;
+			b.id = z.id * 4 + 1;
+			c.id = z.id * 4 + 2;
+			d.id = z.id * 4 + 3;
+
+			a.nbr(Side::north) = c.id;
+			a.nbr(Side::east)  = b.id;
+			b.nbr(Side::north) = d.id;
+			b.nbr(Side::west)  = a.id;
+			c.nbr(Side::east)  = d.id;
+			c.nbr(Side::south) = a.id;
+			d.nbr(Side::south) = b.id;
+			d.nbr(Side::west)  = c.id;
+
+			// north
+			Side s = Side::north;
+			if (z.hasFineNbr(s)) {
+				c.setHasFineNbr(s);
+				c.nbr(s)      = 4 * z.nbr(s);
+				c.nbrRight(s) = 4 * z.nbr(s) + 1;
+
+				d.setHasFineNbr(s);
+				d.nbr(s)      = 4 * z.nbrRight(s);
+				d.nbrRight(s) = 4 * z.nbrRight(s) + 1;
+			} else if (z.hasCoarseNbr(s)) {
+				c.setHasCoarseNbr(s);
+				d.setHasCoarseNbr(s);
+				if (z.leftOfCoarse(s)) {
+					c.nbr(s) = 4 * z.nbr(s) + 1;
+					d.nbr(s) = c.nbr(s);
+				} else {
+					c.nbr(s) = 4 * z.nbr(s);
+					d.nbr(s) = c.nbr(s);
+				}
+			} else if (z.hasNbr(s)) {
+				c.nbr(s) = 4 * z.nbr(s);
+				d.nbr(s) = 4 * z.nbr(s) + 1;
+			}
+
+			// east
+			s = Side::east;
+			if (z.hasFineNbr(s)) {
+				d.setHasFineNbr(s);
+				d.nbr(s)      = 4 * z.nbr(s) + 2;
+				d.nbrRight(s) = 4 * z.nbr(s);
+
+				b.setHasFineNbr(s);
+				b.nbr(s)      = 4 * z.nbrRight(s) + 2;
+				b.nbrRight(s) = 4 * z.nbrRight(s);
+			} else if (z.hasCoarseNbr(s)) {
+				d.setHasCoarseNbr(s);
+				b.setHasCoarseNbr(s);
+				if (z.leftOfCoarse(s)) {
+					d.nbr(s) = 4 * z.nbr(s);
+					b.nbr(s) = d.nbr(s);
+				} else {
+					d.nbr(s) = 4 * z.nbr(s) + 2;
+					b.nbr(s) = d.nbr(s);
+				}
+			} else if (z.hasNbr(s)) {
+				d.nbr(s) = 4 * z.nbr(s) + 2;
+				b.nbr(s) = 4 * z.nbr(s);
+			}
+
+			// south
+			s = Side::south;
+			if (z.hasFineNbr(s)) {
+				b.setHasFineNbr(s);
+				b.nbr(s)      = 4 * z.nbr(s) + 3;
+				b.nbrRight(s) = 4 * z.nbr(s) + 2;
+
+				a.setHasFineNbr(s);
+				a.nbr(s)      = 4 * z.nbrRight(s) + 3;
+				a.nbrRight(s) = 4 * z.nbrRight(s) + 2;
+			} else if (z.hasCoarseNbr(s)) {
+				b.setHasCoarseNbr(s);
+				a.setHasCoarseNbr(s);
+				if (z.leftOfCoarse(s)) {
+					b.nbr(s) = 4 * z.nbr(s) + 2;
+					a.nbr(s) = b.nbr(s);
+				} else {
+					b.nbr(s) = 4 * z.nbr(s) + 3;
+					a.nbr(s) = b.nbr(s);
+				}
+			} else if (z.hasNbr(s)) {
+				b.nbr(s) = 4 * z.nbr(s) + 3;
+				a.nbr(s) = 4 * z.nbr(s) + 2;
+			}
+
+			// west
+			s = Side::west;
+			if (z.hasFineNbr(s)) {
+				a.setHasFineNbr(s);
+				a.nbr(s)      = 4 * z.nbr(s) + 1;
+				a.nbrRight(s) = 4 * z.nbr(s) + 3;
+
+				c.setHasFineNbr(s);
+				c.nbr(s)      = 4 * z.nbrRight(s) + 1;
+				c.nbrRight(s) = 4 * z.nbrRight(s) + 3;
+			} else if (z.hasCoarseNbr(s)) {
+				a.setHasCoarseNbr(s);
+				c.setHasCoarseNbr(s);
+				if (z.leftOfCoarse(s)) {
+					a.nbr(s) = 4 * z.nbr(s) + 3;
+					c.nbr(s) = a.nbr(s);
+				} else {
+					a.nbr(s) = 4 * z.nbr(s) + 1;
+					c.nbr(s) = a.nbr(s);
+				}
+			} else if (z.hasNbr(s)) {
+				a.nbr(s) = 4 * z.nbr(s) + 1;
+				c.nbr(s) = 4 * z.nbr(s) + 3;
+			}
+
+			// add them
+			new_domains[a.id] = a;
+			new_domains[b.id] = b;
+			new_domains[c.id] = c;
+			new_domains[d.id] = d;
+		}
+
+		// replace old domains
+		domains = new_domains;
+
+		determineCoarseness();
+		determineAmrLevel();
+		determineXY();
+		num_global_domains = domains.size();
+	}
+	indexInterfacesBFS();
+	MPI_Bcast(&num_global_domains, 1, MPI_INT, 0, MPI_COMM_WORLD);
+}
+void DomainSignatureCollection::determineCoarseness()
+{
 	set<int>   visited;
 	set<int>   enqueued;
 	deque<int> queue;
@@ -63,8 +204,8 @@ void DomainSignatureCollection::determineCoarseness(){
 		DomainSignature &d    = domains.at(curr);
 		queue.pop_front();
 		visited.insert(curr);
-        Side s = Side::north;
-        do{
+		Side s = Side::north;
+		do {
 			if (d.hasNbr(s)) {
 				if (d.hasFineNbr(s)) {
 					DomainSignature &nbr_left  = domains.at(d.nbr(s));
