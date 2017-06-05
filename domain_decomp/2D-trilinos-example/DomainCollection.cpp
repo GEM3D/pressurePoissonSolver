@@ -1,6 +1,7 @@
 #include "DomainCollection.h"
 #include <tuple>
 #include <array>
+#include <Tpetra_Experimental_BlockCrsMatrix_def.hpp>
 using Teuchos::RCP;
 using Teuchos::rcp;
 using namespace std;
@@ -868,8 +869,7 @@ RCP<block_matrix_type> DomainCollection::formBlockCrsMatrix()
 		}
 	}
 	graph->fillComplete();
-	RCP<block_matrix_type> A = rcp(new block_matrix_type(*graph, n));
-
+	RCP<block_matrix_type> A = rcp(new block_matrix_type(*graph, *matrix_map, *matrix_map, n));
 
 	auto insertBlock = [&](int i, int j, RCP<valarray<double>> block, bool flip_i, bool flip_j) {
 		int local_i = A->getRowMap()->getLocalElement(i);

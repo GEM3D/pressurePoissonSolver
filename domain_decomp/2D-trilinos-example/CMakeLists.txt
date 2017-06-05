@@ -12,11 +12,7 @@ cmake_minimum_required(VERSION 2.8)
 # Your "do-configure" script that invokes CMake should set
 # TRILINOS_PATH to the path to your Trilinos install.
 # You do _not_ need to edit this line.
-#find_package(Trilinos PATHS $ENV{TRILINOS_PATH}/lib/cmake/Trilinos $ENV{TRILINOS_PATH})
-find_package(Belos PATHS $ENV{TRILINOS_DIR}/lib/cmake/Belos $ENV{TRILINOS_DIR})
-find_package(Tpetra PATHS $ENV{TRILINOS_DIR}/lib/cmake/Tpetra $ENV{TRILINOS_DIR})
-find_package(Zoltan PATHS $ENV{TRILINOS_DIR}/lib/cmake/Zoltan $ENV{TRILINOS_DIR})
-find_package(MueLu PATHS $ENV{TRILINOS_DIR}/lib/cmake/MueLu $ENV{TRILINOS_DIR})
+find_package(Trilinos PATHS $ENV{TRILINOS_DIR}/lib/cmake/Trilinos $ENV{TRILINOS_DIR})
 
 # If FIND_PACKAGE successfully found your Trilinos install, it will
 # set the Boolean flag Trilinos_FOUND.  The following IF statement
@@ -24,20 +20,10 @@ find_package(MueLu PATHS $ENV{TRILINOS_DIR}/lib/cmake/MueLu $ENV{TRILINOS_DIR})
 # found, it prints out the values of some Trilinos configuration
 # details.  You may find them useful for building your application
 # that uses Trilinos.
-IF(Belos_FOUND)
-  MESSAGE("Found Belos!")
+IF(Trilinos_FOUND)
+  MESSAGE("Found Trilinos!")
 ELSE()
-    MESSAGE(FATAL_ERROR "Could not find Belos!\n Is TRILINOS_DIR set?")
-ENDIF()
-IF(Tpetra_FOUND)
-   MESSAGE("Found Tpetra!")
-ELSE()
-    MESSAGE(FATAL_ERROR "Could not find Tpetra!\n Is TRILINOS_DIR set?")
-ENDIF()
-IF(Tpetra_FOUND)
-   MESSAGE("Found Zoltan!")
-ELSE()
-    MESSAGE(FATAL_ERROR "Could not find Zoltan!\n Is TRILINOS_DIR set?")
+    MESSAGE(FATAL_ERROR "Could not find Trilinos!\n Is TRILINOS_DIR set?")
 ENDIF()
 
 
@@ -94,20 +80,16 @@ set(SOURCES
 # libraries (TPLs) with which Trilinos was built.
 #
 include_directories(".")
-include_directories(${Belos_TPL_INCLUDE_DIRS})
-include_directories(${Belos_INCLUDE_DIRS})
-include_directories(${Tpetra_TPL_INCLUDE_DIRS})
-include_directories(${Tpetra_INCLUDE_DIRS})
+include_directories(${Trilinos_TPL_INCLUDE_DIRS})
+include_directories(${Trilinos_INCLUDE_DIRS})
 include_directories(${FFTW_INCLUDES})
 include_directories(${MPI_CXX_INCLUDE_PATH})
 
 # Add to the library path Trilinos' library path, and the library
 # paths of the third-party libraries (TPLs) with which Trilinos was
 # built.  
-link_directories(${Belos_LIBRARY_DIRS})
-link_directories(${Belos_TPL_LIBRARY_DIRS})
-link_directories(${Tpetra_LIBRARY_DIRS})
-link_directories(${Tpetra_TPL_LIBRARY_DIRS})
+link_directories(${Trilinos_LIBRARY_DIRS})
+link_directories(${Trilinos_TPL_LIBRARY_DIRS})
 
 # 
 # EDIT HERE: Change trilinosExample to the name of the executable
@@ -137,50 +119,36 @@ target_link_libraries(heat
     RBMatrix
     Domain
     Factory
-  ${Belos_TPL_LIBRARIES}
-  ${Tpetra_TPL_LIBRARIES}
-  ${MueLu_TPL_LIBRARIES}
+  ${Trilinos_TPL_LIBRARIES}
+  ${Trilinos_LIBRARIES} 
   ${FFTW_LIB}
-  ${Belos_LIBRARIES} 
-  ${Tpetra_LIBRARIES} 
-  ${MueLu_LIBRARIES} 
   ${MPI_CXX_LIBRARIES} 
 )
 target_link_libraries(Factory
-  ${Belos_TPL_LIBRARIES}
-  ${Tpetra_TPL_LIBRARIES}
-  ${MueLu_TPL_LIBRARIES}
-  ${Belos_LIBRARIES} 
-  ${Tpetra_LIBRARIES} 
-  ${MueLu_LIBRARIES} 
+  ${Trilinos_TPL_LIBRARIES}
+  ${Trilinos_LIBRARIES} 
   ${MPI_CXX_LIBRARIES} 
 )
 target_link_libraries(RBMatrix
-  ${Belos_TPL_LIBRARIES}
-  ${Tpetra_TPL_LIBRARIES}
+  ${Trilinos_TPL_LIBRARIES}
+  ${Trilinos_LIBRARIES} 
   ${FFTW_LIB}
-  ${Belos_LIBRARIES} 
-  ${Tpetra_LIBRARIES} 
   ${MPI_CXX_LIBRARIES} 
 )
 target_link_libraries(DomainCollection
     RBMatrix 
     Domain
-  ${Belos_TPL_LIBRARIES}
-  ${Tpetra_TPL_LIBRARIES}
+  ${Trilinos_TPL_LIBRARIES}
+  ${Trilinos_LIBRARIES} 
   ${FFTW_LIB}
-  ${Belos_LIBRARIES} 
-  ${Tpetra_LIBRARIES} 
   ${MPI_CXX_LIBRARIES} 
 )
 target_link_libraries(Domain
     FftwSolver
     #    FishpackSolver
-  ${Belos_TPL_LIBRARIES}
-  ${Tpetra_TPL_LIBRARIES}
+  ${Trilinos_TPL_LIBRARIES}
+  ${Trilinos_LIBRARIES} 
   ${FFTW_LIB}
-  ${Belos_LIBRARIES} 
-  ${Tpetra_LIBRARIES} 
   ${MPI_CXX_LIBRARIES} 
 )
 #target_link_libraries(FishpackSolver
@@ -191,6 +159,6 @@ target_link_libraries(FftwSolver
     Domain
 )
 target_link_libraries(DomainSignatureCollection
-  ${Zoltan_TPL_LIBRARIES}
-  ${Zoltan_LIBRARIES} 
+  ${Trilinos_TPL_LIBRARIES}
+  ${Trilinos_LIBRARIES} 
 )

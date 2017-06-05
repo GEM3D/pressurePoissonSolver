@@ -100,6 +100,7 @@ int main(int argc, char *argv[])
     args::ValueFlag<int> f_d(
 	parser, "row", "pin gamma value to zero (by modifying that row of the schur compliment matrix)",
 	{'z'});
+	args::ValueFlag<int> f_div(parser, "divide", "use iterative method", {"divide"});
 	args::Flag f_pinv(parser, "wrapper", "compute using pseudoinverse", {"pinv"});
 	args::Flag f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
 	args::Flag f_blockcrs(parser, "wrapper", "use a function wrapper", {"blockcrs"});
@@ -157,6 +158,11 @@ int main(int argc, char *argv[])
 	} else {
         int d = args::get(f_square);
 		dsc = DomainSignatureCollection(d, d, comm->getRank());
+	}
+    if(f_div){
+		for (int i = 0; i < args::get(f_div); i++) {
+            dsc.divide();
+		}
 	}
 	// Set the number of discretization points in the x and y direction.
 	int    nx            = args::get(f_n);

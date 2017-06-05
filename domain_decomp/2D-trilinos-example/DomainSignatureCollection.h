@@ -17,15 +17,15 @@ struct DomainSignature {
 
 	int refine_level = 1;
 
-	std::array<int, 8> nbr_id      = {-1, -1, -1, -1, -1, -1, -1, -1};
-	std::array<int, 8> proc     = {-1, -1, -1, -1, -1, -1, -1, -1};
-	std::array<int, 4> global_i = {-1, -1, -1, -1};
-	std::array<int, 4> global_i_center = {-1, -1, -1, -1};
-	std::array<int, 8> global_i_refined = {-1, -1, -1, -1,-1,-1,-1,-1};
+	std::array<int, 8> nbr_id           = {{-1, -1, -1, -1, -1, -1, -1, -1}};
+	std::array<int, 8> proc             = {{-1, -1, -1, -1, -1, -1, -1, -1}};
+	std::array<int, 4> global_i         = {{-1, -1, -1, -1}};
+	std::array<int, 4> global_i_center  = {{-1, -1, -1, -1}};
+	std::array<int, 8> global_i_refined = {{-1, -1, -1, -1, -1, -1, -1, -1}};
 	std::bitset<4> nbr_coarse;
 	std::bitset<4> nbr_fine;
 	std::bitset<4> left_of_coarse;
-	int global_i_west = -1;
+	int            global_i_west = -1;
 	/**
 	 * @brief The lower left x coordinate of domain
 	 */
@@ -97,6 +97,7 @@ class DomainSignatureCollection
 	void determineCoarseness();
 	void determineAmrLevel();
 	void determineXY();
+	void divide();
 	/**
 	 * @brief Generate a grid of domains.
 	 *

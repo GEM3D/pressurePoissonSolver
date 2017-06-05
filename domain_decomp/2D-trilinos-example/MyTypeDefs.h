@@ -1,7 +1,7 @@
 #ifndef MYTYPEDEFS_H
 #define MYTYPEDEFS_H
 #include <Tpetra_CrsMatrix.hpp>
-#include <Tpetra_Experimental_BlockCrsMatrix_decl.hpp>
+#include <Tpetra_Experimental_BlockCrsMatrix_Helpers.hpp>
 #include <Tpetra_DefaultPlatform.hpp>
 #include <Kokkos_View.hpp>
 #include <Kokkos_Core.hpp>
