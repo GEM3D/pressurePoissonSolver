@@ -6,6 +6,7 @@
 #include "FunctionWrapper.h"
 #include "MyTypeDefs.h"
 #include "OpATA.h"
+#include "OpShift.h"
 #include "ZeroSum.h"
 #include "args.h"
 //#include <Amesos2.hpp>
@@ -299,7 +300,8 @@ int main(int argc, char *argv[])
 		RCP<vector_type> x     = rcp(new vector_type(matrix_map, 1));
 		RCP<vector_type> d     = rcp(new vector_type(matrix_map, 1));
 		RCP<vector_type> diff  = rcp(new vector_type(matrix_map, 1));
-		RCP<RBMatrix>    RBA;
+		RCP<RBMatrix>                      RBA;
+		RCP<matrix_type>                   A;
 		RCP<Tpetra::Operator<scalar_type>> op;
 		RCP<const Tpetra::RowMatrix<>> rm;
 
@@ -331,7 +333,10 @@ int main(int argc, char *argv[])
 				// start time
 				comm->barrier();
 				steady_clock::time_point form_start = steady_clock::now();
-				RCP<matrix_type> A = dc.formCrsMatrix();
+
+				RCP<single_vector_type> s;
+
+				dc.formCrsMatrix(A, s);
 
 				// stop time
 				comm->barrier();
@@ -340,33 +345,18 @@ int main(int argc, char *argv[])
 				if (my_global_rank == 0)
 					cout << "Matrix Formation Time: " << form_time.count() << endl;
 
-				op = A;
-                rm = A;
+				if (f_neumann && !f_nozerou) {
+					RCP<OpShift> os = rcp(new OpShift(A, s));
+					op              = os;
+				} else {
+					op = A;
+				}
+				rm = A;
 
 				if (save_matrix_file != "")
 					Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file,
 					                                                          A, "", "");
 
-
-            }else if (f_blockcrs) {
-				// start time
-				comm->barrier();
-				steady_clock::time_point form_start = steady_clock::now();
-				RCP<block_matrix_type> A = dc.formBlockCrsMatrix();
-
-				// stop time
-				comm->barrier();
-				duration<double> form_time = steady_clock::now() - form_start;
-
-				if (my_global_rank == 0)
-					cout << "Matrix Formation Time: " << form_time.count() << endl;
-
-				op = A;
-				rm = A;
-
-				if (save_matrix_file != "") {
-					Tpetra::Experimental::blockCrsMatrixWriter<>(*A, save_matrix_file);
-				}
 
 			} else if (f_wrapper) {
 				// Create a function wrapper
@@ -490,7 +480,7 @@ int main(int argc, char *argv[])
 				steady_clock::time_point prec_start = steady_clock::now();
 
 				Teuchos::RCP<Tpetra::Operator<scalar_type>> P
-				= Factory::getAmgPreconditioner(op);
+				= Factory::getAmgPreconditioner(A);
 				problem->setLeftPrec(P);
 
 				comm->barrier();

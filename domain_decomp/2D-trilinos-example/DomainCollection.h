@@ -66,6 +66,9 @@ class DomainCollection
 	Teuchos::RCP<int_vector_type> iface_info;
 
     std::set<Iface> ifaces;
+    std::set<Blockk> blocks;
+
+	void getBlocks();
 
 	public:
 	std::map<int, Teuchos::RCP<Domain>> domains;
@@ -86,7 +89,7 @@ class DomainCollection
 	/**
 	 * @brief Tpetra map use for interface information.
 	 */
-	Teuchos::RCP<map_type> iface_map;
+	Teuchos::RCP<const map_type> iface_map;
 	DomainSignatureCollection dsc;
 
 	/**
@@ -231,8 +234,7 @@ class DomainCollection
 	 * @return the formed matrix
 	 */
 	Teuchos::RCP<RBMatrix> formRBMatrix(Teuchos::RCP<map_type> map, int delete_row = -1);
-	Teuchos::RCP<block_matrix_type> formBlockCrsMatrix();
-	Teuchos::RCP<matrix_type> formCrsMatrix();
+	void formCrsMatrix(Teuchos::RCP<matrix_type> &A, Teuchos::RCP<single_vector_type> &s);
 
 	void swapResidSol()
 	{

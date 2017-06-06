@@ -1,5 +1,70 @@
 #ifndef IFACE_H
 #define IFACE_H
+enum class BlockType {
+	north,
+	east,
+	south,
+	west,
+	// fine in
+	north_fine_in,
+	east_fine_in,
+	south_fine_in,
+	west_fine_in,
+	// fine out
+	// left
+	north_fine_out_left,
+	east_fine_out_left,
+	south_fine_out_left,
+	west_fine_out_left,
+	// right
+	north_fine_out_right,
+	east_fine_out_right,
+	south_fine_out_right,
+	west_fine_out_right,
+	// coarse in
+	north_coarse_in,
+	east_coarse_in,
+	south_coarse_in,
+	west_coarse_in,
+	// coarse out
+	// left
+	north_coarse_out_left,
+	east_coarse_out_left,
+	south_coarse_out_left,
+	west_coarse_out_left,
+	// right
+	north_coarse_out_right,
+	east_coarse_out_right,
+	south_coarse_out_right,
+	west_coarse_out_right
+};
+class Blockk
+{
+	public:
+	Blockk(int i, int j, bool flip_i, bool flip_j, bool right, std::bitset<4> neumann,
+	       BlockType type)
+	{
+		this->i       = i;
+		this->j       = j;
+		this->flip_i  = flip_i;
+		this->flip_j  = flip_j;
+		this->right   = right;
+		this->neumann = neumann;
+		this->type    = type;
+	}
+	int            i, j;
+	bool           flip_i, flip_j, right;
+	std::bitset<4> neumann;
+	BlockType      type;
+	friend bool operator==(const Blockk &l, const Blockk &r)
+	{
+		return l.neumann == r.neumann;
+	}
+	friend bool operator<(const Blockk &l, const Blockk &r)
+	{
+		return std::tie(l.j, l.i, l.right) < std::tie(r.j, r.i, r.right);
+	}
+};
 class Iface
 {
 	public:
@@ -113,7 +178,7 @@ class Iface
 		Side iface_s = Side::north;
 		do {
 			if (d.hasNbr(iface_s)) {
-				int iface_i = d.index(iface_s) * Iface::size;
+				int iface_i = d.globalIndex(iface_s) * Iface::size;
 				int i       = 0;
 				// left
 				if (iface_s == Side::north || iface_s == Side::east) {
