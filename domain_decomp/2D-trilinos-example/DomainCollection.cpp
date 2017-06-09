@@ -423,8 +423,7 @@ void DomainCollection::generateMaps()
 		collection_map = Teuchos::rcp(new map_type(-1, &global[0], global.size(), 0, this->comm));
 		collection_iface_map
 		= Teuchos::rcp(new map_type(-1, &c_iface_global[0], c_iface_global.size(), 0, this->comm));
-		matrix_map
-		= Teuchos::rcp(new map_type(-1, &matrix_global[0], matrix_global.size(), 0, this->comm));
+		matrix_map = Teuchos::rcp(new map_type(-1, matrix_global.size(), 0, this->comm));
 		iface_map = Tpetra::createLocalMap<int, int>(
 		(size_t) Iface::size * dsc.num_global_interfaces, this->comm);
 	}
@@ -669,7 +668,7 @@ void DomainCollection::formCrsMatrix(RCP<matrix_type> &A, RCP<single_vector_type
 	RCP<map_type> row_map = rcp(new map_type(-1, &rows_array[0], rows_array.size(), 0, this->comm));
 	RCP<map_type> col_map = rcp(new map_type(-1, &cols_array[0], cols_array.size(), 0, this->comm));
 
-	A = rcp(new matrix_type(row_map, col_map, 5 * n));
+	A = rcp(new matrix_type(matrix_map, col_map, 5 * n));
 	s = rcp(new single_vector_type(matrix_map));
 
 	set<pair<int, int>> inserted;

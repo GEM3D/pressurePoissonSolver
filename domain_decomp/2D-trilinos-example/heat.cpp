@@ -22,6 +22,9 @@
 #include <BelosTpetraAdapter.hpp>
 #include <MatrixMarket_Tpetra.hpp>
 #include <Ifpack2_Factory.hpp>
+#include <Ifpack2_ILUT_decl.hpp>
+#include <Ifpack2_ILUT_def.hpp>
+#include <Ifpack2_Hypre.hpp>
 #include <Teuchos_Comm.hpp>
 #include <Teuchos_GlobalMPISession.hpp>
 #include <Teuchos_ParameterList.hpp>
@@ -38,7 +41,9 @@
 //#include <mpi.h>
 #include <string>
 #include <unistd.h>
-# define M_PIl          3.141592653589793238462643383279502884L /* pi */
+#ifndef M_PIl
+#define M_PIl          3.141592653589793238462643383279502884L /* pi */
+#endif
 
 using Teuchos::RCP;
 using Teuchos::rcp;
@@ -109,6 +114,7 @@ int main(int argc, char *argv[])
 	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
 	args::Flag f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
 	args::Flag f_precamg(parser, "prec", "use AMG preconditioner", {"precamg"});
+	args::Flag f_boomer(parser, "prec", "use BoomerAMG preconditioner", {"boomer"});
 	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {"neumann"});
 	args::Flag f_cg(parser, "gmres", "use CG for iterative solver", {"cg"});
 	args::Flag f_gmres(parser, "gmres", "use GMRES for iterative solver", {"gmres"});
@@ -169,9 +175,7 @@ int main(int argc, char *argv[])
 	int    nx            = args::get(f_n);
 	int    ny            = args::get(f_n);
 	int    total_cells   = dsc.num_global_domains*nx*ny;
-	if (f_amr) {
-		total_cells *= 5;
-	}
+	cerr << "Total cells: " << total_cells << endl;
 
 	if (dsc.num_global_domains < num_procs) {
 		std::cerr << "number of domains must be greater than or equal to the number of processes\n";
@@ -410,7 +414,57 @@ int main(int argc, char *argv[])
 				new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(op, gamma, b));
 			}
 
-			if (f_riluk) {
+			if (f_boomer) {
+				comm->barrier();
+				steady_clock::time_point prec_start = steady_clock::now();
+				using Teuchos::ParameterList;
+				using Ifpack2::FunctionParameter;
+				using Ifpack2::Hypre::Prec;
+				typedef Tpetra::CrsMatrix<>::scalar_type         Scalar;
+				typedef Tpetra::CrsMatrix<>::local_ordinal_type  LO;
+				typedef Tpetra::CrsMatrix<>::global_ordinal_type GO;
+				typedef Tpetra::CrsMatrix<>::node_type           Node;
+				typedef Ifpack2::Preconditioner<scalar_type>     Preconditioner;
+
+				//
+				// Create the parameters for hypre
+				//
+				RCP<FunctionParameter> functs[6];
+				functs[0] = rcp(new FunctionParameter(Prec, &HYPRE_BoomerAMGSetPrintLevel,
+				                                      1)); // print AMG solution info
+				functs[1] = rcp(new FunctionParameter(Prec, &HYPRE_BoomerAMGSetCoarsenType,
+				                                      6)); // Falgout coarsening
+				functs[2] = rcp(new FunctionParameter(Prec, &HYPRE_BoomerAMGSetStrongThreshold,
+				                                      .25)); // Sym GS/Jacobi hybrid
+				functs[3] = rcp(new FunctionParameter(Prec, &HYPRE_BoomerAMGSetNumSweeps,
+				                                      1)); // Sweeps on each level
+				functs[4] = rcp(
+				new FunctionParameter(Prec, &HYPRE_BoomerAMGSetTol, 0.0)); // Conv tolerance zero
+				functs[5] = rcp(new FunctionParameter(Prec, &HYPRE_BoomerAMGSetMaxIter,
+				                                      1)); // Do only one iteration!
+
+				//
+				// Create the preconditioner
+				//
+				RCP<Preconditioner> prec
+				= rcp(new Ifpack2::Ifpack2_Hypre<double, int, int, Node>(A));
+
+				ParameterList hypreList;
+				hypreList.set("SolveOrPrecondition", Prec);
+				hypreList.set("Preconditioner", Ifpack2::Hypre::BoomerAMG);
+				hypreList.set("NumFunctions", 6);
+				hypreList.set<RCP<FunctionParameter> *>("Functions", functs);
+
+				prec->setParameters(hypreList);
+				prec->initialize();
+				prec->compute();
+				problem->setLeftPrec(prec);
+
+				comm->barrier();
+				duration<double> prec_time = steady_clock::now() - prec_start;
+				if (my_global_rank == 0)
+					cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
+			} else if (f_riluk) {
 				comm->barrier();
 				steady_clock::time_point prec_start = steady_clock::now();
 
@@ -433,7 +487,7 @@ int main(int argc, char *argv[])
 				Teuchos::RCP<Ifpack2::ILUT<Tpetra::RowMatrix<>>> P
 				= rcp(new Ifpack2::ILUT<Tpetra::RowMatrix<>>(rm));
 				Teuchos::ParameterList params;
-				params.set("fact: ilut level-of-fill", 1);
+				params.set("fact: ilut level-of-fill", 3);
 				params.set("fact: drop tolerance", 0.0);
 				params.set("fact: absolute threshold", 0.1);
                 //P->setParameters(params);

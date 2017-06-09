@@ -479,7 +479,6 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank)
 {
 	this->rank            = rank;
 	num_global_domains    = d_x * d_y;
-	num_global_interfaces = 0;
 	if (rank == 0) {
 		for (int domain_y = 0; domain_y < d_y; domain_y++) {
 			for (int domain_x = 0; domain_x < d_x; domain_x++) {
@@ -517,7 +516,6 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank,
 {
 	this->rank            = rank;
 	num_global_domains    = d_x * d_y*5;
-	num_global_interfaces = 0;
 	if (rank == 0) {
 		for (int domain_y = 0; domain_y < d_y; domain_y++) {
 			for (int domain_x = 0; domain_x < d_x; domain_x++) {
