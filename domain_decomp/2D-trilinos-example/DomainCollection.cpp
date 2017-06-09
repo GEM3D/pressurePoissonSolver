@@ -409,7 +409,6 @@ void DomainCollection::generateMaps()
 	for (int i = 0; i < Iface::size * dsc.num_global_interfaces; i++) {
 		iface_global.push_back(i);
 	}
-	cerr << dsc.num_global_interfaces << endl;
 
 	// Now that the global indices have been calculated, we can create a map for the interface
 	// points
@@ -441,7 +440,6 @@ void DomainCollection::distributeIfaceInfo()
 		Domain &d = *p.second;
 		Iface::writeIfaces(d, *iface_info);
 	}
-	cerr << iface_map->isDistributed() << endl;
     iface_info->reduce();
 	Iface::readIfaces(ifaces, *iface_info);
 }
@@ -678,11 +676,11 @@ void DomainCollection::formCrsMatrix(RCP<matrix_type> &A, RCP<single_vector_type
 		if (i == j) {
 			if (flip_j) {
 				for (int q = 0; q < n; q++) {
-					s->sumIntoGlobalValue(j + q, shift_rev[q]);
+					s->sumIntoGlobalValue(j*n + q, shift_rev[q]);
 				}
 			} else {
 				for (int q = 0; q < n; q++) {
-					s->sumIntoGlobalValue(j + q, shift[q]);
+					s->sumIntoGlobalValue(j*n + q, shift[q]);
 				}
 			}
 		}
@@ -725,7 +723,6 @@ void DomainCollection::formCrsMatrix(RCP<matrix_type> &A, RCP<single_vector_type
 
 	int num_types = 0;
 	while (!blocks.empty()) {
-        cerr << "hello!\n";
 		num_types++;
 		// the first in the set is the type of interface that we are going to solve for
 		set<Blockk> todo;

@@ -17,18 +17,15 @@ class OpShift : public Tpetra::Operator<scalar_type>
 		this->s = s;
 		ones    = Teuchos::rcp(new single_vector_type(s->getMap()));
 		ones->putScalar(1);
-        std::cerr << "Sum : "<<s->meanValue()*s->getGlobalLength()<<std::endl;
 	}
 	void apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode = Teuchos::NO_TRANS,
 	           scalar_type alpha = Teuchos::ScalarTraits<scalar_type>::one(),
 	           scalar_type beta  = Teuchos::ScalarTraits<scalar_type>::zero()) const
 	{
         A->apply(x,y);
-		Teuchos::ArrayView<double> dots(new double[s->getNumVectors()], s->getNumVectors());
-		s->dot(y, dots);
 		for (size_t i = 0; i < y.getNumVectors(); i++) {
-            std::cerr << "Dot"<<i<<": " <<dots[i] << std::endl;
-			y.getVectorNonConst(i)->update(dots[i], *ones, 1.0);
+			double dot = s->dot(*x.getVector(i));
+			y.getVectorNonConst(i)->update(dot, *ones, 1.0);
 		}
 	}
 	Teuchos::RCP<const map_type> getDomainMap() const { return A->getDomainMap(); }
