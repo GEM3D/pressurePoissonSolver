@@ -265,7 +265,8 @@ int main(int argc, char *argv[])
 		nfuny = [](double x, double y) { return M_PIl * cosl(M_PIl * y) * cosl(2 * M_PIl * x); };
 	}
 
-	valarray<double> times(loop_count);
+	valarray<double> setup_times(loop_count);
+	valarray<double> solve_times(loop_count);
 	for (int loop = 0; loop < loop_count; loop++) {
 		comm->barrier();
 
@@ -322,6 +323,7 @@ int main(int argc, char *argv[])
 				d.f += fdiff;
 			}
 		}
+        steady_clock::time_point tsolve_start; 
 		if (dsc.num_global_domains != 1) {
 			// do iterative solve
 
@@ -332,6 +334,12 @@ int main(int argc, char *argv[])
 			if (save_rhs_file != "") {
 				Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_rhs_file, b, "", "");
 			}
+
+            ///////////////////
+			// setup start
+            ///////////////////
+			comm->barrier();
+			steady_clock::time_point setup_start = steady_clock::now();
 
 			if (f_crs) {
 				// start time
@@ -360,8 +368,6 @@ int main(int argc, char *argv[])
 				if (save_matrix_file != "")
 					Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file,
 					                                                          A, "", "");
-
-
 			} else if (f_wrapper) {
 				// Create a function wrapper
 				op = rcp(new FuncWrap(b, &dc));
@@ -545,6 +551,23 @@ int main(int argc, char *argv[])
 
 			}
 
+            ///////////////////
+			// setup end
+            ///////////////////
+			comm->barrier();
+			duration<double> setup_time = steady_clock::now() - setup_start;
+
+			if (my_global_rank == 0)
+				cout << "Setup Time: " << setup_time.count() << endl;
+
+			setup_times[loop] = setup_time.count();
+
+			///////////////////
+			// solve start
+			///////////////////
+			comm->barrier();
+			tsolve_start = steady_clock::now();
+
 			if (f_read_gamma) {
 				gamma = Tpetra::MatrixMarket::Reader<matrix_type>::readDenseFile(
 				args::get(f_read_gamma), comm, matrix_map_const);
@@ -664,6 +687,16 @@ int main(int argc, char *argv[])
 			dc.sumResidIntoSol();
 		}
 
+		///////////////////
+		// solve end
+		///////////////////
+		comm->barrier();
+		duration<double> tsolve_time = steady_clock::now() - tsolve_start;
+
+		if (my_global_rank == 0) cout << "Solve Time: " << tsolve_time.count() << endl;
+
+		solve_times[loop] = tsolve_time.count();
+
 		// Calcuate error
 		RCP<map_type>    err_map = rcp(new map_type(-1, 1, 0, comm));
 		Tpetra::Vector<> exact_norm(err_map);
@@ -707,10 +740,8 @@ int main(int argc, char *argv[])
 			// if (f_neumann) {
 			//	std::cout << u8"∮ du/dn - ΣAu: " << dc.sumBoundaryFlux() - ausum << endl;
 			//}
-			cout << std::fixed;
-			cout.precision(2);
+			cout << std::defaultfloat;
 		}
-		times[loop] = total_time.count();
 		if (save_solution_file != "") {
 			ofstream out_file(save_solution_file);
 			dc.outputSolution(out_file);
@@ -753,17 +784,22 @@ int main(int argc, char *argv[])
 		if (f_outclaw) {
 			dc.outputClaw();
 		}
+        cout << std::defaultfloat;
 	}
 
 	if (loop_count > 1 && my_global_rank == 0) {
-		cout << std::fixed;
-		cout.precision(2);
-		std::cout << "Times: ";
-		for (double t : times) {
+		std::cout << "Setup Times: ";
+		for (double t : setup_times) {
 			cout << t << " ";
 		}
 		cout << endl;
-		cout << "Average: " << times.sum() / times.size() << endl;
+		cout << "Average: " << setup_times.sum() / setup_times.size() << endl;
+		std::cout << "Solve Times: ";
+		for (double t : solve_times) {
+			cout << t << " ";
+		}
+		cout << endl;
+		cout << "Average: " << solve_times.sum() / solve_times.size() << endl;
 	}
 
 	return 0;
