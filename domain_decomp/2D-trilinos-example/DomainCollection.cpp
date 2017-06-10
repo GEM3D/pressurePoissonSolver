@@ -499,6 +499,9 @@ void DomainCollection::solveWithInterface(const vector_type &gamma, vector_type 
 	// gamma.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
 	// diff.update(-2, gamma, 1);
 	diff.scale(-1);
+    if(false&&pin_gamma){
+		diff.replaceGlobalValue(0,0, 0);
+	}
 }
 double DomainCollection::diffNorm()
 {
@@ -700,6 +703,18 @@ void DomainCollection::formCrsMatrix(RCP<matrix_type> &A, RCP<single_vector_type
 					block_j = n - j - 1;
 				}
 				copy[i * n + j] = orig[block_i * n + block_j];
+			}
+		}
+		if (pin_gamma) {
+			if (i == 0) {
+				if (j == 0) {
+					copy[0] = 1;
+				} else {
+					copy[0] = 0;
+				}
+				for (i = 1; i < n; i++) {
+					copy[i] = 0;
+				}
 			}
 		}
 		vector<int> inds(n);

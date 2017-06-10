@@ -20,6 +20,7 @@ class DomainCollection
 
     bool neumann = false;
     bool zero_u = false;
+    bool pin_gamma = false;
 	/**
 	 * @brief A map of domain ids to the domain objects.
 	 */
@@ -226,6 +227,7 @@ class DomainCollection
 	double area();
 	double integrateAU();
 	void   setZeroU() { zero_u = true; }
+	void   setPinGamma() { pin_gamma = true; }
 	/**
 	 * @brief Form the Schur complement matrix using an RBMatrix
 	 *

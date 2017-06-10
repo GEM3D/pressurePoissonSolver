@@ -128,6 +128,8 @@ int main(int argc, char *argv[])
 	                    {"nozerou"});
 	args::Flag f_nozerof(parser, "zerou", "don't modify make so that it zeros the solution",
 	                    {"nozerof"});
+	args::Flag f_pingamma(parser, "pingamma", "pin the first gamma to zero",
+	                    {"pingamma"});
 	args::Flag f_lu(parser, "lu", "use LU decomposition", {"lu"});
 	args::Flag f_ilu(parser, "ilu", "use incomplete LU preconditioner", {"ilu"});
 	args::Flag f_riluk(parser, "ilu", "use RILUK preconditioner", {"riluk"});
@@ -276,6 +278,9 @@ int main(int argc, char *argv[])
 		if (f_neumann && !f_nozerou) {
 			dc.setZeroU();
 		}
+		if (f_pingamma) {
+			dc.setPinGamma();
+        }
 
 		ZeroSum zs;
 		if (f_neumann) {
