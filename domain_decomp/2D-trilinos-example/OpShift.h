@@ -8,10 +8,10 @@
 class OpShift : public Tpetra::Operator<scalar_type>
 {
 	public:
-	Teuchos::RCP<matrix_type> A;
+	Teuchos::RCP<Tpetra::Operator<scalar_type>> A;
 	Teuchos::RCP<single_vector_type> s;
     Teuchos::RCP<single_vector_type> ones;
-	OpShift(Teuchos::RCP<matrix_type> A, Teuchos::RCP<single_vector_type> s)
+	OpShift(Teuchos::RCP<Tpetra::Operator<scalar_type>> A, Teuchos::RCP<single_vector_type> s)
 	{
 		this->A = A;
 		this->s = s;

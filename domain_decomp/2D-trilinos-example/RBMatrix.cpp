@@ -27,7 +27,6 @@ RBMatrix::RBMatrix(Teuchos::RCP<map_type> map, int block_size, int num_blocks)
 	this->block_size = block_size;
 
 	block_cols = vector<std::map<int, Block>>(num_blocks);
-	shift = vector<valarray<double>>(num_blocks, valarray<double>(block_size));
 	for (int x = 0; x < num_blocks; x++) {
 		int i = domain->getGlobalElement(curr_local_i);
 		range_map[i] = curr_local_i;
@@ -36,93 +35,14 @@ RBMatrix::RBMatrix(Teuchos::RCP<map_type> map, int block_size, int num_blocks)
 		}
 		curr_local_i += block_size;
 	}
-	shift_vec = rcp(new single_vector_type(domain, 1));
-	ones       = rcp(new vector_type(domain, 1));
-	ones->putScalar(1);
-}
-void LUSolver::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode, scalar_type alpha,
-                     scalar_type beta) const
-{
-	auto x_view = x.getLocalView<Kokkos::HostSpace>();
-	auto y_view = y.getLocalView<Kokkos::HostSpace>();
-	int  block_size = L->getBlockSize();
-	//L solve
-	for (int j = 0; j < L->getNumBlocks(); j++) {
-		// do lower triangular block
-		blk_ptr Lkk = L->getBlock(j * block_size, j * block_size);
-		valarray<double> &Lkk_blk = *Lkk;
-
-		int x_i = x.getMap()->getLocalElement(j * block_size);
-
-        valarray<double> solved_x(block_size);
-		for (int block_i = 0; block_i < block_size; block_i++) {
-			solved_x[block_i] = x_view(x_i + block_i, 0);
-			for (int block_j = block_i - 1; block_j >= 0; block_j--) {
-				solved_x[block_i]
-				-= x_view(x_i + block_j, 0) * Lkk_blk[block_i + block_size * block_j];
-			}
-			x_view(x_i + block_i, 0) = solved_x[block_i];
-		}
-
-		// do rest of blocks
-		for (int i = j + 1; i < L->getNumBlocks(); i++) {
-			int     x_i2 = x.getMap()->getLocalElement(i * block_size);
-			blk_ptr Lik  = L->getBlock(i * block_size, j * block_size);
-			if (!Lik.is_null()) {
-				valarray<double> &Lik_blk = *Lik;
-				for (int block_i = 0; block_i < block_size; block_i++) {
-					for (int block_j = 0; block_j < block_size; block_j++) {
-						x_view(x_i2 + block_i, 0)
-						-= solved_x[block_j] * Lik_blk[block_i + block_size * block_j];
-					}
-				}
-			}
-		}
-	}
-	// U solve
-	for (int j = U->getNumBlocks() - 1; j >= 0; j--) {
-		// do lower triangular block
-		blk_ptr           Ukk     = U->getBlock(j * block_size, j * block_size);
-		valarray<double> &Ukk_blk = *Ukk;
-
-		int x_i = x.getMap()->getLocalElement(j * block_size);
-
-		for (int block_i = block_size - 1; block_i >= 0; block_i--) {
-			for (int block_j = block_size - 1; block_j > block_i; block_j--) {
-				x_view(x_i + block_i, 0)
-				-= x_view(x_i + block_j, 0) * Ukk_blk[block_i + block_size * block_j];
-			}
-			// dvide by diagonal
-			x_view(x_i + block_i, 0) /= (*Ukk)[block_i + block_size * block_i];
-		}
-
-		// do rest of blocks
-		for (int i = j - 1; i >= 0; i--) {
-			int     x_i2 = x.getMap()->getLocalElement(i * block_size);
-			blk_ptr Uik  = U->getBlock(i * block_size, j * block_size);
-			if (!Uik.is_null()) {
-				valarray<double> &Uik_blk = *Uik;
-					for (int block_i = 0; block_i < block_size; block_i++) {
-				for (int block_j = 0; block_j < block_size; block_j++) {
-						x_view(x_i2 + block_i, 0)
-						-= x_view(x_i + block_j, 0) * Uik_blk[block_i + block_size * block_j];
-						//cerr << x_view(x_i2 + block_i, 0) << endl;
-					}
-				}
-			}
-		}
-	}
-	//cerr << "hello\n";
-
-	y.update(1,x,0);
 }
 void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode, scalar_type alpha,
                      scalar_type beta) const
 {
     vector_type my_y(range, 1);
+	y.scale(beta);
+	my_y.doImport(y, *exporter, Tpetra::CombineMode::ADD);
 	auto x_view = x.getLocalView<Kokkos::HostSpace>();
-	y.putScalar(0);
-	my_y.putScalar(0);
 	auto y_view = my_y.getLocalView<Kokkos::HostSpace>();
 	// column loop
 	for (int index = 0; index < num_blocks; index++) {
@@ -131,41 +51,30 @@ void RBMatrix::apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode
 		for (auto &p : block_cols[index]) {
 			int   start_i    = p.first;
 			Block curr_block = p.second;
-			for (int iii = 0; iii < block_size; iii++) {
-				int matrix_i = start_i + iii;
-				if (matrix_i == local_skip_i && local_skip_i != -1 && local_skip_j != -1) {
-					y_view(matrix_i, 0) += x_view(local_skip_j, 0);
-				} else {
-					int block_i = iii;
-					if (curr_block.flip_i) {
-						block_i = block_size - 1 - iii;
-					}
-					valarray<double> &curr_blk = *curr_block.block;
+			for (int jjj = 0; jjj < block_size; jjj++) {
+				int block_j = jjj;
+				if (curr_block.flip_j) {
+					block_j = block_size - 1 - jjj;
+				}
+				valarray<double> &curr_blk = *curr_block.block;
 
-					if (curr_block.flip_j) {
-						for (int i = 0; i < block_size; i++) {
-							y_view(matrix_i, 0)
-							+= x_view(start_j + i, 0)
-							   * curr_blk[block_i + block_size * (block_size - 1 - i)]
-							   * curr_block.scale;
-						}
-					} else {
-						for (int i = 0; i < block_size; i++) {
-							y_view(matrix_i, 0) += x_view(start_j + i, 0)
-							                       * curr_blk[block_i + block_size * i]
-							                       * curr_block.scale;
-						}
+				if (curr_block.flip_i) {
+					for (int i = 0; i < block_size; i++) {
+						y_view(start_i + i, 0)
+						+= x_view(start_j + jjj, 0)
+						   * curr_blk[block_j * block_size + (block_size - 1 - i)];
+					}
+				} else {
+					for (int i = 0; i < block_size; i++) {
+						y_view(start_i + i, 0)
+						+= x_view(start_j + jjj, 0) * curr_blk[block_j * block_size + i];
 					}
 				}
 			}
 		}
 	}
+    my_y.scale(alpha);
 	y.doExport(my_y, *exporter, Tpetra::CombineMode::ADD);
-	y.update(2, x, 1);
-	if (zero_u) {
-		double dot = shift_vec->dot(*x.getVector(0));
-		y.update(dot, *ones, 1);
-	}
 }
 void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_i, bool flip_j,
                            double scale)
@@ -245,13 +154,6 @@ void RBMatrix::insertBlock(int i, int j, RCP<valarray<double>> block, bool flip_
 void RBMatrix::createRangeMap()
 {
 	range = Teuchos::rcp(new map_type(-1, &global_i[0], global_i.size(), 0, domain->getComm()));
-	auto shift_view = shift_vec->getLocalView<Kokkos::HostSpace>();
-	for (int index = 0; index < num_blocks; index++) {
-        valarray<double> s = shift[index];
-        for (int j=0;j<block_size;j++){
-			shift_view(index * block_size + j, 0) = s[j];
-		}
-	}
 	exporter = rcp(new Tpetra::Export<>(range, domain));
 }
 RCP<RBMatrix> RBMatrix::invBlockDiag()
@@ -297,136 +199,26 @@ RCP<RBMatrix> RBMatrix::invBlockDiag()
 	Inv->createRangeMap();
 	return Inv;
 }
-RCP<RBMatrix> RBMatrix::invBlockDiagATA()
+RCP<RBMatrix> RBMatrix::invBlockDiagR()
 {
-	RCP<RBMatrix>    Inv    = rcp(new RBMatrix(domain, block_size, num_blocks));
-	map<double *, RCP<valarray<double>>> computed;
+	RCP<RBMatrix>    R    = rcp(new RBMatrix(domain, block_size, num_blocks));
 	for (int index = 0; index < num_blocks; index++) {
-		int                   start_j  = index * block_size;
-		int                   global_j = domain->getGlobalElement(start_j);
-		RCP<valarray<double>> ata_ptr  = rcp(new valarray<double>(block_size * block_size));
-		valarray<double> &    ata      = *ata_ptr;
+		int              start_j  = index * block_size;
+		int              global_j = domain->getGlobalElement(start_j);
 		// go down the column
 		for (auto &p : block_cols[index]) {
-			RCP<valarray<double>> blk_ptr;
-			Block                 curr_block = p.second;
-			// invert this block
-			blk_ptr                 = blkCopy(curr_block);
-			valarray<double> &blk   = *blk_ptr;
-			char              uplo  = 'U';
-			char              trans = 'N';
-			double            one   = 1;
-			dsyrk_(&uplo, &trans, &block_size, &block_size, &one, &blk[0], &block_size, &one,
-			       &ata[0], &block_size);
-            
-
-		}
-		for (int j = 0; j < block_size; j++) {
-			for (int i = j + 1; i < block_size; i++) {
-				ata[i + j * block_size] = ata[i * block_size + j];
+			int   start_i    = p.first;
+			int   global_i   = range->getGlobalElement(start_i);
+			if (global_j != global_i) {
+				Block                 curr = p.second;
+				R->insertBlock(global_i / block_size, global_j / block_size, curr.block,
+				               curr.flip_i, curr.flip_j);
 			}
 		}
-		valarray<int>    ipiv(block_size + 1);
-		int              lwork = block_size * block_size;
-		valarray<double> work(lwork);
-		int              info;
-		dgetrf_(&block_size, &block_size, &ata[0], &block_size, &ipiv[0], &info);
-		dgetri_(&block_size, &ata[0], &block_size, &ipiv[0], &work[0], &lwork, &info);
-
-		Inv->insertBlock(global_j / block_size, global_j / block_size, ata_ptr);
 	}
-	Inv->createRangeMap();
-	return Inv;
+	R->createRangeMap();
+	return R;
 }
-typedef RCP<valarray<int>> piv_ptr;
-
-void RBMatrix::DGETRF(Block &A_block, blk_ptr &L, blk_ptr &U, piv_ptr &P)
-{
-	try {
-		LUP retval = dgetrf_cache.at(A_block);
-        L = retval.L;
-        U = retval.U;
-        P = retval.P;
-	} catch (const out_of_range &oor) {
-		blk_ptr A = blkCopy(A_block);
-		// compute inverse of block
-		P         = rcp(new valarray<int>(block_size + 1));
-		int lwork = block_size * block_size;
-
-		valarray<double> work(lwork);
-		int              info;
-		L = rcp(new valarray<double>(*A));
-		dgetrf_(&block_size, &block_size, &(*L)[0], &block_size, &(*P)[0], &info);
-		U = rcp(new valarray<double>(*L));
-		for (int i = 0; i < block_size; i++) {
-			for (int j = i + 1; j < block_size; j++) {
-				(*L)[i + block_size * j] = 0;
-			}
-			(*L)[i + block_size * i] = 1;
-		}
-		for (int i = 0; i < block_size; i++) {
-			for (int j = 0; j < i; j++) {
-				(*U)[i + block_size * j] = 0;
-			}
-		}
-		LUP retval = {L, U, P};
-
-		dgetrf_cache[A_block] = retval;
-	}
-}
-
-void RBMatrix::DGESSM(blk_ptr &A, blk_ptr &L, blk_ptr &U, piv_ptr &P)
-{
-	U = rcp(new valarray<double>(*A));
-	// L^-1*P*A
-	char trans = 'N';
-	int  info;
-	dgetrs_(&trans, &block_size, &block_size, &(*L)[0], &block_size, &(*P)[0], &(*U)[0],
-	        &block_size, &info);
-}
-void RBMatrix::LSolve(Block &A_block, blk_ptr &L, blk_ptr &U, piv_ptr &P)
-{
-    try {
-		L = lsolve_cache.at(A_block);
-	} catch (const out_of_range &oor) {
-		blk_ptr A = blkCopy(A_block);
-		L         = rcp(new valarray<double>(*A));
-		valarray<double> TMP(*A);
-		for (int j = 0; j < block_size; j++) {
-			for (int i = 0; i < block_size; i++) {
-				TMP[j + block_size * i] = (*A)[i + block_size * j];
-			}
-		}
-		// L^-1*P*A
-		char trans = 'T';
-		int  info;
-		dgetrs_(&trans, &block_size, &block_size, &(*U)[0], &block_size, &(*P)[0], &TMP[0],
-		        &block_size, &info);
-
-		for (int j = 0; j < block_size; j++) {
-			for (int i = 0; i < block_size; i++) {
-				(*L)[j + block_size * i] = TMP[i + block_size * j];
-			}
-		}
-
-		lsolve_cache[A_block] = L;
-	}
-}
-void RBMatrix::DTSTRF(blk_ptr A, blk_ptr L, blk_ptr U, piv_ptr P)
-{
-	P = rcp(new valarray<int>(2 * block_size + 1));
-	valarray<double> tall(2 * block_size * block_size);
-	tall[gslice(0, {(size_t) block_size, (size_t) block_size}, {1, (size_t) block_size})] = *U;
-	tall[gslice(block_size * block_size, {(size_t) block_size, (size_t) block_size},
-	            {1, (size_t) block_size})]
-	= *A;
-	int info;
-	dgetrf_(&block_size, &block_size, &tall[0], &block_size, &(*P)[0], &info);
-	*U = tall[gslice(0, {(size_t) block_size, (size_t) block_size}, {1, (size_t) block_size})];
-	*L = tall[gslice(block_size * block_size, {(size_t) block_size, (size_t) block_size},
-	                 {1, (size_t) block_size})];
-}
-void RBMatrix::DSSSSM(blk_ptr U, blk_ptr A, blk_ptr L, piv_ptr P){}
 blk_ptr RBMatrix::blkCopy(Block in)
 {
 	blk_ptr C = rcp(new valarray<double>(in.block->size()));
@@ -454,265 +246,6 @@ blk_ptr RBMatrix::getBlock(int i, int j){
 		// do nothing
     }
     return C;
-}
-void RBMatrix::lu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
-{
-	L = rcp(new RBMatrix(domain, block_size, num_blocks));
-	U = rcp(new RBMatrix(domain, block_size, num_blocks));
-    map<tuple<Block,Block>,blk_ptr> mm_comp;
-	for (int k = 0; k < num_blocks; k++) {
-		int range_k = range->getLocalElement(k * block_size);
-
-		Block Akk_block = block_cols[k][range_k];
-		blk_ptr Lkk, Ukk;
-		piv_ptr Pkk;
-        // do lu on diagonal block
-		DGETRF(Akk_block, Lkk, Ukk, Pkk);
-		L->insertBlock(k, k, Lkk, false, false);
-		U->insertBlock(k, k, Ukk, false, false);
-		// get row of U's
-		for (int j = k + 1; j < num_blocks; j++) {
-			auto Akj_block = block_cols[j].find(range_k);
-			if (Akj_block != block_cols[j].end()) {
-				blk_ptr Ukj;
-				blk_ptr Akj = blkCopy(Akj_block->second);
-				DGESSM(Akj, Lkk, Ukj, Pkk);
-				U->insertBlock(k, j, Ukj, false, false);
-			}
-		}
-		// get Column of L's
-		for (int i = k + 1; i < num_blocks; i++) {
-			int  range_i   = range->getLocalElement(i * block_size);
-			auto Aik_block = block_cols[k].find(range_i);
-			if (Aik_block != block_cols[k].end()) {
-				blk_ptr Lik;
-				LSolve(Aik_block->second, Lik, Ukk, Pkk);
-				L->insertBlock(i, k, Lik, false, false);
-			}
-		}
-        //update rest of matrix
-		for (int j = k + 1; j < num_blocks; j++) {
-			int  range_k   = U->range_map[k * block_size];
-			auto Ukj_block = U->block_cols[j].find(range_k);
-			if (Ukj_block != U->block_cols[j].end()) {
-				blk_ptr Ukj = Ukj_block->second.block;
-				for (int i = k + 1; i < num_blocks; i++) {
-					int  range_i   = L->range_map[i * block_size];
-					auto Lik_block = L->block_cols[k].find(range_i);
-					if (Lik_block != L->block_cols[k].end()) {
-						blk_ptr Lik   = Lik_block->second.block;
-						blk_ptr C;
-						C             = rcp(new valarray<double>(block_size * block_size));
-						char    trans = 'N';
-						double  one   = -1;
-						double  zero  = 0;
-						dgemm_(&trans, &trans, &block_size, &block_size, &block_size, &one,
-						       &(*Lik)[0], &block_size, &(*Ukj)[0], &block_size, &zero, &(*C)[0],
-						       &block_size);
-						insertBlock(i, j, C, false, false);
-					}
-				}
-			}
-		}
-	}
-}
-void RBMatrix::ilu(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
-{
-	L = rcp(new RBMatrix(domain, block_size, num_blocks));
-	U = rcp(new RBMatrix(domain, block_size, num_blocks));
-    map<tuple<Block,Block>,blk_ptr> mm_comp;
-	for (int k = 0; k < num_blocks; k++) {
-		int range_k = range->getLocalElement(k * block_size);
-
-		Block Akk_block = block_cols[k][range_k];
-		blk_ptr Lkk, Ukk;
-		piv_ptr Pkk;
-		DGETRF(Akk_block, Lkk, Ukk, Pkk);
-		L->insertBlock(k, k, Lkk, false, false);
-		U->insertBlock(k, k, Ukk, false, false);
-		// get row of U's
-		for (int j = k + 1; j < num_blocks; j++) {
-			auto Akj_block = block_cols[j].find(range_k);
-			if (Akj_block != block_cols[j].end()) {
-				blk_ptr Ukj;
-				blk_ptr Akj = blkCopy(Akj_block->second);
-				DGESSM(Akj, Lkk, Ukj, Pkk);
-				U->insertBlock(k, j, Ukj, false, false);
-			}
-		}
-		// get Column of L's
-		for (int i = k + 1; i < num_blocks; i++) {
-			int  range_i   = range->getLocalElement(i * block_size);
-			auto Aik_block = block_cols[k].find(range_i);
-			if (Aik_block != block_cols[k].end()) {
-				blk_ptr Lik;
-				LSolve(Aik_block->second, Lik, Ukk, Pkk);
-				L->insertBlock(i, k, Lik, false, false);
-			}
-		}
-        /*
-        //update rest of matrix
-		for (int j = k + 1; j < num_blocks; j++) {
-			int  range_k   = U->range_map[k * block_size];
-			blk_ptr Ukj       = U->getBlock(range_k, j * block_size);
-			if (!Ukj.is_null()){
-				for (int i = k + 1; i < num_blocks; i++) {
-					int     range_i = L->range_map[i * block_size];
-					blk_ptr Lik     = L->getBlock(i * block_size, range_i);
-					if (!Lik.is_null() && getBlock(i * block_size, j * block_size).is_null()) {
-						blk_ptr C;
-						C             = rcp(new valarray<double>(block_size * block_size));
-						char    trans = 'N';
-						double  one   = -1;
-						double  zero  = 0;
-						dgemm_(&trans, &trans, &block_size, &block_size, &block_size, &one,
-						       &(*Lik)[0], &block_size, &(*Ukj)[0], &block_size, &zero, &(*C)[0],
-						       &block_size);
-						insertBlock(i * block_size, j * block_size, C, false, false);
-					}
-				}
-			}
-		}
-        */
-	}
-}
-void RBMatrix::ilu2(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
-{
-	L = rcp(new RBMatrix(domain, block_size, num_blocks));
-	U = rcp(new RBMatrix(domain, block_size, num_blocks));
-    map<tuple<Block,Block>,blk_ptr> mm_comp;
-	for (int k = 0; k < num_blocks; k++) {
-		int range_k = range->getLocalElement(k * block_size);
-
-		Block Akk_block = block_cols[k][range_k];
-		blk_ptr Lkk, Ukk;
-		piv_ptr Pkk;
-		DGETRF(Akk_block, Lkk, Ukk, Pkk);
-		L->insertBlock(k * block_size, k * block_size, Lkk, false, false);
-		U->insertBlock(k * block_size, k * block_size, Ukk, false, false);
-		// get row of U's
-		for (int j = k + 1; j < num_blocks; j++) {
-			auto Akj_block = block_cols[j].find(range_k);
-			if (Akj_block != block_cols[j].end()) {
-				blk_ptr Ukj;
-				blk_ptr Akj = blkCopy(Akj_block->second);
-				DGESSM(Akj, Lkk, Ukj, Pkk);
-				U->insertBlock(k * block_size, j * block_size, Ukj, false, false);
-			}
-		}
-		// get Column of L's
-		for (int i = k + 1; i < num_blocks; i++) {
-			int  range_i   = range->getLocalElement(i * block_size);
-			auto Aik_block = block_cols[k].find(range_i);
-			if (Aik_block != block_cols[k].end()) {
-				blk_ptr Lik;
-				LSolve(Aik_block->second, Lik, Ukk, Pkk);
-				L->insertBlock(i * block_size, k * block_size, Lik, false, false);
-			}
-		}
-        //update rest of matrix
-		for (int j = k + 1; j < num_blocks; j++) {
-			blk_ptr Ukj       = U->getBlock(k * block_size, j * block_size);
-			if (!Ukj.is_null()){
-				for (int i = k + 1; i < num_blocks; i++) {
-					blk_ptr Lik = L->getBlock(i * block_size, k * block_size);
-					if (!Lik.is_null() && !getBlock(i * block_size, j * block_size).is_null()) {
-						blk_ptr C;
-						C             = rcp(new valarray<double>(block_size * block_size));
-						char    trans = 'N';
-						double  one   = -1;
-						double  zero  = 0;
-						dgemm_(&trans, &trans, &block_size, &block_size, &block_size, &one,
-						       &(*Lik)[0], &block_size, &(*Ukj)[0], &block_size, &zero, &(*C)[0],
-						       &block_size);
-						insertBlock(i * block_size, j * block_size, C, false, false);
-					}
-				}
-			}
-		}
-	}
-}
-void RBMatrix::ilu3(RCP<RBMatrix> &L, RCP<RBMatrix> &U)
-{
-	L = rcp(new RBMatrix(domain, block_size, num_blocks));
-	U = rcp(new RBMatrix(domain, block_size, num_blocks));
-	RBMatrix F(domain, block_size, num_blocks);
-    map<tuple<Block,Block>,blk_ptr> mm_comp;
-	piv_ptr Pkk;
-	for (int k = 0; k < num_blocks; k++) {
-		int range_k = range->getLocalElement(k * block_size);
-
-		Block Akk_block = block_cols[k][range_k];
-		blk_ptr Lkk, Ukk;
-		DGETRF(Akk_block, Lkk, Ukk, Pkk);
-		L->insertBlock(k * block_size, k * block_size, Lkk, false, false);
-		U->insertBlock(k * block_size, k * block_size, Ukk, false, false);
-		// get row of U's
-		for (int j = k + 1; j < num_blocks; j++) {
-			auto Akj_block = block_cols[j].find(range_k);
-			if (Akj_block != block_cols[j].end()) {
-				blk_ptr Ukj;
-				blk_ptr Akj = blkCopy(Akj_block->second);
-				DGESSM(Akj, Lkk, Ukj, Pkk);
-				U->insertBlock(k * block_size, j * block_size, Ukj, false, false);
-			}
-		}
-		// get Column of L's
-		for (int i = k + 1; i < num_blocks; i++) {
-			int  range_i   = range->getLocalElement(i * block_size);
-			auto Aik_block = block_cols[k].find(range_i);
-			if (Aik_block != block_cols[k].end()) {
-				blk_ptr Lik;
-				LSolve(Aik_block->second, Lik, Ukk, Pkk);
-				L->insertBlock(i * block_size, k * block_size, Lik, false, false);
-			}
-		}
-        //update rest of matrix
-		for (int j = k + 1; j < num_blocks; j++) {
-			blk_ptr Ukj       = U->getBlock(k*block_size, j * block_size);
-			if (!Ukj.is_null()){
-				for (int i = k + 1; i < num_blocks; i++) {
-					blk_ptr Lik     = L->getBlock(i * block_size, k*block_size);
-					if (!Lik.is_null() && getBlock(i * block_size, j * block_size).is_null()) {
-						blk_ptr C;
-						C             = rcp(new valarray<double>(block_size * block_size));
-						char    trans = 'N';
-						double  one   = -1;
-						double  zero  = 0;
-						dgemm_(&trans, &trans, &block_size, &block_size, &block_size, &one,
-						       &(*Lik)[0], &block_size, &(*Ukj)[0], &block_size, &zero, &(*C)[0],
-						       &block_size);
-						F.insertBlock(i * block_size, j * block_size, C, false, false);
-					}
-				}
-			}
-		}
-	}
-	for (int k = 0; k < num_blocks; k++) {
-
-		blk_ptr Lkk, Ukk;
-		Lkk = L->getBlock(k * block_size, k * block_size);
-		Ukk = U->getBlock(k * block_size, k * block_size);
-		// get row of U's
-		for (int j = k + 1; j < num_blocks; j++) {
-			blk_ptr Ukj;
-			blk_ptr Akj = F.getBlock(k * block_size, j * block_size);
-			if (!Akj.is_null()) {
-				DGESSM(Akj, Lkk, Ukj, Pkk);
-				U->insertBlock(k * block_size, j * block_size, Ukj, false, false);
-			}
-		}
-		// get Column of L's
-		for (int i = k + 1; i < num_blocks; i++) {
-			blk_ptr Lik;
-			blk_ptr Aik = F.getBlock(i * block_size, k * block_size);
-			if (!Aik.is_null()) {
-                Block x = Block(Aik);
-				LSolve(x, Lik, Ukk, Pkk);
-				L->insertBlock(i * block_size, k * block_size, Lik, false, false);
-			}
-		}
-	}
 }
 ostream& operator<<(ostream& os, const RBMatrix& A) {
     os << scientific;

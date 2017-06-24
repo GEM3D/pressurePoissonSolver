@@ -38,11 +38,6 @@ class Block
 		       < std::tie(r.flip_i, r.flip_j, right_ptr, r.scale);
 	}
 };
-struct LUP {
-	Teuchos::RCP<std::valarray<double>> L;
-	Teuchos::RCP<std::valarray<double>> U;
-	Teuchos::RCP<std::valarray<int>> P;
-};
 class RBMatrix : public Tpetra::Operator<scalar_type>
 {
     private:
@@ -57,9 +52,6 @@ class RBMatrix : public Tpetra::Operator<scalar_type>
 	std::vector<std::map<int, Block>> block_cols;
 
 	std::map<std::pair<Block, Block>, Block> combos;
-	std::map<Block, LUP> dgetrf_cache;
-	std::map<Block, Teuchos::RCP<std::valarray<double>>> lsolve_cache;
-    Teuchos::RCP<vector_type> ones;
 
 	int block_size;
 	int num_blocks;
@@ -67,8 +59,6 @@ class RBMatrix : public Tpetra::Operator<scalar_type>
 	bool zero_u = false;
 
 	public:
-    Teuchos::RCP<single_vector_type> shift_vec;
-	std::vector<std::valarray<double>> shift;
 	int                                skip_index = -1;
 
 	RBMatrix(Teuchos::RCP<map_type> map, int block_size, int num_blocks);
@@ -79,52 +69,15 @@ class RBMatrix : public Tpetra::Operator<scalar_type>
 	void insertBlock(int i, int j, Teuchos::RCP<std::valarray<double>> block, bool flip_i = false,
 	                 bool flip_j = false, double scale = 1);
 	void                                createRangeMap();
-	void                                setZeroU() { zero_u = true; }
 	Teuchos::RCP<const map_type>        getDomainMap() const { return domain; }
 	Teuchos::RCP<const map_type>        getRangeMap() const { return range; }
 	Teuchos::RCP<RBMatrix>              invBlockDiag();
-	Teuchos::RCP<RBMatrix>              invBlockDiagATA();
-    std::valarray<double>&              getShift(int j){
-		int local_j = domain->getLocalElement(j * block_size) / block_size;
-        return shift[local_j];
-	}
-	void lu(Teuchos::RCP<RBMatrix> &L, Teuchos::RCP<RBMatrix> &U);
-	void ilu(Teuchos::RCP<RBMatrix> &L, Teuchos::RCP<RBMatrix> &U);
-	void ilu2(Teuchos::RCP<RBMatrix> &L, Teuchos::RCP<RBMatrix> &U);
-	void ilu3(Teuchos::RCP<RBMatrix> &L, Teuchos::RCP<RBMatrix> &U);
+	Teuchos::RCP<RBMatrix>              invBlockDiagR();
 	Teuchos::RCP<std::valarray<double>> blkCopy(Block in);
 	Teuchos::RCP<std::valarray<double>> getBlock(int i,int j);
 	int  getNumBlocks() { return num_blocks; }
 	int  getBlockSize() { return block_size; }
-	void DGETRF(Block &A, Teuchos::RCP<std::valarray<double>> &L,
-	            Teuchos::RCP<std::valarray<double>> &U, Teuchos::RCP<std::valarray<int>> &P);
-	void DGESSM(Teuchos::RCP<std::valarray<double>> &A, Teuchos::RCP<std::valarray<double>> &L,
-	            Teuchos::RCP<std::valarray<double>> &U, Teuchos::RCP<std::valarray<int>> &P);
-	void LSolve(Block &A, Teuchos::RCP<std::valarray<double>> &L,
-	            Teuchos::RCP<std::valarray<double>> &U, Teuchos::RCP<std::valarray<int>> &P);
-	void DTSTRF(Teuchos::RCP<std::valarray<double>> A, Teuchos::RCP<std::valarray<double>> L,
-	            Teuchos::RCP<std::valarray<double>> U, Teuchos::RCP<std::valarray<int>> P);
-	void DSSSSM(Teuchos::RCP<std::valarray<double>> A, Teuchos::RCP<std::valarray<double>> L,
-	            Teuchos::RCP<std::valarray<double>> U, Teuchos::RCP<std::valarray<int>> P);
 	friend std::ostream &operator<<(std::ostream &os, const RBMatrix &A);
-};
-class LUSolver : public Tpetra::Operator<scalar_type>
-{
-	private:
-	Teuchos::RCP<RBMatrix> L;
-	Teuchos::RCP<RBMatrix> U;
-
-	public:
-	LUSolver(Teuchos::RCP<RBMatrix> L, Teuchos::RCP<RBMatrix> U)
-	{
-		this->L = L;
-		this->U = U;
-	}
-	void apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode = Teuchos::NO_TRANS,
-	           scalar_type alpha = Teuchos::ScalarTraits<scalar_type>::one(),
-	           scalar_type beta  = Teuchos::ScalarTraits<scalar_type>::zero()) const;
-	Teuchos::RCP<const map_type>        getDomainMap() const { return L->getDomainMap(); }
-	Teuchos::RCP<const map_type>        getRangeMap() const { return L->getDomainMap(); }
 };
 
 #endif

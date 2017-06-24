@@ -22,6 +22,9 @@ find_package(Trilinos PATHS $ENV{TRILINOS_DIR}/lib/cmake/Trilinos $ENV{TRILINOS_
 # that uses Trilinos.
 IF(Trilinos_FOUND)
   MESSAGE("Found Trilinos!")
+     MESSAGE("   Trilinos_DIR = ${Trilinos_DIR}")
+   MESSAGE("   Trilinos_VERSION = ${Trilinos_VERSION}")
+   MESSAGE("   Trilinos_PACKAGE_LIST = ${Trilinos_PACKAGE_LIST}")
 ELSE()
     MESSAGE(FATAL_ERROR "Could not find Trilinos!\n Is TRILINOS_DIR set?")
 ENDIF()
@@ -34,7 +37,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 project(DomainDecomp)
 find_package(FFTW REQUIRED)
 find_package(MPI REQUIRED)
-set (CMAKE_CXX_FLAGS "--std=c++11 -Wall --pedantic -O3 ${CMAKE_CXX_FLAGS}")
+set (CMAKE_CXX_FLAGS "--std=c++11 -Wall --pedantic -O2 ${CMAKE_CXX_FLAGS}")
 IF(NOT CMAKE_CXX_COMPILER)
   MESSAGE("Setting CXX compiler.")
   SET(CMAKE_CXX_COMPILER ${Trilinos_CXX_COMPILER})
@@ -80,8 +83,8 @@ set(SOURCES
 # libraries (TPLs) with which Trilinos was built.
 #
 include_directories(".")
-include_directories(${Trilinos_TPL_INCLUDE_DIRS})
-include_directories(${Trilinos_INCLUDE_DIRS})
+include_directories(SYSTEM ${Trilinos_TPL_INCLUDE_DIRS})
+include_directories(SYSTEM ${Trilinos_INCLUDE_DIRS})
 include_directories(${FFTW_INCLUDES})
 include_directories(${MPI_CXX_INCLUDE_PATH})
 
@@ -101,7 +104,6 @@ add_library(DomainCollection DomainCollection.cpp)
 add_library(DomainSignatureCollection DomainSignatureCollection.cpp)
 add_library(Domain Domain.cpp)
 add_library(RBMatrix RBMatrix.cpp)
-add_library(Factory Factory.cpp)
 add_library(FftwSolver FftwSolver.cpp)
 file(GLOB fishpack_SRC "fishpack/*.f")
 #add_library(FishpackSolver FishpackSolver.cpp)
@@ -118,15 +120,9 @@ target_link_libraries(heat
     DomainSignatureCollection
     RBMatrix
     Domain
-    Factory
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
   ${FFTW_LIB}
-  ${MPI_CXX_LIBRARIES} 
-)
-target_link_libraries(Factory
-  ${Trilinos_TPL_LIBRARIES}
-  ${Trilinos_LIBRARIES} 
   ${MPI_CXX_LIBRARIES} 
 )
 target_link_libraries(RBMatrix

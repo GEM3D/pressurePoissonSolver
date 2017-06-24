@@ -8,6 +8,7 @@
 #include <Tpetra_Vector.hpp>
 #include <Tpetra_Map.hpp>
 #include <Tpetra_MultiVector.hpp>
+#include <Ifpack2_Factory.hpp>
 typedef double scalar_type;
 typedef Tpetra::CrsMatrix<scalar_type>                    matrix_type;
 typedef Tpetra::Experimental::BlockCrsMatrix<scalar_type> block_matrix_type;
@@ -17,4 +18,5 @@ typedef Tpetra::MultiVector<int>                          int_vector_type;
 typedef Kokkos::View<double **, Kokkos::Serial> view_type;
 typedef Tpetra::Map<> map_type;
 typedef Tpetra::CrsGraph<> graph_type;
+typedef Ifpack2::Preconditioner<> precond_type;
 #endif

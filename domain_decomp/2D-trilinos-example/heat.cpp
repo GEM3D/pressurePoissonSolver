@@ -1,16 +1,14 @@
 #include "BelosCGIter.hpp"
 #include "BelosOutputManager.hpp"
 #include "DomainSignatureCollection.h"
-
-#include "Factory.h"
+#include "BlockJacobiRelaxer.h"
 #include "FunctionWrapper.h"
 #include "MyTypeDefs.h"
-#include "OpATA.h"
 #include "OpShift.h"
 #include "ZeroSum.h"
 #include "args.h"
-//#include <Amesos2.hpp>
-//#include <Amesos2_Version.hpp>
+#include <Amesos2.hpp>
+#include <Amesos2_Version.hpp>
 #include <BelosBiCGStabSolMgr.hpp>
 #include <BelosBlockCGSolMgr.hpp>
 #include <BelosBlockGmresSolMgr.hpp>
@@ -24,7 +22,10 @@
 #include <Ifpack2_Factory.hpp>
 #include <Ifpack2_ILUT_decl.hpp>
 #include <Ifpack2_ILUT_def.hpp>
-#include <Ifpack2_Hypre.hpp>
+#include <Ifpack2_Relaxation_decl.hpp>
+#include <Ifpack2_Relaxation_def.hpp>
+#include <Ifpack2_BlockRelaxation_decl.hpp>
+#include <Ifpack2_BlockRelaxation_def.hpp>
 #include <Teuchos_Comm.hpp>
 #include <Teuchos_GlobalMPISession.hpp>
 #include <Teuchos_ParameterList.hpp>
@@ -44,6 +45,9 @@
 #ifndef M_PIl
 #define M_PIl          3.141592653589793238462643383279502884L /* pi */
 #endif
+
+
+#include "DDMultiGrid.h"
 
 using Teuchos::RCP;
 using Teuchos::rcp;
@@ -103,18 +107,22 @@ int main(int argc, char *argv[])
 	                            "the file to write the preconditioner to", {'p'});
 	args::ValueFlag<double> f_t(
 	parser, "tolerance", "set the tolerance of the iterative solver (default is 1e-10)", {'t'});
+	args::ValueFlag<double> f_omega(
+	parser, "tolerance", "set the tolerance of the iterative solver (default is 1e-10)", {"omega"});
     args::ValueFlag<int> f_d(
 	parser, "row", "pin gamma value to zero (by modifying that row of the schur compliment matrix)",
 	{'z'});
 	args::ValueFlag<int> f_div(parser, "divide", "use iterative method", {"divide"});
-	args::Flag f_pinv(parser, "wrapper", "compute using pseudoinverse", {"pinv"});
 	args::Flag f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
 	args::Flag f_blockcrs(parser, "wrapper", "use a function wrapper", {"blockcrs"});
 	args::Flag f_crs(parser, "wrapper", "use a function wrapper", {"crs"});
 	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
 	args::Flag f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
+	args::Flag           f_precblockj(parser, "prec", "use block diagonal jacobi preconditioner",
+	                        {"precblockj"});
+	args::Flag f_precj(parser, "prec", "use block diagonal jacobi preconditioner", {"precj"});
 	args::Flag f_precamg(parser, "prec", "use AMG preconditioner", {"precamg"});
-	args::Flag f_boomer(parser, "prec", "use BoomerAMG preconditioner", {"boomer"});
+	args::Flag f_precddmg(parser, "prec", "use AMG preconditioner", {"ddmg"});
 	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {"neumann"});
 	args::Flag f_cg(parser, "gmres", "use CG for iterative solver", {"cg"});
 	args::Flag f_gmres(parser, "gmres", "use GMRES for iterative solver", {"gmres"});
@@ -128,6 +136,8 @@ int main(int argc, char *argv[])
 	                    {"nozerou"});
 	args::Flag f_nozerof(parser, "zerou", "don't modify make so that it zeros the solution",
 	                    {"nozerof"});
+	args::Flag f_zeropatch(parser, "", "zero patch",
+	                    {"zeropatch"});
 	args::Flag f_pingamma(parser, "pingamma", "pin the first gamma to zero",
 	                    {"pingamma"});
 	args::Flag f_lu(parser, "lu", "use LU decomposition", {"lu"});
@@ -191,6 +201,10 @@ int main(int argc, char *argv[])
 	scalar_type tol = 1e-10;
 	if (f_t) {
 		tol = args::get(f_t);
+	}
+
+	if (f_omega) {
+		BlockJacobiRelaxer::omega = args::get(f_omega);
 	}
 
 	int loop_count = 1;
@@ -278,9 +292,6 @@ int main(int argc, char *argv[])
 		if (f_neumann && !f_nozerou) {
 			dc.setZeroU();
 		}
-		if (f_pingamma) {
-			dc.setPinGamma();
-        }
 
 		ZeroSum zs;
 		if (f_neumann) {
@@ -305,21 +316,25 @@ int main(int argc, char *argv[])
 		RCP<const map_type> matrix_map_const = dc.matrix_map;
 
 		// Create the gamma and diff vectors
-		RCP<vector_type> gamma = rcp(new vector_type(matrix_map, 1));
-		RCP<vector_type> r     = rcp(new vector_type(matrix_map, 1));
-		RCP<vector_type> x     = rcp(new vector_type(matrix_map, 1));
-		RCP<vector_type> d     = rcp(new vector_type(matrix_map, 1));
-		RCP<vector_type> diff  = rcp(new vector_type(matrix_map, 1));
+		RCP<vector_type>                   gamma = rcp(new vector_type(matrix_map, 1));
+		RCP<vector_type>                   r     = rcp(new vector_type(matrix_map, 1));
+		RCP<vector_type>                   x     = rcp(new vector_type(matrix_map, 1));
+		RCP<vector_type>                   d     = rcp(new vector_type(matrix_map, 1));
+		RCP<vector_type>                   diff  = rcp(new vector_type(matrix_map, 1));
+		RCP<vector_type>                   b     = rcp(new vector_type(matrix_map, 1));
 		RCP<RBMatrix>                      RBA;
 		RCP<matrix_type>                   A;
+		RCP<single_vector_type>            s;
 		RCP<Tpetra::Operator<scalar_type>> op;
-		RCP<const Tpetra::RowMatrix<>> rm;
+		RCP<const Tpetra::RowMatrix<>>     rm;
 
 		// Create linear problem for the Belos solver
 		RCP<Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>> problem;
 		RCP<Belos::SolverManager<scalar_type, vector_type, Tpetra::Operator<scalar_type>>> solver;
 		Teuchos::ParameterList belosList;
 
+		typedef Ifpack2::Preconditioner<scalar_type> Preconditioner;
+		RCP<Preconditioner>                          prec;
 		if (f_neumann && !f_nozerof) {
 			double fdiff = (dc.integrateBoundaryFlux() - dc.integrateF()) / dc.area();
 			if (my_global_rank == 0) cout << "Fdiff: " << fdiff << endl;
@@ -333,7 +348,6 @@ int main(int argc, char *argv[])
 			// do iterative solve
 
 			// Get the b vector
-			RCP<vector_type> b = rcp(new vector_type(matrix_map, 1));
 			dc.solveWithInterface(*gamma, *b);
 
 			if (save_rhs_file != "") {
@@ -346,14 +360,33 @@ int main(int argc, char *argv[])
 			comm->barrier();
 			steady_clock::time_point setup_start = steady_clock::now();
 
-			if (f_crs) {
+			if (f_zeropatch) {
 				// start time
 				comm->barrier();
 				steady_clock::time_point form_start = steady_clock::now();
 
-				RCP<single_vector_type> s;
+				//dc.formCrsNeumannMatrix(A);
 
-				dc.formCrsMatrix(A, s);
+				// stop time
+				comm->barrier();
+				duration<double> form_time = steady_clock::now() - form_start;
+
+				if (my_global_rank == 0)
+					cout << "Matrix Formation Time: " << form_time.count() << endl;
+
+					op = A;
+				rm = A;
+
+				if (save_matrix_file != "")
+					Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file,
+					                                                          A, "", "");
+
+            }else if (f_crs) {
+				// start time
+				comm->barrier();
+				steady_clock::time_point form_start = steady_clock::now();
+
+				dc.formCRSMatrix(matrix_map,A, &s);
 
 				// stop time
 				comm->barrier();
@@ -376,15 +409,12 @@ int main(int argc, char *argv[])
 			} else if (f_wrapper) {
 				// Create a function wrapper
 				op = rcp(new FuncWrap(b, &dc));
-			} else { // if (f_rbmatrix || f_lu) {
+			} else {
 				// Form the matrix
 				comm->barrier();
 				steady_clock::time_point form_start = steady_clock::now();
 
-				RBA = dc.formRBMatrix(matrix_map, del);
-				if (f_neumann && !f_nozerou) {
-					RBA->setZeroU();
-				}
+				dc.formRBMatrix(matrix_map, RBA, &s);
 
 				comm->barrier();
 				duration<double> form_time = steady_clock::now() - form_start;
@@ -400,82 +430,28 @@ int main(int argc, char *argv[])
 					out_file << *RBA;
 					out_file.close();
 
-					Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(
-					save_matrix_file + ".s", RBA->shift_vec, "", "");
+					// Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(
+					// save_matrix_file + ".s", RBA->shift_vec, "", "");
 
 					comm->barrier();
 					duration<double> write_time = steady_clock::now() - write_start;
 					if (my_global_rank == 0)
 						cout << "Time to write matrix to file: " << write_time.count() << endl;
 				}
-				if (f_pinv) {
-					op = rcp(new OpATA(RBA));
+
+				if (f_neumann && !f_nozerou) {
+					RCP<OpShift> os = rcp(new OpShift(RBA, s));
+					op              = os;
 				} else {
 					op = RBA;
 				}
 			}
 
-            if(f_pinv){
-				RCP<vector_type> ATb = rcp(new vector_type(matrix_map, 1));
-				RBA->apply(*b, *ATb);
-				problem = rcp(
-				new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(op, gamma, ATb));
-			}else{
-				problem = rcp(
-				new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(op, gamma, b));
-			}
+			problem
+			= rcp(new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(
+			op, gamma, b));
 
-			if (f_boomer) {
-				comm->barrier();
-				steady_clock::time_point prec_start = steady_clock::now();
-				using Teuchos::ParameterList;
-				using Ifpack2::FunctionParameter;
-				using Ifpack2::Hypre::Prec;
-				typedef Tpetra::CrsMatrix<>::scalar_type         Scalar;
-				typedef Tpetra::CrsMatrix<>::local_ordinal_type  LO;
-				typedef Tpetra::CrsMatrix<>::global_ordinal_type GO;
-				typedef Tpetra::CrsMatrix<>::node_type           Node;
-				typedef Ifpack2::Preconditioner<scalar_type>     Preconditioner;
-
-				//
-				// Create the parameters for hypre
-				//
-				RCP<FunctionParameter> functs[6];
-				functs[0] = rcp(new FunctionParameter(Prec, &HYPRE_BoomerAMGSetPrintLevel,
-				                                      1)); // print AMG solution info
-				functs[1] = rcp(new FunctionParameter(Prec, &HYPRE_BoomerAMGSetCoarsenType,
-				                                      6)); // Falgout coarsening
-				functs[2] = rcp(new FunctionParameter(Prec, &HYPRE_BoomerAMGSetStrongThreshold,
-				                                      .25)); // Sym GS/Jacobi hybrid
-				functs[3] = rcp(new FunctionParameter(Prec, &HYPRE_BoomerAMGSetNumSweeps,
-				                                      1)); // Sweeps on each level
-				functs[4] = rcp(
-				new FunctionParameter(Prec, &HYPRE_BoomerAMGSetTol, 0.0)); // Conv tolerance zero
-				functs[5] = rcp(new FunctionParameter(Prec, &HYPRE_BoomerAMGSetMaxIter,
-				                                      1)); // Do only one iteration!
-
-				//
-				// Create the preconditioner
-				//
-				RCP<Preconditioner> prec
-				= rcp(new Ifpack2::Ifpack2_Hypre<double, int, int, Node>(A));
-
-				ParameterList hypreList;
-				hypreList.set("SolveOrPrecondition", Prec);
-				hypreList.set("Preconditioner", Ifpack2::Hypre::BoomerAMG);
-				hypreList.set("NumFunctions", 6);
-				hypreList.set<RCP<FunctionParameter> *>("Functions", functs);
-
-				prec->setParameters(hypreList);
-				prec->initialize();
-				prec->compute();
-				problem->setLeftPrec(prec);
-
-				comm->barrier();
-				duration<double> prec_time = steady_clock::now() - prec_start;
-				if (my_global_rank == 0)
-					cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
-			} else if (f_riluk) {
+			if (f_riluk) {
 				comm->barrier();
 				steady_clock::time_point prec_start = steady_clock::now();
 
@@ -512,12 +488,57 @@ int main(int argc, char *argv[])
 				if (my_global_rank == 0)
 					cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
 
-			} else if (f_prec) {
+			} else if (f_precj) {
+				comm->barrier();
+				steady_clock::time_point prec_start = steady_clock::now();
+
+				// Create the relaxation.  You could also do this using
+				// Ifpack2::Factory (the preconditioner factory) if you like.
+				RCP<precond_type> prec = rcp(new Ifpack2::Relaxation<Tpetra::RowMatrix<>>(A));
+				// Make the list of relaxation parameters.
+				Teuchos::ParameterList params;
+				// Do symmetric SOR / Gauss-Seidel.
+				params.set("relaxation: type", "Jacobi");
+				// Two sweeps (of symmetric SOR / Gauss-Seidel) per apply() call.
+				params.set("relaxation: sweeps", 1);
+				// ... Set any other parameters you want to set ...
+
+				// Set parameters.
+				prec->setParameters(params);
+				// Prepare the relaxation instance for use.
+				prec->initialize();
+				prec->compute();
+
+				comm->barrier();
+				duration<double> prec_time = steady_clock::now() - prec_start;
+
+				if (my_global_rank == 0)
+					cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
+
+			} else if (f_precblockj) {
 				comm->barrier();
 				steady_clock::time_point prec_start = steady_clock::now();
 
 
-				RCP<RBMatrix> P = RBA->invBlockDiag();
+				RCP<BlockJacobiRelaxer> P = rcp(new BlockJacobiRelaxer(RBA,s));
+				problem->setLeftPrec(P);
+
+				comm->barrier();
+				duration<double> prec_time = steady_clock::now() - prec_start;
+
+				if (my_global_rank == 0)
+					cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
+
+			} else if (f_precddmg) {
+				comm->barrier();
+				steady_clock::time_point prec_start = steady_clock::now();
+
+				RCP<DDMultiGrid>         P;
+				if(f_neumann){
+					P = rcp(new DDMultiGrid(&dc, RBA, s));
+				}else{
+					P = rcp(new DDMultiGrid(&dc, RBA));
+				}
 				problem->setRightPrec(P);
 
 				comm->barrier();
@@ -526,27 +547,29 @@ int main(int argc, char *argv[])
 				if (my_global_rank == 0)
 					cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
 
-				if (save_prec_file != "") {
-					comm->barrier();
-					steady_clock::time_point write_start = steady_clock::now();
-
-					ofstream out_file(save_prec_file);
-					out_file << *P;
-					out_file.close();
-
-					comm->barrier();
-					duration<double> write_time = steady_clock::now() - write_start;
-					if (my_global_rank == 0)
-						cout << "Time to write preconditioner to file: " << write_time.count()
-						     << endl;
-				}
-			} else if (f_precamg) {
+			} else if (f_prec) {
 				comm->barrier();
 				steady_clock::time_point prec_start = steady_clock::now();
 
-				Teuchos::RCP<Tpetra::Operator<scalar_type>> P
-				= Factory::getAmgPreconditioner(A);
-				problem->setLeftPrec(P);
+				// Create the relaxation.  You could also do this using
+				// Ifpack2::Factory (the preconditioner factory) if you like.
+				RCP<precond_type> prec = rcp(new Ifpack2::BlockRelaxation<Tpetra::RowMatrix<>>(A));
+				// Make the list of relaxation parameters.
+				Teuchos::ParameterList params;
+				// Do symmetric SOR / Gauss-Seidel.
+				params.set("relaxation: type", "Jacobi");
+				// Two sweeps (of symmetric SOR / Gauss-Seidel) per apply() call.
+				params.set("relaxation: sweeps", 1);
+				params.set("relaxation: container", "Dense");
+				// ... Set any other parameters you want to set ...
+				params.set("partitioner: local parts", dsc.matrix_j_high - dsc.matrix_j_low);
+
+				// Set parameters.
+				prec->setParameters(params);
+				// Prepare the relaxation instance for use.
+				prec->initialize();
+				prec->compute();
+
 
 				comm->barrier();
 				duration<double> prec_time = steady_clock::now() - prec_start;
@@ -580,21 +603,41 @@ int main(int argc, char *argv[])
 				comm->barrier();
 				steady_clock::time_point lu_start = steady_clock::now();
 
-				RCP<RBMatrix> L, U;
-				RBA->lu(L,U);
-				LUSolver solver(L,U);
-				solver.apply(*b, *gamma);
+				if (f_neumann) {
+					A->resumeFill();
+					size_t                     size = A->getNumEntriesInGlobalRow(0);
+					Teuchos::ArrayView<int>    inds(new int[size], size);
+					Teuchos::ArrayView<double> vals(new double[size], size);
+					A->getGlobalRowCopy(0, inds, vals, size);
+					for (size_t i = 0; i < size; i++) {
+						if (inds[i] == 0) {
+							vals[i] = 1;
+                            cerr << "set i " <<endl;
+						} else {
+							vals[i] = 0;
+						}
+					}
+					A->replaceGlobalValues(0, inds, vals);
+					A->fillComplete();
+
+                }
+				RCP<Amesos2::Solver<matrix_type, vector_type>> solver
+				= Amesos2::create<matrix_type, vector_type>("KLU2", A, gamma, b);
+
+				solver->symbolicFactorization().numericFactorization().solve();
+
+				if (f_neumann) {
+					RCP<single_vector_type> ones
+					= Teuchos::rcp(new single_vector_type(s->getMap()));
+					ones->putScalar(1);
+					double dot = s->dot(*gamma->getVector(0));
+					cerr << dot << endl;
+					gamma->getVectorNonConst(0)->update(dot, *ones, 1.0);
+				}
 
 				comm->barrier();
 				duration<double> lu_time = steady_clock::now() - lu_start;
 				if (my_global_rank == 0) std::cout << "LU Time: " << lu_time.count() << endl;
-
-				// ofstream out_file("L.mm");
-				// out_file << *L;
-				// out_file.close();
-				// out_file = ofstream("U.mm");
-				// out_file << *U;
-				// out_file.close();
 
 			} else {
 				problem->setProblem();
@@ -605,8 +648,9 @@ int main(int argc, char *argv[])
 				belosList.set("Block Size", 1);
 				belosList.set("Maximum Iterations", 5000);
 				belosList.set("Convergence Tolerance", tol);
+				belosList.set("Output Frequency", 1);
 				int verbosity = Belos::Errors + Belos::StatusTestDetails + Belos::Warnings
-				                + Belos::TimingDetails + Belos::Debug;
+				                + Belos::TimingDetails + Belos::Debug + Belos::IterationDetails;
 				belosList.set("Verbosity", verbosity);
 				// belosList.set("Orthogonalization", "ICGS");
                 //
@@ -669,22 +713,18 @@ int main(int argc, char *argv[])
 		if (f_iter) {
 			dc.residual();
 			dc.swapResidSol();
+
 			if (dsc.num_global_domains != 1) {
 				x->putScalar(0);
 				dc.solveWithInterface(*x, *r);
+				//op->apply(*gamma, *r);
+				//r->update(1.0, *b, -1.0);
 
 				solver->reset(Belos::ResetType::Problem);
 				if (f_wrapper) {
 					((FuncWrap *) op.getRawPtr())->setB(r);
 				}
-				if (f_pinv) {
-					RCP<vector_type> ATr = rcp(new vector_type(matrix_map, 1));
-					RBA->apply(*r, *ATr);
-					problem->setProblem(x, ATr);
-					problem->setProblem(x, r);
-				} else {
-					problem->setProblem(x, r);
-				}
+				problem->setProblem(x, r);
 				solver->setProblem(problem);
 				solver->solve();
 			}

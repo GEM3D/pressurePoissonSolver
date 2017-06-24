@@ -20,7 +20,6 @@ class DomainCollection
 
     bool neumann = false;
     bool zero_u = false;
-    bool pin_gamma = false;
 	/**
 	 * @brief A map of domain ids to the domain objects.
 	 */
@@ -28,13 +27,6 @@ class DomainCollection
 	 * @brief The MPI communicator used.
 	 */
 	Teuchos::RCP<const Teuchos::Comm<int>> comm;
-	/**
-	 * @brief The number of cells in a single dimension.
-	 *
-	 * i.e. n means nxn cells in each domain.
-	 */
-	int n;
-
 	int num_cols = 0;
 
 	/**
@@ -67,11 +59,15 @@ class DomainCollection
 	Teuchos::RCP<int_vector_type> iface_info;
 
     std::set<Iface> ifaces;
-    std::set<Blockk> blocks;
-
-	void getBlocks();
 
 	public:
+	/**
+	 * @brief The number of cells in a single dimension.
+	 *
+	 * i.e. n means nxn cells in each domain.
+	 */
+	int n;
+
 	std::map<int, Teuchos::RCP<Domain>> domains;
 	bool amr = false;
 	double f_mean=0;
@@ -90,7 +86,7 @@ class DomainCollection
 	/**
 	 * @brief Tpetra map use for interface information.
 	 */
-	Teuchos::RCP<const map_type> iface_map;
+	Teuchos::RCP<map_type> iface_map;
 	DomainSignatureCollection dsc;
 
 	/**
@@ -227,7 +223,6 @@ class DomainCollection
 	double area();
 	double integrateAU();
 	void   setZeroU() { zero_u = true; }
-	void   setPinGamma() { pin_gamma = true; }
 	/**
 	 * @brief Form the Schur complement matrix using an RBMatrix
 	 *
@@ -235,8 +230,11 @@ class DomainCollection
 	 *
 	 * @return the formed matrix
 	 */
-	Teuchos::RCP<RBMatrix> formRBMatrix(Teuchos::RCP<map_type> map, int delete_row = -1);
-	void formCrsMatrix(Teuchos::RCP<matrix_type> &A, Teuchos::RCP<single_vector_type> &s);
+	Teuchos::RCP<map_type> formMatrixMap(int n);
+	void formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<matrix_type> &A,
+	                  Teuchos::RCP<single_vector_type> *s = nullptr, int n = -1);
+	void formRBMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<RBMatrix> &A,
+	                  Teuchos::RCP<single_vector_type> *s = nullptr, int n = -1);
 
 	void swapResidSol()
 	{
