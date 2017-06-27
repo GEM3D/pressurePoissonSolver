@@ -1,7 +1,7 @@
 #include "DomainCollection.h"
-#include <tuple>
-#include <array>
 #include <Tpetra_Experimental_BlockCrsMatrix_def.hpp>
+#include <array>
+#include <tuple>
 using Teuchos::RCP;
 using Teuchos::rcp;
 using namespace std;
@@ -23,11 +23,11 @@ DomainCollection::DomainCollection(DomainSignatureCollection dsc, int n,
 	// cerr<< "High: " << high << "\n";
 	this->comm         = comm;
 	this->n            = n;
-    this->dsc = dsc;
+	this->dsc          = dsc;
 	num_global_domains = dsc.num_global_domains;
 	for (auto p : dsc.domains) {
-		DomainSignature ds       = p.second;
-		int             i        = ds.id;
+		DomainSignature ds = p.second;
+		int             i  = ds.id;
 
 		// create a domain
 		RCP<Domain> d_ptr = rcp(new Domain(ds, n));
@@ -40,10 +40,10 @@ void DomainCollection::initNeumann(function<double(double, double)> ffun,
                                    function<double(double, double)> nfunx,
                                    function<double(double, double)> nfuny, bool amr)
 {
-	neumann = true;
-    this->amr = amr;
+	neumann   = true;
+	this->amr = amr;
 	for (auto &p : domains) {
-		Domain &d        = *p.second;
+		Domain &d = *p.second;
 
 		// Generate RHS vector
 		std::valarray<double> &f     = d.f;
@@ -61,7 +61,7 @@ void DomainCollection::initNeumann(function<double(double, double)> ffun,
 				}
 				// east
 				if (!d.hasNbr(Side::east)) {
-					d.boundary_east[yi] = nfunx(d.x_start+d.x_length, y);
+					d.boundary_east[yi] = nfunx(d.x_start + d.x_length, y);
 				}
 				// south
 				if (!d.hasNbr(Side::south)) {
@@ -69,7 +69,7 @@ void DomainCollection::initNeumann(function<double(double, double)> ffun,
 				}
 				// north
 				if (!d.hasNbr(Side::north)) {
-					d.boundary_north[xi] = nfuny(x, d.y_start+d.y_length);
+					d.boundary_north[xi] = nfuny(x, d.y_start + d.y_length);
 				}
 			}
 		}
@@ -80,7 +80,7 @@ void DomainCollection::initNeumann(function<double(double, double)> ffun,
 	generateMaps();
 	distributeIfaceInfo();
 	for (const Iface &i : ifaces) {
-        const_cast<Iface&>(i).setNeumann();
+		const_cast<Iface &>(i).setNeumann();
 	}
 }
 
@@ -88,7 +88,7 @@ void DomainCollection::initDirichlet(function<double(double, double)> ffun,
                                      function<double(double, double)> gfun)
 {
 	for (auto &p : domains) {
-		Domain &d        = *p.second;
+		Domain &d = *p.second;
 
 		// Generate RHS vector
 		std::valarray<double> &f     = d.f;
@@ -101,10 +101,10 @@ void DomainCollection::initDirichlet(function<double(double, double)> ffun,
 				f[yi * n + xi]     = ffun(x, y);
 				exact[yi * n + xi] = gfun(x, y);
 				if (!d.hasNbr(Side::north)) {
-					d.boundary_north[xi] = gfun(x, d.y_start+d.y_length);
+					d.boundary_north[xi] = gfun(x, d.y_start + d.y_length);
 				}
 				if (!d.hasNbr(Side::east)) {
-					d.boundary_east[yi] = gfun(d.x_start+d.x_length, y);
+					d.boundary_east[yi] = gfun(d.x_start + d.x_length, y);
 				}
 				if (!d.hasNbr(Side::south)) {
 					d.boundary_south[xi] = gfun(x, d.y_start);
@@ -133,13 +133,13 @@ void DomainCollection::generateMaps()
 	vector<int> global;
 	int &       curr_i = num_cols;
 	vector<int> c_iface_global;
-	int         curr_c_i = 0;
+	int         curr_c_i      = 0;
 	int         curr_matrix_i = 0;
 	global.reserve(domains.size() * (2 * n + 2 * n));
 	auto addToMap = [&](int curr_i, int global_i) {
-        if(global_i==-1){
-            cerr << "neg global i"<<endl;
-        }
+		if (global_i == -1) {
+			cerr << "neg global i" << endl;
+		}
 		for (int i = 0; i < Iface::size; i++) {
 			c_iface_global.push_back(global_i * Iface::size + i);
 			curr_c_i++;
@@ -154,13 +154,13 @@ void DomainCollection::generateMaps()
 		queue.push_back(first);
 		enqueued.insert(first);
 		while (!queue.empty()) {
-			int              curr = queue.front();
+			int     curr = queue.front();
 			Domain &d    = *domains.at(curr);
 			queue.pop_front();
 			visited.insert(curr);
-            not_visited.erase(curr);
-            Side s = Side::north;
-            do{
+			not_visited.erase(curr);
+			Side s = Side::north;
+			do {
 				if (d.hasNbr(s) && d.index(s) == -1) {
 					// a new edge that we have not assigned an index to
 					d.index(s) = curr_i++;
@@ -202,14 +202,15 @@ void DomainCollection::generateMaps()
 					} else if (d.hasCoarseNbr(s)) {
 						d.indexCenter(s) = curr_i++;
 						addToMap(d.indexCenter(s), d.globalIndexCenter(s));
-                        int other_i = -1;
+						int other_i = -1;
 						try {
 							Domain &nbr = *domains.at(d.nbr(s));
 							other_i     = curr_i++;
 							if (d.isCoarseLeft(s)) {
 								nbr.indexRefinedLeft(!s)  = d.index(s);
 								nbr.indexRefinedRight(!s) = other_i;
-								addToMap(nbr.indexRefinedRight(!s), nbr.globalIndexRefinedRight(!s));
+								addToMap(nbr.indexRefinedRight(!s),
+								         nbr.globalIndexRefinedRight(!s));
 							} else {
 								nbr.indexRefinedRight(!s) = d.index(s);
 								nbr.indexRefinedLeft(!s)  = other_i;
@@ -262,7 +263,7 @@ void DomainCollection::generateMaps()
 								enqueued.insert(d.nbr(s));
 							}
 						} catch (out_of_range &oor) {
-                            // do nothing
+							// do nothing
 						}
 					}
 				}
@@ -299,12 +300,13 @@ void DomainCollection::generateMaps()
 		= Teuchos::rcp(new map_type(-1, &iface_global[0], iface_global.size(), 0, this->comm));
 	}
 #ifdef DNDEBUG
-    auto out = Teuchos::getFancyOStream (Teuchos::rcpFromRef (std::cerr));
-    matrix_map->describe(*out);
-    collection_map->describe(*out);
+	auto out = Teuchos::getFancyOStream(Teuchos::rcpFromRef(std::cerr));
+	matrix_map->describe(*out);
+	collection_map->describe(*out);
 #endif
 }
-RCP<map_type> DomainCollection::formMatrixMap(int n){
+RCP<map_type> DomainCollection::formMatrixMap(int n)
+{
 	vector<int> matrix_global;
 	for (int i = n * dsc.matrix_j_low; i < n * dsc.matrix_j_high; i++) {
 		matrix_global.push_back(i);
@@ -350,12 +352,12 @@ void DomainCollection::solveWithInterface(const vector_type &gamma, vector_type 
 
 	// solve over domains on this proc
 	for (auto &p : domains) {
-        Domain&d = *p.second;
+		Domain &d = *p.second;
 		d.solveWithInterface(local_gamma);
 	}
 
 	if (neumann && zero_u) {
-		//make avarage of solution be zero
+		// make avarage of solution be zero
 		double avg = integrateU() / area();
 		for (auto &p : domains) {
 			Domain &d = *p.second;
@@ -523,7 +525,7 @@ double DomainCollection::integrateAU()
 	return retval;
 }
 void DomainCollection::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<matrix_type> &A,
-                                     Teuchos::RCP<single_vector_type> *s, int n)
+                                     Teuchos::RCP<single_vector_type> *s, int n, bool transpose)
 {
 	if (n == -1) {
 		n = this->n;
@@ -546,7 +548,7 @@ void DomainCollection::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<ma
 	rows.erase(-1);
 	vector<int> cols_array;
 	for (int j : cols) {
-        rows.erase(j);
+		rows.erase(j);
 		for (int q = 0; q < n; q++)
 			cols_array.push_back(j * n + q);
 	}
@@ -557,43 +559,78 @@ void DomainCollection::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<ma
 	}
 	RCP<map_type> row_map = rcp(new map_type(-1, &rows_array[0], rows_array.size(), 0, this->comm));
 	RCP<map_type> col_map = rcp(new map_type(-1, &cols_array[0], cols_array.size(), 0, this->comm));
-	A                     = rcp(new matrix_type(row_map, col_map, 5 * n));
-	*s                    = rcp(new single_vector_type(map));
+
+	if (transpose) {
+		A = rcp(new matrix_type(col_map, row_map, 5 * n));
+	} else {
+		A = rcp(new matrix_type(row_map, col_map, 5 * n));
+	}
+	*s = rcp(new single_vector_type(map));
 
 	set<pair<int, int>> inserted;
 	auto insertBlock = [&](int i, int j, RCP<valarray<double>> block, bool flip_i, bool flip_j) {
-		int local_i = A->getRowMap()->getLocalElement(i * n);
-		int local_j = A->getColMap()->getLocalElement(j * n);
+		int local_i = row_map->getLocalElement(i * n);
+		int local_j = col_map->getLocalElement(j * n);
 
 		valarray<double> &orig = *block;
 		valarray<double>  copy(n * n);
-		for (int i = 0; i < n; i++) {
-			int block_i = i;
-			if (flip_i) {
-				block_i = n - i - 1;
-			}
-			for (int j = 0; j < n; j++) {
-				int block_j = j;
-				if (flip_j) {
-					block_j = n - j - 1;
+		if (transpose) {
+			for (int i = 0; i < n; i++) {
+				int block_i = i;
+				if (flip_i) {
+					block_i = n - i - 1;
 				}
-				copy[i * n + j] = orig[block_i * n + block_j];
+				for (int j = 0; j < n; j++) {
+					int block_j = j;
+					if (flip_j) {
+						block_j = n - j - 1;
+					}
+					copy[i + n * j] = orig[block_i * n + block_j];
+				}
+			}
+			vector<int> inds(n);
+			for (int q = 0; q < n; q++) {
+				inds[q] = local_i + q;
+			}
+			if (inserted.count(make_pair(i, j)) == 0) {
+				for (int q = 0; q < n; q++) {
+					A->insertLocalValues(local_j + q, n, &copy[q * n], &inds[0]);
+				}
+			} else {
+				inserted.insert(make_pair(i, j));
+				for (int q = 0; q < n; q++) {
+					A->sumIntoLocalValues(local_j + q, n, &copy[q * n], &inds[0]);
+				}
+			}
+		} else {
+			for (int i = 0; i < n; i++) {
+				int block_i = i;
+				if (flip_i) {
+					block_i = n - i - 1;
+				}
+				for (int j = 0; j < n; j++) {
+					int block_j = j;
+					if (flip_j) {
+						block_j = n - j - 1;
+					}
+					copy[i * n + j] = orig[block_i * n + block_j];
+				}
+			}
+			vector<int> inds(n);
+			for (int q = 0; q < n; q++) {
+				inds[q] = local_j + q;
+			}
+			if (inserted.count(make_pair(i, j)) == 0) {
+				for (int q = 0; q < n; q++) {
+					A->insertLocalValues(local_i + q, n, &copy[q * n], &inds[0]);
+				}
+			} else {
+				inserted.insert(make_pair(i, j));
+				for (int q = 0; q < n; q++) {
+					A->sumIntoLocalValues(local_i + q, n, &copy[q * n], &inds[0]);
+				}
 			}
 		}
-		vector<int> inds(n);
-		for (int q = 0; q < n; q++) {
-			inds[q] = local_j + q;
-		}
-        if(inserted.count(make_pair(i,j))==0){
-			for (int q = 0; q < n; q++) {
-				A->insertLocalValues(local_i + q, n, &copy[q * n], &inds[0]);
-			}
-        }else{
-            inserted.insert(make_pair(i,j));
-			for (int q = 0; q < n; q++) {
-				A->sumIntoLocalValues(local_i + q, n, &copy[q * n], &inds[0]);
-			}
-        }
 	};
 
 	// create iface objects
@@ -623,9 +660,9 @@ void DomainCollection::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<ma
 
 		// create domain representing curr_type
 		DomainSignature ds;
-        ds.x_length=n;
-        ds.y_length=n;
-        for(int q=0;q<4;q++){
+		ds.x_length = n;
+		ds.y_length = n;
+		for (int q = 0; q < 4; q++) {
 			if (curr_type.neumann[q]) {
 				ds.nbr_id[q * 2] = -1;
 			} else {
@@ -646,74 +683,73 @@ void DomainCollection::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<ma
 		RCP<valarray<double>> s_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> w_ptr = rcp(new valarray<double>(n * n));
 
-		valarray<double> &    n_b   = *n_ptr;
-		valarray<double> &    e_b   = *e_ptr;
-		valarray<double> &    s_b   = *s_ptr;
-		valarray<double> &    w_b   = *w_ptr;
+		valarray<double> &n_b = *n_ptr;
+		valarray<double> &e_b = *e_ptr;
+		valarray<double> &s_b = *s_ptr;
+		valarray<double> &w_b = *w_ptr;
 
-        RCP<valarray<double>> nf_ptr = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> nf_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> ef_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> sf_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> wf_ptr = rcp(new valarray<double>(n * n));
 
-		valarray<double> &    nf_b   = *nf_ptr;
-		valarray<double> &    ef_b   = *ef_ptr;
-		valarray<double> &    sf_b   = *sf_ptr;
-		valarray<double> &    wf_b   = *wf_ptr;
+		valarray<double> &nf_b = *nf_ptr;
+		valarray<double> &ef_b = *ef_ptr;
+		valarray<double> &sf_b = *sf_ptr;
+		valarray<double> &wf_b = *wf_ptr;
 
-        RCP<valarray<double>> nfl_ptr = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> nfl_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> efl_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> sfl_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> wfl_ptr = rcp(new valarray<double>(n * n));
 
-		valarray<double> &    nfl_b   = *nfl_ptr;
-		valarray<double> &    efl_b   = *efl_ptr;
-		valarray<double> &    sfl_b   = *sfl_ptr;
-		valarray<double> &    wfl_b   = *wfl_ptr;
+		valarray<double> &nfl_b = *nfl_ptr;
+		valarray<double> &efl_b = *efl_ptr;
+		valarray<double> &sfl_b = *sfl_ptr;
+		valarray<double> &wfl_b = *wfl_ptr;
 
-        RCP<valarray<double>> nfr_ptr = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> nfr_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> efr_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> sfr_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> wfr_ptr = rcp(new valarray<double>(n * n));
 
-		valarray<double> &    nfr_b   = *nfr_ptr;
-		valarray<double> &    efr_b   = *efr_ptr;
-		valarray<double> &    sfr_b   = *sfr_ptr;
-		valarray<double> &    wfr_b   = *wfr_ptr;
+		valarray<double> &nfr_b = *nfr_ptr;
+		valarray<double> &efr_b = *efr_ptr;
+		valarray<double> &sfr_b = *sfr_ptr;
+		valarray<double> &wfr_b = *wfr_ptr;
 
-        RCP<valarray<double>> nc_ptr = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> nc_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> ec_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> sc_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> wc_ptr = rcp(new valarray<double>(n * n));
 
-		valarray<double> &    nc_b   = *nc_ptr;
-		valarray<double> &    ec_b   = *ec_ptr;
-		valarray<double> &    sc_b   = *sc_ptr;
-		valarray<double> &    wc_b   = *wc_ptr;
+		valarray<double> &nc_b = *nc_ptr;
+		valarray<double> &ec_b = *ec_ptr;
+		valarray<double> &sc_b = *sc_ptr;
+		valarray<double> &wc_b = *wc_ptr;
 
-        RCP<valarray<double>> ncl_ptr = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> ncl_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> ecl_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> scl_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> wcl_ptr = rcp(new valarray<double>(n * n));
 
-		valarray<double> &    ncl_b   = *ncl_ptr;
-		valarray<double> &    ecl_b   = *ecl_ptr;
-		valarray<double> &    scl_b   = *scl_ptr;
-		valarray<double> &    wcl_b   = *wcl_ptr;
+		valarray<double> &ncl_b = *ncl_ptr;
+		valarray<double> &ecl_b = *ecl_ptr;
+		valarray<double> &scl_b = *scl_ptr;
+		valarray<double> &wcl_b = *wcl_ptr;
 
-        RCP<valarray<double>> ncr_ptr = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> ncr_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> ecr_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> scr_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> wcr_ptr = rcp(new valarray<double>(n * n));
 
-		valarray<double> &    ncr_b   = *ncr_ptr;
-		valarray<double> &    ecr_b   = *ecr_ptr;
-		valarray<double> &    scr_b   = *scr_ptr;
-		valarray<double> &    wcr_b   = *wcr_ptr;
+		valarray<double> &ncr_b = *ncr_ptr;
+		valarray<double> &ecr_b = *ecr_ptr;
+		valarray<double> &scr_b = *scr_ptr;
+		valarray<double> &wcr_b = *wcr_ptr;
 
-
-        valarray<double> shift(n);
-        valarray<double> shift_rev(n);
+		valarray<double> shift(n);
+		valarray<double> shift_rev(n);
 		for (int i = 0; i < n; i++) {
 			d.boundary_north[i] = 1;
 			d.solve();
@@ -766,24 +802,24 @@ void DomainCollection::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<ma
 			= (iface.axis == X_AXIS && iface.right) || (iface.axis == Y_AXIS && !iface.right);
 			bool reverse_y = iface.right;
 
-		    int j = iface.global_i[0];
+			int j = iface.global_i[0];
 
-		    if (neumann && s != nullptr) {
-			    auto s_view  = (*s)->getLocalView<Kokkos::HostSpace>();
-			    int  local_j = map->getLocalElement(j * n);
-			    if (reverse_x) {
-				    for (int i = 0; i < n; i++) {
-					    s_view(local_j + i, 0) += shift_rev[i];
-				    }
-			    } else {
-				    for (int i = 0; i < n; i++) {
-					    s_view(local_j + i, 0) += shift[i];
-				    }
-			    }
-		    }
+			if (neumann && s != nullptr) {
+				auto s_view  = (*s)->getLocalView<Kokkos::HostSpace>();
+				int  local_j = map->getLocalElement(j * n);
+				if (reverse_x) {
+					for (int i = 0; i < n; i++) {
+						s_view(local_j + i, 0) += shift_rev[i];
+					}
+				} else {
+					for (int i = 0; i < n; i++) {
+						s_view(local_j + i, 0) += shift[i];
+					}
+				}
+			}
 
-		    if (iface.hasFineNbr[0]) {
-			    insertBlock(iface.global_i[0], j, nc_ptr, reverse_x, reverse_x);
+			if (iface.hasFineNbr[0]) {
+				insertBlock(iface.global_i[0], j, nc_ptr, reverse_x, reverse_x);
 				insertBlock(iface.refined_left[0], j, ncl_ptr, reverse_x, reverse_x);
 				insertBlock(iface.refined_right[0], j, ncr_ptr, reverse_x, reverse_x);
 			} else if (iface.hasCoarseNbr[0]) {
@@ -892,9 +928,9 @@ void DomainCollection::formRBMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<RBM
 
 		// create domain representing curr_type
 		DomainSignature ds;
-        ds.x_length=n;
-        ds.y_length=n;
-        for(int q=0;q<4;q++){
+		ds.x_length = n;
+		ds.y_length = n;
+		for (int q = 0; q < 4; q++) {
 			if (curr_type.neumann[q]) {
 				ds.nbr_id[q * 2] = -1;
 			} else {
@@ -914,74 +950,73 @@ void DomainCollection::formRBMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<RBM
 		RCP<valarray<double>> s_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> w_ptr = rcp(new valarray<double>(n * n));
 
-		valarray<double> &    n_b   = *n_ptr;
-		valarray<double> &    e_b   = *e_ptr;
-		valarray<double> &    s_b   = *s_ptr;
-		valarray<double> &    w_b   = *w_ptr;
+		valarray<double> &n_b = *n_ptr;
+		valarray<double> &e_b = *e_ptr;
+		valarray<double> &s_b = *s_ptr;
+		valarray<double> &w_b = *w_ptr;
 
-        RCP<valarray<double>> nf_ptr = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> nf_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> ef_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> sf_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> wf_ptr = rcp(new valarray<double>(n * n));
 
-		valarray<double> &    nf_b   = *nf_ptr;
-		valarray<double> &    ef_b   = *ef_ptr;
-		valarray<double> &    sf_b   = *sf_ptr;
-		valarray<double> &    wf_b   = *wf_ptr;
+		valarray<double> &nf_b = *nf_ptr;
+		valarray<double> &ef_b = *ef_ptr;
+		valarray<double> &sf_b = *sf_ptr;
+		valarray<double> &wf_b = *wf_ptr;
 
-        RCP<valarray<double>> nfl_ptr = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> nfl_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> efl_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> sfl_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> wfl_ptr = rcp(new valarray<double>(n * n));
 
-		valarray<double> &    nfl_b   = *nfl_ptr;
-		valarray<double> &    efl_b   = *efl_ptr;
-		valarray<double> &    sfl_b   = *sfl_ptr;
-		valarray<double> &    wfl_b   = *wfl_ptr;
+		valarray<double> &nfl_b = *nfl_ptr;
+		valarray<double> &efl_b = *efl_ptr;
+		valarray<double> &sfl_b = *sfl_ptr;
+		valarray<double> &wfl_b = *wfl_ptr;
 
-        RCP<valarray<double>> nfr_ptr = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> nfr_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> efr_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> sfr_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> wfr_ptr = rcp(new valarray<double>(n * n));
 
-		valarray<double> &    nfr_b   = *nfr_ptr;
-		valarray<double> &    efr_b   = *efr_ptr;
-		valarray<double> &    sfr_b   = *sfr_ptr;
-		valarray<double> &    wfr_b   = *wfr_ptr;
+		valarray<double> &nfr_b = *nfr_ptr;
+		valarray<double> &efr_b = *efr_ptr;
+		valarray<double> &sfr_b = *sfr_ptr;
+		valarray<double> &wfr_b = *wfr_ptr;
 
-        RCP<valarray<double>> nc_ptr = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> nc_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> ec_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> sc_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> wc_ptr = rcp(new valarray<double>(n * n));
 
-		valarray<double> &    nc_b   = *nc_ptr;
-		valarray<double> &    ec_b   = *ec_ptr;
-		valarray<double> &    sc_b   = *sc_ptr;
-		valarray<double> &    wc_b   = *wc_ptr;
+		valarray<double> &nc_b = *nc_ptr;
+		valarray<double> &ec_b = *ec_ptr;
+		valarray<double> &sc_b = *sc_ptr;
+		valarray<double> &wc_b = *wc_ptr;
 
-        RCP<valarray<double>> ncl_ptr = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> ncl_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> ecl_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> scl_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> wcl_ptr = rcp(new valarray<double>(n * n));
 
-		valarray<double> &    ncl_b   = *ncl_ptr;
-		valarray<double> &    ecl_b   = *ecl_ptr;
-		valarray<double> &    scl_b   = *scl_ptr;
-		valarray<double> &    wcl_b   = *wcl_ptr;
+		valarray<double> &ncl_b = *ncl_ptr;
+		valarray<double> &ecl_b = *ecl_ptr;
+		valarray<double> &scl_b = *scl_ptr;
+		valarray<double> &wcl_b = *wcl_ptr;
 
-        RCP<valarray<double>> ncr_ptr = rcp(new valarray<double>(n * n));
+		RCP<valarray<double>> ncr_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> ecr_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> scr_ptr = rcp(new valarray<double>(n * n));
 		RCP<valarray<double>> wcr_ptr = rcp(new valarray<double>(n * n));
 
-		valarray<double> &    ncr_b   = *ncr_ptr;
-		valarray<double> &    ecr_b   = *ecr_ptr;
-		valarray<double> &    scr_b   = *scr_ptr;
-		valarray<double> &    wcr_b   = *wcr_ptr;
+		valarray<double> &ncr_b = *ncr_ptr;
+		valarray<double> &ecr_b = *ecr_ptr;
+		valarray<double> &scr_b = *scr_ptr;
+		valarray<double> &wcr_b = *wcr_ptr;
 
-
-        valarray<double> shift(n);
-        valarray<double> shift_rev(n);
+		valarray<double> shift(n);
+		valarray<double> shift_rev(n);
 		for (int i = 0; i < n; i++) {
 			d.boundary_north[i] = 1;
 			d.solve();
@@ -1030,7 +1065,6 @@ void DomainCollection::formRBMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<RBM
 
 		// now insert these results into the matrix for each interface
 		for (Iface iface : todo) {
-
 			bool reverse_x
 			= (iface.axis == X_AXIS && iface.right) || (iface.axis == Y_AXIS && !iface.right);
 			bool reverse_y = iface.right;
@@ -1038,16 +1072,16 @@ void DomainCollection::formRBMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<RBM
 			int j = iface.global_i[0];
 
 			if (neumann && s != nullptr) {
-                auto s_view = (*s)->getLocalView<Kokkos::HostSpace>();
+				auto s_view  = (*s)->getLocalView<Kokkos::HostSpace>();
 				int  local_j = map->getLocalElement(j * n);
 				if (reverse_x) {
-                    for(int i=0;i<n;i++){
-                        s_view(local_j+i,0)+=shift_rev[i];
-                    }
+					for (int i = 0; i < n; i++) {
+						s_view(local_j + i, 0) += shift_rev[i];
+					}
 				} else {
-                    for(int i=0;i<n;i++){
-                        s_view(local_j+i,0)+=shift[i];
-                    }
+					for (int i = 0; i < n; i++) {
+						s_view(local_j + i, 0) += shift[i];
+					}
 				}
 			}
 
@@ -1187,11 +1221,11 @@ void DomainCollection::outputResidual(std::ostream &os)
 		int domain_j   = j / n;
 		int internal_j = j % n;
 		for (int i = 0; i < num_i; i++) {
-			int domain_i   = i / n;
-			int internal_i = i % n;
-			int id         = domain_i * d_x + domain_j;
-            Domain &d = *domains[id];
-			os << d.resid[internal_i * n + internal_j]*d.h_x*d.h_y << '\n';
+			int     domain_i   = i / n;
+			int     internal_i = i % n;
+			int     id         = domain_i * d_x + domain_j;
+			Domain &d          = *domains[id];
+			os << d.resid[internal_i * n + internal_j] * d.h_x * d.h_y << '\n';
 		}
 	}
 }
@@ -1207,11 +1241,11 @@ void DomainCollection::outputResidualRefined(std::ostream &os)
 		int domain_j   = j / n;
 		int internal_j = j % n;
 		for (int i = 0; i < num_i; i++) {
-			int domain_i   = i / n;
-			int internal_i = i % n;
-			int id         = d_x * d_x / 4 + domain_i * d_x + domain_j;
-            Domain &d = *domains[id];
-			os << d.resid[internal_i * n + internal_j]*d.h_x*d.h_y << '\n';
+			int     domain_i   = i / n;
+			int     internal_i = i % n;
+			int     id         = d_x * d_x / 4 + domain_i * d_x + domain_j;
+			Domain &d          = *domains[id];
+			os << d.resid[internal_i * n + internal_j] * d.h_x * d.h_y << '\n';
 		}
 	}
 }

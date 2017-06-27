@@ -1,7 +1,7 @@
 #include "BelosCGIter.hpp"
 #include "BelosOutputManager.hpp"
-#include "DomainSignatureCollection.h"
 #include "BlockJacobiRelaxer.h"
+#include "DomainSignatureCollection.h"
 #include "FunctionWrapper.h"
 #include "MyTypeDefs.h"
 #include "OpShift.h"
@@ -18,14 +18,14 @@
 #include <BelosLSQRSolMgr.hpp>
 #include <BelosLinearProblem.hpp>
 #include <BelosTpetraAdapter.hpp>
-#include <MatrixMarket_Tpetra.hpp>
+#include <Ifpack2_BlockRelaxation_decl.hpp>
+#include <Ifpack2_BlockRelaxation_def.hpp>
 #include <Ifpack2_Factory.hpp>
 #include <Ifpack2_ILUT_decl.hpp>
 #include <Ifpack2_ILUT_def.hpp>
 #include <Ifpack2_Relaxation_decl.hpp>
 #include <Ifpack2_Relaxation_def.hpp>
-#include <Ifpack2_BlockRelaxation_decl.hpp>
-#include <Ifpack2_BlockRelaxation_def.hpp>
+#include <MatrixMarket_Tpetra.hpp>
 #include <Teuchos_Comm.hpp>
 #include <Teuchos_GlobalMPISession.hpp>
 #include <Teuchos_ParameterList.hpp>
@@ -43,9 +43,8 @@
 #include <string>
 #include <unistd.h>
 #ifndef M_PIl
-#define M_PIl          3.141592653589793238462643383279502884L /* pi */
+#define M_PIl 3.141592653589793238462643383279502884L /* pi */
 #endif
-
 
 #include "DDMultiGrid.h"
 
@@ -64,7 +63,7 @@ int main(int argc, char *argv[])
 	using Teuchos::rcp;
 	using namespace std::chrono;
 
-	Teuchos::GlobalMPISession global(&argc, &argv, nullptr);
+	Teuchos::GlobalMPISession     global(&argc, &argv, nullptr);
 	RCP<const Teuchos::Comm<int>> comm = Tpetra::DefaultPlatform::getDefaultPlatform().getComm();
 
 	int num_procs = comm->getSize();
@@ -72,18 +71,18 @@ int main(int argc, char *argv[])
 	int my_global_rank = comm->getRank();
 
 	// parse input
-	args::ArgumentParser  parser("");
-	args::HelpFlag        help(parser, "help", "Display this help menu", {'h', "help"});
+	args::ArgumentParser parser("");
+	args::HelpFlag       help(parser, "help", "Display this help menu", {'h', "help"});
 
 	args::ValueFlag<int> f_n(parser, "n", "number of cells in the x direction, in each domain",
-	                          {'n'});
+	                         {'n'});
 	args::ValueFlag<string> f_mesh(parser, "file_name", "read in a mesh", {"mesh"});
-	args::ValueFlag<int> f_square(
-	parser, "num_domains", "create a num_domains x num_domains square of grids", {"square"});
+	args::ValueFlag<int>    f_square(parser, "num_domains",
+	                              "create a num_domains x num_domains square of grids", {"square"});
 	args::ValueFlag<int> f_amr(parser, "num_domains", "create a num_domains x num_domains square "
-	                                                   "of grids, and a num_domains*2 x "
-	                                                   "num_domains*2 refined square next to it",
-	                            {"amr"});
+	                                                  "of grids, and a num_domains*2 x "
+	                                                  "num_domains*2 refined square next to it",
+	                           {"amr"});
 	args::Flag           f_outclaw(parser, "outclaw", "output amrclaw ascii file", {"outclaw"});
 	args::ValueFlag<int> f_l(parser, "n", "run the program n times and print out the average",
 	                         {'l'});
@@ -93,8 +92,8 @@ int main(int argc, char *argv[])
 	                            {'s'});
 	args::ValueFlag<string> f_resid(parser, "residual filename",
 	                                "the file to write the residual to", {"residual"});
-	args::ValueFlag<string> f_error(parser, "error filename",
-	                                "the file to write the error to", {"error"});
+	args::ValueFlag<string> f_error(parser, "error filename", "the file to write the error to",
+	                                {"error"});
 	args::ValueFlag<string> f_r(parser, "rhs filename", "the file to write the rhs vector to",
 	                            {'r'});
 	args::ValueFlag<string> f_g(parser, "gamma filename", "the file to write the gamma vector to",
@@ -102,22 +101,22 @@ int main(int argc, char *argv[])
 	args::ValueFlag<string> f_read_gamma(parser, "gamma filename",
 	                                     "the file to read gamma vector from", {"readgamma"});
 	args::ValueFlag<string> f_flux(parser, "flux filename", "the file to write flux difference to",
-	                            {"flux"});
+	                               {"flux"});
 	args::ValueFlag<string> f_p(parser, "preconditioner filename",
 	                            "the file to write the preconditioner to", {'p'});
 	args::ValueFlag<double> f_t(
 	parser, "tolerance", "set the tolerance of the iterative solver (default is 1e-10)", {'t'});
 	args::ValueFlag<double> f_omega(
 	parser, "tolerance", "set the tolerance of the iterative solver (default is 1e-10)", {"omega"});
-    args::ValueFlag<int> f_d(
+	args::ValueFlag<int> f_d(
 	parser, "row", "pin gamma value to zero (by modifying that row of the schur compliment matrix)",
 	{'z'});
 	args::ValueFlag<int> f_div(parser, "divide", "use iterative method", {"divide"});
-	args::Flag f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
-	args::Flag f_blockcrs(parser, "wrapper", "use a function wrapper", {"blockcrs"});
-	args::Flag f_crs(parser, "wrapper", "use a function wrapper", {"crs"});
-	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
-	args::Flag f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
+	args::Flag           f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
+	args::Flag           f_blockcrs(parser, "wrapper", "use a function wrapper", {"blockcrs"});
+	args::Flag           f_crs(parser, "wrapper", "use a function wrapper", {"crs"});
+	args::Flag           f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
+	args::Flag           f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
 	args::Flag           f_precblockj(parser, "prec", "use block diagonal jacobi preconditioner",
 	                        {"precblockj"});
 	args::Flag f_precj(parser, "prec", "use block diagonal jacobi preconditioner", {"precj"});
@@ -133,13 +132,11 @@ int main(int argc, char *argv[])
 	args::Flag f_nozero(parser, "nozero", "don't make the average of vector zero in CG solver",
 	                    {"nozero"});
 	args::Flag f_nozerou(parser, "zerou", "don't modify make so that it zeros the solution",
-	                    {"nozerou"});
+	                     {"nozerou"});
 	args::Flag f_nozerof(parser, "zerou", "don't modify make so that it zeros the solution",
-	                    {"nozerof"});
-	args::Flag f_zeropatch(parser, "", "zero patch",
-	                    {"zeropatch"});
-	args::Flag f_pingamma(parser, "pingamma", "pin the first gamma to zero",
-	                    {"pingamma"});
+	                     {"nozerof"});
+	args::Flag f_zeropatch(parser, "", "zero patch", {"zeropatch"});
+	args::Flag f_pingamma(parser, "pingamma", "pin the first gamma to zero", {"pingamma"});
 	args::Flag f_lu(parser, "lu", "use LU decomposition", {"lu"});
 	args::Flag f_ilu(parser, "ilu", "use incomplete LU preconditioner", {"ilu"});
 	args::Flag f_riluk(parser, "ilu", "use RILUK preconditioner", {"riluk"});
@@ -175,18 +172,18 @@ int main(int argc, char *argv[])
 		int d = args::get(f_amr);
 		dsc   = DomainSignatureCollection(d, d, comm->getRank(), true);
 	} else {
-        int d = args::get(f_square);
-		dsc = DomainSignatureCollection(d, d, comm->getRank());
+		int d = args::get(f_square);
+		dsc   = DomainSignatureCollection(d, d, comm->getRank());
 	}
-    if(f_div){
+	if (f_div) {
 		for (int i = 0; i < args::get(f_div); i++) {
-            dsc.divide();
+			dsc.divide();
 		}
 	}
 	// Set the number of discretization points in the x and y direction.
-	int    nx            = args::get(f_n);
-	int    ny            = args::get(f_n);
-	int    total_cells   = dsc.num_global_domains*nx*ny;
+	int nx          = args::get(f_n);
+	int ny          = args::get(f_n);
+	int total_cells = dsc.num_global_domains * nx * ny;
 	cerr << "Total cells: " << total_cells << endl;
 
 	if (dsc.num_global_domains < num_procs) {
@@ -212,7 +209,7 @@ int main(int argc, char *argv[])
 		loop_count = args::get(f_l);
 	}
 
-    int del = -1;
+	int del = -1;
 	if (f_d) {
 		del = args::get(f_d);
 	}
@@ -301,7 +298,7 @@ int main(int argc, char *argv[])
 			dc.initNeumann(ffun, gfun, nfunx, nfuny, f_amr);
 		} else {
 			dc.initDirichlet(ffun, gfun);
-            dc.amr = f_amr;
+			dc.amr = f_amr;
 		}
 
 		comm->barrier();
@@ -343,7 +340,7 @@ int main(int argc, char *argv[])
 				d.f += fdiff;
 			}
 		}
-        steady_clock::time_point tsolve_start; 
+		steady_clock::time_point tsolve_start;
 		if (dsc.num_global_domains != 1) {
 			// do iterative solve
 
@@ -354,9 +351,9 @@ int main(int argc, char *argv[])
 				Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_rhs_file, b, "", "");
 			}
 
-            ///////////////////
+			///////////////////
 			// setup start
-            ///////////////////
+			///////////////////
 			comm->barrier();
 			steady_clock::time_point setup_start = steady_clock::now();
 
@@ -365,7 +362,7 @@ int main(int argc, char *argv[])
 				comm->barrier();
 				steady_clock::time_point form_start = steady_clock::now();
 
-				//dc.formCrsNeumannMatrix(A);
+				// dc.formCrsNeumannMatrix(A);
 
 				// stop time
 				comm->barrier();
@@ -374,19 +371,23 @@ int main(int argc, char *argv[])
 				if (my_global_rank == 0)
 					cout << "Matrix Formation Time: " << form_time.count() << endl;
 
-					op = A;
+				op = A;
 				rm = A;
 
 				if (save_matrix_file != "")
-					Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file,
-					                                                          A, "", "");
+					Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A,
+					                                                           "", "");
 
-            }else if (f_crs) {
+			} else if (f_crs) {
 				// start time
 				comm->barrier();
 				steady_clock::time_point form_start = steady_clock::now();
 
-				dc.formCRSMatrix(matrix_map,A, &s);
+				if (f_lu) {
+					dc.formCRSMatrix(matrix_map, A, &s, nx, true);
+				} else {
+					dc.formCRSMatrix(matrix_map, A, &s);
+				}
 
 				// stop time
 				comm->barrier();
@@ -404,8 +405,8 @@ int main(int argc, char *argv[])
 				rm = A;
 
 				if (save_matrix_file != "")
-					Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file,
-					                                                          A, "", "");
+					Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A,
+					                                                           "", "");
 			} else if (f_wrapper) {
 				// Create a function wrapper
 				op = rcp(new FuncWrap(b, &dc));
@@ -457,7 +458,7 @@ int main(int argc, char *argv[])
 
 				Teuchos::RCP<Ifpack2::RILUK<Tpetra::RowMatrix<>>> P
 				= rcp(new Ifpack2::RILUK<Tpetra::RowMatrix<>>(rm));
-                P->compute();
+				P->compute();
 
 				problem->setLeftPrec(P);
 
@@ -477,9 +478,9 @@ int main(int argc, char *argv[])
 				params.set("fact: ilut level-of-fill", 3);
 				params.set("fact: drop tolerance", 0.0);
 				params.set("fact: absolute threshold", 0.1);
-                //P->setParameters(params);
+				// P->setParameters(params);
 
-                P->compute();
+				P->compute();
 				problem->setLeftPrec(P);
 
 				comm->barrier();
@@ -519,8 +520,7 @@ int main(int argc, char *argv[])
 				comm->barrier();
 				steady_clock::time_point prec_start = steady_clock::now();
 
-
-				RCP<BlockJacobiRelaxer> P = rcp(new BlockJacobiRelaxer(RBA,s));
+				RCP<BlockJacobiRelaxer> P = rcp(new BlockJacobiRelaxer(RBA, s));
 				problem->setLeftPrec(P);
 
 				comm->barrier();
@@ -533,10 +533,10 @@ int main(int argc, char *argv[])
 				comm->barrier();
 				steady_clock::time_point prec_start = steady_clock::now();
 
-				RCP<DDMultiGrid>         P;
-				if(f_neumann){
+				RCP<DDMultiGrid> P;
+				if (f_neumann) {
 					P = rcp(new DDMultiGrid(&dc, RBA, s));
-				}else{
+				} else {
 					P = rcp(new DDMultiGrid(&dc, RBA));
 				}
 				problem->setRightPrec(P);
@@ -570,23 +570,20 @@ int main(int argc, char *argv[])
 				prec->initialize();
 				prec->compute();
 
-
 				comm->barrier();
 				duration<double> prec_time = steady_clock::now() - prec_start;
 
 				if (my_global_rank == 0)
 					cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
-
 			}
 
-            ///////////////////
+			///////////////////
 			// setup end
-            ///////////////////
+			///////////////////
 			comm->barrier();
 			duration<double> setup_time = steady_clock::now() - setup_start;
 
-			if (my_global_rank == 0)
-				cout << "Setup Time: " << setup_time.count() << endl;
+			if (my_global_rank == 0) cout << "Setup Time: " << setup_time.count() << endl;
 
 			setup_times[loop] = setup_time.count();
 
@@ -612,17 +609,22 @@ int main(int argc, char *argv[])
 					for (size_t i = 0; i < size; i++) {
 						if (inds[i] == 0) {
 							vals[i] = 1;
-                            cerr << "set i " <<endl;
+							cerr << "set i " << endl;
 						} else {
 							vals[i] = 0;
 						}
 					}
 					A->replaceGlobalValues(0, inds, vals);
 					A->fillComplete();
+				}
 
-                }
 				RCP<Amesos2::Solver<matrix_type, vector_type>> solver
 				= Amesos2::create<matrix_type, vector_type>("KLU2", A, gamma, b);
+
+				Teuchos::RCP<Teuchos::ParameterList> amesoslist
+				= Teuchos::rcp(new Teuchos::ParameterList("Amesos2"));
+				amesoslist->sublist("KLU2").set("Transpose", true);
+				solver->setParameters(amesoslist);
 
 				solver->symbolicFactorization().numericFactorization().solve();
 
@@ -653,9 +655,9 @@ int main(int argc, char *argv[])
 				                + Belos::TimingDetails + Belos::Debug + Belos::IterationDetails;
 				belosList.set("Verbosity", verbosity);
 				// belosList.set("Orthogonalization", "ICGS");
-                //
-                belosList.set("Rel RHS Err",0.0);
-                belosList.set("Rel Mat Err",0.0);
+				//
+				belosList.set("Rel RHS Err", 0.0);
+				belosList.set("Rel Mat Err", 0.0);
 
 				// Create solver and solve
 				if (f_rgmres) {
@@ -717,8 +719,8 @@ int main(int argc, char *argv[])
 			if (dsc.num_global_domains != 1) {
 				x->putScalar(0);
 				dc.solveWithInterface(*x, *r);
-				//op->apply(*gamma, *r);
-				//r->update(1.0, *b, -1.0);
+				// op->apply(*gamma, *r);
+				// r->update(1.0, *b, -1.0);
 
 				solver->reset(Belos::ResetType::Problem);
 				if (f_wrapper) {
@@ -748,8 +750,8 @@ int main(int argc, char *argv[])
 		Tpetra::Vector<> diff_norm(err_map);
 
 		if (f_neumann) {
-			double uavg = dc.integrateU()/dc.area();
-			double eavg = dc.integrateExact()/dc.area();
+			double uavg = dc.integrateU() / dc.area();
+			double eavg = dc.integrateExact() / dc.area();
 
 			if (my_global_rank == 0) {
 				cout << "Average of computed solution: " << uavg << endl;
@@ -781,7 +783,7 @@ int main(int argc, char *argv[])
 			std::cout.precision(13);
 			std::cout << "Error: " << global_diff_norm / global_exact_norm << endl;
 			std::cout << "Residual: " << residual / fnorm << endl;
-			std::cout << u8"ΣAu-Σf: " << ausum-fsum << endl;
+			std::cout << u8"ΣAu-Σf: " << ausum - fsum << endl;
 			// if (f_neumann) {
 			//	std::cout << u8"∮ du/dn - ΣAu: " << dc.sumBoundaryFlux() - ausum << endl;
 			//}
@@ -821,15 +823,15 @@ int main(int argc, char *argv[])
 			Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_gamma_file, gamma, "",
 			                                                          "");
 		}
-        if (f_flux){
-            dc.getFluxDiff(*gamma);
+		if (f_flux) {
+			dc.getFluxDiff(*gamma);
 			Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(args::get(f_flux), gamma, "",
 			                                                          "");
 		}
 		if (f_outclaw) {
 			dc.outputClaw();
 		}
-        cout << std::defaultfloat;
+		cout << std::defaultfloat;
 	}
 
 	if (loop_count > 1 && my_global_rank == 0) {

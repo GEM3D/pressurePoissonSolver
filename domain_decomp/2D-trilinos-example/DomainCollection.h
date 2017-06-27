@@ -1,8 +1,8 @@
 #ifndef DOMAINCOLLECTION_H
 #define DOMAINCOLLECTION_H
 #include "Domain.h"
-#include "Iface.h"
 #include "DomainSignatureCollection.h"
+#include "Iface.h"
 #include "MyTypeDefs.h"
 #include "RBMatrix.h"
 /**
@@ -17,9 +17,8 @@
 class DomainCollection
 {
 	private:
-
-    bool neumann = false;
-    bool zero_u = false;
+	bool neumann = false;
+	bool zero_u  = false;
 	/**
 	 * @brief A map of domain ids to the domain objects.
 	 */
@@ -27,14 +26,14 @@ class DomainCollection
 	 * @brief The MPI communicator used.
 	 */
 	Teuchos::RCP<const Teuchos::Comm<int>> comm;
-	int num_cols = 0;
+	int                                    num_cols = 0;
 
 	/**
 	 * @brief Number of global domains
 	 */
 	int num_global_domains;
 	/**
-     * TODO update this
+	 * TODO update this
 	 * @brief a vector of integers that stores information for each inteface.
 	 *
 	 * For the current format each interface requires 15 integers in order to store information.
@@ -58,7 +57,7 @@ class DomainCollection
 	 */
 	Teuchos::RCP<int_vector_type> iface_info;
 
-    std::set<Iface> ifaces;
+	std::set<Iface> ifaces;
 
 	public:
 	/**
@@ -69,8 +68,8 @@ class DomainCollection
 	int n;
 
 	std::map<int, Teuchos::RCP<Domain>> domains;
-	bool amr = false;
-	double f_mean=0;
+	bool   amr    = false;
+	double f_mean = 0;
 	/**
 	 * @brief Tpetra map that assures each domains has access to it's interface values
 	 */
@@ -86,7 +85,7 @@ class DomainCollection
 	/**
 	 * @brief Tpetra map use for interface information.
 	 */
-	Teuchos::RCP<map_type> iface_map;
+	Teuchos::RCP<map_type>    iface_map;
 	DomainSignatureCollection dsc;
 
 	/**
@@ -154,9 +153,9 @@ class DomainCollection
 	 */
 	void solveWithInterface(const vector_type &gamma, vector_type &diff);
 
-    /**
-     * @brief get the difference in flux on refined boundaries
-     */
+	/**
+	 * @brief get the difference in flux on refined boundaries
+	 */
 	void getFluxDiff(vector_type &diff);
 
 	/**
@@ -232,7 +231,8 @@ class DomainCollection
 	 */
 	Teuchos::RCP<map_type> formMatrixMap(int n);
 	void formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<matrix_type> &A,
-	                  Teuchos::RCP<single_vector_type> *s = nullptr, int n = -1);
+	                   Teuchos::RCP<single_vector_type> *s = nullptr, int n = -1,
+	                   bool transpose = false);
 	void formRBMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<RBMatrix> &A,
 	                  Teuchos::RCP<single_vector_type> *s = nullptr, int n = -1);
 
@@ -242,11 +242,12 @@ class DomainCollection
 			p.second->swapResidSol();
 		}
 	}
-	void sumResidIntoSol(){
+	void sumResidIntoSol()
+	{
 		for (auto &p : domains) {
 			p.second->sumResidIntoSol();
 		}
-    }
+	}
 	void outputClaw();
 	int  getGlobalNumCells() { return num_global_domains * n * n; }
 };
