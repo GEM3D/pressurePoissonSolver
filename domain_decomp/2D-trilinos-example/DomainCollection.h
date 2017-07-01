@@ -56,8 +56,11 @@ class DomainCollection
 	 *   14. The axis that the interface resides on
 	 */
 	Teuchos::RCP<int_vector_type> iface_info;
+	Teuchos::RCP<int_vector_type> row_iface_info;
 
-	std::set<Iface> ifaces;
+	std::set<ColIface> ifaces;
+	std::set<RowIface> row_ifaces;
+	std::set<MatrixBlock> blocks;
 
 	public:
 	/**
@@ -78,6 +81,7 @@ class DomainCollection
 	 * @brief Tpetra map that assures each domains has access to it's interface information values
 	 */
 	Teuchos::RCP<map_type> collection_iface_map;
+	Teuchos::RCP<map_type> collection_row_iface_map;
 	/**
 	 * @brief Tpetra map for interface values used in Schur complement matrix
 	 */
@@ -86,6 +90,7 @@ class DomainCollection
 	 * @brief Tpetra map use for interface information.
 	 */
 	Teuchos::RCP<map_type>    iface_map;
+	Teuchos::RCP<map_type>    row_iface_map;
 	DomainSignatureCollection dsc;
 
 	/**

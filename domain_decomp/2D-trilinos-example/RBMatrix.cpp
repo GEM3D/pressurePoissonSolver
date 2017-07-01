@@ -274,7 +274,7 @@ ostream& operator<<(ostream& os, const RBMatrix& A) {
 						}
 						if (i == j) {
 							os << i + 1 << ' ' << j + 1 << ' '
-							   << (curr_blk[block_i + A.block_size * block_j] + 2.0)
+							   << (curr_blk[block_i + A.block_size * block_j])
 							      * curr_block.scale
 							   << "\n";
 						} else {

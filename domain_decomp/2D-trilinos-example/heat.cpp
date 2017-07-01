@@ -137,7 +137,9 @@ int main(int argc, char *argv[])
 	                     {"nozerof"});
 	args::Flag f_zeropatch(parser, "", "zero patch", {"zeropatch"});
 	args::Flag f_pingamma(parser, "pingamma", "pin the first gamma to zero", {"pingamma"});
-	args::Flag f_lu(parser, "lu", "use LU decomposition", {"lu"});
+	args::Flag f_lu(parser, "lu", "use KLU solver", {"klu"});
+	args::Flag f_mumps(parser, "lu", "use MUMPS solver", {"mumps"});
+	args::Flag f_superlu(parser, "lu", "use SUPERLU solver", {"superlu"});
 	args::Flag f_ilu(parser, "ilu", "use incomplete LU preconditioner", {"ilu"});
 	args::Flag f_riluk(parser, "ilu", "use RILUK preconditioner", {"riluk"});
 	args::Flag f_iter(parser, "iterative", "use iterative method", {"iterative"});
@@ -383,11 +385,7 @@ int main(int argc, char *argv[])
 				comm->barrier();
 				steady_clock::time_point form_start = steady_clock::now();
 
-				if (f_lu) {
-					dc.formCRSMatrix(matrix_map, A, &s, nx, true);
-				} else {
-					dc.formCRSMatrix(matrix_map, A, &s);
-				}
+				dc.formCRSMatrix(matrix_map, A, &s);
 
 				// stop time
 				comm->barrier();
@@ -596,7 +594,7 @@ int main(int argc, char *argv[])
 			if (f_read_gamma) {
 				gamma = Tpetra::MatrixMarket::Reader<matrix_type>::readDenseFile(
 				args::get(f_read_gamma), comm, matrix_map_const);
-			} else if (f_lu) {
+			} else if (f_lu || f_superlu || f_mumps) {
 				comm->barrier();
 				steady_clock::time_point lu_start = steady_clock::now();
 
@@ -618,13 +616,18 @@ int main(int argc, char *argv[])
 					A->fillComplete();
 				}
 
+				string name;
+				if (f_lu) {
+					name = "KLU2";
+				}
+				if (f_mumps) {
+					name = "MUMPS";
+				}
+				if (f_superlu) {
+					name = "superlu_dist";
+				}
 				RCP<Amesos2::Solver<matrix_type, vector_type>> solver
-				= Amesos2::create<matrix_type, vector_type>("KLU2", A, gamma, b);
-
-				Teuchos::RCP<Teuchos::ParameterList> amesoslist
-				= Teuchos::rcp(new Teuchos::ParameterList("Amesos2"));
-				amesoslist->sublist("KLU2").set("Transpose", true);
-				solver->setParameters(amesoslist);
+				= Amesos2::create<matrix_type, vector_type>(name, A, gamma, b);
 
 				solver->symbolicFactorization().numericFactorization().solve();
 

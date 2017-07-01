@@ -79,8 +79,8 @@ void DomainCollection::initNeumann(function<double(double, double)> ffun,
 	// create map for domains
 	generateMaps();
 	distributeIfaceInfo();
-	for (const Iface &i : ifaces) {
-		const_cast<Iface &>(i).setNeumann();
+	for (const ColIface &i : ifaces) {
+		const_cast<ColIface &>(i).setNeumann();
 	}
 }
 
@@ -133,6 +133,7 @@ void DomainCollection::generateMaps()
 	vector<int> global;
 	int &       curr_i = num_cols;
 	vector<int> c_iface_global;
+	vector<int> c_row_iface_global;
 	int         curr_c_i      = 0;
 	int         curr_matrix_i = 0;
 	global.reserve(domains.size() * (2 * n + 2 * n));
@@ -140,8 +141,11 @@ void DomainCollection::generateMaps()
 		if (global_i == -1) {
 			cerr << "neg global i" << endl;
 		}
-		for (int i = 0; i < Iface::size; i++) {
-			c_iface_global.push_back(global_i * Iface::size + i);
+		for (int i = 0; i < RowIface::size; i++) {
+			c_row_iface_global.push_back(global_i * RowIface::size + i);
+		}
+		for (int i = 0; i < ColIface::size; i++) {
+			c_iface_global.push_back(global_i * ColIface::size + i);
 			curr_c_i++;
 		}
 		for (int i = 0; i < n; i++) {
@@ -274,11 +278,15 @@ void DomainCollection::generateMaps()
 
 	vector<int> matrix_global;
 	vector<int> iface_global;
+	vector<int> row_iface_global;
 	for (int i = n * dsc.matrix_j_low; i < n * dsc.matrix_j_high; i++) {
 		matrix_global.push_back(i);
 	}
-	for (int i = Iface::size * dsc.matrix_j_low; i < Iface::size * dsc.matrix_j_high; i++) {
+	for (int i = ColIface::size * dsc.matrix_j_low; i < ColIface::size * dsc.matrix_j_high; i++) {
 		iface_global.push_back(i);
+	}
+	for (int i = RowIface::size * dsc.matrix_j_low; i < RowIface::size * dsc.matrix_j_high; i++) {
+		row_iface_global.push_back(i);
 	}
 	cerr << dsc.num_global_interfaces << endl;
 
@@ -286,18 +294,24 @@ void DomainCollection::generateMaps()
 	// points
 	if (num_global_domains == 1) {
 		// this is a special case for when there is only one domain
-		collection_map       = Teuchos::rcp(new map_type(1, 0, comm));
-		collection_iface_map = Teuchos::rcp(new map_type(1, 0, comm));
-		matrix_map           = Teuchos::rcp(new map_type(1, 0, comm));
-		iface_map            = Teuchos::rcp(new map_type(1, 0, comm));
+		collection_map           = Teuchos::rcp(new map_type(1, 0, comm));
+		collection_iface_map     = Teuchos::rcp(new map_type(1, 0, comm));
+		collection_row_iface_map = Teuchos::rcp(new map_type(1, 0, comm));
+		matrix_map               = Teuchos::rcp(new map_type(1, 0, comm));
+		iface_map                = Teuchos::rcp(new map_type(1, 0, comm));
+		row_iface_map            = Teuchos::rcp(new map_type(1, 0, comm));
 	} else {
 		collection_map = Teuchos::rcp(new map_type(-1, &global[0], global.size(), 0, this->comm));
 		collection_iface_map
 		= Teuchos::rcp(new map_type(-1, &c_iface_global[0], c_iface_global.size(), 0, this->comm));
+		collection_row_iface_map = Teuchos::rcp(
+		new map_type(-1, &c_row_iface_global[0], c_row_iface_global.size(), 0, this->comm));
 		matrix_map
 		= Teuchos::rcp(new map_type(-1, &matrix_global[0], matrix_global.size(), 0, this->comm));
 		iface_map
 		= Teuchos::rcp(new map_type(-1, &iface_global[0], iface_global.size(), 0, this->comm));
+		row_iface_map = Teuchos::rcp(
+		new map_type(-1, &row_iface_global[0], row_iface_global.size(), 0, this->comm));
 	}
 #ifdef DNDEBUG
 	auto out = Teuchos::getFancyOStream(Teuchos::rcpFromRef(std::cerr));
@@ -315,15 +329,33 @@ RCP<map_type> DomainCollection::formMatrixMap(int n)
 }
 void DomainCollection::distributeIfaceInfo()
 {
-	int_vector_type dist(collection_iface_map, 1);
-	iface_info = rcp(new int_vector_type(iface_map, 1));
-	for (auto &p : domains) {
-		Domain &d = *p.second;
-		Iface::writeIfaces(d, dist);
+	// column ifaces
+	{
+		int_vector_type dist(collection_iface_map, 1);
+		iface_info = rcp(new int_vector_type(iface_map, 1));
+		for (auto &p : domains) {
+			Domain &d = *p.second;
+			ColIface::writeIfaces(d, dist);
+		}
+		Tpetra::Export<> exporter(collection_iface_map, iface_map);
+		iface_info->doExport(dist, exporter, Tpetra::CombineMode::ADD);
+		ColIface::readIfaces(ifaces, *iface_info);
 	}
-	Tpetra::Export<> exporter(collection_iface_map, iface_map);
-	iface_info->doExport(dist, exporter, Tpetra::CombineMode::ADD);
-	Iface::readIfaces(ifaces, *iface_info);
+
+	// row ifaces
+	{
+		int_vector_type dist(collection_row_iface_map, 1);
+		row_iface_info = rcp(new int_vector_type(row_iface_map, 1));
+		for (auto &p : domains) {
+			Domain &d = *p.second;
+			RowIface::writeIfaces(d, dist);
+		}
+		Tpetra::Export<> exporter(collection_row_iface_map, row_iface_map);
+		row_iface_info->doExport(dist, exporter, Tpetra::CombineMode::ADD);
+		RowIface::readIfaces(row_ifaces, *row_iface_info);
+	}
+
+	MatrixBlock::getBlocks(blocks, row_ifaces);
 }
 void DomainCollection::getFluxDiff(vector_type &diff)
 {
@@ -530,122 +562,104 @@ void DomainCollection::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<ma
 	if (n == -1) {
 		n = this->n;
 	}
-	if (s != nullptr) {
-		*s = rcp(new single_vector_type(map));
-	}
 	set<int> rows;
 	set<int> cols;
-	for (Iface i : ifaces) {
-		cols.insert(i.global_i[0]);
-		for (int q = 0; q < 4; q++) {
-			rows.insert(i.global_i[q]);
-			rows.insert(i.center_i[q]);
-			rows.insert(i.refined_left[q]);
-			rows.insert(i.refined_right[q]);
-		}
+	for (MatrixBlock b : blocks) {
+		rows.insert(b.i);
+		cols.insert(b.j);
 	}
 
-	rows.erase(-1);
-	vector<int> cols_array;
-	for (int j : cols) {
-		rows.erase(j);
-		for (int q = 0; q < n; q++)
-			cols_array.push_back(j * n + q);
-	}
-	vector<int> rows_array(cols_array);
+	vector<int> rows_array;
 	for (int i : rows) {
+		cols.erase(i);
 		for (int q = 0; q < n; q++)
 			rows_array.push_back(i * n + q);
+	}
+	vector<int> cols_array(rows_array);
+	for (int j : cols) {
+		for (int q = 0; q < n; q++)
+			cols_array.push_back(j * n + q);
 	}
 	RCP<map_type> row_map = rcp(new map_type(-1, &rows_array[0], rows_array.size(), 0, this->comm));
 	RCP<map_type> col_map = rcp(new map_type(-1, &cols_array[0], cols_array.size(), 0, this->comm));
 
-	if (transpose) {
-		A = rcp(new matrix_type(col_map, row_map, 5 * n));
-	} else {
-		A = rcp(new matrix_type(row_map, col_map, 5 * n));
-	}
+	A  = rcp(new matrix_type(row_map, col_map, 5 * n));
 	*s = rcp(new single_vector_type(map));
 
 	set<pair<int, int>> inserted;
+	valarray<double> shift(n);
+	valarray<double> shift_rev(n);
 	auto insertBlock = [&](int i, int j, RCP<valarray<double>> block, bool flip_i, bool flip_j) {
-		int local_i = row_map->getLocalElement(i * n);
-		int local_j = col_map->getLocalElement(j * n);
+		if (i == j) {
+			if (flip_j) {
+				for (int q = 0; q < n; q++) {
+					(*s)->sumIntoGlobalValue(j * n + q, shift_rev[q]);
+				}
+			} else {
+				for (int q = 0; q < n; q++) {
+					(*s)->sumIntoGlobalValue(j * n + q, shift[q]);
+				}
+			}
+		}
+		int local_i = A->getRowMap()->getLocalElement(i * n);
+		int local_j = A->getColMap()->getLocalElement(j * n);
 
 		valarray<double> &orig = *block;
 		valarray<double>  copy(n * n);
-		if (transpose) {
-			for (int i = 0; i < n; i++) {
-				int block_i = i;
-				if (flip_i) {
-					block_i = n - i - 1;
+		for (int i = 0; i < n; i++) {
+			int block_i = i;
+			if (flip_i) {
+				block_i = n - i - 1;
+			}
+			for (int j = 0; j < n; j++) {
+				int block_j = j;
+				if (flip_j) {
+					block_j = n - j - 1;
 				}
-				for (int j = 0; j < n; j++) {
-					int block_j = j;
-					if (flip_j) {
-						block_j = n - j - 1;
-					}
-					copy[i + n * j] = orig[block_i * n + block_j];
+				copy[i * n + j] = orig[block_i * n + block_j];
+			}
+		}
+		if (neumann) {
+			if (i == 0) {
+				if (j == 0) {
+					copy[0] = 1;
+				} else {
+					copy[0] = 0;
+				}
+				for (i = 1; i < n; i++) {
+					copy[i] = 0;
 				}
 			}
-			vector<int> inds(n);
+		}
+		vector<int> inds(n);
+		for (int q = 0; q < n; q++) {
+			inds[q] = local_j + q;
+		}
+		if (inserted.count(make_pair(i, j)) == 0) {
 			for (int q = 0; q < n; q++) {
-				inds[q] = local_i + q;
-			}
-			if (inserted.count(make_pair(i, j)) == 0) {
-				for (int q = 0; q < n; q++) {
-					A->insertLocalValues(local_j + q, n, &copy[q * n], &inds[0]);
-				}
-			} else {
-				inserted.insert(make_pair(i, j));
-				for (int q = 0; q < n; q++) {
-					A->sumIntoLocalValues(local_j + q, n, &copy[q * n], &inds[0]);
-				}
+				A->insertLocalValues(local_i + q, n, &copy[q * n], &inds[0]);
 			}
 		} else {
-			for (int i = 0; i < n; i++) {
-				int block_i = i;
-				if (flip_i) {
-					block_i = n - i - 1;
-				}
-				for (int j = 0; j < n; j++) {
-					int block_j = j;
-					if (flip_j) {
-						block_j = n - j - 1;
-					}
-					copy[i * n + j] = orig[block_i * n + block_j];
-				}
-			}
-			vector<int> inds(n);
+			inserted.insert(make_pair(i, j));
 			for (int q = 0; q < n; q++) {
-				inds[q] = local_j + q;
-			}
-			if (inserted.count(make_pair(i, j)) == 0) {
-				for (int q = 0; q < n; q++) {
-					A->insertLocalValues(local_i + q, n, &copy[q * n], &inds[0]);
-				}
-			} else {
-				inserted.insert(make_pair(i, j));
-				for (int q = 0; q < n; q++) {
-					A->sumIntoLocalValues(local_i + q, n, &copy[q * n], &inds[0]);
-				}
+				A->sumIntoLocalValues(local_i + q, n, &copy[q * n], &inds[0]);
 			}
 		}
 	};
 
 	// create iface objects
-	set<Iface> ifaces = this->ifaces;
+	set<MatrixBlock> blocks = this->blocks;
 
 	int num_types = 0;
-	while (!ifaces.empty()) {
+	while (!blocks.empty()) {
 		num_types++;
 		// the first in the set is the type of interface that we are going to solve for
-		set<Iface> todo;
-		Iface      curr_type = *ifaces.begin();
-		ifaces.erase(ifaces.begin());
+		set<MatrixBlock> todo;
+		MatrixBlock      curr_type = *blocks.begin();
+		blocks.erase(blocks.begin());
 		todo.insert(curr_type);
-		set<Iface> to_be_deleted;
-		for (auto iter = ifaces.begin(); iter != ifaces.end(); iter++) {
+		set<MatrixBlock> to_be_deleted;
+		for (auto iter = blocks.begin(); iter != blocks.end(); iter++) {
 			if (*iter == curr_type) {
 				todo.insert(*iter);
 				to_be_deleted.insert(*iter);
@@ -654,8 +668,8 @@ void DomainCollection::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<ma
 				// iter=ifaces.begin();
 			}
 		}
-		for (Iface i : to_be_deleted) {
-			ifaces.erase(i);
+		for (MatrixBlock i : to_be_deleted) {
+			blocks.erase(i);
 		}
 
 		// create domain representing curr_type
@@ -670,7 +684,6 @@ void DomainCollection::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<ma
 			}
 		}
 		Domain d(ds, n);
-
 		d.boundary_north = valarray<double>(n);
 		d.boundary_east  = valarray<double>(n);
 		d.boundary_south = valarray<double>(n);
@@ -748,8 +761,6 @@ void DomainCollection::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<ma
 		valarray<double> &scr_b = *scr_ptr;
 		valarray<double> &wcr_b = *wcr_ptr;
 
-		valarray<double> shift(n);
-		valarray<double> shift_rev(n);
 		for (int i = 0; i < n; i++) {
 			d.boundary_north[i] = 1;
 			d.solve();
@@ -796,91 +807,128 @@ void DomainCollection::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<ma
 			d.boundary_north[i] = 0;
 		}
 
+		auto getBlock = [&](const MatrixBlock &b) {
+			RCP<valarray<double>> ret;
+			switch (b.type) {
+				case BlockType::plain:
+					switch (b.s) {
+						case Side::north:
+							ret = n_ptr;
+							break;
+						case Side::east:
+							ret = e_ptr;
+							break;
+						case Side::south:
+							ret = s_ptr;
+							break;
+						case Side::west:
+							ret = w_ptr;
+					}
+					break;
+				// fine in
+				case BlockType::fine:
+					switch (b.s) {
+						case Side::north:
+							ret = nf_ptr;
+							break;
+						case Side::east:
+							ret = ef_ptr;
+							break;
+						case Side::south:
+							ret = sf_ptr;
+							break;
+						case Side::west:
+							ret = wf_ptr;
+					}
+					break;
+				// fine out
+				// left
+				case BlockType::fine_out_left:
+					switch (b.s) {
+						case Side::north:
+							ret = nfl_ptr;
+							break;
+						case Side::east:
+							ret = efl_ptr;
+							break;
+						case Side::south:
+							ret = sfl_ptr;
+							break;
+						case Side::west:
+							ret = wfl_ptr;
+					}
+					break;
+				// right
+				case BlockType::fine_out_right:
+					switch (b.s) {
+						case Side::north:
+							ret = nfr_ptr;
+							break;
+						case Side::east:
+							ret = efr_ptr;
+							break;
+						case Side::south:
+							ret = sfr_ptr;
+							break;
+						case Side::west:
+							ret = wfr_ptr;
+					}
+					break;
+
+				// coarse in
+				case BlockType::coarse:
+					switch (b.s) {
+						case Side::north:
+							ret = nc_ptr;
+							break;
+						case Side::east:
+							ret = ec_ptr;
+							break;
+						case Side::south:
+							ret = sc_ptr;
+							break;
+						case Side::west:
+							ret = wc_ptr;
+					}
+					break;
+				// coarse out
+				// left
+				case BlockType::coarse_out_left:
+					switch (b.s) {
+						case Side::north:
+							ret = ncl_ptr;
+							break;
+						case Side::east:
+							ret = ecl_ptr;
+							break;
+						case Side::south:
+							ret = scl_ptr;
+							break;
+						case Side::west:
+							ret = wcl_ptr;
+					}
+					break;
+				// right
+				case BlockType::coarse_out_right:
+					switch (b.s) {
+						case Side::north:
+							ret = ncr_ptr;
+							break;
+						case Side::east:
+							ret = ecr_ptr;
+							break;
+						case Side::south:
+							ret = scr_ptr;
+							break;
+						case Side::west:
+							ret = wcr_ptr;
+					}
+			}
+			return ret;
+		};
 		// now insert these results into the matrix for each interface
-		for (Iface iface : todo) {
-			bool reverse_x
-			= (iface.axis == X_AXIS && iface.right) || (iface.axis == Y_AXIS && !iface.right);
-			bool reverse_y = iface.right;
-
-			int j = iface.global_i[0];
-
-			if (neumann && s != nullptr) {
-				auto s_view  = (*s)->getLocalView<Kokkos::HostSpace>();
-				int  local_j = map->getLocalElement(j * n);
-				if (reverse_x) {
-					for (int i = 0; i < n; i++) {
-						s_view(local_j + i, 0) += shift_rev[i];
-					}
-				} else {
-					for (int i = 0; i < n; i++) {
-						s_view(local_j + i, 0) += shift[i];
-					}
-				}
-			}
-
-			if (iface.hasFineNbr[0]) {
-				insertBlock(iface.global_i[0], j, nc_ptr, reverse_x, reverse_x);
-				insertBlock(iface.refined_left[0], j, ncl_ptr, reverse_x, reverse_x);
-				insertBlock(iface.refined_right[0], j, ncr_ptr, reverse_x, reverse_x);
-			} else if (iface.hasCoarseNbr[0]) {
-				insertBlock(iface.global_i[0], j, nf_ptr, reverse_x, reverse_x);
-				if (iface.isCoarseLeft[0]) {
-					insertBlock(iface.center_i[0], j, nfl_ptr, reverse_x, reverse_x);
-				} else {
-					insertBlock(iface.center_i[0], j, nfr_ptr, reverse_x, reverse_x);
-				}
-			} else {
-				insertBlock(iface.global_i[0], j, n_ptr, reverse_x, reverse_x);
-			}
-
-			if (iface.global_i[1] != -1) {
-				if (iface.hasFineNbr[1]) {
-					insertBlock(iface.global_i[1], j, ec_ptr, reverse_y, reverse_x);
-					insertBlock(iface.refined_left[1], j, ecl_ptr, reverse_y, reverse_x);
-					insertBlock(iface.refined_right[1], j, ecr_ptr, reverse_y, reverse_x);
-				} else if (iface.hasCoarseNbr[1]) {
-					insertBlock(iface.global_i[1], j, ef_ptr, reverse_y, reverse_x);
-					if (iface.isCoarseLeft[1]) {
-						insertBlock(iface.center_i[1], j, efl_ptr, reverse_y, reverse_x);
-					} else {
-						insertBlock(iface.center_i[1], j, efr_ptr, reverse_y, reverse_x);
-					}
-				} else {
-					insertBlock(iface.global_i[1], j, e_ptr, reverse_y, reverse_x);
-				}
-			}
-			if (iface.global_i[2] != -1) {
-				if (iface.hasFineNbr[2]) {
-					insertBlock(iface.global_i[2], j, sc_ptr, reverse_x, reverse_x);
-					insertBlock(iface.refined_left[2], j, scl_ptr, reverse_x, reverse_x);
-					insertBlock(iface.refined_right[2], j, scr_ptr, reverse_x, reverse_x);
-				} else if (iface.hasCoarseNbr[2]) {
-					insertBlock(iface.global_i[2], j, sf_ptr, reverse_x, reverse_x);
-					if (iface.isCoarseLeft[2]) {
-						insertBlock(iface.center_i[2], j, sfl_ptr, reverse_x, reverse_x);
-					} else {
-						insertBlock(iface.center_i[2], j, sfr_ptr, reverse_x, reverse_x);
-					}
-				} else {
-					insertBlock(iface.global_i[2], j, s_ptr, reverse_x, reverse_x);
-				}
-			}
-			if (iface.global_i[3] != -1) {
-				if (iface.hasFineNbr[3]) {
-					insertBlock(iface.global_i[3], j, wc_ptr, reverse_y, reverse_x);
-					insertBlock(iface.refined_left[3], j, wcl_ptr, reverse_y, reverse_x);
-					insertBlock(iface.refined_right[3], j, wcr_ptr, reverse_y, reverse_x);
-				} else if (iface.hasCoarseNbr[3]) {
-					insertBlock(iface.global_i[3], j, wf_ptr, reverse_y, reverse_x);
-					if (iface.isCoarseLeft[3]) {
-						insertBlock(iface.center_i[3], j, wfl_ptr, reverse_y, reverse_x);
-					} else {
-						insertBlock(iface.center_i[3], j, wfr_ptr, reverse_y, reverse_x);
-					}
-				} else {
-					insertBlock(iface.global_i[3], j, w_ptr, reverse_y, reverse_x);
-				}
-			}
+		for (MatrixBlock block : todo) {
+			insertBlock(block.i, block.j, getBlock(block), block.flip_i, block.flip_j);
 		}
 	}
 
@@ -897,22 +945,22 @@ void DomainCollection::formRBMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<RBM
 	}
 	A = rcp(new RBMatrix(map, n, dsc.matrix_j_high - dsc.matrix_j_low));
 #if NDEBUG
-	for (Iface i : ifaces) {
+	for (ColIface i : ifaces) {
 		cerr << i << endl;
 	}
 #endif
 	// create iface objects
-	set<Iface> ifaces = this->ifaces;
+	set<ColIface> ifaces = this->ifaces;
 
 	int num_types = 0;
 	while (!ifaces.empty()) {
 		num_types++;
 		// the first in the set is the type of interface that we are going to solve for
-		set<Iface> todo;
-		Iface      curr_type = *ifaces.begin();
+		set<ColIface> todo;
+		ColIface      curr_type = *ifaces.begin();
 		ifaces.erase(ifaces.begin());
 		todo.insert(curr_type);
-		set<Iface> to_be_deleted;
+		set<ColIface> to_be_deleted;
 		for (auto iter = ifaces.begin(); iter != ifaces.end(); iter++) {
 			if (*iter == curr_type) {
 				todo.insert(*iter);
@@ -922,7 +970,7 @@ void DomainCollection::formRBMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<RBM
 				// iter=ifaces.begin();
 			}
 		}
-		for (Iface i : to_be_deleted) {
+		for (ColIface i : to_be_deleted) {
 			ifaces.erase(i);
 		}
 
@@ -1064,7 +1112,7 @@ void DomainCollection::formRBMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<RBM
 		}
 
 		// now insert these results into the matrix for each interface
-		for (Iface iface : todo) {
+		for (ColIface iface : todo) {
 			bool reverse_x
 			= (iface.axis == X_AXIS && iface.right) || (iface.axis == Y_AXIS && !iface.right);
 			bool reverse_y = iface.right;

@@ -32,8 +32,8 @@ class Level
 		r                          = rcp(new vector_type(map, 1));
 		if (n / 2 > 4) {
 			child = new Level(dc, n / 2, neumann);
-        }
-        if(n / 2 > 4){
+		}
+		if (n / 2 > 4) {
 			dc->formRBMatrix(map, A, &s, n);
 			if (neumann) {
 				R                        = Teuchos::rcp(new BlockJacobiRelaxer(A, s));
@@ -44,7 +44,7 @@ class Level
 				R  = Teuchos::rcp(new BlockJacobiRelaxer(A));
 			}
 		} else {
-			dc->formCRSMatrix(map, cA, &s, n, true);
+			dc->formCRSMatrix(map, cA, &s, n);
 			std::cerr << "Hello" << std::endl;
 			if (neumann) {
 				cA->resumeFill();
@@ -64,12 +64,6 @@ class Level
 			}
 
 			solver = Amesos2::create<matrix_type, vector_type>("KLU2", cA, x, b);
-
-			Teuchos::RCP<Teuchos::ParameterList> amesoslist
-			= Teuchos::rcp(new Teuchos::ParameterList);
-			amesoslist->set("Trans", "TRANS", "Solve with transpose");
-			amesoslist->set("Transpose", true);
-			solver->setParameters(amesoslist);
 
 			solver->symbolicFactorization().numericFactorization();
 		}
@@ -114,15 +108,15 @@ class Level
 			}
 
 		} else {
-            if(solver.is_null()){
-			// relax
-			x->putScalar(0);
-			R->apply(*b, *x);
+			if (solver.is_null()) {
+				// relax
+				x->putScalar(0);
+				R->apply(*b, *x);
 				// relax
 				R->apply(*b, *x, Teuchos::NO_TRANS, 1.0, 1.0);
-            }else{
-			solver->solve();
-            }
+			} else {
+				solver->solve();
+			}
 		}
 		// interpolate
 		auto e_view = e_fine.getLocalView<Kokkos::HostSpace>();
