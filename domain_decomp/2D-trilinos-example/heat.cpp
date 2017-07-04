@@ -139,6 +139,7 @@ int main(int argc, char *argv[])
 	args::Flag f_pingamma(parser, "pingamma", "pin the first gamma to zero", {"pingamma"});
 	args::Flag f_lu(parser, "lu", "use KLU solver", {"klu"});
 	args::Flag f_mumps(parser, "lu", "use MUMPS solver", {"mumps"});
+	args::Flag f_basker(parser, "lu", "use Basker solver", {"basker"});
 	args::Flag f_superlu(parser, "lu", "use SUPERLU solver", {"superlu"});
 	args::Flag f_ilu(parser, "ilu", "use incomplete LU preconditioner", {"ilu"});
 	args::Flag f_riluk(parser, "ilu", "use RILUK preconditioner", {"riluk"});
@@ -288,7 +289,7 @@ int main(int argc, char *argv[])
 		steady_clock::time_point domain_start = steady_clock::now();
 
 		DomainCollection dc(dsc, nx, comm);
-		if (f_neumann && !f_nozerou) {
+		if (f_neumann && !f_nozerou&& !f_lu) {
 			dc.setZeroU();
 		}
 
@@ -594,11 +595,11 @@ int main(int argc, char *argv[])
 			if (f_read_gamma) {
 				gamma = Tpetra::MatrixMarket::Reader<matrix_type>::readDenseFile(
 				args::get(f_read_gamma), comm, matrix_map_const);
-			} else if (f_lu || f_superlu || f_mumps) {
+			} else if (f_lu || f_superlu || f_mumps || f_basker) {
 				comm->barrier();
 				steady_clock::time_point lu_start = steady_clock::now();
 
-				if (f_neumann) {
+				/*if (f_neumann) {
 					A->resumeFill();
 					size_t                     size = A->getNumEntriesInGlobalRow(0);
 					Teuchos::ArrayView<int>    inds(new int[size], size);
@@ -614,31 +615,38 @@ int main(int argc, char *argv[])
 					}
 					A->replaceGlobalValues(0, inds, vals);
 					A->fillComplete();
-				}
+				}*/
 
 				string name;
 				if (f_lu) {
 					name = "KLU2";
 				}
 				if (f_mumps) {
-					name = "MUMPS";
+					name = "umfpack";
 				}
 				if (f_superlu) {
 					name = "superlu_dist";
 				}
+				if (f_basker) {
+					name = "Basker";
+				}
 				RCP<Amesos2::Solver<matrix_type, vector_type>> solver
 				= Amesos2::create<matrix_type, vector_type>(name, A, gamma, b);
 
+                Teuchos::RCP<Teuchos::ParameterList> amesoslist
+                     = Teuchos::rcp(new Teuchos::ParameterList);
+                 amesoslist->sublist("KLU2").set("IterRefine", "DOUBLE");
+                   solver->setParameters(amesoslist);
 				solver->symbolicFactorization().numericFactorization().solve();
 
-				if (f_neumann) {
+				/*if (f_neumann) {
 					RCP<single_vector_type> ones
 					= Teuchos::rcp(new single_vector_type(s->getMap()));
 					ones->putScalar(1);
 					double dot = s->dot(*gamma->getVector(0));
 					cerr << dot << endl;
 					gamma->getVectorNonConst(0)->update(dot, *ones, 1.0);
-				}
+				}*/
 
 				comm->barrier();
 				duration<double> lu_time = steady_clock::now() - lu_start;

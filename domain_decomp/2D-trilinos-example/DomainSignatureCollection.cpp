@@ -1,8 +1,8 @@
 #include "DomainSignatureCollection.h"
-#include <iostream>
 #include <deque>
-#include <set>
 #include <fstream>
+#include <iostream>
+#include <set>
 using namespace std;
 DomainSignatureCollection::DomainSignatureCollection(string file_name, int rank)
 {
@@ -237,7 +237,8 @@ void DomainSignatureCollection::determineCoarseness()
 		} while (s != Side::north);
 	}
 }
-void DomainSignatureCollection::determineAmrLevel(){
+void DomainSignatureCollection::determineAmrLevel()
+{
 	set<int>   visited;
 	set<int>   enqueued;
 	deque<int> queue;
@@ -246,20 +247,20 @@ void DomainSignatureCollection::determineAmrLevel(){
 	enqueued.insert(first);
 	int min_level = 1;
 	while (!queue.empty()) {
-		int              curr = queue.front();
-		DomainSignature &d    = domains.at(curr);
+		int              curr       = queue.front();
+		DomainSignature &d          = domains.at(curr);
 		int              curr_level = d.refine_level;
 		queue.pop_front();
 		visited.insert(curr);
-        Side s = Side::north;
-        do{
+		Side s = Side::north;
+		do {
 			if (d.hasNbr(s) && visited.count(d.nbr(s)) == 0) {
 				// fine case
 				if (d.hasFineNbr(s)) {
 					DomainSignature &nbr_left  = domains.at(d.nbr(s));
 					DomainSignature &nbr_right = domains.at(d.nbrRight(s));
 
-					nbr_left.refine_level      = curr_level + 1;
+					nbr_left.refine_level  = curr_level + 1;
 					nbr_right.refine_level = curr_level + 1;
 					// enqueue domains
 					if (enqueued.count(d.nbr(s)) == 0) {
@@ -274,7 +275,7 @@ void DomainSignatureCollection::determineAmrLevel(){
 				} else if (d.hasCoarseNbr(s)) {
 					DomainSignature &nbr = domains.at(d.nbr(s));
 
-					nbr.refine_level     = curr_level - 1;
+					nbr.refine_level = curr_level - 1;
 					if (curr_level - 1 < min_level) {
 						min_level = curr_level;
 					}
@@ -298,7 +299,8 @@ void DomainSignatureCollection::determineAmrLevel(){
 		} while (s != Side::north);
 	}
 }
-void DomainSignatureCollection::determineXY(){
+void DomainSignatureCollection::determineXY()
+{
 	set<int>   visited;
 	set<int>   enqueued;
 	deque<int> queue;
@@ -319,15 +321,15 @@ void DomainSignatureCollection::determineXY(){
 		if (d.y_start < y_min) {
 			y_min = d.y_start;
 		}
-        if(d.x_start+d.x_length>x_max){
-            x_max = d.x_start+d.x_length;
-        }
-        if(d.y_start+d.y_length>y_max){
-            y_max = d.y_start+d.y_length;
-        }
+		if (d.x_start + d.x_length > x_max) {
+			x_max = d.x_start + d.x_length;
+		}
+		if (d.y_start + d.y_length > y_max) {
+			y_max = d.y_start + d.y_length;
+		}
 		visited.insert(curr);
-        Side s = Side::north;
-        do{
+		Side s = Side::north;
+		do {
 			if (d.hasNbr(s) && visited.count(d.nbr(s)) == 0) {
 				// a new edge that we have not assigned an index to
 
@@ -389,7 +391,7 @@ void DomainSignatureCollection::determineXY(){
 								nbr.y_start = d.y_start + d.y_length;
 							}
 							break;
-                        case Side::east:
+						case Side::east:
 							if (d.leftOfCoarse(s)) {
 								nbr.x_start = d.x_start + d.x_length;
 								nbr.y_start = d.y_start;
@@ -457,14 +459,14 @@ void DomainSignatureCollection::determineXY(){
 			s++;
 		} while (s != Side::north);
 	}
-    double x_shift = -x_min;
-    double y_shift = -y_min;
+	double x_shift = -x_min;
+	double y_shift = -y_min;
 	double x_scale = x_max - x_min;
 	double y_scale = y_max - y_min;
-	double scale = x_scale;
-    if(y_scale>scale){
-        scale=y_scale;
-    }
+	double scale   = x_scale;
+	if (y_scale > scale) {
+		scale = y_scale;
+	}
 	for (auto &p : domains) {
 		DomainSignature &d = p.second;
 		d.x_start += x_shift;
@@ -477,8 +479,8 @@ void DomainSignatureCollection::determineXY(){
 }
 DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank)
 {
-	this->rank            = rank;
-	num_global_domains    = d_x * d_y;
+	this->rank         = rank;
+	num_global_domains = d_x * d_y;
 	if (rank == 0) {
 		for (int domain_y = 0; domain_y < d_y; domain_y++) {
 			for (int domain_x = 0; domain_x < d_x; domain_x++) {
@@ -509,19 +511,19 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank)
 			}
 		}
 	}
-		indexInterfacesBFS();
+	indexInterfacesBFS();
 }
 
 DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank, bool amr)
 {
-	this->rank            = rank;
-	num_global_domains    = d_x * d_y*5;
+	this->rank         = rank;
+	num_global_domains = d_x * d_y * 5;
 	if (rank == 0) {
 		for (int domain_y = 0; domain_y < d_y; domain_y++) {
 			for (int domain_x = 0; domain_x < d_x; domain_x++) {
 				DomainSignature ds;
-				ds.id = domain_y * d_x + domain_x;
-                ds.refine_level=1;
+				ds.id           = domain_y * d_x + domain_x;
+				ds.refine_level = 1;
 				if (domain_y != d_y - 1) {
 					ds.nbr(Side::north) = (domain_y + 1) * d_x + domain_x;
 					ds.proc[0]          = 0;
@@ -536,7 +538,7 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank,
 				}
 				if (domain_x != 0) {
 					ds.nbr(Side::west) = domain_y * d_x + domain_x - 1;
-					ds.proc[6] = 0;
+					ds.proc[6]         = 0;
 				}
 				ds.x_length    = 1.0 / d_x;
 				ds.y_length    = 1.0 / d_y;
@@ -574,8 +576,8 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank,
 				domains[ds.id] = ds;
 			}
 		}
-        //stitch together grids
-        for(int i=0;i<d_y;i++){
+		// stitch together grids
+		for (int i = 0; i < d_y; i++) {
 			DomainSignature &left      = domains[i * d_x + d_x - 1];
 			DomainSignature &low_nbr   = domains[d_y * d_x + 2 * i * d_x * 2];
 			DomainSignature &high_nbr  = domains[d_y * d_x + (2 * i + 1) * d_x * 2];
@@ -590,115 +592,115 @@ DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank,
 			high_nbr.left_of_coarse[3] = true;
 		}
 	}
-		indexInterfacesBFS();
+	indexInterfacesBFS();
 }
 void DomainSignatureCollection::indexInterfacesBFS()
 {
 	int curr_i = 0;
-    if(domains.size()!=0){
-	set<int>   visited;
-	set<int>   enqueued;
-	deque<int> queue;
-	int        first = domains.begin()->first;
-	queue.push_back(first);
-	enqueued.insert(first);
-	while (!queue.empty()) {
-		int              curr = queue.front();
-		DomainSignature &d    = domains.at(curr);
-		queue.pop_front();
-		visited.insert(curr);
-        Side s = Side::north;
-        do{
-			if (d.hasNbr(s) && d.index(s) == -1) {
-				// a new edge that we have not assigned an index to
-				d.index(s) = curr_i;
-				curr_i++;
-
-				// fine case
-				if (d.hasFineNbr(s)) {
-					DomainSignature &nbr_left  = domains.at(d.nbr(s));
-					DomainSignature &nbr_right = domains.at(d.nbrRight(s));
-
-					// set center indexes
-					nbr_left.indexCenter(!s)  = d.index(s);
-					nbr_right.indexCenter(!s) = d.index(s);
-
-					// set left and right indexes index
-					nbr_left.index(!s) = curr_i;
-					curr_i++;
-					nbr_right.index(!s) = curr_i;
+	if (domains.size() != 0) {
+		set<int>   visited;
+		set<int>   enqueued;
+		deque<int> queue;
+		int        first = domains.begin()->first;
+		queue.push_back(first);
+		enqueued.insert(first);
+		while (!queue.empty()) {
+			int              curr = queue.front();
+			DomainSignature &d    = domains.at(curr);
+			queue.pop_front();
+			visited.insert(curr);
+			Side s = Side::north;
+			do {
+				if (d.hasNbr(s) && d.index(s) == -1) {
+					// a new edge that we have not assigned an index to
+					d.index(s) = curr_i;
 					curr_i++;
 
-                    // set refined indexes
-					d.indexRefinedLeft(s)  = nbr_left.index(!s);
-					d.indexRefinedRight(s) = nbr_right.index(!s);
+					// fine case
+					if (d.hasFineNbr(s)) {
+						DomainSignature &nbr_left  = domains.at(d.nbr(s));
+						DomainSignature &nbr_right = domains.at(d.nbrRight(s));
 
-					// enqueue domains
-					if (enqueued.count(d.nbr(s)) == 0) {
-						queue.push_back(d.nbr(s));
-						enqueued.insert(d.nbr(s));
-					}
-					if (enqueued.count(d.nbrRight(s)) == 0) {
-						queue.push_back(d.nbrRight(s));
-						enqueued.insert(d.nbrRight(s));
-					}
-					// coarse case
-				} else if (d.hasCoarseNbr(s)) {
-					DomainSignature &nbr      = domains.at(d.nbr(s));
-					int              buddy_id = -1;
-					if (d.leftOfCoarse(s)) {
-						DomainSignature &buddy = domains.at(nbr.nbrRight(!s));
-						buddy_id               = buddy.id;
+						// set center indexes
+						nbr_left.indexCenter(!s)  = d.index(s);
+						nbr_right.indexCenter(!s) = d.index(s);
 
-						nbr.indexRefinedLeft(!s) = d.index(s);
-
-						nbr.indexRefinedRight(!s) = curr_i;
-						buddy.index(s)            = curr_i;
+						// set left and right indexes index
+						nbr_left.index(!s) = curr_i;
+						curr_i++;
+						nbr_right.index(!s) = curr_i;
 						curr_i++;
 
-						d.indexCenter(s)     = curr_i;
-						nbr.index(!s)        = curr_i;
-						buddy.indexCenter(s) = curr_i;
-						curr_i++;
+						// set refined indexes
+						d.indexRefinedLeft(s)  = nbr_left.index(!s);
+						d.indexRefinedRight(s) = nbr_right.index(!s);
+
+						// enqueue domains
+						if (enqueued.count(d.nbr(s)) == 0) {
+							queue.push_back(d.nbr(s));
+							enqueued.insert(d.nbr(s));
+						}
+						if (enqueued.count(d.nbrRight(s)) == 0) {
+							queue.push_back(d.nbrRight(s));
+							enqueued.insert(d.nbrRight(s));
+						}
+						// coarse case
+					} else if (d.hasCoarseNbr(s)) {
+						DomainSignature &nbr      = domains.at(d.nbr(s));
+						int              buddy_id = -1;
+						if (d.leftOfCoarse(s)) {
+							DomainSignature &buddy = domains.at(nbr.nbrRight(!s));
+							buddy_id               = buddy.id;
+
+							nbr.indexRefinedLeft(!s) = d.index(s);
+
+							nbr.indexRefinedRight(!s) = curr_i;
+							buddy.index(s)            = curr_i;
+							curr_i++;
+
+							d.indexCenter(s)     = curr_i;
+							nbr.index(!s)        = curr_i;
+							buddy.indexCenter(s) = curr_i;
+							curr_i++;
+						} else {
+							DomainSignature &buddy = domains.at(nbr.nbr(!s));
+							buddy_id               = buddy.id;
+
+							nbr.indexRefinedRight(!s) = d.index(s);
+
+							nbr.indexRefinedLeft(!s) = curr_i;
+							buddy.index(s)           = curr_i;
+							curr_i++;
+
+							d.indexCenter(s)     = curr_i;
+							nbr.index(!s)        = curr_i;
+							buddy.indexCenter(s) = curr_i;
+							curr_i++;
+						}
+
+						// enqueue domains
+						if (enqueued.count(nbr.id) == 0) {
+							queue.push_back(nbr.id);
+							enqueued.insert(nbr.id);
+						}
+						if (enqueued.count(buddy_id) == 0) {
+							queue.push_back(buddy_id);
+							enqueued.insert(buddy_id);
+						}
+						// normal case
 					} else {
-						DomainSignature &buddy = domains.at(nbr.nbr(!s));
-						buddy_id               = buddy.id;
-
-						nbr.indexRefinedRight(!s) = d.index(s);
-
-						nbr.indexRefinedLeft(!s) = curr_i;
-						buddy.index(s)           = curr_i;
-						curr_i++;
-
-						d.indexCenter(s)     = curr_i;
-						nbr.index(!s)        = curr_i;
-						buddy.indexCenter(s) = curr_i;
-						curr_i++;
-					}
-
-					// enqueue domains
-					if (enqueued.count(nbr.id) == 0) {
-						queue.push_back(nbr.id);
-						enqueued.insert(nbr.id);
-					}
-					if (enqueued.count(buddy_id) == 0) {
-						queue.push_back(buddy_id);
-						enqueued.insert(buddy_id);
-					}
-					// normal case
-				} else {
-					DomainSignature &nbr = domains.at(d.nbr(s));
-					nbr.index(!s)        = d.index(s);
-					// enqueue domain
-					if (enqueued.count(d.nbr(s)) == 0) {
-						queue.push_back(d.nbr(s));
-						enqueued.insert(d.nbr(s));
+						DomainSignature &nbr = domains.at(d.nbr(s));
+						nbr.index(!s)        = d.index(s);
+						// enqueue domain
+						if (enqueued.count(d.nbr(s)) == 0) {
+							queue.push_back(d.nbr(s));
+							enqueued.insert(d.nbr(s));
+						}
 					}
 				}
-			}
-			s++;
-		} while (s != Side::north);
-	}
+				s++;
+			} while (s != Side::north);
+		}
 	}
 	num_global_interfaces = curr_i;
 	matrix_j_low          = 0;
@@ -708,10 +710,10 @@ void DomainSignatureCollection::indexInterfacesBFS()
 void DomainSignatureCollection::zoltanBalance()
 {
 	int size;
-    MPI_Comm_size(MPI_COMM_WORLD,&size);
-	matrix_j_low = num_global_interfaces * rank / size;
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	matrix_j_low  = num_global_interfaces * rank / size;
 	matrix_j_high = num_global_interfaces * (rank + 1) / size;
-    cerr << matrix_j_low << "," << matrix_j_high << "," << rank<<","<<size<< endl;
+	cerr << matrix_j_low << "," << matrix_j_high << "," << rank << "," << size << endl;
 	Zoltan *zz = new Zoltan(MPI_COMM_WORLD);
 
 	// parameters
@@ -765,38 +767,39 @@ void DomainSignatureCollection::zoltanBalance()
 	}
 	cout << "I have " << domains.size() << " domains: ";
 
-    int prev=-100;
-    bool range = false;
-	for (auto &p : domains)
-	{
-        int curr = p.second.id;
+#if DNDEBUG
+	int  prev  = -100;
+	bool range = false;
+	for (auto &p : domains) {
+		int curr = p.second.id;
 		if (curr != prev + 1 && !range) {
 			cout << curr << "-";
-            range = true;
-		}else if(curr != prev + 1 && range){
-            cout << prev << " " << curr << "-";
-        }
+			range = true;
+		} else if (curr != prev + 1 && range) {
+			cout << prev << " " << curr << "-";
+		}
 		prev = curr;
-        
 	}
 
-	cout <<prev<< "\n";
+	cout << prev << "\n";
+#endif
+	cout << endl;
 }
 
 /*int DomainSignatureCollection::dimensions(void *data, int *ierr)
 {
-	*ierr = ZOLTAN_OK;
-	return 2;
+    *ierr = ZOLTAN_OK;
+    return 2;
 }*/
 /*void DomainSignatureCollection::coord(void *data, int num_gid_entries, int num_lid_entries,
                                       ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id,
                                       double *geom_vec, int *ierr){
-	DomainSignatureCollection *dsc = (DomainSignatureCollection *) data;
-	*ierr                          = ZOLTAN_OK;
+    DomainSignatureCollection *dsc = (DomainSignatureCollection *) data;
+    *ierr                          = ZOLTAN_OK;
 
-	auto &ds    = dsc->domains[*global_id];
-	geom_vec[0] = ds.id % dsc->d_y;
-	geom_vec[1] = ds.id % dsc->d_x;
+    auto &ds    = dsc->domains[*global_id];
+    geom_vec[0] = ds.id % dsc->d_y;
+    geom_vec[1] = ds.id % dsc->d_x;
 }*/
 // query functions that respond to requests from Zoltan
 int DomainSignatureCollection::get_number_of_objects(void *data, int *ierr)

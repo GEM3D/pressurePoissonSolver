@@ -46,7 +46,7 @@ class Level
 		} else {
 			dc->formCRSMatrix(map, cA, &s, n);
 			std::cerr << "Hello" << std::endl;
-			if (neumann) {
+			/*if (neumann) {
 				cA->resumeFill();
 				size_t                     size = cA->getNumEntriesInGlobalRow(0);
 				Teuchos::ArrayView<int>    inds(new int[size], size);
@@ -61,7 +61,7 @@ class Level
 				}
 				cA->replaceGlobalValues(0, inds, vals);
 				cA->fillComplete();
-			}
+			}*/
 
 			solver = Amesos2::create<matrix_type, vector_type>("KLU2", cA, x, b);
 

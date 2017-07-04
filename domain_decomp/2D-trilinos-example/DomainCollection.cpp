@@ -79,9 +79,6 @@ void DomainCollection::initNeumann(function<double(double, double)> ffun,
 	// create map for domains
 	generateMaps();
 	distributeIfaceInfo();
-	for (const ColIface &i : ifaces) {
-		const_cast<ColIface &>(i).setNeumann();
-	}
 }
 
 void DomainCollection::initDirichlet(function<double(double, double)> ffun,
@@ -355,6 +352,14 @@ void DomainCollection::distributeIfaceInfo()
 		RowIface::readIfaces(row_ifaces, *row_iface_info);
 	}
 
+	if (neumann) {
+		for (const ColIface &i : ifaces) {
+			const_cast<ColIface &>(i).setNeumann();
+		}
+		for (const RowIface &i : row_ifaces) {
+			const_cast<RowIface &>(i).setNeumann();
+		}
+	}
 	MatrixBlock::getBlocks(blocks, row_ifaces);
 }
 void DomainCollection::getFluxDiff(vector_type &diff)
@@ -619,18 +624,23 @@ void DomainCollection::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<ma
 				copy[i * n + j] = orig[block_i * n + block_j];
 			}
 		}
-		if (neumann) {
-			if (i == 0) {
-				if (j == 0) {
-					copy[0] = 1;
-				} else {
-					copy[0] = 0;
-				}
+		/*if (neumann) {
+			if (i == 0 && j == 0) {
+				copy[0] = 1;
 				for (i = 1; i < n; i++) {
+					copy[i]     = 0;
+					copy[i * n] = 0;
+				}
+			} else if (i == 0) {
+				for (i = 0; i < n; i++) {
 					copy[i] = 0;
 				}
+			} else {
+				for (i = 0; i < n; i++) {
+					copy[i * n] = 0;
+				}
 			}
-		}
+		}*/
 		vector<int> inds(n);
 		for (int q = 0; q < n; q++) {
 			inds[q] = local_j + q;

@@ -23,10 +23,10 @@ class ColIface
 	int              refine_level = 1;
 	int              main_i;
 	Side             s;
-	std::array<int, 4> global_i      = {-1, -1, -1, -1};
-	std::array<int, 4> center_i      = {-1, -1, -1, -1};
-	std::array<int, 4> refined_left  = {-1, -1, -1, -1};
-	std::array<int, 4> refined_right = {-1, -1, -1, -1};
+	std::array<int, 4> global_i      = {{-1, -1, -1, -1}};
+	std::array<int, 4> center_i      = {{-1, -1, -1, -1}};
+	std::array<int, 4> refined_left  = {{-1, -1, -1, -1}};
+	std::array<int, 4> refined_right = {{-1, -1, -1, -1}};
 
 	std::array<std::bitset<4>, 9> domain_boundaries;
 
@@ -36,11 +36,9 @@ class ColIface
 	std::bitset<4> isCoarseLeft;
 	void           setNeumann()
 	{
-		/*
 		for (int q = 0; q < 4; q++) {
-		    neumann[q] = global_i[q] == -1;
+			neumann[q] = global_i[q] == -1;
 		}
-		*/
 	}
 	static void readIfaces(std::set<ColIface> &ifaces, int_vector_type &iface_info)
 	{
@@ -451,45 +449,66 @@ class MatrixBlock
 			// north
 			{
 				Side s = Side::north;
+
+				std::bitset<4> neumann = iface.neumann;
+
 				getrevxy(s + absolute_s, reverse_x, reverse_y);
 				bool        right = (absolute_s + s == Side::south || absolute_s + s == Side::west);
 				bool        flip_i = reverse_x;
 				bool        flip_j = reverse_x;
 				int         j      = iface.global_i[0];
-				MatrixBlock b(i, j, flip_i, flip_j, right, iface.neumann, s, iface.getBlockType());
+				MatrixBlock b(i, j, flip_i, flip_j, right, neumann, s, iface.getBlockType());
 				blocks.insert(b);
 			}
 			// east
 			if (iface.global_i[1] != -1) {
 				Side s = Side::west;
+
+				std::bitset<4> neumann;
+				for (int q = 0; q < 4; q++) {
+					neumann[q] = iface.neumann[(q + 1) % 4];
+				}
+
 				getrevxy(s + absolute_s, reverse_x, reverse_y);
 				bool        right = (absolute_s + s == Side::south || absolute_s + s == Side::west);
 				bool        flip_i = !reverse_y;
 				bool        flip_j = !reverse_x;
 				int         j      = iface.global_i[1];
-				MatrixBlock b(i, j, flip_i, flip_j, right, iface.neumann, s, iface.getBlockType());
+				MatrixBlock b(i, j, flip_i, flip_j, right, neumann, s, iface.getBlockType());
 				blocks.insert(b);
 			}
 			// south
 			if (iface.global_i[2] != -1) {
 				Side s = Side::south;
+
+				std::bitset<4> neumann;
+				for (int q = 0; q < 4; q++) {
+					neumann[q] = iface.neumann[(q + 2) % 4];
+				}
+
 				getrevxy(s + absolute_s, reverse_x, reverse_y);
 				bool        right = (absolute_s + s == Side::south || absolute_s + s == Side::west);
 				bool        flip_i = reverse_x;
 				bool        flip_j = reverse_x;
 				int         j      = iface.global_i[2];
-				MatrixBlock b(i, j, flip_i, flip_j, right, iface.neumann, s, iface.getBlockType());
+				MatrixBlock b(i, j, flip_i, flip_j, right, neumann, s, iface.getBlockType());
 				blocks.insert(b);
 			}
 			// west
 			if (iface.global_i[3] != -1) {
 				Side s = Side::east;
+
+				std::bitset<4> neumann;
+				for (int q = 0; q < 4; q++) {
+					neumann[q] = iface.neumann[(q + 3) % 4];
+				}
+
 				getrevxy(s + absolute_s, reverse_x, reverse_y);
 				bool        right = (absolute_s + s == Side::south || absolute_s + s == Side::west);
 				bool        flip_i = !reverse_y;
 				bool        flip_j = !reverse_x;
 				int         j      = iface.global_i[3];
-				MatrixBlock b(i, j, flip_i, flip_j, right, iface.neumann, s, iface.getBlockType());
+				MatrixBlock b(i, j, flip_i, flip_j, right, neumann, s, iface.getBlockType());
 				blocks.insert(b);
 			}
 		}
