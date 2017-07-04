@@ -167,6 +167,7 @@ int main(int argc, char *argv[])
 		}
 		return 1;
 	}
+	bool                      direct_solve = (f_lu || f_superlu || f_mumps || f_basker);
 	DomainSignatureCollection dsc;
 	if (f_mesh) {
 		string d = args::get(f_mesh);
@@ -273,12 +274,23 @@ int main(int argc, char *argv[])
 		};
 	} else {
 		ffun = [](double x, double y) {
+			x += .3;
 			return -5 * M_PIl * M_PIl * sinl(M_PIl * y) * cosl(2 * M_PIl * x);
 		};
-		gfun = [](double x, double y) { return sinl(M_PIl * y) * cosl(2 * M_PIl * x); };
-		nfunx
-		= [](double x, double y) { return -2 * M_PIl * sinl(M_PIl * y) * sinl(2 * M_PIl * x); };
-		nfuny = [](double x, double y) { return M_PIl * cosl(M_PIl * y) * cosl(2 * M_PIl * x); };
+		gfun = [](double x, double y) {
+
+			x += .3;
+			return sinl(M_PIl * y) * cosl(2 * M_PIl * x);
+		};
+		nfunx = [](double x, double y) {
+
+			x += .3;
+			return -2 * M_PIl * sinl(M_PIl * y) * sinl(2 * M_PIl * x);
+		};
+		nfuny = [](double x, double y) {
+			x += .3;
+			return M_PIl * cosl(M_PIl * y) * cosl(2 * M_PIl * x);
+		};
 	}
 
 	valarray<double> setup_times(loop_count);
@@ -289,7 +301,7 @@ int main(int argc, char *argv[])
 		steady_clock::time_point domain_start = steady_clock::now();
 
 		DomainCollection dc(dsc, nx, comm);
-		if (f_neumann && !f_nozerou&& !f_lu) {
+		if (f_neumann && !f_nozerou && !f_lu) {
 			dc.setZeroU();
 		}
 
@@ -327,6 +339,7 @@ int main(int argc, char *argv[])
 		RCP<single_vector_type>            s;
 		RCP<Tpetra::Operator<scalar_type>> op;
 		RCP<const Tpetra::RowMatrix<>>     rm;
+		RCP<Amesos2::Solver<matrix_type, vector_type>> dsolver;
 
 		// Create linear problem for the Belos solver
 		RCP<Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>> problem;
@@ -576,6 +589,25 @@ int main(int argc, char *argv[])
 					cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
 			}
 
+			if (direct_solve) {
+				string name;
+				if (f_lu) {
+					name = "KLU2";
+				}
+				if (f_mumps) {
+					name = "umfpack";
+				}
+				if (f_superlu) {
+					name = "superlu_dist";
+				}
+				if (f_basker) {
+					name = "Basker";
+				}
+
+				dsolver = Amesos2::create<matrix_type, vector_type>(name, A);
+
+				dsolver->symbolicFactorization().numericFactorization();
+			}
 			///////////////////
 			// setup end
 			///////////////////
@@ -596,61 +628,16 @@ int main(int argc, char *argv[])
 				gamma = Tpetra::MatrixMarket::Reader<matrix_type>::readDenseFile(
 				args::get(f_read_gamma), comm, matrix_map_const);
 			} else if (f_lu || f_superlu || f_mumps || f_basker) {
-				comm->barrier();
-				steady_clock::time_point lu_start = steady_clock::now();
+				dsolver->solve(&*gamma, &*b);
+				if (f_iter) {
+					x->putScalar(0);
+					A->apply(*gamma, *r);
+					r->update(1.0, *b, -1.0);
 
-				/*if (f_neumann) {
-					A->resumeFill();
-					size_t                     size = A->getNumEntriesInGlobalRow(0);
-					Teuchos::ArrayView<int>    inds(new int[size], size);
-					Teuchos::ArrayView<double> vals(new double[size], size);
-					A->getGlobalRowCopy(0, inds, vals, size);
-					for (size_t i = 0; i < size; i++) {
-						if (inds[i] == 0) {
-							vals[i] = 1;
-							cerr << "set i " << endl;
-						} else {
-							vals[i] = 0;
-						}
-					}
-					A->replaceGlobalValues(0, inds, vals);
-					A->fillComplete();
-				}*/
+					dsolver->solve(&*x, &*r);
 
-				string name;
-				if (f_lu) {
-					name = "KLU2";
+					gamma->update(1.0, *x, 1.0);
 				}
-				if (f_mumps) {
-					name = "umfpack";
-				}
-				if (f_superlu) {
-					name = "superlu_dist";
-				}
-				if (f_basker) {
-					name = "Basker";
-				}
-				RCP<Amesos2::Solver<matrix_type, vector_type>> solver
-				= Amesos2::create<matrix_type, vector_type>(name, A, gamma, b);
-
-                Teuchos::RCP<Teuchos::ParameterList> amesoslist
-                     = Teuchos::rcp(new Teuchos::ParameterList);
-                 amesoslist->sublist("KLU2").set("IterRefine", "DOUBLE");
-                   solver->setParameters(amesoslist);
-				solver->symbolicFactorization().numericFactorization().solve();
-
-				/*if (f_neumann) {
-					RCP<single_vector_type> ones
-					= Teuchos::rcp(new single_vector_type(s->getMap()));
-					ones->putScalar(1);
-					double dot = s->dot(*gamma->getVector(0));
-					cerr << dot << endl;
-					gamma->getVectorNonConst(0)->update(dot, *ones, 1.0);
-				}*/
-
-				comm->barrier();
-				duration<double> lu_time = steady_clock::now() - lu_start;
-				if (my_global_rank == 0) std::cout << "LU Time: " << lu_time.count() << endl;
 
 			} else {
 				problem->setProblem();
@@ -723,7 +710,7 @@ int main(int argc, char *argv[])
 				std::cout << u8"∮ du/dn - ΣAu: " << bflux - ausum2 << endl;
 			}
 		}
-		if (f_iter) {
+		if (f_iter && !direct_solve) {
 			dc.residual();
 			dc.swapResidSol();
 
