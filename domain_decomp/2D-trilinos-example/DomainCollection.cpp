@@ -624,23 +624,23 @@ void DomainCollection::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<ma
 				copy[i * n + j] = orig[block_i * n + block_j];
 			}
 		}
-		if (neumann) {
-			if (i == 0 && j == 0) {
-				copy[0] = 1;
-				for (i = 1; i < n; i++) {
-					copy[i] = 0;
-					// copy[i * n] = 0;
-				}
-			} else if (i == 0) {
-				for (i = 0; i < n; i++) {
-					copy[i] = 0;
-				}
-			} else if (j == 0) {
-				for (i = 0; i < n; i++) {
-					// copy[i * n] = 0;
-				}
-			}
-		}
+		/*if (neumann) {
+		    if (i == 0 && j == 0) {
+		        copy[0] = 1;
+		        for (i = 1; i < n; i++) {
+		            copy[i] = 0;
+		            // copy[i * n] = 0;
+		        }
+		    } else if (i == 0) {
+		        for (i = 0; i < n; i++) {
+		            copy[i] = 0;
+		        }
+		    } else if (j == 0) {
+		        for (i = 0; i < n; i++) {
+		            //copy[i * n] = 0;
+		        }
+		    }
+		}*/
 		vector<int> inds(n);
 		for (int q = 0; q < n; q++) {
 			inds[q] = local_j + q;
@@ -694,6 +694,8 @@ void DomainCollection::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<ma
 			}
 		}
 		Domain d(ds, n);
+		d.zero_patch = curr_type.zero_patch;
+
 		d.boundary_north = valarray<double>(n);
 		d.boundary_east  = valarray<double>(n);
 		d.boundary_south = valarray<double>(n);

@@ -1,12 +1,11 @@
-#include <valarray>
 #include "Domain.h"
-#include "Iface.h"
 #include "FftwSolver.h"
+#include <valarray>
 //#include "FishpackSolver.h"
 using namespace std;
 Domain::Domain(DomainSignature ds, int n)
 {
-	this->n  = n;
+	this->n   = n;
 	this->h_x = ds.x_length / n;
 	this->h_y = ds.y_length / n;
 	this->ds  = ds;
@@ -18,20 +17,20 @@ Domain::Domain(DomainSignature ds, int n)
 	cerr << "Length:     " << ds.x_length << ", " << ds.y_length << "\n";
 	cerr << "North: " << ds.nbr(Side::north) << ", " << ds.nbrRight(Side::north) << "\n";
 	cerr << "Idx:   " << ds.index(Side::north) << ", " << ds.indexCenter(Side::north) << "\n";
-	cerr << "       " << indexRefinedLeft(Side::north) << ", "
-	     << indexRefinedRight(Side::north) << "\n";
+	cerr << "       " << indexRefinedLeft(Side::north) << ", " << indexRefinedRight(Side::north)
+	     << "\n";
 	cerr << "East:  " << ds.nbr(Side::east) << ", " << ds.nbrRight(Side::east) << "\n";
 	cerr << "Idx:   " << ds.index(Side::east) << ", " << ds.indexCenter(Side::east) << "\n";
-	cerr << "       " << indexRefinedLeft(Side::east) << ", "
-	     << indexRefinedRight(Side::east) << "\n";
+	cerr << "       " << indexRefinedLeft(Side::east) << ", " << indexRefinedRight(Side::east)
+	     << "\n";
 	cerr << "South: " << ds.nbr(Side::south) << ", " << ds.nbrRight(Side::south) << "\n";
 	cerr << "Idx:   " << ds.index(Side::south) << ", " << ds.indexCenter(Side::south) << "\n";
-	cerr << "       " << indexRefinedLeft(Side::south) << ", "
-	     << indexRefinedRight(Side::south) << "\n";
+	cerr << "       " << indexRefinedLeft(Side::south) << ", " << indexRefinedRight(Side::south)
+	     << "\n";
 	cerr << "West:  " << ds.nbr(Side::west) << ", " << ds.nbrRight(Side::west) << "\n";
 	cerr << "Idx:   " << ds.index(Side::west) << ", " << ds.indexCenter(Side::west) << "\n";
-	cerr << "       " << indexRefinedLeft(Side::west) << ", "
-	     << indexRefinedRight(Side::west) << "\n";
+	cerr << "       " << indexRefinedLeft(Side::west) << ", " << indexRefinedRight(Side::west)
+	     << "\n";
 	cerr << "\n";
 #endif
 	f      = valarray<double>(n * n);
@@ -60,7 +59,7 @@ Domain::Domain(DomainSignature ds, int n)
 
 Domain::~Domain()
 {
-    delete solver;
+	delete solver;
 #if NDEBUG
 	cerr << "I am Domain: " << ds.id << "\n";
 	cerr << "h:           " << this->h_x << endl;
@@ -86,32 +85,23 @@ Domain::~Domain()
 #endif
 }
 
-void Domain::plan(){
-    solver = new FftwSolver(this); 
-}
-void Domain::planDirichlet()
-{
-    plan();
-}
-
+void Domain::plan() { solver = new FftwSolver(this); }
+void Domain::planDirichlet() { plan(); }
 void Domain::planNeumann()
 {
-	neumann                       = true;
-    plan();
+	neumann = true;
+	plan();
 }
 
-void Domain::solve()
+void Domain::solve() { solver->solve(); }
+void Domain::getFluxDiff(vector_type &flux)
 {
-    solver->solve();
-}
-
-void Domain::getFluxDiff(vector_type &flux){
-	auto ptr  = flux.getVectorNonConst(0);
+	auto ptr = flux.getVectorNonConst(0);
 	if (hasNbr(Side::north)) {
 		fillFluxVector(Side::north, *ptr);
 	}
 	if (hasNbr(Side::east)) {
-	    fillFluxVector(Side::east, *ptr);
+		fillFluxVector(Side::east, *ptr);
 	}
 	if (hasNbr(Side::south)) {
 		fillFluxVector(Side::south, *ptr);
@@ -139,7 +129,7 @@ void Domain::fillFluxVector(Side s, single_vector_type &diff)
 			diff_view(curr_i_center, 0) += diff_coarse[i];
 			curr_i_center++;
 		}
-	}else{
+	} else {
 		valarray<double> diff = getDiff(s);
 
 		int curr_i = index(s) * n;
@@ -147,7 +137,7 @@ void Domain::fillFluxVector(Side s, single_vector_type &diff)
 			diff_view(curr_i, 0) += diff[i];
 			curr_i++;
 		}
-    }
+	}
 }
 void Domain::putGhostCells(vector_type &ghost)
 {
@@ -181,10 +171,10 @@ double Domain::residual(vector_type &ghost)
 	auto right_ptr = ghost.getVector(1);
 
 	if (hasNbr(Side::north)) {
-	    fillBoundary(Side::north, *left_ptr);
+		fillBoundary(Side::north, *left_ptr);
 	}
 	if (hasNbr(Side::east)) {
-	    fillBoundary(Side::east, *left_ptr);
+		fillBoundary(Side::east, *left_ptr);
 	}
 	if (hasNbr(Side::south)) {
 		if (hasFineNbr(Side::south) || hasCoarseNbr(Side::south)) {
@@ -213,7 +203,7 @@ double Domain::residual(vector_type &ghost)
 		} else if (!hasNbr(Side::west)) {
 			f_comp[j * n] = (2 * west - 3 * center + east) / (h_x * h_x);
 		} else {
-		    f_comp[j * n] = (west - 2 * center + east) / (h_x * h_x);
+			f_comp[j * n] = (west - 2 * center + east) / (h_x * h_x);
 		}
 	}
 	// middle
@@ -351,7 +341,7 @@ double Domain::residual()
 }
 void Domain::solveWithInterface(const vector_type &gamma)
 {
-	auto vec_ptr  = gamma.getVector(0);
+	auto vec_ptr = gamma.getVector(0);
 
 	Side s = Side::north;
 	do {
@@ -363,12 +353,11 @@ void Domain::solveWithInterface(const vector_type &gamma)
 
 	// solve
 	solve();
-
 }
 void Domain::getDiff(vector_type &diff)
 {
 	auto diff_ptr = diff.getVectorNonConst(0);
-	Side s = Side::north;
+	Side s        = Side::north;
 	do {
 		if (hasNbr(s)) {
 			fillDiffVector(s, *diff_ptr);
@@ -390,7 +379,7 @@ double Domain::integrateU() { return u.sum() * h_x * h_y; }
 double Domain::exactNorm() { return sqrt((exact * exact).sum()); }
 double Domain::fNorm() { return sqrt((f * f).sum()); }
 double Domain::exactNorm(double eavg) { return sqrt(pow(exact - eavg, 2).sum()); }
-double                          Domain::integrateExact() { return exact.sum()*h_x*h_y; }
+double                          Domain::integrateExact() { return exact.sum() * h_x * h_y; }
 valarray<double> Domain::getSide(const Side s) const
 {
 	valarray<double> retval(n);
@@ -629,7 +618,7 @@ valarray<double> Domain::getDiffFineToCoarse(const Side s) const
 valarray<double> Domain::getDiffCombinedLeft(const Side s) const
 {
 	valarray<double> retval(n);
-	valarray<double> side = getSide(s);
+	valarray<double> side     = getSide(s);
 	valarray<double> boundary = getBoundary(s);
 	if (s == Side::north || s == Side::west) {
 		for (int i = 0; i < n; i++) {
@@ -648,7 +637,7 @@ valarray<double> Domain::getDiffCombinedLeft(const Side s) const
 valarray<double> Domain::getDiffCombinedRight(const Side s) const
 {
 	valarray<double> retval(n);
-	valarray<double> side = getSide(s);
+	valarray<double> side     = getSide(s);
 	valarray<double> boundary = getBoundary(s);
 	if (s == Side::north || s == Side::west) {
 		for (int i = 0; i < n; i++) {
@@ -658,7 +647,7 @@ valarray<double> Domain::getDiffCombinedRight(const Side s) const
 	} else {
 		for (int i = 0; i < n; i++) {
 			retval[n - 1 - i / 2] -= side[n - 1 - i];
-            retval[n - 1 - i / 2] += boundary[n - 1 - i];
+			retval[n - 1 - i / 2] += boundary[n - 1 - i];
 		}
 	}
 	return retval;
@@ -827,7 +816,7 @@ double Domain::integrateBoundaryFlux()
 	if (!hasNbr(Side::west)) {
 		sum += boundary_west.sum() * h_y;
 	}
-    return sum;
+	return sum;
 }
 void Domain::outputClaw(std::ostream &os)
 {

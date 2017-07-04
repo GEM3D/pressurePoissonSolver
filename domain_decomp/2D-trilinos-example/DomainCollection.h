@@ -58,8 +58,8 @@ class DomainCollection
 	Teuchos::RCP<int_vector_type> iface_info;
 	Teuchos::RCP<int_vector_type> row_iface_info;
 
-	std::set<ColIface> ifaces;
-	std::set<RowIface> row_ifaces;
+	std::set<ColIface>    ifaces;
+	std::set<RowIface>    row_ifaces;
 	std::set<MatrixBlock> blocks;
 
 	public:

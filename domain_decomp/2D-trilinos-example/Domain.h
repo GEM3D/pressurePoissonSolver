@@ -12,39 +12,40 @@
 class Domain
 {
 	public:
-	Solver *               solver;
-	DomainSignature        ds;
-	std::valarray<double>  f;
-	std::valarray<double>  f_comp;
-	std::valarray<double>  f_back;
-	std::valarray<double>  resid;
-	std::valarray<double>  u;
-	std::valarray<double>  u_back;
-	std::valarray<double>  exact;
-	std::valarray<double>  tmp;
-	std::valarray<double>  denom;
-	std::valarray<double>  error;
-	int                    n;
-	double                 h_x;
-	double                 h_y;
-	std::valarray<double>  boundary_north;
-	std::valarray<double>  boundary_south;
-	std::valarray<double>  boundary_east;
-	std::valarray<double>  boundary_west;
-	std::valarray<double>  boundary_north_back;
-	std::valarray<double>  boundary_south_back;
-	std::valarray<double>  boundary_east_back;
-	std::valarray<double>  boundary_west_back;
+	Solver *              solver;
+	DomainSignature       ds;
+	std::valarray<double> f;
+	std::valarray<double> f_comp;
+	std::valarray<double> f_back;
+	std::valarray<double> resid;
+	std::valarray<double> u;
+	std::valarray<double> u_back;
+	std::valarray<double> exact;
+	std::valarray<double> tmp;
+	std::valarray<double> denom;
+	std::valarray<double> error;
+	int                   n;
+	double                h_x;
+	double                h_y;
+	std::valarray<double> boundary_north;
+	std::valarray<double> boundary_south;
+	std::valarray<double> boundary_east;
+	std::valarray<double> boundary_west;
+	std::valarray<double> boundary_north_back;
+	std::valarray<double> boundary_south_back;
+	std::valarray<double> boundary_east_back;
+	std::valarray<double> boundary_west_back;
 	std::array<int, 4> local_i        = {-1, -1, -1, -1};
 	std::array<int, 4> local_i_center = {-1, -1, -1, -1};
-	std::array<int, 4> local_i_left = {-1, -1, -1, -1};
-	std::array<int, 4> local_i_right = {-1, -1, -1, -1};
+	std::array<int, 4> local_i_left   = {-1, -1, -1, -1};
+	std::array<int, 4> local_i_right  = {-1, -1, -1, -1};
 	Teuchos::RCP<map_type> domain_map;
-	bool                   neumann = false;
-	double                 x_start  = 0;
-	double                 y_start  = 0;
-	double                 x_length = 0;
-	double                 y_length = 0;
+	bool                   neumann    = false;
+	bool                   zero_patch = false;
+	double                 x_start    = 0;
+	double                 y_start    = 0;
+	double                 x_length   = 0;
+	double                 y_length   = 0;
 
 	Domain() = default;
 	Domain(DomainSignature ds, int n);
@@ -121,10 +122,7 @@ class Domain
 	void getFluxDiff(vector_type &flux);
 	void fillFluxVector(Side s, single_vector_type &diff);
 
-	inline int &index(Side s)
-	{
-		return local_i[static_cast<int>(s)];
-	}
+	inline int &index(Side s) { return local_i[static_cast<int>(s)]; }
 	inline int &indexCenter(Side s) { return local_i_center[static_cast<int>(s)]; }
 	inline int &indexRefinedLeft(Side s) { return local_i_left[static_cast<int>(s)]; }
 	inline int &indexRefinedRight(Side s) { return local_i_right[static_cast<int>(s)]; }

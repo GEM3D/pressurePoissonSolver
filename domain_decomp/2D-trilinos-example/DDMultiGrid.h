@@ -47,20 +47,20 @@ class Level
 			dc->formCRSMatrix(map, cA, &s, n);
 			std::cerr << "Hello" << std::endl;
 			/*if (neumann) {
-				cA->resumeFill();
-				size_t                     size = cA->getNumEntriesInGlobalRow(0);
-				Teuchos::ArrayView<int>    inds(new int[size], size);
-				Teuchos::ArrayView<double> vals(new double[size], size);
-				cA->getGlobalRowCopy(0, inds, vals, size);
-				for (size_t i = 0; i < size; i++) {
-					if (inds[i] == 0) {
-						vals[i] = 1;
-					} else {
-						vals[i] = 0;
-					}
-				}
-				cA->replaceGlobalValues(0, inds, vals);
-				cA->fillComplete();
+			    cA->resumeFill();
+			    size_t                     size = cA->getNumEntriesInGlobalRow(0);
+			    Teuchos::ArrayView<int>    inds(new int[size], size);
+			    Teuchos::ArrayView<double> vals(new double[size], size);
+			    cA->getGlobalRowCopy(0, inds, vals, size);
+			    for (size_t i = 0; i < size; i++) {
+			        if (inds[i] == 0) {
+			            vals[i] = 1;
+			        } else {
+			            vals[i] = 0;
+			        }
+			    }
+			    cA->replaceGlobalValues(0, inds, vals);
+			    cA->fillComplete();
 			}*/
 
 			solver = Amesos2::create<matrix_type, vector_type>("KLU2", cA, x, b);

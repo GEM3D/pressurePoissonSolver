@@ -30,6 +30,7 @@ class ColIface
 
 	std::array<std::bitset<4>, 9> domain_boundaries;
 
+	bool           zero_patch = false;
 	std::bitset<4> neumann;
 	std::bitset<4> hasCoarseNbr;
 	std::bitset<4> hasFineNbr;
@@ -205,10 +206,11 @@ class RowIface
 	const static int hfn_offset          = 3;
 	const static int hcn_offset          = 4;
 	const static int icl_offset          = 5;
-	const static int global_offset       = 6;
-	const static int right_offset        = 10;
-	const static int coarse_right_offset = 20;
-	const static int size                = 30;
+	const static int zp_offset           = 6;
+	const static int global_offset       = 7;
+	const static int right_offset        = 11;
+	const static int coarse_right_offset = 22;
+	const static int size                = 33;
 
 	int       main_i;
 	Side      s;
@@ -218,6 +220,7 @@ class RowIface
 	bool      isCoarseLeft;
 	std::array<int, 4> global_i = {-1, -1, -1, -1};
 
+	bool           zero_patch = false;
 	std::bitset<4> neumann;
 	void           setNeumann()
 	{
@@ -239,6 +242,7 @@ class RowIface
 			left.hasFineNbr   = iface_view(iface_i + hfn_offset, 0);
 			left.hasCoarseNbr = iface_view(iface_i + hcn_offset, 0);
 			left.isCoarseLeft = iface_view(iface_i + icl_offset, 0);
+			left.zero_patch   = iface_view(iface_i + zp_offset, 0);
 			for (int q = 0; q < 4; q++) {
 				left.global_i[q] = iface_view(iface_i + global_offset + q, 0);
 			}
@@ -251,6 +255,7 @@ class RowIface
 			right.hasFineNbr   = iface_view(iface_i + hfn_offset, 0);
 			right.hasCoarseNbr = iface_view(iface_i + hcn_offset, 0);
 			right.isCoarseLeft = iface_view(iface_i + icl_offset, 0);
+			right.zero_patch   = iface_view(iface_i + zp_offset, 0);
 			for (int q = 0; q < 4; q++) {
 				right.global_i[q] = iface_view(iface_i + global_offset + q, 0);
 			}
@@ -263,6 +268,7 @@ class RowIface
 				coarse_right.hasFineNbr   = iface_view(iface_i + hfn_offset, 0);
 				coarse_right.hasCoarseNbr = iface_view(iface_i + hcn_offset, 0);
 				coarse_right.isCoarseLeft = iface_view(iface_i + icl_offset, 0);
+				coarse_right.zero_patch   = iface_view(iface_i + zp_offset, 0);
 				for (int q = 0; q < 4; q++) {
 					coarse_right.global_i[q] = iface_view(iface_i + global_offset + q, 0);
 				}
@@ -277,7 +283,10 @@ class RowIface
 		return std::tie(l.main_i, l.global_i, l.type, l.s)
 		       < std::tie(r.main_i, r.global_i, r.type, r.s);
 	}
-	friend bool operator==(const RowIface &l, const RowIface &r) { return l.neumann == r.neumann; }
+	friend bool operator==(const RowIface &l, const RowIface &r)
+	{
+		return std::tie(l.neumann, l.zero_patch) == std::tie(r.neumann, r.zero_patch);
+	}
 	/*friend bool operator!=(const ColIface &l, const ColIface &r)
 	{
 	    return std::tie(l.l_south, l.t_south, l.l_east, l.t_east, l.l_north, l.t_north, l.l_west,
@@ -305,6 +314,7 @@ class RowIface
 				dist_view(iface_i + hfn_offset, 0)  = d.hasFineNbr(iface_s);
 				dist_view(iface_i + hcn_offset, 0)  = d.hasCoarseNbr(iface_s);
 				dist_view(iface_i + icl_offset, 0)  = d.isCoarseLeft(iface_s);
+				dist_view(iface_i + zp_offset, 0)   = d.zero_patch;
 				for (int q = 0; q < 4; q++) {
 					dist_view(iface_i + global_offset + q, 0) = d.globalIndex(iface_s + q);
 				}
@@ -325,6 +335,7 @@ class RowIface
 				dist_view(iface_i + hfn_offset, 0)  = d.hasFineNbr(iface_s);
 				dist_view(iface_i + hcn_offset, 0)  = d.hasCoarseNbr(iface_s);
 				dist_view(iface_i + icl_offset, 0)  = d.isCoarseLeft(iface_s);
+				dist_view(iface_i + zp_offset, 0)   = d.zero_patch;
 				for (int q = 0; q < 4; q++) {
 					dist_view(iface_i + global_offset + q, 0) = d.globalIndex(iface_s + q);
 				}
@@ -340,6 +351,7 @@ class RowIface
 				dist_view(iface_i + hfn_offset, 0)  = d.hasFineNbr(iface_s);
 				dist_view(iface_i + hcn_offset, 0)  = d.hasCoarseNbr(iface_s);
 				dist_view(iface_i + icl_offset, 0)  = d.isCoarseLeft(iface_s);
+				dist_view(iface_i + zp_offset, 0)   = d.zero_patch;
 				for (int q = 0; q < 4; q++) {
 					dist_view(iface_i + global_offset + q, 0) = d.globalIndex(iface_s + q);
 				}
@@ -354,6 +366,7 @@ class RowIface
 				dist_view(iface_i + hfn_offset, 0)  = d.hasFineNbr(iface_s);
 				dist_view(iface_i + hcn_offset, 0)  = d.hasCoarseNbr(iface_s);
 				dist_view(iface_i + icl_offset, 0)  = d.isCoarseLeft(iface_s);
+				dist_view(iface_i + zp_offset, 0)   = d.zero_patch;
 				for (int q = 0; q < 4; q++) {
 					dist_view(iface_i + global_offset + q, 0) = d.globalIndex(iface_s + q);
 				}
@@ -393,26 +406,28 @@ class RowIface
 class MatrixBlock
 {
 	public:
-	MatrixBlock(int i, int j, bool flip_i, bool flip_j, bool right, std::bitset<4> neumann, Side s,
-	            BlockType type)
+	MatrixBlock(int i, int j, bool flip_i, bool flip_j, bool right, std::bitset<4> neumann,
+	            bool zero_patch, Side s, BlockType type)
 	{
-		this->i       = i;
-		this->j       = j;
-		this->flip_i  = flip_i;
-		this->flip_j  = flip_j;
-		this->right   = right;
-		this->neumann = neumann;
-		this->type    = type;
-		this->s       = s;
+		this->i          = i;
+		this->j          = j;
+		this->flip_i     = flip_i;
+		this->flip_j     = flip_j;
+		this->right      = right;
+		this->neumann    = neumann;
+		this->zero_patch = zero_patch;
+		this->type       = type;
+		this->s          = s;
 	}
 	int            i, j;
 	bool           flip_i, flip_j, right;
+	bool           zero_patch;
 	std::bitset<4> neumann;
 	Side           s;
 	BlockType      type;
 	friend bool operator==(const MatrixBlock &l, const MatrixBlock &r)
 	{
-		return l.neumann == r.neumann;
+		return std::tie(l.neumann, l.zero_patch) == std::tie(r.neumann, r.zero_patch);
 	}
 	friend bool operator<(const MatrixBlock &l, const MatrixBlock &r)
 	{
@@ -457,7 +472,8 @@ class MatrixBlock
 				bool        flip_i = reverse_x;
 				bool        flip_j = reverse_x;
 				int         j      = iface.global_i[0];
-				MatrixBlock b(i, j, flip_i, flip_j, right, neumann, s, iface.getBlockType());
+				MatrixBlock b(i, j, flip_i, flip_j, right, neumann, iface.zero_patch, s,
+				              iface.getBlockType());
 				blocks.insert(b);
 			}
 			// east
@@ -474,7 +490,8 @@ class MatrixBlock
 				bool        flip_i = !reverse_y;
 				bool        flip_j = !reverse_x;
 				int         j      = iface.global_i[1];
-				MatrixBlock b(i, j, flip_i, flip_j, right, neumann, s, iface.getBlockType());
+				MatrixBlock b(i, j, flip_i, flip_j, right, neumann, iface.zero_patch, s,
+				              iface.getBlockType());
 				blocks.insert(b);
 			}
 			// south
@@ -491,7 +508,8 @@ class MatrixBlock
 				bool        flip_i = reverse_x;
 				bool        flip_j = reverse_x;
 				int         j      = iface.global_i[2];
-				MatrixBlock b(i, j, flip_i, flip_j, right, neumann, s, iface.getBlockType());
+				MatrixBlock b(i, j, flip_i, flip_j, right, neumann, iface.zero_patch, s,
+				              iface.getBlockType());
 				blocks.insert(b);
 			}
 			// west
@@ -508,7 +526,8 @@ class MatrixBlock
 				bool        flip_i = !reverse_y;
 				bool        flip_j = !reverse_x;
 				int         j      = iface.global_i[3];
-				MatrixBlock b(i, j, flip_i, flip_j, right, neumann, s, iface.getBlockType());
+				MatrixBlock b(i, j, flip_i, flip_j, right, neumann, iface.zero_patch, s,
+				              iface.getBlockType());
 				blocks.insert(b);
 			}
 		}

@@ -274,23 +274,12 @@ int main(int argc, char *argv[])
 		};
 	} else {
 		ffun = [](double x, double y) {
-			x += .3;
 			return -5 * M_PIl * M_PIl * sinl(M_PIl * y) * cosl(2 * M_PIl * x);
 		};
-		gfun = [](double x, double y) {
-
-			x += .3;
-			return sinl(M_PIl * y) * cosl(2 * M_PIl * x);
-		};
-		nfunx = [](double x, double y) {
-
-			x += .3;
-			return -2 * M_PIl * sinl(M_PIl * y) * sinl(2 * M_PIl * x);
-		};
-		nfuny = [](double x, double y) {
-			x += .3;
-			return M_PIl * cosl(M_PIl * y) * cosl(2 * M_PIl * x);
-		};
+		gfun = [](double x, double y) { return sinl(M_PIl * y) * cosl(2 * M_PIl * x); };
+		nfunx
+		= [](double x, double y) { return -2 * M_PIl * sinl(M_PIl * y) * sinl(2 * M_PIl * x); };
+		nfuny = [](double x, double y) { return M_PIl * cosl(M_PIl * y) * cosl(2 * M_PIl * x); };
 	}
 
 	valarray<double> setup_times(loop_count);
@@ -303,6 +292,9 @@ int main(int argc, char *argv[])
 		DomainCollection dc(dsc, nx, comm);
 		if (f_neumann && !f_nozerou && !f_lu) {
 			dc.setZeroU();
+		}
+		if (f_zeropatch && dc.domains.count(0)) {
+			dc.domains[0]->zero_patch = true;
 		}
 
 		ZeroSum zs;
@@ -373,28 +365,7 @@ int main(int argc, char *argv[])
 			comm->barrier();
 			steady_clock::time_point setup_start = steady_clock::now();
 
-			if (f_zeropatch) {
-				// start time
-				comm->barrier();
-				steady_clock::time_point form_start = steady_clock::now();
-
-				// dc.formCrsNeumannMatrix(A);
-
-				// stop time
-				comm->barrier();
-				duration<double> form_time = steady_clock::now() - form_start;
-
-				if (my_global_rank == 0)
-					cout << "Matrix Formation Time: " << form_time.count() << endl;
-
-				op = A;
-				rm = A;
-
-				if (save_matrix_file != "")
-					Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A,
-					                                                           "", "");
-
-			} else if (f_crs) {
+			if (f_crs) {
 				// start time
 				comm->barrier();
 				steady_clock::time_point form_start = steady_clock::now();

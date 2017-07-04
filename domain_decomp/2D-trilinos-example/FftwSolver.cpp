@@ -126,9 +126,9 @@ void FftwSolver::solve()
 
 	tmp /= denom;
 
-	if (d->neumann
-	    && !(d->hasNbr(Side::north) || d->hasNbr(Side::east) || d->hasNbr(Side::south)
-	         || d->hasNbr(Side::west))) {
+	if (d->neumann && (!(d->hasNbr(Side::north) || d->hasNbr(Side::east) || d->hasNbr(Side::south)
+	                     || d->hasNbr(Side::west))
+	                   || d->zero_patch)) {
 		tmp[0] = 0;
 	}
 
