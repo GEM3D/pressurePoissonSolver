@@ -998,6 +998,7 @@ void DomainCollection::formRBMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<RBM
 			}
 		}
 		Domain d(ds, n);
+		d.zero_patch     = curr_type.zero_patch;
 		d.boundary_north = valarray<double>(n);
 		d.boundary_east  = valarray<double>(n);
 		d.boundary_south = valarray<double>(n);
