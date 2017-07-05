@@ -16,8 +16,8 @@ class ColIface
 	const static int side_size              = 6 + 2;
 	const static int right_offset           = 28 + 2 * 4;
 	const static int domain_boundary_offset = 46 + 2 * 7;
-	const static int main_side_offset       = 46 + 2 * 7 + 9;
-	const static int size                   = 46 + 2 * 7 + 9 + 2;
+	const static int zp_offset              = 46 + 2 * 7 + 2;
+	const static int size                   = 46 + 2 * 7 + 2 + 2;
 	bool             right;
 	int              axis;
 	int              refine_level = 1;
@@ -47,7 +47,10 @@ class ColIface
 		for (size_t i = 0; i < iface_view.dimension(0); i += size) {
 			ColIface left;
 			ColIface right;
-			int      blr = iface_view(i, 0);
+
+			left.zero_patch  = iface_view(i + zp_offset, 0);
+			right.zero_patch = iface_view(i + zp_offset + 1, 0);
+			int blr          = iface_view(i, 0);
 
 			left.right            = false;
 			left.axis             = iface_view(i + 1, 0);
@@ -104,7 +107,10 @@ class ColIface
 	{
 		return std::tie(l.global_i[0], l.right) < std::tie(r.global_i[0], r.right);
 	}
-	friend bool operator==(const ColIface &l, const ColIface &r) { return l.neumann == r.neumann; }
+	friend bool operator==(const ColIface &l, const ColIface &r)
+	{
+		return std::tie(l.neumann, l.zero_patch) == std::tie(r.neumann, r.zero_patch);
+	}
 	/*friend bool operator!=(const ColIface &l, const ColIface &r)
 	{
 	    return std::tie(l.l_south, l.t_south, l.l_east, l.t_east, l.l_north, l.t_north, l.l_west,
@@ -143,7 +149,8 @@ class ColIface
 					}
 					dist_view(iface_i + 2, 0) = d.ds.refine_level;
 					Side s = iface_s;
-					i      = ColIface::left_offset;
+					dist_view(iface_i + zp_offset, 0) = d.zero_patch;
+					i = ColIface::left_offset;
 					do {
 						dist_view(iface_i + i, 0)     = d.globalIndex(s);
 						dist_view(iface_i + i + 1, 0) = d.globalIndexCenter(s);
@@ -177,6 +184,7 @@ class ColIface
 					}
 					Side s = iface_s;
 					s++;
+					dist_view(iface_i + zp_offset + 1, 0) = d.zero_patch;
 					i = ColIface::right_offset;
 					do {
 						dist_view(iface_i + i, 0)     = d.globalIndex(s);
@@ -218,7 +226,7 @@ class RowIface
 	bool      hasFineNbr;
 	bool      hasCoarseNbr;
 	bool      isCoarseLeft;
-	std::array<int, 4> global_i = {-1, -1, -1, -1};
+	std::array<int, 4> global_i = {{-1, -1, -1, -1}};
 
 	bool           zero_patch = false;
 	std::bitset<4> neumann;
