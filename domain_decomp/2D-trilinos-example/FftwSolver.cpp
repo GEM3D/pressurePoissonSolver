@@ -126,13 +126,17 @@ void FftwSolver::solve()
 
 	tmp /= denom;
 
-	if (d->neumann && (!(d->hasNbr(Side::north) || d->hasNbr(Side::east) || d->hasNbr(Side::south)
-	                     || d->hasNbr(Side::west))
-	                   || d->zero_patch)) {
+	if (d->neumann
+	    && !(d->hasNbr(Side::north) || d->hasNbr(Side::east) || d->hasNbr(Side::south)
+	         || d->hasNbr(Side::west))) {
 		tmp[0] = 0;
 	}
 
 	fftw_execute(plan2);
 
 	d->u = u / (4.0 * d->n * d->n);
+
+	if (d->zero_patch) {
+		d->u -= d->u.sum() / d->u.size();
+	}
 }
