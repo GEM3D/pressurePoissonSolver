@@ -1,11 +1,9 @@
-#include "BelosCGIter.hpp"
-#include "BelosOutputManager.hpp"
 #include "BlockJacobiRelaxer.h"
 #include "DomainSignatureCollection.h"
 #include "FunctionWrapper.h"
 #include "MyTypeDefs.h"
 #include "OpShift.h"
-#include "ZeroSum.h"
+#include "Timer.h"
 #include "args.h"
 #include <Amesos2.hpp>
 #include <Amesos2_Version.hpp>
@@ -282,12 +280,9 @@ int main(int argc, char *argv[])
 		nfuny = [](double x, double y) { return M_PIl * cosl(M_PIl * y) * cosl(2 * M_PIl * x); };
 	}
 
-	valarray<double> setup_times(loop_count);
-	valarray<double> solve_times(loop_count);
+	Tools::Timer timer;
 	for (int loop = 0; loop < loop_count; loop++) {
-		comm->barrier();
-
-		steady_clock::time_point domain_start = steady_clock::now();
+		timer.start("Domain Initialization");
 
 		DomainCollection dc(dsc, nx, comm);
 		if (f_neumann && !f_nozerou && !f_lu) {
@@ -297,23 +292,14 @@ int main(int argc, char *argv[])
 			dc.domains[0]->zero_patch = true;
 		}
 
-		ZeroSum zs;
 		if (f_neumann) {
-			if (!f_nozero) {
-				zs.setTrue();
-			}
 			dc.initNeumann(ffun, gfun, nfunx, nfuny, f_amr);
 		} else {
 			dc.initDirichlet(ffun, gfun);
 			dc.amr = f_amr;
 		}
 
-		comm->barrier();
-		steady_clock::time_point domain_stop = steady_clock::now();
-		duration<double>         domain_time = domain_stop - domain_start;
-
-		if (my_global_rank == 0)
-			cout << "Domain Initialization Time: " << domain_time.count() << endl;
+		timer.stop("Domain Initialization");
 
 		// Create a map that will be used in the iterative solver
 		RCP<map_type>       matrix_map       = dc.matrix_map;
@@ -362,22 +348,14 @@ int main(int argc, char *argv[])
 			///////////////////
 			// setup start
 			///////////////////
-			comm->barrier();
-			steady_clock::time_point setup_start = steady_clock::now();
+			timer.start("Linear System Setup");
 
 			if (f_crs) {
-				// start time
-				comm->barrier();
-				steady_clock::time_point form_start = steady_clock::now();
+				timer.start("Matrix Formation");
 
 				dc.formCRSMatrix(matrix_map, A, &s);
 
-				// stop time
-				comm->barrier();
-				duration<double> form_time = steady_clock::now() - form_start;
-
-				if (my_global_rank == 0)
-					cout << "Matrix Formation Time: " << form_time.count() << endl;
+				timer.stop("Matrix Formation");
 
 				if (f_neumann && !f_nozerou) {
 					RCP<OpShift> os = rcp(new OpShift(A, s));
@@ -395,16 +373,11 @@ int main(int argc, char *argv[])
 				op = rcp(new FuncWrap(b, &dc));
 			} else {
 				// Form the matrix
-				comm->barrier();
-				steady_clock::time_point form_start = steady_clock::now();
+				timer.start("Matrix Formation");
 
 				dc.formRBMatrix(matrix_map, RBA, &s);
 
-				comm->barrier();
-				duration<double> form_time = steady_clock::now() - form_start;
-
-				if (my_global_rank == 0)
-					cout << "Matrix Formation Time: " << form_time.count() << endl;
+				timer.stop("Matrix Formation");
 
 				if (save_matrix_file != "") {
 					comm->barrier();
@@ -436,8 +409,7 @@ int main(int argc, char *argv[])
 			op, gamma, b));
 
 			if (f_riluk) {
-				comm->barrier();
-				steady_clock::time_point prec_start = steady_clock::now();
+				timer.start("RILUK Preconditioner Formation");
 
 				Teuchos::RCP<Ifpack2::RILUK<Tpetra::RowMatrix<>>> P
 				= rcp(new Ifpack2::RILUK<Tpetra::RowMatrix<>>(rm));
@@ -445,15 +417,9 @@ int main(int argc, char *argv[])
 
 				problem->setLeftPrec(P);
 
-				comm->barrier();
-				duration<double> prec_time = steady_clock::now() - prec_start;
-
-				if (my_global_rank == 0)
-					cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
-
+				timer.stop("RILUK Preconditioner Formation");
 			} else if (f_ilu) {
-				comm->barrier();
-				steady_clock::time_point prec_start = steady_clock::now();
+				timer.start("ILUT Preconditioner Formation");
 
 				Teuchos::RCP<Ifpack2::ILUT<Tpetra::RowMatrix<>>> P
 				= rcp(new Ifpack2::ILUT<Tpetra::RowMatrix<>>(rm));
@@ -466,15 +432,9 @@ int main(int argc, char *argv[])
 				P->compute();
 				problem->setLeftPrec(P);
 
-				comm->barrier();
-				duration<double> prec_time = steady_clock::now() - prec_start;
-
-				if (my_global_rank == 0)
-					cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
-
+				timer.stop("ILUT Preconditioner Formation");
 			} else if (f_precj) {
-				comm->barrier();
-				steady_clock::time_point prec_start = steady_clock::now();
+				timer.start("Jacobi Preconditioner Formation");
 
 				// Create the relaxation.  You could also do this using
 				// Ifpack2::Factory (the preconditioner factory) if you like.
@@ -493,46 +453,24 @@ int main(int argc, char *argv[])
 				prec->initialize();
 				prec->compute();
 
-				comm->barrier();
-				duration<double> prec_time = steady_clock::now() - prec_start;
-
-				if (my_global_rank == 0)
-					cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
-
+				timer.stop("Jacobi Preconditioner Formation");
 			} else if (f_precblockj) {
-				comm->barrier();
-				steady_clock::time_point prec_start = steady_clock::now();
+				timer.start("Block Jacobi Preconditioner Formation");
 
 				RCP<BlockJacobiRelaxer> P = rcp(new BlockJacobiRelaxer(RBA, s));
 				problem->setLeftPrec(P);
 
-				comm->barrier();
-				duration<double> prec_time = steady_clock::now() - prec_start;
-
-				if (my_global_rank == 0)
-					cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
-
+				timer.stop("Block Jacobi Preconditioner Formation");
 			} else if (f_precddmg) {
-				comm->barrier();
-				steady_clock::time_point prec_start = steady_clock::now();
+				timer.start("DDMG Preconditioner Formation");
 
-				RCP<DDMultiGrid> P;
-				if (f_neumann) {
-					P = rcp(new DDMultiGrid(&dc, RBA, s));
-				} else {
-					P = rcp(new DDMultiGrid(&dc, RBA));
-				}
+				RCP<DDMultiGrid> P = rcp(new DDMultiGrid(&dc, RBA));
+
 				problem->setRightPrec(P);
 
-				comm->barrier();
-				duration<double> prec_time = steady_clock::now() - prec_start;
-
-				if (my_global_rank == 0)
-					cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
-
+				timer.stop("DDMG Preconditioner Formation");
 			} else if (f_prec) {
-				comm->barrier();
-				steady_clock::time_point prec_start = steady_clock::now();
+				timer.start("Block Diagonal Preconditioner Formation");
 
 				// Create the relaxation.  You could also do this using
 				// Ifpack2::Factory (the preconditioner factory) if you like.
@@ -553,14 +491,11 @@ int main(int argc, char *argv[])
 				prec->initialize();
 				prec->compute();
 
-				comm->barrier();
-				duration<double> prec_time = steady_clock::now() - prec_start;
-
-				if (my_global_rank == 0)
-					cout << "Preconditioner Formation Time: " << prec_time.count() << endl;
+				timer.stop("Block Diagonal Preconditioner Formation");
 			}
 
 			if (direct_solve) {
+				timer.start("LU Factorization");
 				string name;
 				if (f_lu) {
 					name = "KLU2";
@@ -578,23 +513,19 @@ int main(int argc, char *argv[])
 				dsolver = Amesos2::create<matrix_type, vector_type>(name, A);
 
 				dsolver->symbolicFactorization().numericFactorization();
+				timer.stop("LU Factorization");
 			}
 			///////////////////
 			// setup end
 			///////////////////
-			comm->barrier();
-			duration<double> setup_time = steady_clock::now() - setup_start;
-
-			if (my_global_rank == 0) cout << "Setup Time: " << setup_time.count() << endl;
-
-			setup_times[loop] = setup_time.count();
+			timer.stop("Linear System Setup");
 
 			///////////////////
 			// solve start
 			///////////////////
-			comm->barrier();
-			tsolve_start = steady_clock::now();
+			timer.start("Complete Solve");
 
+			timer.start("Gamma Solve");
 			if (f_read_gamma) {
 				gamma = Tpetra::MatrixMarket::Reader<matrix_type>::readDenseFile(
 				args::get(f_read_gamma), comm, matrix_map_const);
@@ -613,8 +544,6 @@ int main(int argc, char *argv[])
 			} else {
 				problem->setProblem();
 
-				comm->barrier();
-				steady_clock::time_point iter_start = steady_clock::now();
 				// Set the parameters
 				belosList.set("Block Size", 1);
 				belosList.set("Maximum Iterations", 5000);
@@ -647,25 +576,16 @@ int main(int argc, char *argv[])
 					problem, rcp(&belosList, false)));
 				}
 				solver->solve();
-
-				comm->barrier();
-				duration<double> iter_time = steady_clock::now() - iter_start;
-				if (my_global_rank == 0)
-					std::cout << "Gamma Solve Time: " << iter_time.count() << endl;
 			}
 		}
+		timer.stop("Gamma Solve");
 
 		// Do one last solve
-		comm->barrier();
-		steady_clock::time_point solve_start = steady_clock::now();
+		timer.start("Patch Solve");
 
 		dc.solveWithInterface(*gamma, *diff);
 
-		comm->barrier();
-		duration<double> solve_time = steady_clock::now() - solve_start;
-
-		if (my_global_rank == 0)
-			std::cout << "Time to solve with given set of gammas: " << solve_time.count() << endl;
+		timer.stop("Patch Solve");
 
 		dc.residual();
 		double ausum2 = dc.integrateAU();
@@ -682,6 +602,7 @@ int main(int argc, char *argv[])
 			}
 		}
 		if (f_iter && !direct_solve) {
+			timer.start("Iterative Refinement Step");
 			dc.residual();
 			dc.swapResidSol();
 
@@ -701,17 +622,13 @@ int main(int argc, char *argv[])
 			}
 			dc.solveWithInterface(*x, *d);
 			dc.sumResidIntoSol();
+			timer.stop("Iterative Refinement Step");
 		}
 
 		///////////////////
 		// solve end
 		///////////////////
-		comm->barrier();
-		duration<double> tsolve_time = steady_clock::now() - tsolve_start;
-
-		if (my_global_rank == 0) cout << "Solve Time: " << tsolve_time.count() << endl;
-
-		solve_times[loop] = tsolve_time.count();
+		timer.stop("Complete Solve");
 
 		// Calcuate error
 		RCP<map_type>    err_map = rcp(new map_type(-1, 1, 0, comm));
@@ -738,16 +655,11 @@ int main(int argc, char *argv[])
 		global_diff_norm  = diff_norm.norm2();
 		global_exact_norm = exact_norm.norm2();
 
-		comm->barrier();
-		steady_clock::time_point total_stop = steady_clock::now();
-		duration<double>         total_time = total_stop - domain_start;
-
 		double residual = dc.residual();
 		double fnorm    = dc.fNorm();
 		double ausum    = dc.integrateAU();
 		double fsum     = dc.integrateF();
 		if (my_global_rank == 0) {
-			std::cout << "Total run time: " << total_time.count() << endl;
 			std::cout << std::scientific;
 			std::cout.precision(13);
 			std::cout << "Error: " << global_diff_norm / global_exact_norm << endl;
@@ -803,20 +715,8 @@ int main(int argc, char *argv[])
 		cout << std::defaultfloat;
 	}
 
-	if (loop_count > 1 && my_global_rank == 0) {
-		std::cout << "Setup Times: ";
-		for (double t : setup_times) {
-			cout << t << " ";
-		}
-		cout << endl;
-		cout << "Average: " << setup_times.sum() / setup_times.size() << endl;
-		std::cout << "Solve Times: ";
-		for (double t : solve_times) {
-			cout << t << " ";
-		}
-		cout << endl;
-		cout << "Average: " << solve_times.sum() / solve_times.size() << endl;
+	if (my_global_rank == 0) {
+		cout << timer;
 	}
-
 	return 0;
 }
