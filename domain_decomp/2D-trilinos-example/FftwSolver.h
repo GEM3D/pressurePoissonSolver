@@ -6,16 +6,26 @@
 #include <fftw3.h>
 #include <map>
 #include <valarray>
-class DomainCmp
-{
-	public:
-	bool operator()(Domain *const &lhs, Domain *const &rhs) const
+struct DomainKey {
+	ulong  neumann = 0;
+	double h_x     = 0;
+	double h_y     = 0;
+	int    n       = 0;
+
+	DomainKey() {}
+	DomainKey(Domain *d)
 	{
-		ulong l = lhs->neumann_sides.to_ulong();
-		ulong r = rhs->neumann_sides.to_ulong();
-		return std::tie(l, lhs->h_x, lhs->h_y, lhs->n) < std::tie(r, rhs->h_x, rhs->h_y, rhs->n);
+		this->neumann = d->neumann_sides.to_ulong();
+		this->h_x     = d->h_x;
+		this->h_y     = d->h_y;
+		this->n       = d->n;
+	}
+	friend bool operator<(const DomainKey &l, const DomainKey &r)
+	{
+		return std::tie(l.neumann, l.h_x, l.h_y, l.n) < std::tie(r.neumann, r.h_x, r.h_y, r.n);
 	}
 };
+
 class FftwSolver : public Solver
 {
 	private:
@@ -26,7 +36,7 @@ class FftwSolver : public Solver
 	static std::valarray<double> f_copy;
 	static std::valarray<double> tmp;
 	static std::valarray<double> u;
-	static std::map<Domain *, std::valarray<double>, DomainCmp> denoms;
+	static std::map<DomainKey, std::valarray<double>> denoms;
 	std::valarray<double> *denom_ptr;
 
 	public:

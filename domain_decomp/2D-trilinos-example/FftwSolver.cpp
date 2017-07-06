@@ -5,7 +5,7 @@ bool             FftwSolver::initialized = false;
 valarray<double> FftwSolver::f_copy;
 valarray<double> FftwSolver::tmp;
 valarray<double> FftwSolver::u;
-map<Domain *, valarray<double>, DomainCmp> FftwSolver::denoms;
+map<DomainKey, valarray<double>> FftwSolver::denoms;
 
 FftwSolver::FftwSolver(Domain *dom)
 {
