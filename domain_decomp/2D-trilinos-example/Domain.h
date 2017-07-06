@@ -7,6 +7,7 @@
 #include <Teuchos_RCP.hpp>
 #include <Tpetra_Import_decl.hpp>
 #include <array>
+#include <bitset>
 #include <cmath>
 #include <valarray>
 class Domain
@@ -14,6 +15,7 @@ class Domain
 	public:
 	Solver *              solver;
 	DomainSignature       ds;
+	std::bitset<4>        neumann_sides;
 	std::valarray<double> f;
 	std::valarray<double> f_comp;
 	std::valarray<double> f_back;
@@ -35,10 +37,10 @@ class Domain
 	std::valarray<double> boundary_south_back;
 	std::valarray<double> boundary_east_back;
 	std::valarray<double> boundary_west_back;
-	std::array<int, 4> local_i        = {-1, -1, -1, -1};
-	std::array<int, 4> local_i_center = {-1, -1, -1, -1};
-	std::array<int, 4> local_i_left   = {-1, -1, -1, -1};
-	std::array<int, 4> local_i_right  = {-1, -1, -1, -1};
+	std::array<int, 4> local_i        = {{-1, -1, -1, -1}};
+	std::array<int, 4> local_i_center = {{-1, -1, -1, -1}};
+	std::array<int, 4> local_i_left   = {{-1, -1, -1, -1}};
+	std::array<int, 4> local_i_right  = {{-1, -1, -1, -1}};
 	Teuchos::RCP<map_type> domain_map;
 	bool                   neumann    = false;
 	bool                   zero_patch = false;

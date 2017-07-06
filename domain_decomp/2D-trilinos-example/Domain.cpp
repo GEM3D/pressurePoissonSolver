@@ -89,6 +89,9 @@ void Domain::plan() { solver = new FftwSolver(this); }
 void Domain::planDirichlet() { plan(); }
 void Domain::planNeumann()
 {
+    for(int q=0;q<4;q++){
+        neumann_sides[q]=hasNbr(static_cast<Side>(q));
+    }
 	neumann = true;
 	plan();
 }
