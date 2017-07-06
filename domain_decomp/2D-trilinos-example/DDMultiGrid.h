@@ -35,33 +35,10 @@ class Level
 		}
 		if (n / 2 > 4) {
 			dc->formRBMatrix(map, A, &s, n);
-			if (neumann) {
-				R                        = Teuchos::rcp(new BlockJacobiRelaxer(A, s));
-				Teuchos::RCP<OpShift> os = Teuchos::rcp(new OpShift(A, s));
-				this->op                 = os;
-			} else {
-				op = A;
-				R  = Teuchos::rcp(new BlockJacobiRelaxer(A));
-			}
+			op = A;
+			R  = Teuchos::rcp(new BlockJacobiRelaxer(A));
 		} else {
 			dc->formCRSMatrix(map, cA, &s, n);
-			std::cerr << "Hello" << std::endl;
-			/*if (neumann) {
-			    cA->resumeFill();
-			    size_t                     size = cA->getNumEntriesInGlobalRow(0);
-			    Teuchos::ArrayView<int>    inds(new int[size], size);
-			    Teuchos::ArrayView<double> vals(new double[size], size);
-			    cA->getGlobalRowCopy(0, inds, vals, size);
-			    for (size_t i = 0; i < size; i++) {
-			        if (inds[i] == 0) {
-			            vals[i] = 1;
-			        } else {
-			            vals[i] = 0;
-			        }
-			    }
-			    cA->replaceGlobalValues(0, inds, vals);
-			    cA->fillComplete();
-			}*/
 
 			solver = Amesos2::create<matrix_type, vector_type>("KLU2", cA, x, b);
 
@@ -150,22 +127,15 @@ class DDMultiGrid : public Tpetra::Operator<scalar_type>
 	Teuchos::RCP<Tpetra::Operator<>> A;
 
 	public:
-	DDMultiGrid(DomainCollection *dc, Teuchos::RCP<RBMatrix> A,
-	            Teuchos::RCP<single_vector_type> s = Teuchos::null)
+	DDMultiGrid(DomainCollection *dc, Teuchos::RCP<RBMatrix> A)
 	{
 		this->dc = dc;
-		if (s.is_null()) {
-			this->A = A;
-			R       = Teuchos::rcp(new BlockJacobiRelaxer(A));
-		} else {
-			R                        = Teuchos::rcp(new BlockJacobiRelaxer(A, s));
-			Teuchos::RCP<OpShift> os = Teuchos::rcp(new OpShift(A, s));
-			this->A                  = os;
-		}
-		map    = dc->formMatrixMap(dc->n);
-		bottom = new Level(dc, dc->n / 2, !s.is_null());
-		r      = rcp(new vector_type(map, 1));
-		R      = Teuchos::rcp(new BlockJacobiRelaxer(A));
+		this->A  = A;
+		R        = Teuchos::rcp(new BlockJacobiRelaxer(A));
+		map      = dc->formMatrixMap(dc->n);
+		bottom   = new Level(dc, dc->n / 2);
+		r        = rcp(new vector_type(map, 1));
+		R        = Teuchos::rcp(new BlockJacobiRelaxer(A));
 	}
 	~DDMultiGrid() { delete bottom; }
 	void apply(const vector_type &b, vector_type &x, Teuchos::ETransp mode = Teuchos::NO_TRANS,
