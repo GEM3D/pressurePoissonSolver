@@ -668,7 +668,7 @@ int main(int argc, char *argv[])
 			// if (f_neumann) {
 			//	std::cout << u8"∮ du/dn - ΣAu: " << dc.sumBoundaryFlux() - ausum << endl;
 			//}
-			cout << std::defaultfloat;
+			cout.unsetf(std::ios_base::floatfield);
 		}
 		if (save_solution_file != "") {
 			ofstream out_file(save_solution_file);
@@ -712,7 +712,7 @@ int main(int argc, char *argv[])
 		if (f_outclaw) {
 			dc.outputClaw();
 		}
-		cout << std::defaultfloat;
+		cout.unsetf(std::ios_base::floatfield);
 	}
 
 	if (my_global_rank == 0) {
