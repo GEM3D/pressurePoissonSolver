@@ -4,7 +4,7 @@
 # before reading this example; in particular, you should know how to
 # add C++ source files and header files to your project.
 #
-enable_language(Fortran)
+#enable_language(Fortran)
 
 # You need CMake version >= 2.8 to use this example.
 cmake_minimum_required(VERSION 2.8)
@@ -37,7 +37,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 project(DomainDecomp)
 find_package(FFTW REQUIRED)
 find_package(MPI REQUIRED)
-set (CMAKE_CXX_FLAGS "--std=c++11 -Wall --pedantic -O2 ${CMAKE_CXX_FLAGS}")
+set (CMAKE_CXX_FLAGS "--std=c++11 -Wall --pedantic -O3 ${CMAKE_CXX_FLAGS}")
 IF(NOT CMAKE_CXX_COMPILER)
   MESSAGE("Setting CXX compiler.")
   SET(CMAKE_CXX_COMPILER ${Trilinos_CXX_COMPILER})
