@@ -397,7 +397,7 @@ int main(int argc, char *argv[])
 				functs[1] = rcp(new FunctionParameter(Prec, &HYPRE_BoomerAMGSetCoarsenType,
 				                                      6)); // Falgout coarsening
 				functs[2] = rcp(new FunctionParameter(Prec, &HYPRE_BoomerAMGSetStrongThreshold,
-				                                      .9)); // Sym GS/Jacobi hybrid
+				                                      .25)); // Sym GS/Jacobi hybrid
 				functs[3] = rcp(new FunctionParameter(Prec, &HYPRE_BoomerAMGSetNumSweeps,
 				                                      1)); // Sweeps on each level
 				functs[4] = rcp(
