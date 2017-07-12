@@ -1,5 +1,6 @@
 #include "BlockJacobiRelaxer.h"
 #include "DomainSignatureCollection.h"
+#include "Factory.h"
 #include "FunctionWrapper.h"
 #include "MyTypeDefs.h"
 #include "OpShift.h"
@@ -114,11 +115,12 @@ int main(int argc, char *argv[])
 	args::Flag           f_blockcrs(parser, "wrapper", "use a function wrapper", {"blockcrs"});
 	args::Flag           f_crs(parser, "wrapper", "use a function wrapper", {"crs"});
 	args::Flag           f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
+	args::Flag           f_zero(parser, "gauss", "solve gaussian function", {"zero"});
 	args::Flag           f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
 	args::Flag           f_precblockj(parser, "prec", "use block diagonal jacobi preconditioner",
 	                        {"precblockj"});
 	args::Flag f_precj(parser, "prec", "use block diagonal jacobi preconditioner", {"precj"});
-	args::Flag f_precamg(parser, "prec", "use AMG preconditioner", {"precamg"});
+	args::Flag f_precmuelu(parser, "prec", "use AMG preconditioner", {"muelu"});
 	args::Flag f_precddmg(parser, "prec", "use AMG preconditioner", {"ddmg"});
 	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {"neumann"});
 	args::Flag f_cg(parser, "gmres", "use CG for iterative solver", {"cg"});
@@ -254,7 +256,12 @@ int main(int argc, char *argv[])
 	function<double(double, double)> nfunx;
 	function<double(double, double)> nfuny;
 
-	if (f_gauss) {
+	if (f_zero) {
+		ffun  = [](double x, double y) { return 0; };
+		gfun  = [](double x, double y) { return 0; };
+		nfunx = [](double x, double y) { return 0; };
+		nfuny = [](double x, double y) { return 0; };
+	} else if (f_gauss) {
 		gfun
 		= [](double x, double y) { return exp(cos(10 * M_PIl * x)) - exp(cos(11 * M_PIl * y)); };
 		ffun = [](double x, double y) {
@@ -408,7 +415,16 @@ int main(int argc, char *argv[])
 			= rcp(new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(
 			op, gamma, b));
 
-			if (f_riluk) {
+			if (f_precmuelu) {
+				timer.start("MueLu Preconditioner Formation");
+
+				Teuchos::RCP<op_type> P = Factory::getAmgPreconditioner(A);
+
+				problem->setLeftPrec(P);
+
+				timer.stop("MueLu Preconditioner Formation");
+
+			} else if (f_riluk) {
 				timer.start("RILUK Preconditioner Formation");
 
 				Teuchos::RCP<Ifpack2::RILUK<Tpetra::RowMatrix<>>> P
@@ -549,7 +565,7 @@ int main(int argc, char *argv[])
 				belosList.set("Maximum Iterations", 5000);
 				belosList.set("Convergence Tolerance", tol);
 				belosList.set("Output Frequency", 1);
-				int verbosity = Belos::Errors + Belos::StatusTestDetails + Belos::Warnings
+				int verbosity = Belos::Errors + /* Belos::StatusTestDetails +*/ Belos::Warnings
 				                + Belos::TimingDetails + Belos::Debug + Belos::IterationDetails;
 				belosList.set("Verbosity", verbosity);
 				// belosList.set("Orthogonalization", "ICGS");

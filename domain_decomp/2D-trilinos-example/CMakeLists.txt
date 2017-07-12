@@ -105,6 +105,7 @@ add_library(DomainSignatureCollection DomainSignatureCollection.cpp)
 add_library(Domain Domain.cpp)
 add_library(RBMatrix RBMatrix.cpp)
 add_library(FftwSolver FftwSolver.cpp)
+add_library(Factory Factory.cpp)
 file(GLOB fishpack_SRC "fishpack/*.f")
 #add_library(FishpackSolver FishpackSolver.cpp)
 #add_library(Fishpack ${fishpack_SRC})
@@ -120,10 +121,15 @@ target_link_libraries(heat
     DomainSignatureCollection
     RBMatrix
     Domain
+    Factory
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
   ${FFTW_LIB}
   ${MPI_CXX_LIBRARIES} 
+)
+target_link_libraries(Factory
+  ${Trilinos_TPL_LIBRARIES}
+  ${Trilinos_LIBRARIES} 
 )
 target_link_libraries(RBMatrix
   ${Trilinos_TPL_LIBRARIES}
