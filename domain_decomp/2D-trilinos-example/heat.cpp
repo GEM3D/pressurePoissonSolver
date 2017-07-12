@@ -129,13 +129,10 @@ int main(int argc, char *argv[])
 	args::Flag f_rgmres(parser, "rgmres", "use GCRO-DR (Recycling GMRES) for iterative solver",
 	                    {"rgmres"});
 	args::Flag f_bicg(parser, "gmres", "use BiCGStab for iterative solver", {"bicg"});
-	args::Flag f_nozero(parser, "nozero", "don't make the average of vector zero in CG solver",
-	                    {"nozero"});
-	args::Flag f_nozerou(parser, "zerou", "don't modify make so that it zeros the solution",
-	                     {"nozerou"});
-	args::Flag f_nozerof(parser, "zerou", "don't modify make so that it zeros the solution",
+	args::Flag f_zerou(parser, "zerou", "modify matrix so that the sum of the solution is zero",
+	                   {"nozerou"});
+	args::Flag f_nozerof(parser, "zerou", "don't  make the rhs match the boundary conditions",
 	                     {"nozerof"});
-	args::Flag f_zeropatch(parser, "", "zero patch", {"zeropatch"});
 	args::Flag f_pingamma(parser, "pingamma", "pin the first gamma to zero", {"pingamma"});
 	args::Flag f_lu(parser, "lu", "use KLU solver", {"klu"});
 	args::Flag f_mumps(parser, "lu", "use MUMPS solver", {"mumps"});
@@ -167,7 +164,10 @@ int main(int argc, char *argv[])
 		}
 		return 1;
 	}
-	bool                      direct_solve = (f_lu || f_superlu || f_mumps || f_basker);
+
+	bool direct_solve = (f_lu || f_superlu || f_mumps || f_basker);
+	bool use_crs = (f_crs || direct_solve || f_ilu || f_riluk || f_precj || f_precmuelu || f_prec);
+
 	DomainSignatureCollection dsc;
 	if (f_mesh) {
 		string d = args::get(f_mesh);
@@ -292,11 +292,12 @@ int main(int argc, char *argv[])
 		timer.start("Domain Initialization");
 
 		DomainCollection dc(dsc, nx, comm);
-		if (f_neumann && !f_nozerou && !f_lu) {
-			dc.setZeroU();
-		}
-		if (f_zeropatch && dc.domains.count(0)) {
-			dc.domains[0]->zero_patch = true;
+		if (f_neumann) {
+			if (f_neumann && f_zerou) {
+				dc.setZeroU();
+			} else if (!f_pingamma && dc.domains.count(0)) {
+				dc.domains[0]->zero_patch = true;
+			}
 		}
 
 		if (f_neumann) {
@@ -357,14 +358,14 @@ int main(int argc, char *argv[])
 			///////////////////
 			timer.start("Linear System Setup");
 
-			if (f_crs) {
+			if (use_crs) {
 				timer.start("Matrix Formation");
 
 				dc.formCRSMatrix(matrix_map, A, &s);
 
 				timer.stop("Matrix Formation");
 
-				if (f_neumann && !f_nozerou) {
+				if (f_neumann && f_zerou) {
 					RCP<OpShift> os = rcp(new OpShift(A, s));
 					op              = os;
 				} else {
@@ -403,7 +404,7 @@ int main(int argc, char *argv[])
 						cout << "Time to write matrix to file: " << write_time.count() << endl;
 				}
 
-				if (f_neumann && !f_nozerou) {
+				if (f_neumann && f_zerou) {
 					RCP<OpShift> os = rcp(new OpShift(RBA, s));
 					op              = os;
 				} else {
@@ -418,7 +419,8 @@ int main(int argc, char *argv[])
 			if (f_precmuelu) {
 				timer.start("MueLu Preconditioner Formation");
 
-				Teuchos::RCP<op_type> P = Factory::getAmgPreconditioner(A);
+				Teuchos::RCP<vector_type> xy = dc.getInterfaceCoords();
+				Teuchos::RCP<op_type>     P  = Factory::getAmgPreconditioner(A, xy);
 
 				problem->setLeftPrec(P);
 

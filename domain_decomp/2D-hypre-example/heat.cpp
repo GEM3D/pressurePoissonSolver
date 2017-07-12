@@ -122,15 +122,15 @@ int main(int argc, char *argv[])
 	args::Flag f_bicg(parser, "gmres", "use BiCGStab for iterative solver", {"bicg"});
 	args::Flag f_nozero(parser, "nozero", "don't make the average of vector zero in CG solver",
 	                    {"nozero"});
-	args::Flag f_nozerou(parser, "zerou", "don't modify make so that it zeros the solution",
-	                     {"nozerou"});
+	args::Flag f_zerou(parser, "zerou", "modify matrix so that the sum of the solution is zero",
+	                   {"nozerou"});
 	args::Flag f_nozerof(parser, "zerou", "don't modify make so that it zeros the solution",
 	                     {"nozerof"});
-	args::Flag f_zeropatch(parser, "", "zero patch", {"zeropatch"});
 	args::Flag f_pingamma(parser, "pingamma", "pin the first gamma to zero", {"pingamma"});
 	args::Flag f_iter(parser, "iterative", "use iterative method", {"iterative"});
 	args::Flag f_boomer(parser, "prec", "use BoomerAMG preconditioner", {"boomer"});
-	args::Flag f_hypre(parser, "prec", "use BoomerAMG preconditioner and hypre solver", {"hypre"});
+	// args::Flag f_hypre(parser, "prec", "use BoomerAMG preconditioner and hypre solver",
+	// {"hypre"});
 
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;
@@ -274,11 +274,12 @@ int main(int argc, char *argv[])
 		timer.start("Domain Initialization");
 
 		DomainCollection dc(dsc, nx, comm);
-		if (f_neumann && !f_nozerou) {
-			dc.setZeroU();
-		}
-		if (f_zeropatch && dc.domains.count(0)) {
-			dc.domains[0]->zero_patch = true;
+		if (f_neumann) {
+			if (f_neumann && f_zerou) {
+				dc.setZeroU();
+			} else if (!f_pingamma && dc.domains.count(0)) {
+				dc.domains[0]->zero_patch = true;
+			}
 		}
 
 		if (f_neumann) {
