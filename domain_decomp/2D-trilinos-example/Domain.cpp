@@ -89,9 +89,9 @@ void Domain::plan() { solver = new FftwSolver(this); }
 void Domain::planDirichlet() { plan(); }
 void Domain::planNeumann()
 {
-    for(int q=0;q<4;q++){
-        neumann_sides[q]=hasNbr(static_cast<Side>(q));
-    }
+	for (int q = 0; q < 4; q++) {
+		neumann_sides[q] = hasNbr(static_cast<Side>(q));
+	}
 	neumann = true;
 	plan();
 }
@@ -112,6 +112,88 @@ void Domain::getFluxDiff(vector_type &flux)
 	if (hasNbr(Side::west)) {
 		fillFluxVector(Side::west, *ptr);
 	}
+}
+void Domain::putCoords(vector_type &xy)
+{
+	if (hasNbr(Side::north)) {
+		if (hasFineNbr(Side::north) || hasCoarseNbr(Side::north)) {
+			fillCoords(Side::north, xy);
+		}
+	}
+	if (hasNbr(Side::east)) {
+		if (hasFineNbr(Side::east) || hasCoarseNbr(Side::east)) {
+			fillCoords(Side::east, xy);
+		}
+	}
+	if (hasNbr(Side::south)) {
+		fillCoords(Side::south, xy);
+	}
+	if (hasNbr(Side::west)) {
+		fillCoords(Side::west, xy);
+	}
+}
+void Domain::fillCoords(Side s, vector_type &xy)
+{
+	auto xy_view = xy.getLocalView<Kokkos::HostSpace>();
+	/*if (hasFineNbr(s)) {
+	    valarray<double> side        = getSide(s);
+	    valarray<double> coarse      = getSideCoarse(s);
+	    int              curr_i      = index(s) * n;
+	    int              curr_low_i  = indexRefinedRight(s) * n;
+	    int              curr_high_i = indexRefinedLeft(s) * n;
+	    if (s == Side::north || s == Side::west) {
+	        int tmp     = curr_high_i;
+	        curr_high_i = curr_low_i;
+	        curr_low_i  = tmp;
+	    }
+	    for (int i = 0; i < n; i++) {
+	        diff_view(curr_i, 0) += side[i];
+	        diff_view(curr_i, 0) -= 8.0 / 15.0 * (coarse[2 * i] + coarse[2 * i + 1]);
+	        diff_view(curr_low_i, 0) += coarse[i] * 8.0 / 15.0;
+	        diff_view(curr_high_i, 0) += coarse[n + i] * 8.0 / 15.0;
+	        curr_i++;
+	        curr_low_i++;
+	        curr_high_i++;
+	    }
+	} else if (hasCoarseNbr(s)) {
+	    valarray<double> center        = getSideFine(s);
+	    valarray<double> incenter      = getInnerSideFine(s);
+	    valarray<double> side          = getSide(s);
+	    valarray<double> inside        = getInnerSide(s);
+	    int              curr_i        = index(s) * n;
+	    int              curr_i_center = indexCenter(s) * n;
+	    for (int i = 0; i < n; i++) {
+	        diff_view(curr_i_center, 0) += center[i];
+	        diff_view(curr_i_center, 0) -= 2.0 / 3.0 * center[i] - 1.0 / 5.0 * incenter[i];
+	        diff_view(curr_i, 0) += 2.0 / 3.0 * side[i] - 1.0 / 5.0 * inside[i];
+	        curr_i_center++;
+	        curr_i++;
+	    }
+	} else {
+	*/
+	int curr_i = index(s) * n;
+	if (s == Side::north || s == Side::south) {
+		double y = ds.y_start;
+		if (s == Side::north) {
+			y += ds.y_length;
+		}
+		for (int i = 0; i < n; i++) {
+			double x = x_start + h_x / 2.0 + x_length * i / n;
+			xy_view(curr_i + i, 0) = x;
+			xy_view(curr_i + i, 1) = y;
+		}
+	} else {
+		double x = ds.x_start;
+		if (s == Side::east) {
+			x += ds.x_length;
+		}
+		for (int i = 0; i < n; i++) {
+			double y = y_start + h_y / 2.0 + y_length * i / n;
+			xy_view(curr_i + i, 0) = x;
+			xy_view(curr_i + i, 1) = y;
+		}
+	}
+	//}
 }
 void Domain::fillFluxVector(Side s, single_vector_type &diff)
 {

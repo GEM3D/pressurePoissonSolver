@@ -36,6 +36,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 # to edit this line.
 project(DomainDecomp)
 find_package(FFTW REQUIRED)
+find_package(VTK REQUIRED)
 find_package(MPI REQUIRED)
 set (CMAKE_CXX_FLAGS "--std=c++11 -Wall --pedantic -O3 ${CMAKE_CXX_FLAGS}")
 IF(NOT CMAKE_CXX_COMPILER)
@@ -85,6 +86,7 @@ set(SOURCES
 include_directories(".")
 include_directories(SYSTEM ${Trilinos_TPL_INCLUDE_DIRS})
 include_directories(SYSTEM ${Trilinos_INCLUDE_DIRS})
+include_directories(SYSTEM ${VTK_INCLUDE_DIRS})
 include_directories(${FFTW_INCLUDES})
 include_directories(${MPI_CXX_INCLUDE_PATH})
 
@@ -93,6 +95,7 @@ include_directories(${MPI_CXX_INCLUDE_PATH})
 # built.  
 link_directories(${Trilinos_LIBRARY_DIRS})
 link_directories(${Trilinos_TPL_LIBRARY_DIRS})
+link_directories(${VTK_LIBRARY_DIRS})
 
 # 
 # EDIT HERE: Change trilinosExample to the name of the executable
@@ -142,6 +145,7 @@ target_link_libraries(DomainCollection
     Domain
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
+  ${VTK_LIBRARIES} 
   ${FFTW_LIB}
   ${MPI_CXX_LIBRARIES} 
 )

@@ -2,6 +2,14 @@
 #include <Tpetra_Experimental_BlockCrsMatrix_def.hpp>
 #include <array>
 #include <tuple>
+#include <vtkCellData.h>
+#include <vtkDoubleArray.h>
+#include <vtkImageData.h>
+#include <vtkMultiBlockDataSet.h>
+#include <vtkMultiPieceDataSet.h>
+#include <vtkSmartPointer.h>
+#include <vtkXMLMultiBlockDataWriter.h>
+#include <vtkXMLPMultiBlockDataWriter.h>
 using Teuchos::RCP;
 using Teuchos::rcp;
 using namespace std;
@@ -375,6 +383,20 @@ void DomainCollection::getFluxDiff(vector_type &diff)
 	diff.scale(0);
 	diff.doExport(local_diff, importer, Tpetra::CombineMode::ADD);
 }
+RCP<vector_type> DomainCollection::getInterfaceCoords()
+{
+	RCP<vector_type> xy = rcp(new vector_type(matrix_map, 2));
+	Tpetra::Import<> importer(matrix_map, collection_map);
+	vector_type      local_xy(collection_map, 2);
+
+	// solve over domains on this proc
+	for (auto &p : domains) {
+		p.second->putCoords(local_xy);
+	}
+
+	xy->doExport(local_xy, importer, Tpetra::CombineMode::ADD);
+	return xy;
+}
 void DomainCollection::solveWithInterface(const vector_type &gamma, vector_type &diff)
 {
 	// auto out = Teuchos::getFancyOStream (Teuchos::rcpFromRef (std::cout));
@@ -624,23 +646,6 @@ void DomainCollection::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<ma
 				copy[i * n + j] = orig[block_i * n + block_j];
 			}
 		}
-		/*if (neumann) {
-		    if (i == 0 && j == 0) {
-		        copy[0] = 1;
-		        for (i = 1; i < n; i++) {
-		            copy[i] = 0;
-		            // copy[i * n] = 0;
-		        }
-		    } else if (i == 0) {
-		        for (i = 0; i < n; i++) {
-		            copy[i] = 0;
-		        }
-		    } else if (j == 0) {
-		        for (i = 0; i < n; i++) {
-		            //copy[i * n] = 0;
-		        }
-		    }
-		}*/
 		vector<int> inds(n);
 		for (int q = 0; q < n; q++) {
 			inds[q] = local_j + q;
@@ -1374,4 +1379,84 @@ void DomainCollection::outputClaw()
 		d.outputClaw(q_file);
 	}
 	q_file.close();
+}
+void DomainCollection::outputVTK()
+{
+	int rank, size;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+	set<vtkSmartPointer<vtkImageData>>   images;
+	set<vtkSmartPointer<vtkDoubleArray>> arrays;
+	// create MultiPieceDataSet and fill with patch information
+	vtkSmartPointer<vtkXMLMultiBlockDataWriter> writer
+	= vtkSmartPointer<vtkXMLMultiBlockDataWriter>::New();
+	vtkSmartPointer<vtkMultiBlockDataSet> block = vtkSmartPointer<vtkMultiBlockDataSet>::New();
+	vtkSmartPointer<vtkMultiPieceDataSet> data  = vtkSmartPointer<vtkMultiPieceDataSet>::New();
+
+	data->SetNumberOfPieces(domains.size());
+
+	int i = 0;
+	for (auto &p : domains) {
+		Domain &d = *p.second;
+
+		// create image object
+		vtkSmartPointer<vtkImageData> image = vtkSmartPointer<vtkImageData>::New();
+		images.insert(image);
+		image->SetOrigin(d.x_start, d.y_start, 0);
+		image->SetSpacing(d.h_x, d.h_y, 0);
+		image->SetExtent(d.x_start, d.x_start + d.x_length, d.y_start, d.y_start + d.y_length, 0,
+		                 0);
+		image->PrepareForNewData();
+		image->SetDimensions(n + 1, n + 1, 1);
+
+		// create solution vector
+		vtkSmartPointer<vtkDoubleArray> solution = vtkSmartPointer<vtkDoubleArray>::New();
+		arrays.insert(solution);
+		solution->SetNumberOfComponents(1);
+		solution->SetNumberOfValues(d.u.size());
+		solution->SetName("Solution");
+		for (size_t i = 0; i < d.u.size(); i++) {
+			solution->SetValue(i, d.u[i]);
+		}
+		image->GetCellData()->AddArray(solution);
+
+		// create error vector
+		vtkSmartPointer<vtkDoubleArray> error = vtkSmartPointer<vtkDoubleArray>::New();
+		arrays.insert(error);
+		error->SetNumberOfComponents(1);
+		error->SetNumberOfValues(d.error.size());
+		error->SetName("Error");
+		for (size_t i = 0; i < d.error.size(); i++) {
+			error->SetValue(i, d.error[i]);
+		}
+		image->GetCellData()->AddArray(error);
+
+		// create residual vector
+		vtkSmartPointer<vtkDoubleArray> resid = vtkSmartPointer<vtkDoubleArray>::New();
+		arrays.insert(resid);
+		resid->SetNumberOfComponents(1);
+		resid->SetNumberOfValues(d.resid.size());
+		resid->SetName("Residual");
+		for (size_t i = 0; i < d.resid.size(); i++) {
+			resid->SetValue(i, d.resid[i]*d.h_x*d.h_y);
+		}
+		image->GetCellData()->AddArray(resid);
+
+		// add image to dataset
+		data->SetPiece(i, image);
+		i++;
+	}
+
+	block->SetNumberOfBlocks(1);
+	block->SetBlock(0, data);
+
+	writer->SetFileName("blah.vtmb");
+	// writer->SetNumberOfPieces(1);
+	// writer->SetStartPiece(0);
+	writer->SetInputData(block);
+	writer->Update();
+
+	// write data
+	writer->Write();
 }

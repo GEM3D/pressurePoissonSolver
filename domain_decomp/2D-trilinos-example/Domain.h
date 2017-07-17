@@ -122,6 +122,8 @@ class Domain
 	void fillDiffVector(Side s, single_vector_type &diff);
 	void fillGhostVector(Side s, single_vector_type &diff);
 	void getFluxDiff(vector_type &flux);
+	void putCoords(vector_type &xy);
+	void fillCoords(Side s,vector_type &xy);
 	void fillFluxVector(Side s, single_vector_type &diff);
 
 	inline int &index(Side s) { return local_i[static_cast<int>(s)]; }

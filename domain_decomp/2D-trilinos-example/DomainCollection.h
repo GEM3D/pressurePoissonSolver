@@ -162,6 +162,7 @@ class DomainCollection
 	 * @brief get the difference in flux on refined boundaries
 	 */
 	void getFluxDiff(vector_type &diff);
+    Teuchos::RCP<vector_type> getInterfaceCoords();
 
 	/**
 	 * @brief Generate Tpetra maps
@@ -254,6 +255,7 @@ class DomainCollection
 		}
 	}
 	void outputClaw();
+	void outputVTK();
 	int  getGlobalNumCells() { return num_global_domains * n * n; }
 };
 #endif
