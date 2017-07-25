@@ -83,7 +83,9 @@ int main(int argc, char *argv[])
 	                                                  "num_domains*2 refined square next to it",
 	                           {"amr"});
 	args::Flag           f_outclaw(parser, "outclaw", "output amrclaw ascii file", {"outclaw"});
+#ifdef HAVE_VTK
 	args::Flag           f_outvtk(parser, "", "output to vtk format", {"outvtk"});
+#endif
 	args::ValueFlag<int> f_l(parser, "n", "run the program n times and print out the average",
 	                         {'l'});
 	args::ValueFlag<string> f_m(parser, "matrix filename", "the file to write the matrix to",
@@ -731,9 +733,11 @@ int main(int argc, char *argv[])
 		if (f_outclaw) {
 			dc.outputClaw();
 		}
+#ifdef HAVE_VTK
 		if (f_outvtk) {
 			dc.outputVTK();
 		}
+#endif
 		cout.unsetf(std::ios_base::floatfield);
 	}
 

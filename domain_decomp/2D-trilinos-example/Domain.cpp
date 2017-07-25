@@ -10,7 +10,7 @@ Domain::Domain(DomainSignature ds, int n)
 	this->h_y = ds.y_length / n;
 	this->ds  = ds;
 
-#if NDEBUG
+#if DD_DEBUG
 	cerr << "I am Domain: " << ds.id << "\n";
 	cerr << "h:           " << this->h_x << endl;
 	cerr << "I start at:  " << ds.x_start << ", " << ds.y_start << "\n";
@@ -60,7 +60,7 @@ Domain::Domain(DomainSignature ds, int n)
 Domain::~Domain()
 {
 	delete solver;
-#if NDEBUG
+#if DD_DEBUG
 	cerr << "I am Domain: " << ds.id << "\n";
 	cerr << "h:           " << this->h_x << endl;
 	cerr << "I start at:  " << ds.x_start << ", " << ds.y_start << "\n";

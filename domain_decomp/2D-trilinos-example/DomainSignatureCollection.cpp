@@ -767,7 +767,7 @@ void DomainSignatureCollection::zoltanBalance()
 	}
 	cout << "I have " << domains.size() << " domains: ";
 
-#if DNDEBUG
+#if DD_DEBUG
 	int  prev  = -100;
 	bool range = false;
 	for (auto &p : domains) {

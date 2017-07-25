@@ -2,6 +2,7 @@
 #include <Tpetra_Experimental_BlockCrsMatrix_def.hpp>
 #include <array>
 #include <tuple>
+#ifdef HAVE_VTK
 #include <vtkCellData.h>
 #include <vtkDoubleArray.h>
 #include <vtkImageData.h>
@@ -10,6 +11,7 @@
 #include <vtkSmartPointer.h>
 #include <vtkXMLMultiBlockDataWriter.h>
 #include <vtkXMLPMultiBlockDataWriter.h>
+#endif
 using Teuchos::RCP;
 using Teuchos::rcp;
 using namespace std;
@@ -318,8 +320,8 @@ void DomainCollection::generateMaps()
 		row_iface_map = Teuchos::rcp(
 		new map_type(-1, &row_iface_global[0], row_iface_global.size(), 0, this->comm));
 	}
-#ifdef DNDEBUG
-	auto out = Teuchos::getFancyOStream(Teuchos::rcpFromRef(std::cerr));
+#ifdef DD_DEBUG
+	auto out = Teuchos::getFancyOStream(Teuchos::rcpFromRef(cerr));
 	matrix_map->describe(*out);
 	collection_map->describe(*out);
 #endif
@@ -961,7 +963,7 @@ void DomainCollection::formRBMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<RBM
 		*s = rcp(new single_vector_type(map));
 	}
 	A = rcp(new RBMatrix(map, n, dsc.matrix_j_high - dsc.matrix_j_low));
-#if NDEBUG
+#if DD_DEBUG
 	for (ColIface i : ifaces) {
 		cerr << i << endl;
 	}
@@ -1380,6 +1382,7 @@ void DomainCollection::outputClaw()
 	}
 	q_file.close();
 }
+#ifdef HAVE_VTK
 void DomainCollection::outputVTK()
 {
 	int rank, size;
@@ -1460,3 +1463,4 @@ void DomainCollection::outputVTK()
 	// write data
 	writer->Write();
 }
+#endif

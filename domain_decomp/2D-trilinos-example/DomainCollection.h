@@ -255,7 +255,9 @@ class DomainCollection
 		}
 	}
 	void outputClaw();
+#ifdef HAVE_VTK
 	void outputVTK();
+#endif
 	int  getGlobalNumCells() { return num_global_domains * n * n; }
 };
 #endif
