@@ -2,9 +2,10 @@
     <Parameter name="problem: symmetric" type="bool" value="false"/>
     <Parameter name="cycle type" type="string" value="W"/>
     <Parameter name="verbosity" type="string" value="low"/>
-    <Parameter name="max levels" type="int" value="100"/>
-    <Parameter name="coarse: max size" type="int" value="10"/>
+    <Parameter name="max levels" type="int" value="1000"/>
+    <Parameter name="coarse: max size" type="int" value="1000"/>
     <Parameter name="multigrid algorithm" type="string" value="sa"/>
+    <Parameter name="sa: use filtered matrix" type="bool" value="true"/>
     <!-- Damped Jacobi smoothing -->
     <Parameter name="smoother: type" type="string" value="RELAXATION"/>
     <ParameterList name="smoother: params">
@@ -13,8 +14,13 @@
         <Parameter name="relaxation: damping factor" type="double" value="1.1"/>
     </ParameterList>
     <!-- Aggregation -->
-    <Parameter name="aggregation: type" type="string" value="uncoupled"/>
+    <Parameter name="aggregation: type" type="string" value="coupled"/>
+    <Parameter name="aggregation: drop scheme" type="string" value="classical"/>
     <Parameter name="aggregation: drop tol" type="double" value="-0.06"/>
     <Parameter name="aggregation: min agg size" type="int" value="2"/>
     <Parameter name="aggregation: max agg size" type="int" value="4"/>
+    <Parameter name="repartition: enable" type="bool" value="true"/>
+    <Parameter name="repartition: start level" type="int" value="1"/>
+    <Parameter name="repartition: remap parts" type="bool" value="true"/>
+    <Parameter name="repartition: max imbalance" type="double" value="1.0"/>
 </ParameterList>
