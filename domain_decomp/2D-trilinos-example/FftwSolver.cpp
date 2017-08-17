@@ -153,7 +153,7 @@ void FftwSolver::solve()
 	d->u = u[slice(0, d->n * d->n, 1)];
 	d->u /= (4.0 * d->n * d->n);
 
-	if (d->zero_patch) {
+	if (d->ds.zero_patch) {
 		d->u -= d->u.sum() / d->u.size();
 	}
 }

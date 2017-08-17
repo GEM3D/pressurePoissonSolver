@@ -15,7 +15,6 @@ class Domain
 	public:
 	Solver *              solver;
 	DomainSignature       ds;
-	std::bitset<4>        neumann_sides;
 	std::valarray<double> f;
 	std::valarray<double> f_comp;
 	std::valarray<double> f_back;
@@ -37,13 +36,8 @@ class Domain
 	std::valarray<double> boundary_south_back;
 	std::valarray<double> boundary_east_back;
 	std::valarray<double> boundary_west_back;
-	std::array<int, 4> local_i        = {{-1, -1, -1, -1}};
-	std::array<int, 4> local_i_center = {{-1, -1, -1, -1}};
-	std::array<int, 4> local_i_left   = {{-1, -1, -1, -1}};
-	std::array<int, 4> local_i_right  = {{-1, -1, -1, -1}};
 	Teuchos::RCP<map_type> domain_map;
 	bool                   neumann    = false;
-	bool                   zero_patch = false;
 	double                 x_start    = 0;
 	double                 y_start    = 0;
 	double                 x_length   = 0;
@@ -126,14 +120,14 @@ class Domain
 	void fillCoords(Side s,vector_type &xy);
 	void fillFluxVector(Side s, single_vector_type &diff);
 
-	inline int &index(Side s) { return local_i[static_cast<int>(s)]; }
-	inline int &indexCenter(Side s) { return local_i_center[static_cast<int>(s)]; }
-	inline int &indexRefinedLeft(Side s) { return local_i_left[static_cast<int>(s)]; }
-	inline int &indexRefinedRight(Side s) { return local_i_right[static_cast<int>(s)]; }
-	inline int &globalIndex(Side s) { return ds.index(s); }
-	inline int &globalIndexCenter(Side s) { return ds.indexCenter(s); }
-	inline int &globalIndexRefinedLeft(Side s) { return ds.indexRefinedLeft(s); }
-	inline int &globalIndexRefinedRight(Side s) { return ds.indexRefinedRight(s); }
+	inline int &index(Side s) { return ds.index(s); }
+	inline int &indexCenter(Side s) { return ds.indexCenter(s); }
+	inline int &indexRefinedLeft(Side s) { return ds.indexRefinedLeft(s); }
+	inline int &indexRefinedRight(Side s) { return ds.indexRefinedRight(s); }
+	inline int &globalIndex(Side s) { return ds.globalIndex(s); }
+	inline int &globalIndexCenter(Side s) { return ds.globalIndexCenter(s); }
+	inline int &globalIndexRefinedLeft(Side s) { return ds.globalIndexRefinedLeft(s); }
+	inline int &globalIndexRefinedRight(Side s) { return ds.globalIndexRefinedRight(s); }
 	inline int nbr(Side s) { return ds.nbr(s); }
 	inline int nbrRight(Side      s) { return ds.nbrRight(s); }
 	inline std::valarray<double> *getBoundaryPtr(Side s)

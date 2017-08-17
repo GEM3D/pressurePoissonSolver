@@ -15,7 +15,7 @@ struct DomainKey {
 	DomainKey() {}
 	DomainKey(Domain *d)
 	{
-		this->neumann = d->neumann_sides.to_ulong();
+		this->neumann = d->ds.neumann.to_ulong();
 		this->h_x     = d->h_x;
 		this->h_y     = d->h_y;
 		this->n       = d->n;

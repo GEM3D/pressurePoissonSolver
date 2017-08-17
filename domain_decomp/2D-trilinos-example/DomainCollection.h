@@ -2,7 +2,6 @@
 #define DOMAINCOLLECTION_H
 #include "Domain.h"
 #include "DomainSignatureCollection.h"
-#include "Iface.h"
 #include "MyTypeDefs.h"
 #include "RBMatrix.h"
 /**
@@ -32,35 +31,6 @@ class DomainCollection
 	 * @brief Number of global domains
 	 */
 	int num_global_domains;
-	/**
-	 * TODO update this
-	 * @brief a vector of integers that stores information for each inteface.
-	 *
-	 * For the current format each interface requires 15 integers in order to store information.
-	 *
-	 * Each index represents:
-	 *   0. The interface's global index in the interface value array.
-	 *   1. The interfaces type
-	 *   2. The interfaces western neighbor on it's right
-	 *   3. The interfaces western neighbor on it's right type
-	 *   4. The interfaces northern neighbor on it's right
-	 *   5. The interfaces northern neighbor on it's right type
-	 *   6. The interfaces eastern neighbor on it's right
-	 *   7. The interfaces eastern neighbor on it's right type
-	 *   8. The interfaces western neighbor on it's left
-	 *   9. The interfaces western neighbor on it's left type
-	 *   10. The interfaces northern neighbor on it's left
-	 *   11. The interfaces northern neighbor on it's left type
-	 *   12. The interfaces eastern neighbor on it's left
-	 *   13. The interfaces eastern neighbor on it's left type
-	 *   14. The axis that the interface resides on
-	 */
-	Teuchos::RCP<int_vector_type> iface_info;
-	Teuchos::RCP<int_vector_type> row_iface_info;
-
-	std::set<ColIface>    ifaces;
-	std::set<RowIface>    row_ifaces;
-	std::set<MatrixBlock> blocks;
 
 	public:
 	/**

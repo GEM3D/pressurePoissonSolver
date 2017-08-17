@@ -14,7 +14,6 @@
 #include <BelosConfigDefs.hpp>
 #include <BelosGCRODRSolMgr.hpp>
 #include <BelosLSQRSolMgr.hpp>
-#include <BelosLSQRSolMgr.hpp>
 #include <BelosLinearProblem.hpp>
 #include <BelosTpetraAdapter.hpp>
 #include <Ifpack2_BlockRelaxation_decl.hpp>
@@ -36,7 +35,6 @@
 #include <Xpetra_TpetraBlockCrsMatrix.hpp>
 #include <chrono>
 #include <cmath>
-#include <iostream>
 #include <iostream>
 //#include <mpi.h>
 #include <string>
@@ -82,9 +80,9 @@ int main(int argc, char *argv[])
 	                                                  "of grids, and a num_domains*2 x "
 	                                                  "num_domains*2 refined square next to it",
 	                           {"amr"});
-	args::Flag           f_outclaw(parser, "outclaw", "output amrclaw ascii file", {"outclaw"});
+	args::Flag f_outclaw(parser, "outclaw", "output amrclaw ascii file", {"outclaw"});
 #ifdef HAVE_VTK
-	args::Flag           f_outvtk(parser, "", "output to vtk format", {"outvtk"});
+	args::Flag f_outvtk(parser, "", "output to vtk format", {"outvtk"});
 #endif
 	args::ValueFlag<int> f_l(parser, "n", "run the program n times and print out the average",
 	                         {'l'});
@@ -185,6 +183,12 @@ int main(int argc, char *argv[])
 	if (f_div) {
 		for (int i = 0; i < args::get(f_div); i++) {
 			dsc.divide();
+		}
+	}
+	if (f_neumann) {
+		dsc.setNeumann();
+		if (!f_pingamma && !f_zerou) {
+		dsc.setZeroPatch();
 		}
 	}
 	// Set the number of discretization points in the x and y direction.
@@ -298,8 +302,6 @@ int main(int argc, char *argv[])
 		if (f_neumann) {
 			if (f_neumann && f_zerou) {
 				dc.setZeroU();
-			} else if (!f_pingamma && dc.domains.count(0)) {
-				dc.domains[0]->zero_patch = true;
 			}
 		}
 

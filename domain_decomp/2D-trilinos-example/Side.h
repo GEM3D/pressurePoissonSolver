@@ -12,6 +12,12 @@ inline Side operator+(const Side &a, const Side &b)
 	s = static_cast<Side>((static_cast<int>(a) + static_cast<int>(b)) % 4);
 	return s;
 }
+inline Side operator-(const Side &a, const Side &b)
+{
+	Side s;
+	s = static_cast<Side>((static_cast<int>(a) - static_cast<int>(b)) % 4);
+	return s;
+}
 inline Side operator+(const Side &a, const int &b)
 {
 	Side s;
