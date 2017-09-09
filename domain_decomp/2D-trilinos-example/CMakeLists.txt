@@ -63,6 +63,7 @@ ELSE()
 ENDIF()
 find_package(MPI REQUIRED)
 set (CMAKE_CXX_FLAGS "-Wall ${Trilinos_CXX_COMPILER_FLAGS} ${CMAKE_CXX_FLAGS}")
+set (CMAKE_CXX_FLAGS_DEBUG  "-g ${CMAKE_CXX_FLAGS}")
   MESSAGE("Setting CXX compiler.")
   SET(CMAKE_CXX_COMPILER ${Trilinos_CXX_COMPILER})
 
@@ -128,6 +129,7 @@ add_library(DomainSignatureCollection DomainSignatureCollection.cpp)
 add_library(Domain Domain.cpp)
 add_library(RBMatrix RBMatrix.cpp)
 add_library(FftwSolver FftwSolver.cpp)
+add_library(SlimFftwSolver SlimFftwSolver.cpp)
 add_library(Factory Factory.cpp)
 file(GLOB fishpack_SRC "fishpack/*.f")
 #add_library(FishpackSolver FishpackSolver.cpp)
@@ -145,6 +147,7 @@ target_link_libraries(heat
     RBMatrix
     Domain
     Factory
+    SlimFftwSolver
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
   ${FFTW_LIB}
@@ -183,6 +186,11 @@ target_link_libraries(Domain
 #)
 target_link_libraries(FftwSolver
     Domain
+)
+target_link_libraries(SlimFftwSolver
+  ${Trilinos_TPL_LIBRARIES}
+  ${Trilinos_LIBRARIES} 
+  ${MPI_CXX_LIBRARIES} 
 )
 target_link_libraries(DomainSignatureCollection
   ${Trilinos_TPL_LIBRARIES}
