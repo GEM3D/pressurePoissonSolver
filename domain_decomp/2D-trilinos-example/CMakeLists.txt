@@ -4,7 +4,7 @@
 # before reading this example; in particular, you should know how to
 # add C++ source files and header files to your project.
 #
-#enable_language(Fortran)
+enable_language(Fortran)
 
 # You need CMake version >= 2.8 to use this example.
 cmake_minimum_required(VERSION 2.8)
@@ -73,7 +73,7 @@ set (CMAKE_CXX_FLAGS_DEBUG  "-g ${CMAKE_CXX_FLAGS}")
   MESSAGE("Setting C compiler.")
   SET(CMAKE_C_COMPILE ${Trilinos_C_COMPILER})
 
-set (CMAKE_Fortran_FLAGS "-fdefault-real-8 ${CMAKE_Fortran_FLAGS}")
+set (CMAKE_Fortran_FLAGS "-fdefault-real-8 -O3 ${CMAKE_Fortran_FLAGS}")
 
 find_program(CCACHE_FOUND ccache)
 if(CCACHE_FOUND)
@@ -132,8 +132,8 @@ add_library(FftwSolver FftwSolver.cpp)
 add_library(SlimFftwSolver SlimFftwSolver.cpp)
 add_library(Factory Factory.cpp)
 file(GLOB fishpack_SRC "fishpack/*.f")
-#add_library(FishpackSolver FishpackSolver.cpp)
-#add_library(Fishpack ${fishpack_SRC})
+add_library(FishpackSolver FishpackSolver.cpp)
+add_library(Fishpack ${fishpack_SRC})
 
 #
 # EDIT HERE: Change trilinosExample to the name of the executable
@@ -174,16 +174,16 @@ target_link_libraries(DomainCollection
 )
 target_link_libraries(Domain
     FftwSolver
-    #    FishpackSolver
+    FishpackSolver
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
   ${FFTW_LIB}
   ${MPI_CXX_LIBRARIES} 
 )
-#target_link_libraries(FishpackSolver
-#    Domain
-#    Fishpack
-#)
+target_link_libraries(FishpackSolver
+    Domain
+    Fishpack
+)
 target_link_libraries(FftwSolver
     Domain
 )

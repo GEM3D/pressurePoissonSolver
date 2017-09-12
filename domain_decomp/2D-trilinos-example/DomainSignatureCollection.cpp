@@ -142,8 +142,6 @@ void DomainSignatureCollection::enumerateIfaces()
 						iface.right = ds;
 						iface.left  = domains[ds.nbr(s)];
 					}
-					cerr << "ID: " << iface.id << " L: " << iface.left.id
-					     << " R: " << iface.right.id <<endl;
 				}
 			}
 			s++;
@@ -1252,11 +1250,6 @@ std::set<MatrixBlock> Iface::getGlobalColBlocks()
 	auto addBlocks = [&](DomainSignature &ds, Side main, Side s) {
 		std::bitset<4> neumann = ds.neumannRelative(main);
 		int            j       = ds.globalIndex(main);
-		if (s == Side::north) {
-			cerr << "J: " << j << " BS: " << neumann.to_string()
-			     << " MAIN: " << static_cast<int>(main) << " BSDS: " << ds.neumann.to_string()
-			     << " ZP: " << ds.zero_patch<< endl;
-		}
 		bool zp = ds.zero_patch;
 		if (ds.hasFineNbr(main + s)) {
 			MatrixBlock b(ds.globalIndex(main + s), j, main, s, neumann, zp, BlockType::coarse);

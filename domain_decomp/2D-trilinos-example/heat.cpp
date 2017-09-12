@@ -142,6 +142,8 @@ int main(int argc, char *argv[])
 	args::Flag f_ilu(parser, "ilu", "use incomplete LU preconditioner", {"ilu"});
 	args::Flag f_riluk(parser, "ilu", "use RILUK preconditioner", {"riluk"});
 	args::Flag f_iter(parser, "iterative", "use iterative method", {"iterative"});
+	args::Flag f_fish(parser, "fishpack", "use fishpack as the patch solver", {"fishpack"});
+
 
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;
@@ -166,6 +168,10 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	if (f_fish) {
+		Domain::solver_type = SolverType::fishpack;
+	}
+
 	bool direct_solve = (f_lu || f_superlu || f_mumps || f_basker);
 	bool use_crs = (f_crs || direct_solve || f_ilu || f_riluk || f_precj || f_precmuelu || f_prec);
 
@@ -188,7 +194,7 @@ int main(int argc, char *argv[])
 	if (f_neumann) {
 		dsc.setNeumann();
 		if (!f_pingamma && !f_zerou) {
-		dsc.setZeroPatch();
+			dsc.setZeroPatch();
 		}
 	}
 	// Set the number of discretization points in the x and y direction.

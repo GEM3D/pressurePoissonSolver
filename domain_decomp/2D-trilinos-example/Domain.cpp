@@ -1,8 +1,9 @@
 #include "Domain.h"
 #include "FftwSolver.h"
+#include "FishpackSolver.h"
 #include <valarray>
-//#include "FishpackSolver.h"
 using namespace std;
+SolverType Domain::solver_type = SolverType::fftw;
 Domain::Domain(DomainSignature ds, int n)
 {
 	this->n   = n;
@@ -85,7 +86,17 @@ Domain::~Domain()
 #endif
 }
 
-void Domain::plan() { solver = new FftwSolver(this); }
+void Domain::plan()
+{
+	switch (solver_type) {
+		case SolverType::fftw:
+			solver = new FftwSolver(this);
+			break;
+		case SolverType::fishpack:
+			solver = new FishpackSolver(this);
+			break;
+	}
+}
 void Domain::planDirichlet() { plan(); }
 void Domain::planNeumann()
 {

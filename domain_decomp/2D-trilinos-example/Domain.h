@@ -10,38 +10,40 @@
 #include <bitset>
 #include <cmath>
 #include <valarray>
+enum class SolverType { fftw, fishpack };
 class Domain
 {
 	public:
-	Solver *              solver;
-	DomainSignature       ds;
-	std::valarray<double> f;
-	std::valarray<double> f_comp;
-	std::valarray<double> f_back;
-	std::valarray<double> resid;
-	std::valarray<double> u;
-	std::valarray<double> u_back;
-	std::valarray<double> exact;
-	std::valarray<double> tmp;
-	std::valarray<double> denom;
-	std::valarray<double> error;
-	int                   n;
-	double                h_x;
-	double                h_y;
-	std::valarray<double> boundary_north;
-	std::valarray<double> boundary_south;
-	std::valarray<double> boundary_east;
-	std::valarray<double> boundary_west;
-	std::valarray<double> boundary_north_back;
-	std::valarray<double> boundary_south_back;
-	std::valarray<double> boundary_east_back;
-	std::valarray<double> boundary_west_back;
+	Solver *               solver;
+	DomainSignature        ds;
+	std::valarray<double>  f;
+	std::valarray<double>  f_comp;
+	std::valarray<double>  f_back;
+	std::valarray<double>  resid;
+	std::valarray<double>  u;
+	std::valarray<double>  u_back;
+	std::valarray<double>  exact;
+	std::valarray<double>  tmp;
+	std::valarray<double>  denom;
+	std::valarray<double>  error;
+	int                    n;
+	static SolverType      solver_type;
+	double                 h_x;
+	double                 h_y;
+	std::valarray<double>  boundary_north;
+	std::valarray<double>  boundary_south;
+	std::valarray<double>  boundary_east;
+	std::valarray<double>  boundary_west;
+	std::valarray<double>  boundary_north_back;
+	std::valarray<double>  boundary_south_back;
+	std::valarray<double>  boundary_east_back;
+	std::valarray<double>  boundary_west_back;
 	Teuchos::RCP<map_type> domain_map;
-	bool                   neumann    = false;
-	double                 x_start    = 0;
-	double                 y_start    = 0;
-	double                 x_length   = 0;
-	double                 y_length   = 0;
+	bool                   neumann  = false;
+	double                 x_start  = 0;
+	double                 y_start  = 0;
+	double                 x_length = 0;
+	double                 y_length = 0;
 
 	Domain() = default;
 	Domain(DomainSignature ds, int n);
@@ -117,7 +119,7 @@ class Domain
 	void fillGhostVector(Side s, single_vector_type &diff);
 	void getFluxDiff(vector_type &flux);
 	void putCoords(vector_type &xy);
-	void fillCoords(Side s,vector_type &xy);
+	void fillCoords(Side s, vector_type &xy);
 	void fillFluxVector(Side s, single_vector_type &diff);
 
 	inline int &index(Side s) { return ds.index(s); }
