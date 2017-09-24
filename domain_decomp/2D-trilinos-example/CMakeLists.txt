@@ -62,7 +62,7 @@ ELSE()
   MESSAGE("VTK not found, disabling vtk output")
 ENDIF()
 find_package(MPI REQUIRED)
-set (CMAKE_CXX_FLAGS "-Wall ${Trilinos_CXX_COMPILER_FLAGS} ${CMAKE_CXX_FLAGS}")
+set (CMAKE_CXX_FLAGS "-Wall -g ${Trilinos_CXX_COMPILER_FLAGS} ${CMAKE_CXX_FLAGS}")
 set (CMAKE_CXX_FLAGS_DEBUG  "-g ${CMAKE_CXX_FLAGS}")
   MESSAGE("Setting CXX compiler.")
   SET(CMAKE_CXX_COMPILER ${Trilinos_CXX_COMPILER})
@@ -130,6 +130,7 @@ add_library(Domain Domain.cpp)
 add_library(RBMatrix RBMatrix.cpp)
 add_library(FftwSolver FftwSolver.cpp)
 add_library(SlimFftwSolver SlimFftwSolver.cpp)
+add_library(CufftSolver CufftSolver.cpp)
 add_library(Factory Factory.cpp)
 file(GLOB fishpack_SRC "fishpack/*.f")
 add_library(FishpackSolver FishpackSolver.cpp)
@@ -175,6 +176,7 @@ target_link_libraries(DomainCollection
 target_link_libraries(Domain
     FftwSolver
     FishpackSolver
+    CufftSolver
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
   ${FFTW_LIB}
@@ -185,6 +187,9 @@ target_link_libraries(FishpackSolver
     Fishpack
 )
 target_link_libraries(FftwSolver
+    Domain
+)
+target_link_libraries(CufftSolver
     Domain
 )
 target_link_libraries(SlimFftwSolver

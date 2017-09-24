@@ -143,6 +143,7 @@ int main(int argc, char *argv[])
 	args::Flag f_riluk(parser, "ilu", "use RILUK preconditioner", {"riluk"});
 	args::Flag f_iter(parser, "iterative", "use iterative method", {"iterative"});
 	args::Flag f_fish(parser, "fishpack", "use fishpack as the patch solver", {"fishpack"});
+	args::Flag f_cufft(parser, "cufft", "use CuFFT as the patch solver", {"cufft"});
 
 
 	if (argc < 5) {
@@ -171,6 +172,9 @@ int main(int argc, char *argv[])
 	if (f_fish) {
 		Domain::solver_type = SolverType::fishpack;
 	}
+    if(f_cufft){
+		Domain::solver_type = SolverType::cufft;
+    }
 
 	bool direct_solve = (f_lu || f_superlu || f_mumps || f_basker);
 	bool use_crs = (f_crs || direct_solve || f_ilu || f_riluk || f_precj || f_precmuelu || f_prec);

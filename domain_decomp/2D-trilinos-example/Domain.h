@@ -10,7 +10,7 @@
 #include <bitset>
 #include <cmath>
 #include <valarray>
-enum class SolverType { fftw, fishpack };
+enum class SolverType { fftw, fishpack,cufft };
 class Domain
 {
 	public:
