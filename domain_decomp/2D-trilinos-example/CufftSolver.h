@@ -3,6 +3,7 @@
 #include "Domain.h"
 #include "Solver.h"
 #include <bitset>
+#include <cufft.h>
 #include <map>
 #include <valarray>
 struct CDomainKey {
@@ -28,9 +29,13 @@ struct CDomainKey {
 class CufftSolver : public Solver
 {
 	private:
-	static bool  compareDomains();
+	static bool compareDomains();
 	static std::map<CDomainKey, std::valarray<double>> denoms;
 	std::valarray<double> *denom_ptr;
+	cufftDoubleReal *(*x_forward)(cufftDoubleReal *, int, int);
+	cufftDoubleReal *(*y_forward)(cufftDoubleReal *, int, int);
+	cufftDoubleReal *(*x_inverse)(cufftDoubleReal *, int, int);
+	cufftDoubleReal *(*y_inverse)(cufftDoubleReal *, int, int);
 
 	public:
 	CufftSolver(Domain *d);

@@ -39,6 +39,8 @@
 //#include <mpi.h>
 #include <string>
 #include <unistd.h>
+#include <cuda.h>
+#include <cuda_runtime.h>
 #ifndef M_PIl
 #define M_PIl 3.141592653589793238462643383279502884L /* pi */
 #endif
