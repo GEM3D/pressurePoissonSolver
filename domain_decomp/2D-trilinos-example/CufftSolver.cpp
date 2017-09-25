@@ -778,6 +778,7 @@ cufftDoubleReal *dct4(cufftDoubleReal *x, int n, int dim)
 
 	// get final output
 	dct4_post<<<n, n>>>(out, retval, n, dim);
+	scale<<<n, n>>>(retval, sqrt(2.0/n), n);
 
 	// free weights and fft output
 	cudaFree(w);
@@ -968,6 +969,7 @@ cufftDoubleReal *dst4(cufftDoubleReal *x, int n, int dim)
 
 	// get final output
 	dst4_post<<<n, n>>>(out, retval, n, dim);
+	scale<<<n, n>>>(retval, sqrt(2.0/n), n);
 
 	// free weights and fft output
 	cudaFree(w);
@@ -1143,7 +1145,7 @@ void CufftSolver::solve()
 
 	// d->u /= (4.0 * d->n * d->n);
 
-	/*if (d->ds.zero_patch) {
+	if (d->ds.zero_patch) {
 	    d->u -= d->u.sum() / d->u.size();
-	}*/
+	}
 }
