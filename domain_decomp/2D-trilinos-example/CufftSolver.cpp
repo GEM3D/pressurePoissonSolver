@@ -5,6 +5,14 @@
 using namespace std;
 // intialize static members
 map<CDomainKey, valarray<double>> CufftSolver::denoms;
+
+__global__ void scale(cufftDoubleReal *in, double scale, int n)
+{
+	int i = blockIdx.x * blockDim.x + threadIdx.x;
+	if (i < n * n) {
+		in[i] *= scale;
+	}
+}
 __global__ void dct2_pre(cufftDoubleReal *in, cufftDoubleComplex *out, cufftDoubleComplex *w, int n,
                          int dim)
 {
@@ -270,6 +278,7 @@ cufftDoubleReal *idct2(cufftDoubleReal *x, int n, int dim)
 
 	// get final output
 	idct2_post<<<n, n>>>(out, retval, n, dim);
+	scale<<<n, n>>>(retval, 1.0/(2.0*n), n);
 
 	// free weights and fft output
 	cudaFree(w);
@@ -586,6 +595,7 @@ cufftDoubleReal *idst2(cufftDoubleReal *x, int n, int dim)
 
 	// get final output
 	idst2_post<<<n, n>>>(out, retval, n, dim);
+	scale<<<n, n>>>(retval, 1.0/(2.0*n), n);
 
 	// free weights and fft output
 	cudaFree(w);
@@ -606,37 +616,31 @@ __global__ void dct4_pre(cufftDoubleReal *in, cufftDoubleComplex *out, cufftDoub
 			w[col].x = cos(-x) / 2;
 			w[col].y = sin(-x) / 2;
 			if (col == 0) {
-				w[col].x *= 2;
-				w[col].y *= 2;
+				w[0].x *= 2;
+				w[0].y *= 2;
 			}
-			x            = (n + col) * M_PI / (4 * n);
-			w[n + col].x = cos(-x) / 2;
-			w[n + col].y = sin(-x) / 2;
-			x            = (2*n + col) * M_PI / (4 * n);
-			w[2*n + col].x = -cos(-x) / 2;
-			w[2*n + col].y = -sin(-x) / 2;
+			x                = (n + col) * M_PI / (4 * n);
+			w[n + col].x     = cos(-x) / 2;
+			w[n + col].y     = sin(-x) / 2;
+			x                = (2 * n + col) * M_PI / (4 * n);
+			w[2 * n + col].x = -cos(-x) / 2;
+			w[2 * n + col].y = -sin(-x) / 2;
 			if (col == 0) {
-				w[2*n].x = 0;
-				w[2*n].y = 0;
+				w[2 * n].x = 0;
+				w[2 * n].y = 0;
 			}
-			x            = (3*n + col) * M_PI / (4 * n);
-			w[3*n + col].x = -cos(-x) / 2;
-			w[3*n + col].y = -sin(-x) / 2;
+			x                = (3 * n + col) * M_PI / (4 * n);
+			w[3 * n + col].x = -cos(-x) / 2;
+			w[3 * n + col].y = -sin(-x) / 2;
 		}
 		if (dim == 0) {
 			// rows
-			if (col == 0) {
-				out[4 * n * row + 2 * n].x = 1;
-			}
-			out[4 * n * row + 2*col+1].x = in[i];
-			out[4 * n * row +4*n-2*col ].x = in[i];
+			out[4 * n * row + 2 * col + 1].x         = in[i];
+			out[4 * n * row + 4 * n - 2 * col - 1].x = in[i];
 		} else {
 			// cols
-			if (row == 0) {
-				out[n *(2*n) +col].x = 1;
-			}
-			out[n * (2*row+1) + col].x = in[i];
-			out[n * (4*n-2*row) +col ].x = in[i];
+			out[n * (2 * row + 1) + col].x         = in[i];
+			out[n * (4 * n - 2 * row - 1) + col].x = in[i];
 		}
 	}
 }
@@ -649,56 +653,56 @@ __global__ void dct4_weight(cufftDoubleComplex *in, cufftDoubleComplex *w, int n
 		int col = i % n;
 		if (dim == 0) {
 			double x, y, w_x, w_y;
-			x                           = in[4 * n * row + col].x;
-			y                           = in[4 * n * row + col].y;
-			w_x                         = w[col].x;
-			w_y                         = w[col].y;
-			in[4 * n * row + col].x     = x * w_x - y * w_y;
-			in[4 * n * row + col].y     = x * w_y + y * w_x;
-			x                           = in[4 * n * row + n + col].x;
-			y                           = in[4 * n * row + n + col].y;
-			w_x                         = w[col + n].x;
-			w_y                         = w[col + n].y;
-			in[4 * n * row + col + n].x = x * w_x - y * w_y;
-			in[4 * n * row + col + n].y = x * w_y + y * w_x;
-			x                           = in[4 * n * row + 2*n + col].x;
-			y                           = in[4 * n * row + 2*n + col].y;
-			w_x                         = w[col + 2*n].x;
-			w_y                         = w[col + 2*n].y;
-			in[4 * n * row + col + 2*n].x = x * w_x - y * w_y;
-			in[4 * n * row + col + 2*n].y = x * w_y + y * w_x;
-			x                           = in[4 * n * row + 3*n + col].x;
-			y                           = in[4 * n * row + 3*n + col].y;
-			w_x                         = w[col + 3*n].x;
-			w_y                         = w[col + 3*n].y;
-			in[4 * n * row + col + 3*n].x = x * w_x - y * w_y;
-			in[4 * n * row + col + 3*n].y = x * w_y + y * w_x;
+			x                               = in[4 * n * row + col].x;
+			y                               = in[4 * n * row + col].y;
+			w_x                             = w[col].x;
+			w_y                             = w[col].y;
+			in[4 * n * row + col].x         = x * w_x - y * w_y;
+			in[4 * n * row + col].y         = x * w_y + y * w_x;
+			x                               = in[4 * n * row + n + col].x;
+			y                               = in[4 * n * row + n + col].y;
+			w_x                             = w[col + n].x;
+			w_y                             = w[col + n].y;
+			in[4 * n * row + col + n].x     = x * w_x - y * w_y;
+			in[4 * n * row + col + n].y     = x * w_y + y * w_x;
+			x                               = in[4 * n * row + 2 * n + col].x;
+			y                               = in[4 * n * row + 2 * n + col].y;
+			w_x                             = w[col + 2 * n].x;
+			w_y                             = w[col + 2 * n].y;
+			in[4 * n * row + col + 2 * n].x = x * w_x - y * w_y;
+			in[4 * n * row + col + 2 * n].y = x * w_y + y * w_x;
+			x                               = in[4 * n * row + 3 * n + col].x;
+			y                               = in[4 * n * row + 3 * n + col].y;
+			w_x                             = w[col + 3 * n].x;
+			w_y                             = w[col + 3 * n].y;
+			in[4 * n * row + col + 3 * n].x = x * w_x - y * w_y;
+			in[4 * n * row + col + 3 * n].y = x * w_y + y * w_x;
 		} else {
 			double x, y, w_x, w_y;
-			x                         = in[n * row + col].x;
-			y                         = in[n * row + col].y;
-			w_x                       = w[row].x;
-			w_y                       = w[row].y;
-			in[n * row + col].x       = x * w_x - y * w_y;
-			in[n * row + col].y       = x * w_y + y * w_x;
-			x                         = in[n * (n + row) + col].x;
-			y                         = in[n * (n + row) + col].y;
-			w_x                       = w[n + row].x;
-			w_y                       = w[n + row].y;
-			in[n * (n + row) + col].x = x * w_x - y * w_y;
-			in[n * (n + row) + col].y = x * w_y + y * w_x;
-			x                         = in[n * (2*n + row) + col].x;
-			y                         = in[n * (2*n + row) + col].y;
-			w_x                       = w[2*n + row].x;
-			w_y                       = w[2*n + row].y;
-			in[n * (2*n + row) + col].x = x * w_x - y * w_y;
-			in[n * (2*n + row) + col].y = x * w_y + y * w_x;
-			x                         = in[n * (3*n + row) + col].x;
-			y                         = in[n * (3*n + row) + col].y;
-			w_x                       = w[3*n + row].x;
-			w_y                       = w[3*n + row].y;
-			in[n * (3*n + row) + col].x = x * w_x - y * w_y;
-			in[n * (3*n + row) + col].y = x * w_y + y * w_x;
+			x                             = in[n * row + col].x;
+			y                             = in[n * row + col].y;
+			w_x                           = w[row].x;
+			w_y                           = w[row].y;
+			in[n * row + col].x           = x * w_x - y * w_y;
+			in[n * row + col].y           = x * w_y + y * w_x;
+			x                             = in[n * (n + row) + col].x;
+			y                             = in[n * (n + row) + col].y;
+			w_x                           = w[n + row].x;
+			w_y                           = w[n + row].y;
+			in[n * (n + row) + col].x     = x * w_x - y * w_y;
+			in[n * (n + row) + col].y     = x * w_y + y * w_x;
+			x                             = in[n * (2 * n + row) + col].x;
+			y                             = in[n * (2 * n + row) + col].y;
+			w_x                           = w[2 * n + row].x;
+			w_y                           = w[2 * n + row].y;
+			in[n * (2 * n + row) + col].x = x * w_x - y * w_y;
+			in[n * (2 * n + row) + col].y = x * w_y + y * w_x;
+			x                             = in[n * (3 * n + row) + col].x;
+			y                             = in[n * (3 * n + row) + col].y;
+			w_x                           = w[3 * n + row].x;
+			w_y                           = w[3 * n + row].y;
+			in[n * (3 * n + row) + col].x = x * w_x - y * w_y;
+			in[n * (3 * n + row) + col].y = x * w_y + y * w_x;
 		}
 	}
 }
@@ -710,18 +714,16 @@ __global__ void dct4_post(cufftDoubleComplex *in, cufftDoubleReal *out, int n, i
 		int col = i % n;
 		if (dim == 0) {
 			// rows
-			double x      = in[4 * n * row + col].x;
-			double y      = in[4 * n * row + col].y;
-			double result = x - y;
-			result *= 2.0 / n;
-				out[n * row + col] = result;
+			double x           = in[4 * n * row + col].x;
+			double y           = in[4 * n * row + col].y;
+			double result      = x - y;
+			out[n * row + col] = result;
 		} else {
 			// cols
-			double x      = in[n * row + col].x;
-			double y      = in[n * row + col].y;
-			double result = x - y;
-			result *= 2.0 / n;
-				out[n * row + col] = result;
+			double x           = in[n * row + col].x;
+			double y           = in[n * row + col].y;
+			double result      = x - y;
+			out[n * row + col] = result;
 		}
 	}
 }
@@ -783,6 +785,197 @@ cufftDoubleReal *dct4(cufftDoubleReal *x, int n, int dim)
 
 	return retval;
 }
+__global__ void dst4_pre(cufftDoubleReal *in, cufftDoubleComplex *out, cufftDoubleComplex *w,
+
+                         int n, int dim)
+{
+	int i = blockIdx.x * blockDim.x + threadIdx.x;
+	if (i < n * n) {
+		int row = i / n;
+		int col = i % n;
+		if (row == 0) {
+			double x = col * M_PI / (4 * n);
+			w[col].x = cos(-x) / 2;
+			w[col].y = sin(-x) / 2;
+			if (col == 0) {
+				w[0].x *= 2;
+				w[0].y *= 2;
+			}
+			x                = (n + col) * M_PI / (4 * n);
+			w[n + col].x     = cos(-x) / 2;
+			w[n + col].y     = sin(-x) / 2;
+			x                = (2 * n + col) * M_PI / (4 * n);
+			w[2 * n + col].x = -cos(-x) / 2;
+			w[2 * n + col].y = -sin(-x) / 2;
+			if (col == 0) {
+				w[2 * n].x = 0;
+				w[2 * n].y = 0;
+			}
+			x                = (3 * n + col) * M_PI / (4 * n);
+			w[3 * n + col].x = -cos(-x) / 2;
+			w[3 * n + col].y = -sin(-x) / 2;
+		}
+		if (dim == 0) {
+			// rows
+			out[4 * n * row + 2 *(n- col-1) + 1].x         = in[i];
+			out[4 * n * row + 4 * n - 2 * (n-col-1) - 1].x = in[i];
+		} else {
+			// cols
+			out[n * (2 * (n-row-1) + 1) + col].x         = in[i];
+			out[n * (4 * n - 2 * (n-row-1) - 1) + col].x = in[i];
+		}
+	}
+}
+
+__global__ void dst4_weight(cufftDoubleComplex *in, cufftDoubleComplex *w, int n, int dim)
+{
+	int i = blockIdx.x * blockDim.x + threadIdx.x;
+	if (i < n * n) {
+		int row = i / n;
+		int col = i % n;
+		if (dim == 0) {
+			double x, y, w_x, w_y;
+			x                               = in[4 * n * row + col].x;
+			y                               = in[4 * n * row + col].y;
+			w_x                             = w[col].x;
+			w_y                             = w[col].y;
+			in[4 * n * row + col].x         = x * w_x - y * w_y;
+			in[4 * n * row + col].y         = x * w_y + y * w_x;
+			x                               = in[4 * n * row + n + col].x;
+			y                               = in[4 * n * row + n + col].y;
+			w_x                             = w[col + n].x;
+			w_y                             = w[col + n].y;
+			in[4 * n * row + col + n].x     = x * w_x - y * w_y;
+			in[4 * n * row + col + n].y     = x * w_y + y * w_x;
+			x                               = in[4 * n * row + 2 * n + col].x;
+			y                               = in[4 * n * row + 2 * n + col].y;
+			w_x                             = w[col + 2 * n].x;
+			w_y                             = w[col + 2 * n].y;
+			in[4 * n * row + col + 2 * n].x = x * w_x - y * w_y;
+			in[4 * n * row + col + 2 * n].y = x * w_y + y * w_x;
+			x                               = in[4 * n * row + 3 * n + col].x;
+			y                               = in[4 * n * row + 3 * n + col].y;
+			w_x                             = w[col + 3 * n].x;
+			w_y                             = w[col + 3 * n].y;
+			in[4 * n * row + col + 3 * n].x = x * w_x - y * w_y;
+			in[4 * n * row + col + 3 * n].y = x * w_y + y * w_x;
+		} else {
+			double x, y, w_x, w_y;
+			x                             = in[n * row + col].x;
+			y                             = in[n * row + col].y;
+			w_x                           = w[row].x;
+			w_y                           = w[row].y;
+			in[n * row + col].x           = x * w_x - y * w_y;
+			in[n * row + col].y           = x * w_y + y * w_x;
+			x                             = in[n * (n + row) + col].x;
+			y                             = in[n * (n + row) + col].y;
+			w_x                           = w[n + row].x;
+			w_y                           = w[n + row].y;
+			in[n * (n + row) + col].x     = x * w_x - y * w_y;
+			in[n * (n + row) + col].y     = x * w_y + y * w_x;
+			x                             = in[n * (2 * n + row) + col].x;
+			y                             = in[n * (2 * n + row) + col].y;
+			w_x                           = w[2 * n + row].x;
+			w_y                           = w[2 * n + row].y;
+			in[n * (2 * n + row) + col].x = x * w_x - y * w_y;
+			in[n * (2 * n + row) + col].y = x * w_y + y * w_x;
+			x                             = in[n * (3 * n + row) + col].x;
+			y                             = in[n * (3 * n + row) + col].y;
+			w_x                           = w[3 * n + row].x;
+			w_y                           = w[3 * n + row].y;
+			in[n * (3 * n + row) + col].x = x * w_x - y * w_y;
+			in[n * (3 * n + row) + col].y = x * w_y + y * w_x;
+		}
+	}
+}
+__global__ void dst4_post(cufftDoubleComplex *in, cufftDoubleReal *out, int n, int dim)
+{
+	int i = blockIdx.x * blockDim.x + threadIdx.x;
+	if (i < n * n) {
+		int row = i / n;
+		int col = i % n;
+		if (dim == 0) {
+			// rows
+			double x           = in[4 * n * row + col].x;
+			double y           = in[4 * n * row + col].y;
+			double result      = x - y;
+            if(col%2==0){
+			out[n * row + col] = result;
+            }else{
+			out[n * row + col] = -result;
+            }
+		} else {
+			// cols
+			double x           = in[n * row + col].x;
+			double y           = in[n * row + col].y;
+			double result      = x - y;
+            if(row%2==0){
+			out[n * row + col] = result;
+            }else{
+			out[n * row + col] = -result;
+            }
+		}
+	}
+}
+
+cufftDoubleReal *dst4(cufftDoubleReal *x, int n, int dim)
+{
+	// allocate fft input and memset
+	cufftDoubleComplex *in = nullptr;
+	cudaMalloc((void **) &in, sizeof(cufftDoubleComplex) * n * n * 4);
+	cudaMemset((void *) in, 0, sizeof(cufftDoubleComplex) * n * n * 4);
+
+	// allocate weight vector
+	cufftDoubleComplex *w = nullptr;
+	cudaMalloc((void **) &w, 4 * sizeof(cufftDoubleComplex) * n);
+
+	// prepare fft input
+	dst4_pre<<<n, n>>>(x, in, w, n, dim);
+	dst4_weight<<<n, n>>>(in, w, n, dim);
+
+	// create plan
+	cufftHandle plan;
+	if (dim == 0) {
+		int transform_size = 4 * n;
+		int inembed        = 4 * n;
+		int istride        = 1;
+		int idist          = 4 * n;
+		cufftPlanMany(&plan, 1, &transform_size, &inembed, istride, idist, &inembed, istride, idist,
+		              CUFFT_Z2Z, n);
+	} else {
+		int transform_size = 4 * n;
+		int inembed        = 4 * n;
+		int istride        = n;
+		int idist          = 1;
+		cufftPlanMany(&plan, 1, &transform_size, &inembed, istride, idist, &inembed, istride, idist,
+		              CUFFT_Z2Z, n);
+	}
+
+	// allocate fft output
+	cufftDoubleComplex *out = nullptr;
+	cudaMalloc((void **) &out, sizeof(cufftDoubleComplex) * n * n * 4);
+
+	// perform transform
+	int i = cufftExecZ2Z(plan, in, out, CUFFT_FORWARD);
+	cufftDestroy(plan);
+
+	// free input
+	cudaFree(in);
+
+	// allocate final output
+	cufftDoubleReal *retval = nullptr;
+	cudaMalloc((void **) &retval, sizeof(cufftDoubleReal) * n * n);
+
+	// get final output
+	dst4_post<<<n, n>>>(out, retval, n, dim);
+
+	// free weights and fft output
+	cudaFree(w);
+	cudaFree(out);
+
+	return retval;
+}
+
 
 __global__ void gpu_div(cufftDoubleReal *f_hat, cufftDoubleReal *denom, int n)
 {
@@ -806,8 +999,8 @@ CufftSolver::CufftSolver(Domain *dom)
 			x_forward = &dct4;
 			x_inverse = &dct4;
 		} else if (!d->hasNbr(Side::east)) {
-			x_forward = &dct4;
-			x_inverse = &dct4;
+			x_forward = &dst4;
+			x_inverse = &dst4;
 		}
 		if (!d->hasNbr(Side::north) && !d->hasNbr(Side::south)) {
 			y_forward = &dct2;
@@ -816,8 +1009,8 @@ CufftSolver::CufftSolver(Domain *dom)
 			y_forward = &dct4;
 			y_inverse = &dct4;
 		} else if (!d->hasNbr(Side::north)) {
-			y_forward = &dct4;
-			y_inverse = &dct4;
+			y_forward = &dst4;
+			y_inverse = &dst4;
 		}
 	}
 	if (denoms.count(d)) {
@@ -911,7 +1104,6 @@ void CufftSolver::solve()
 		f_copy[slice(0, d->n, d->n)] -= 2 / (d->h_x * d->h_x) * d->boundary_west;
 	}
 
-	f_copy /= (4.0 * d->n * d->n);
 	// copy f to gpu
 	cufftDoubleReal *dev_f = nullptr;
 	cudaMalloc((void **) &dev_f, sizeof(cufftDoubleReal) * d->n * d->n);
@@ -951,7 +1143,7 @@ void CufftSolver::solve()
 
 	// d->u /= (4.0 * d->n * d->n);
 
-	if (d->ds.zero_patch) {
-		d->u -= d->u.sum() / d->u.size();
-	}
+	/*if (d->ds.zero_patch) {
+	    d->u -= d->u.sum() / d->u.size();
+	}*/
 }
