@@ -5,6 +5,11 @@
 using namespace std;
 // intialize static members
 map<CDomainKey, valarray<double>> CufftSolver::denoms;
+int         CufftSolver::count = 0;
+cufftHandle CufftSolver::n2row;
+cufftHandle CufftSolver::n2col;
+cufftHandle CufftSolver::n4row;
+cufftHandle CufftSolver::n4col;
 
 __global__ void scale(cufftDoubleReal *in, double scale, int n)
 {
@@ -278,7 +283,7 @@ cufftDoubleReal *idct2(cufftDoubleReal *x, int n, int dim)
 
 	// get final output
 	idct2_post<<<n, n>>>(out, retval, n, dim);
-	scale<<<n, n>>>(retval, 1.0/(2.0*n), n);
+	scale<<<n, n>>>(retval, 1.0 / (2.0 * n), n);
 
 	// free weights and fft output
 	cudaFree(w);
@@ -373,19 +378,9 @@ cufftDoubleReal *dst2(cufftDoubleReal *x, int n, int dim)
 	// create plan
 	cufftHandle plan;
 	if (dim == 0) {
-		int transform_size = 2 * n;
-		int inembed        = 2 * n;
-		int istride        = 1;
-		int idist          = 2 * n;
-		cufftPlanMany(&plan, 1, &transform_size, &inembed, istride, idist, &inembed, istride, idist,
-		              CUFFT_Z2Z, n);
+		plan = CufftSolver::n2row;
 	} else {
-		int transform_size = 2 * n;
-		int inembed        = 2 * n;
-		int istride        = n;
-		int idist          = 1;
-		cufftPlanMany(&plan, 1, &transform_size, &inembed, istride, idist, &inembed, istride, idist,
-		              CUFFT_Z2Z, n);
+		plan = CufftSolver::n2col;
 	}
 
 	// allocate fft output
@@ -394,7 +389,6 @@ cufftDoubleReal *dst2(cufftDoubleReal *x, int n, int dim)
 
 	// perform transform
 	int i = cufftExecZ2Z(plan, in, out, CUFFT_INVERSE);
-	cufftDestroy(plan);
 
 	// free input
 	cudaFree(in);
@@ -563,19 +557,9 @@ cufftDoubleReal *idst2(cufftDoubleReal *x, int n, int dim)
 	// create plan
 	cufftHandle plan;
 	if (dim == 0) {
-		int transform_size = 2 * n;
-		int inembed        = 2 * n;
-		int istride        = 1;
-		int idist          = 2 * n;
-		cufftPlanMany(&plan, 1, &transform_size, &inembed, istride, idist, &inembed, istride, idist,
-		              CUFFT_Z2Z, n);
+		plan = CufftSolver::n2row;
 	} else {
-		int transform_size = 2 * n;
-		int inembed        = 2 * n;
-		int istride        = n;
-		int idist          = 1;
-		cufftPlanMany(&plan, 1, &transform_size, &inembed, istride, idist, &inembed, istride, idist,
-		              CUFFT_Z2Z, n);
+		plan = CufftSolver::n2col;
 	}
 
 	// allocate fft output
@@ -584,7 +568,6 @@ cufftDoubleReal *idst2(cufftDoubleReal *x, int n, int dim)
 
 	// perform transform
 	int i = cufftExecZ2Z(plan, in, out, CUFFT_FORWARD);
-	cufftDestroy(plan);
 
 	// free input
 	cudaFree(in);
@@ -595,7 +578,7 @@ cufftDoubleReal *idst2(cufftDoubleReal *x, int n, int dim)
 
 	// get final output
 	idst2_post<<<n, n>>>(out, retval, n, dim);
-	scale<<<n, n>>>(retval, 1.0/(2.0*n), n);
+	scale<<<n, n>>>(retval, 1.0 / (2.0 * n), n);
 
 	// free weights and fft output
 	cudaFree(w);
@@ -746,19 +729,9 @@ cufftDoubleReal *dct4(cufftDoubleReal *x, int n, int dim)
 	// create plan
 	cufftHandle plan;
 	if (dim == 0) {
-		int transform_size = 4 * n;
-		int inembed        = 4 * n;
-		int istride        = 1;
-		int idist          = 4 * n;
-		cufftPlanMany(&plan, 1, &transform_size, &inembed, istride, idist, &inembed, istride, idist,
-		              CUFFT_Z2Z, n);
+		plan = CufftSolver::n4row;
 	} else {
-		int transform_size = 4 * n;
-		int inembed        = 4 * n;
-		int istride        = n;
-		int idist          = 1;
-		cufftPlanMany(&plan, 1, &transform_size, &inembed, istride, idist, &inembed, istride, idist,
-		              CUFFT_Z2Z, n);
+		plan = CufftSolver::n4col;
 	}
 
 	// allocate fft output
@@ -767,7 +740,6 @@ cufftDoubleReal *dct4(cufftDoubleReal *x, int n, int dim)
 
 	// perform transform
 	int i = cufftExecZ2Z(plan, in, out, CUFFT_FORWARD);
-	cufftDestroy(plan);
 
 	// free input
 	cudaFree(in);
@@ -778,7 +750,7 @@ cufftDoubleReal *dct4(cufftDoubleReal *x, int n, int dim)
 
 	// get final output
 	dct4_post<<<n, n>>>(out, retval, n, dim);
-	scale<<<n, n>>>(retval, sqrt(2.0/n), n);
+	scale<<<n, n>>>(retval, sqrt(2.0 / n), n);
 
 	// free weights and fft output
 	cudaFree(w);
@@ -818,12 +790,12 @@ __global__ void dst4_pre(cufftDoubleReal *in, cufftDoubleComplex *out, cufftDoub
 		}
 		if (dim == 0) {
 			// rows
-			out[4 * n * row + 2 *(n- col-1) + 1].x         = in[i];
-			out[4 * n * row + 4 * n - 2 * (n-col-1) - 1].x = in[i];
+			out[4 * n * row + 2 * (n - col - 1) + 1].x         = in[i];
+			out[4 * n * row + 4 * n - 2 * (n - col - 1) - 1].x = in[i];
 		} else {
 			// cols
-			out[n * (2 * (n-row-1) + 1) + col].x         = in[i];
-			out[n * (4 * n - 2 * (n-row-1) - 1) + col].x = in[i];
+			out[n * (2 * (n - row - 1) + 1) + col].x         = in[i];
+			out[n * (4 * n - 2 * (n - row - 1) - 1) + col].x = in[i];
 		}
 	}
 }
@@ -897,24 +869,24 @@ __global__ void dst4_post(cufftDoubleComplex *in, cufftDoubleReal *out, int n, i
 		int col = i % n;
 		if (dim == 0) {
 			// rows
-			double x           = in[4 * n * row + col].x;
-			double y           = in[4 * n * row + col].y;
-			double result      = x - y;
-            if(col%2==0){
-			out[n * row + col] = result;
-            }else{
-			out[n * row + col] = -result;
-            }
+			double x      = in[4 * n * row + col].x;
+			double y      = in[4 * n * row + col].y;
+			double result = x - y;
+			if (col % 2 == 0) {
+				out[n * row + col] = result;
+			} else {
+				out[n * row + col] = -result;
+			}
 		} else {
 			// cols
-			double x           = in[n * row + col].x;
-			double y           = in[n * row + col].y;
-			double result      = x - y;
-            if(row%2==0){
-			out[n * row + col] = result;
-            }else{
-			out[n * row + col] = -result;
-            }
+			double x      = in[n * row + col].x;
+			double y      = in[n * row + col].y;
+			double result = x - y;
+			if (row % 2 == 0) {
+				out[n * row + col] = result;
+			} else {
+				out[n * row + col] = -result;
+			}
 		}
 	}
 }
@@ -937,19 +909,9 @@ cufftDoubleReal *dst4(cufftDoubleReal *x, int n, int dim)
 	// create plan
 	cufftHandle plan;
 	if (dim == 0) {
-		int transform_size = 4 * n;
-		int inembed        = 4 * n;
-		int istride        = 1;
-		int idist          = 4 * n;
-		cufftPlanMany(&plan, 1, &transform_size, &inembed, istride, idist, &inembed, istride, idist,
-		              CUFFT_Z2Z, n);
+		plan = CufftSolver::n4row;
 	} else {
-		int transform_size = 4 * n;
-		int inembed        = 4 * n;
-		int istride        = n;
-		int idist          = 1;
-		cufftPlanMany(&plan, 1, &transform_size, &inembed, istride, idist, &inembed, istride, idist,
-		              CUFFT_Z2Z, n);
+		plan = CufftSolver::n4col;
 	}
 
 	// allocate fft output
@@ -958,7 +920,6 @@ cufftDoubleReal *dst4(cufftDoubleReal *x, int n, int dim)
 
 	// perform transform
 	int i = cufftExecZ2Z(plan, in, out, CUFFT_FORWARD);
-	cufftDestroy(plan);
 
 	// free input
 	cudaFree(in);
@@ -969,7 +930,7 @@ cufftDoubleReal *dst4(cufftDoubleReal *x, int n, int dim)
 
 	// get final output
 	dst4_post<<<n, n>>>(out, retval, n, dim);
-	scale<<<n, n>>>(retval, sqrt(2.0/n), n);
+	scale<<<n, n>>>(retval, sqrt(2.0 / n), n);
 
 	// free weights and fft output
 	cudaFree(w);
@@ -977,7 +938,6 @@ cufftDoubleReal *dst4(cufftDoubleReal *x, int n, int dim)
 
 	return retval;
 }
-
 
 __global__ void gpu_div(cufftDoubleReal *f_hat, cufftDoubleReal *denom, int n)
 {
@@ -988,7 +948,42 @@ __global__ void gpu_div(cufftDoubleReal *f_hat, cufftDoubleReal *denom, int n)
 }
 CufftSolver::CufftSolver(Domain *dom)
 {
-	this->d   = dom;
+	this->d = dom;
+	if (count == 0) {
+		{
+			int transform_size = 4 * d->n;
+			int inembed        = 4 * d->n;
+			int istride        = 1;
+			int idist          = 4 * d->n;
+			cufftPlanMany(&n4row, 1, &transform_size, &inembed, istride, idist, &inembed, istride,
+			              idist, CUFFT_Z2Z, d->n);
+		}
+		{
+			int transform_size = 4 * d->n;
+			int inembed        = 4 * d->n;
+			int istride        = d->n;
+			int idist          = 1;
+			cufftPlanMany(&n4col, 1, &transform_size, &inembed, istride, idist, &inembed, istride,
+			              idist, CUFFT_Z2Z, d->n);
+		}
+		{
+			int transform_size = 2 * d->n;
+			int inembed        = 2 * d->n;
+			int istride        = 1;
+			int idist          = 2 * d->n;
+			cufftPlanMany(&n2row, 1, &transform_size, &inembed, istride, idist, &inembed, istride,
+			              idist, CUFFT_Z2Z, d->n);
+		}
+		{
+			int transform_size = 2 * d->n;
+			int inembed        = 2 * d->n;
+			int istride        = d->n;
+			int idist          = 1;
+			cufftPlanMany(&n2col, 1, &transform_size, &inembed, istride, idist, &inembed, istride,
+			              idist, CUFFT_Z2Z, d->n);
+		}
+	}
+	count++;
 	x_forward = &dst2;
 	x_inverse = &idst2;
 	y_forward = &dst2;
@@ -1076,10 +1071,13 @@ CufftSolver::CufftSolver(Domain *dom)
 }
 CufftSolver::~CufftSolver()
 {
-	/*
-	fftw_destroy_plan(plan1);
-	fftw_destroy_plan(plan2);
-	*/
+    count--;
+    if(count==0){
+        cufftDestroy(n2row);
+        cufftDestroy(n2col);
+        cufftDestroy(n4row);
+        cufftDestroy(n4col);
+    }
 }
 void CufftSolver::solve()
 {
@@ -1146,6 +1144,6 @@ void CufftSolver::solve()
 	// d->u /= (4.0 * d->n * d->n);
 
 	if (d->ds.zero_patch) {
-	    d->u -= d->u.sum() / d->u.size();
+		d->u -= d->u.sum() / d->u.size();
 	}
 }
