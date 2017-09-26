@@ -1,3 +1,4 @@
+#ifdef __cudacc__
 #ifndef CUFFTSOLVER_H
 #define CUFFTSOLVER_H
 #include "Domain.h"
@@ -36,15 +37,18 @@ class CufftSolver : public Solver
 	cufftDoubleReal *(*y_forward)(cufftDoubleReal *, int, int);
 	cufftDoubleReal *(*x_inverse)(cufftDoubleReal *, int, int);
 	cufftDoubleReal *(*y_inverse)(cufftDoubleReal *, int, int);
-	static int                  count;
+	static int count;
 
 	public:
-    static cufftHandle n2row;
-    static cufftHandle n2col;
-    static cufftHandle n4row;
-    static cufftHandle n4col;
+	static cufftHandle         n2row;
+	static cufftHandle         n2col;
+	static cufftHandle         n4row;
+	static cufftHandle         n4col;
+	static cufftDoubleComplex *w_dst2;
+	static cufftDoubleComplex *w_idst2;
 	CufftSolver(Domain *d);
 	~CufftSolver();
 	void solve();
 };
+#endif
 #endif

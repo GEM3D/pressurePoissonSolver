@@ -39,8 +39,6 @@
 //#include <mpi.h>
 #include <string>
 #include <unistd.h>
-#include <cuda.h>
-#include <cuda_runtime.h>
 #ifndef M_PIl
 #define M_PIl 3.141592653589793238462643383279502884L /* pi */
 #endif
@@ -145,8 +143,9 @@ int main(int argc, char *argv[])
 	args::Flag f_riluk(parser, "ilu", "use RILUK preconditioner", {"riluk"});
 	args::Flag f_iter(parser, "iterative", "use iterative method", {"iterative"});
 	args::Flag f_fish(parser, "fishpack", "use fishpack as the patch solver", {"fishpack"});
+#ifdef __cudacc__
 	args::Flag f_cufft(parser, "cufft", "use CuFFT as the patch solver", {"cufft"});
-
+#endif
 
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;
@@ -174,9 +173,11 @@ int main(int argc, char *argv[])
 	if (f_fish) {
 		Domain::solver_type = SolverType::fishpack;
 	}
-    if(f_cufft){
+#ifdef __cudacc__
+	if (f_cufft) {
 		Domain::solver_type = SolverType::cufft;
-    }
+	}
+#endif
 
 	bool direct_solve = (f_lu || f_superlu || f_mumps || f_basker);
 	bool use_crs = (f_crs || direct_solve || f_ilu || f_riluk || f_precj || f_precmuelu || f_prec);

@@ -1,4 +1,6 @@
+#ifdef __cudacc__
 #include "CufftSolver.h"
+#include <cuda_profiler_api.h>
 #include <fftw3.h>
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
@@ -617,7 +619,7 @@ __global__ void dct4_pre(cufftDoubleReal *in, cufftDoubleComplex *out, cufftDoub
 			w[3 * n + col].y = -sin(-x) / 2;
 		}
 		if (dim == 0) {
-			// rows
+			// rowscudaProfilerStop()
 			out[4 * n * row + 2 * col + 1].x         = in[i];
 			out[4 * n * row + 4 * n - 2 * col - 1].x = in[i];
 		} else {
@@ -1071,16 +1073,17 @@ CufftSolver::CufftSolver(Domain *dom)
 }
 CufftSolver::~CufftSolver()
 {
-    count--;
-    if(count==0){
-        cufftDestroy(n2row);
-        cufftDestroy(n2col);
-        cufftDestroy(n4row);
-        cufftDestroy(n4col);
-    }
+	count--;
+	if (count == 0) {
+		cufftDestroy(n2row);
+		cufftDestroy(n2col);
+		cufftDestroy(n4row);
+		cufftDestroy(n4col);
+	}
 }
 void CufftSolver::solve()
 {
+	cudaProfilerStart();
 	valarray<double> f_copy(d->n * d->n);
 	f_copy[slice(0, d->n * d->n, 1)] = d->f;
 	if (!d->hasNbr(Side::north) && d->neumann) {
@@ -1146,4 +1149,6 @@ void CufftSolver::solve()
 	if (d->ds.zero_patch) {
 		d->u -= d->u.sum() / d->u.size();
 	}
+	cudaProfilerStop();
 }
+#endif

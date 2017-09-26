@@ -1,7 +1,7 @@
 #include "Domain.h"
+#include "CufftSolver.h"
 #include "FftwSolver.h"
 #include "FishpackSolver.h"
-#include "CufftSolver.h"
 #include <valarray>
 using namespace std;
 SolverType Domain::solver_type = SolverType::fftw;
@@ -90,14 +90,16 @@ Domain::~Domain()
 void Domain::plan()
 {
 	switch (solver_type) {
-		case SolverType::fftw:
-			solver = new FftwSolver(this);
-			break;
 		case SolverType::fishpack:
 			solver = new FishpackSolver(this);
 			break;
+#ifdef __cudacc__
 		case SolverType::cufft:
 			solver = new CufftSolver(this);
+			break;
+#endif
+		default:
+			solver = new FftwSolver(this);
 			break;
 	}
 }
