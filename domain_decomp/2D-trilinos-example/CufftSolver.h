@@ -1,4 +1,4 @@
-#ifdef __cudacc__
+#ifdef __NVCC__
 #ifndef CUFFTSOLVER_H
 #define CUFFTSOLVER_H
 #include "Domain.h"

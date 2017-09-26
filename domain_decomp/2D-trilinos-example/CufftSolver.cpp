@@ -1,4 +1,4 @@
-#ifdef __cudacc__
+#ifdef __NVCC__
 #include "CufftSolver.h"
 #include <cuda_profiler_api.h>
 #include <fftw3.h>
