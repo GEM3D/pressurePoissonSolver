@@ -93,7 +93,7 @@ void Domain::plan()
 		case SolverType::fishpack:
 			solver = new FishpackSolver(this);
 			break;
-#ifdef __cudacc__
+#ifdef __NVCC__
 		case SolverType::cufft:
 			solver = new CufftSolver(this);
 			break;
