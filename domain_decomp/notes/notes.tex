@@ -4,6 +4,8 @@
 \usepackage{graphicx}
 \usepackage{subcaption}
 \usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
 \usepackage{algpseudocode}
 \usepackage{algorithm}
 
@@ -16,63 +18,44 @@
 \section{Forming Schur Complement Matrix}
 
 If there is a $\gamma$ for each point on the interface, how to we determine the values?
-
 \begin{figure}[H]
     \centering
-    \includegraphics[width=2in]{abgamma2.pdf}
-    \caption{figure with l and r}
+    \includegraphics[width=4in]{images/abdomain.pdf}
+    \caption{Two domain example}
 \end{figure}
-
-We want the flux going out of ouf the $l$ cell to match the flux going into the $r$ cell.
-So we get the equation:
+We want the gamma value to equal to the average of the solution on both sides:
 \begin{equation}
-\gamma-l=r-\gamma
+    \gamma = \frac{East(\Omega_1)+West(\Omega_2)}{2}
 \end{equation}
-or:
+Where $East$ and $West$ are subroutines that return the solution values along the east side or west side
+of a domain.
+So now we have a function of $\gamma$
 \begin{equation}
-2\gamma-(l+r)=0
-\end{equation}
-Note that $l$ and $r$ are not constants, but are dependent on the value of $\gamma$.
-So, let's change them to the be functions of $\gamma$:
-\begin{equation}
-2\gamma-(L(\gamma)+R(\gamma))=0
-\end{equation}
-So now we have a function of $\gamma$:
-\begin{equation}
-F(\gamma)=2\gamma-(L(\gamma)+R(\gamma))
+    F(\gamma)=2\gamma-(East(\Omega_1)+West(\Omega_2))
     \label{function}
 \end{equation}
-Therefore we have a function that we want to find the zero of this function:
-\begin{equation}
-F(\gamma)=0
-\end{equation}
+that we want to find the zero of. In subroutine form, this would look like:
+\begin{algorithm}[H]
+\caption{Two-Domain Function}
+\begin{algorithmic}[1]
+    \Procedure{F}{$\gamma$}
+    \State $\Omega_1.solveWithInterface(\gamma)$
+    \State $\Omega_2.solveWithInterface(\gamma)$
+    \State \Return $2\gamma-(East(\Omega_1)+West(\Omega_1))$
+    \EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
-If we have a single $\gamma$ value that we are solving for, this function becomes a linear equation of the form:
-\begin{equation}
-F(\gamma)=a\gamma-b
-\end{equation}
-we can find the coefficients by:
-\begin{align}
-    b&=-F(0)\\
-    a&=F(1)+b
-\end{align}
-With these coefficients, we can solve for $\gamma$
-\begin{align}
-F(\gamma)=0\\
-a\gamma-b=0\\
-a\gamma=b\\
-\gamma=\frac{b}{a}
-\end{align}
-When there are multiple interface points, then we have a system of linear equations:
+When there are multiple interface points, then we have a system of linear equations
 \begin{equation}
 F(\gamma)=A\gamma-b
 \end{equation}
-the $b$ vector is found by
+The $b$ vector is found by
 \begin{equation}
 b=-F(0)
     \label{bvec}
 \end{equation}
-each column of the matrix is found by
+and each column of the matrix is found by
 \begin{equation}
 A(:,i) = F(e_i)+b
     \label{matrixcol}
@@ -81,11 +64,32 @@ we can then determine the  $\gamma$ vector by solving
 \begin{equation}
 A\gamma=b
 \end{equation}
+\subsection{Generalized Function}
+\begin{algorithm}[H]
+\caption{Generalized Function}
+\begin{algorithmic}[1]
+    \Procedure{F}{$\gamma, Domains$}
+    \State $result(\gamma.size())$ \Comment{Allocate new vector}
+    \For{$\Omega \in Domains$}
+        \State $\Omega.solveWithInterface(\gamma)$
+        \For{$side \in \{North,East,South,West\}$}
+            \If{$\Omega.hasNeighbor(side)$}
+                \State $i \gets \Omega.ifaceIndex(side)$
+                \State $start \gets i*n$
+                \State $stop \gets (i+1)*n$
+                \State $result(start:stop) \gets \gamma(start:stop) - \Omega.getSolutionEdge(side)$
+            \EndIf
+        \EndFor
+    \EndFor
+    \State \Return $result$
+    \EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
 \section{Quick Formation of the Schur Complement Matrix}
 In this section, we can use the process described in equation \eqref{matrixcol} to derive an algorithm
 that allow us to quickly form the Schur compliment matrix.
-\paragraph{The matrix does not depent on the RHS}
+\paragraph{The matrix does not depent on the RHS on the domains}
 First, let's reconsider equations  \eqref{bvec} and \eqref{matrixcol}. If we are solving on a system
 where the rhs and lhs on each patch is zero, the $b$ vector for the Schur complement matrix will
 be $0$, since $0$ is the correct solution for the interfaces. So equation \ref{matrixcol} turns into
@@ -110,6 +114,11 @@ If the individual values in the $\gamma$ vector are indexed in the following way
     \item If the interface is on the east or west side of the patch, the $\gamma$ values will be indexed consecutively from the bottom up.
     \item If the interface is on the north or south side of the patch, the $\gamma$ values will be indexed consecutively from left to right.
 \end{itemize}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=3in]{images/indexing.pdf}
+    \caption{Indexing of $\gamma$ values}
+\end{figure}
 Since the $\gamma$ values on each interface indexed consecutively, the Schur complement matrix takes
 on a block structure, where each block is $n\times n$.
 \paragraph{Sparsity}
@@ -137,13 +146,13 @@ different times.
     F_{right}(\gamma)&=\gamma-R(\gamma) \label{function_right}
 \end{align}
 
-So, when we process the left and right domains, we use equations \ref{function_left} and 
-\ref{function_right}, respectively, for the diagonal blocks ($i_{\textnormal{main}}$).
+So, when we process the left and right domains, we use equations \eqref{function_left} and 
+\eqref{function_right}, respectively, for the diagonal blocks ($i_{\textnormal{main}}$).
 When we are forming the matrix, we will insert the diagonal
 block twice, summing the coefficients of one block into the other.
 
 \paragraph{Rotation}
-\begin{figure}[H]
+\begin{figure}
     \centering
     \begin{subfigure}[b]{0.30\textwidth}
         \includegraphics[width=\textwidth]{images/north1.pdf}
@@ -166,65 +175,37 @@ block twice, summing the coefficients of one block into the other.
     \label{rotation}
 \end{figure}
 
-Let the north side be our canonical side. Lets consider part a in figure \ref{rotation} where the
+We can get the coefficients for the blocks in the Schur complement matrix by
+setting each $\gamma$ value along one side of the domain to $1$, and then reuse these coefficients 
+for the interfaces on the other sides.
+
+Let the north side be our canonical side. If we set each $\gamma$ value along the north interface to
+$1$, we can save the resulting coefficients into four blocks. This is done in algorithm
+\ref{getblocks}.
+
+Let's consider part (a) in figure \ref{rotation} where the
 first $\gamma$ value on the north interface is set to $1$. If rotate this domain clockwise by $90$
 degrees, that is equivalent to setting the last $\gamma$ value on the east interface to $1$. If we
 rotate it again, it is equivalent to setting the last $\gamma$ value on the south interface to
 $1$. And if we rotate once more, it would be equivalent to setting the first $\gamma$ value on the
-east interface. 
+east interface. What this means is that if we want to reuse the blocks from the north interface 
+for either the east or south interface, we will have to reverse the order of the columns in the 
+blocks.
 
-This means that when we can get to coefficients for the blocks in the Schur complement matrix, by
-setting each $\gamma$ value along the north interface to $1$, and then reuse these coefficients for
-the interfaces on the other sides.
+Another thing that we will have to consider is that order of the rows for the canonical east and
+west blocks will also have to be reversed if we are using them on either the south or west
+interfaces. To illustrate this, let's look at the south interface on figure \ref{rotation}. When we
+are solving along the north interface, the arrows along east and west of the domain are pointing
+towards the interface. But when we look at the south interface, the arrows are pointing away from
+it. This means that when we are 
 
 
-
-\paragraph{Algorithm}
-
-%\begin{algorithm}
-%\caption{Quick Schur Compliment Formation}
+\begin{algorithm}
+\caption{}
+\label{getblocks}
 \begin{algorithmic}[1]
-    \Procedure{FormMatrix}{Domains}
-    \State $tbp \gets \emptyset$ \Comment{Set of interfaces to be processed}
-    \ForAll{$\Omega \in Domains$}
-        \If{$\Omega.northIndex \not= null$}
-            \State $iface()$ \Comment{New iface object}
-            \State $iface.side \gets North$
-            \State $iface.northIndex \gets \Omega.northIndex$
-            \State $iface.eastIndex \gets \Omega.eastIndex$
-            \State $iface.southIndex \gets \Omega.southIndex$
-            \State $iface.westIndex \gets \Omega.westIndex$
-            \State $tbp.insert(iface)$
-        \EndIf
-        \If{$\Omega.eastIndex \not= null$}
-            \State $iface()$ \Comment{New iface object}
-            \State $iface.side \gets East$
-            \State $iface.northIndex \gets \Omega.eastIndex$
-            \State $iface.eastIndex \gets \Omega.southIndex$
-            \State $iface.southIndex \gets \Omega.westIndex$
-            \State $iface.westIndex \gets \Omega.northIndex$
-            \State $tbp.insert(iface)$
-        \EndIf
-        \If{$\Omega.southIndex \not= null$}
-            \State $iface()$ \Comment{New iface object}
-            \State $iface.side \gets South$
-            \State $iface.northIndex \gets \Omega.southIndex$
-            \State $iface.eastIndex \gets \Omega.westIndex$
-            \State $iface.southIndex \gets \Omega.northIndex$
-            \State $iface.westIndex \gets \Omega.eastIndex$
-            \State $tbp.insert(iface)$
-        \EndIf
-        \If{$\Omega.westIndex \not= null$}
-            \State $iface()$ \Comment{New iface object}
-            \State $iface.side \gets West$
-            \State $iface.northIndex \gets \Omega.westIndex$
-            \State $iface.eastIndex \gets \Omega.northIndex$
-            \State $iface.southIndex \gets \Omega.eastIndex$
-            \State $iface.westIndex \gets \Omega.southIndex$
-            \State $tbp.insert(iface)$
-        \EndIf
-    \EndFor
-    \State $\Omega()$
+    \Procedure{getBlocks}{n}
+    \State $\Omega()$ \Comment{Create empty domain}
     \State $\Omega.rhs \gets 0$
     \State $\Omega.northBoundary \gets 0$
     \State $\Omega.eastBoundary \gets 0$
@@ -236,14 +217,77 @@ the interfaces on the other sides.
     \State $WestBlock(n*n)$
     \For{$i \gets 1,n$}
          \State $\Omega.northBoundary(i) \gets 1$
-         \State $\Omega.solve()$
-         \State $NorthBlock(:,i) \gets \Omega.northBoundary-\Omega.lhs(:,n)$
-         \State $EastBlock(:,i) \gets -\Omega.lhs(n,:)$
-         \State $SouthBlock(:,i) \gets -\Omega.lhs(:,1)$
-         \State $WestBlock(:,i) \gets -\Omega.lhs(1,:)$
+         \State $\Omega.\Call{solve}{ }$
+         \State $NorthBlock(:,i) \gets \Omega.northBoundary - \Call{North}{\Omega}$
+         \State $EastBlock(:,i) \gets -\Call{East}{\Omega}$
+         \State $SouthBlock(:,i) \gets -\Call{South}{\Omega}$
+         \State $WestBlock(:,i) \gets -\Call{West}{\Omega}$
+         \State $\Omega.northBoundary(i) \gets 0$
     \EndFor
+
+    \State \Return $NorthBlock, EastBlock, SouthBlock, WestBlock$
+    \EndProcedure
+\end{algorithmic}
+\end{algorithm}
+\paragraph{Algorithm}
+
+%\begin{algorithm}
+%\caption{Quick Schur Compliment Formation}
+\begin{algorithm}[H]
+\caption{}
+\begin{algorithmic}[1]
+    \Procedure{EnumerateIfaceStructs}{Domains}
+    \State $ifaces \gets \emptyset$ \Comment{Set of interfaces to be processed}
+    \ForAll{$\Omega \in Domains$}
+        \If{$\Omega.northIndex \not= null$}
+            \State $iface()$ \Comment{New iface object}
+            \State $iface.side \gets North$
+            \State $iface.northIndex \gets \Omega.northIndex$
+            \State $iface.eastIndex \gets \Omega.eastIndex$
+            \State $iface.southIndex \gets \Omega.southIndex$
+            \State $iface.westIndex \gets \Omega.westIndex$
+            \State $ifaces.insert(iface)$
+        \EndIf
+        \If{$\Omega.eastIndex \not= null$}
+            \State $iface()$ \Comment{New iface object}
+            \State $iface.side \gets East$
+            \State $iface.northIndex \gets \Omega.eastIndex$
+            \State $iface.eastIndex \gets \Omega.southIndex$
+            \State $iface.southIndex \gets \Omega.westIndex$
+            \State $iface.westIndex \gets \Omega.northIndex$
+            \State $ifaces.insert(iface)$
+        \EndIf
+        \If{$\Omega.southIndex \not= null$}
+            \State $iface()$ \Comment{New iface object}
+            \State $iface.side \gets South$
+            \State $iface.northIndex \gets \Omega.southIndex$
+            \State $iface.eastIndex \gets \Omega.westIndex$
+            \State $iface.southIndex \gets \Omega.northIndex$
+            \State $iface.westIndex \gets \Omega.eastIndex$
+            \State $ifaces.insert(iface)$
+        \EndIf
+        \If{$\Omega.westIndex \not= null$}
+            \State $iface()$ \Comment{New iface object}
+            \State $iface.side \gets West$
+            \State $iface.northIndex \gets \Omega.westIndex$
+            \State $iface.eastIndex \gets \Omega.northIndex$
+            \State $iface.southIndex \gets \Omega.eastIndex$
+            \State $iface.westIndex \gets \Omega.southIndex$
+            \State $ifaces.insert(iface)$
+        \EndIf
+    \EndFor
+    \State \Return $ifaces$
+    \EndProcedure
+\end{algorithmic}
+\end{algorithm}
+\begin{algorithm}[H]
+\caption{Matrix Formation}
+\begin{algorithmic}[1]
+    \Procedure{FormMatrix}{Domains}
+    \State $ifaces \gets \Call{EnumerateIfaceStructs}{Domains}$
+    \State $NorthBlock, EastBlock, SouthBlock, WestBlock \gets \Call{getBlocks}{n}$
     \State $A()$ \Comment{Allocate Matrix}
-    \ForAll{$iface \in tbp$} \Comment{Insert Blocks into Matrix}
+    \ForAll{$iface \in ifaces$} \Comment{Insert Blocks into Matrix}
         \State $reverseColumns \gets False$
         \State $reverseRows \gets False$
         \If {iface.side = East \textbf{or} iface.side = South}
@@ -275,6 +319,7 @@ the interfaces on the other sides.
     \EndFor
     \EndProcedure
 \end{algorithmic}
+\end{algorithm}
 %\end{algorithm}
 
 
