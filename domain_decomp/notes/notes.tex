@@ -65,6 +65,76 @@ we can then determine the  $\gamma$ vector by solving
 A\gamma=b
 \end{equation}
 \subsection{Generalized Function}
+Given some arbitrary mesh, we want to be able to index the interface values in the $\gamma$ vector.
+One way that we can do this is have the interface values on each interface be consecutively indexed,
+and also give a unique index to each of the interface. If our domains each have $n \times n$ values,
+the interface with index $1$ will have the first $n$ values, a interface with index $2$ will have
+the second $n$ values, and so on.
+
+\paragraph{Indexing of Interfaces}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=3in]{images/4domain.pdf}
+    \caption{Indexing of $\gamma$ values}
+    \label{fourdomain}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=3in]{images/4domaingraph.pdf}
+    \caption{Four domain mesh}
+    \label{fourgraph}
+\end{figure}
+Consider the mesh given in figure \ref{fourdomain}. In order to give a unique index to each
+interface, we can think of the mesh as a graph. Where each domain is a vertex, and an edge 
+represents
+domains sharing an interface. We can then perform a breadth-first traversal of the graph and label
+each edge with a unique index as is shown in figure \ref{fourgraph}. An algorithm for indexing the
+interfaces is shown in algorithm \ref{indexbfs}. 
+
+\begin{algorithm}[H]
+\caption{Interface Indexing}
+\begin{algorithmic}[1]
+    \Procedure{IndexIfacesBFS}{$\Omega_{start}$}
+    \State $queue()$ \Comment{queue of domains to visit next}
+    \State $queue.pushBack(\Omega_{start})$ \Comment{insert starting domain}
+    \State $visited \gets \emptyset$ \Comment{set of visited domains}
+    \State $i \gets 1$ 
+    \While{$!queue.empty()$} \Comment{Breadth-First traversal of our mesh}
+        \State $\Omega \gets queue.popFront()$
+        \For{$side \in \{North,East,South,West\}$}
+            \If{$\Omega.hasNeighbor(side)$ \textbf{and} $\Omega.getNeighbor(side) \notin visited$}
+                \State $\Omega_{nbr} \gets \Omega.getNeighbor(side)$
+                \If{$\Omega_{nbr}\notin queue$}
+                    \State $queue.pushBack(\Omega_{nbr})$
+                \EndIf
+                \State $\Omega.ifaceIndex(side)\gets i$ \Comment{Set index for interface}
+                \State $\Omega_{nbr}.ifaceIndex(Opposite(side))\gets i$ \Comment{Also set index for
+                neighbor}
+                \State $i \gets i+1$
+            \EndIf
+        \EndFor
+        \State $visited.insert(\Omega)$
+    \EndWhile
+    \EndProcedure
+\end{algorithmic}
+\label{indexbfs}
+\end{algorithm}
+
+\paragraph{Consecutive Indexing of $\gamma$ Values} 
+We can index the values on each interface in the following way:
+\begin{itemize}
+    \item If the interface is on the east or west side of the patch, the $\gamma$ values will be indexed consecutively from the bottom up.
+    \item If the interface is on the north or south side of the patch, the $\gamma$ values will be indexed consecutively from left to right.
+\end{itemize}
+\begin{figure}
+    \label{indexing}
+    \centering
+    \includegraphics[width=3in]{images/indexing.pdf}
+    \caption{Graph of four domain mesh}
+\end{figure}
+Since the $\gamma$ values on each interface indexed consecutively, the Schur complement matrix takes
+on a block structure, where each block is $n\times n$.
+
 \begin{algorithm}[H]
 \caption{Generalized Function}
 \begin{algorithmic}[1]
@@ -75,8 +145,8 @@ A\gamma=b
         \For{$side \in \{North,East,South,West\}$}
             \If{$\Omega.hasNeighbor(side)$}
                 \State $i \gets \Omega.ifaceIndex(side)$
-                \State $start \gets i*n$
-                \State $stop \gets (i+1)*n$
+                \State $start \gets i*(n-1)+1$
+                \State $stop \gets i*n$
                 \State $result(start:stop) \gets \gamma(start:stop) - \Omega.getSolutionEdge(side)$
             \EndIf
         \EndFor
@@ -92,7 +162,7 @@ that allow us to quickly form the Schur compliment matrix.
 \paragraph{The matrix does not depent on the RHS on the domains}
 First, let's reconsider equations  \eqref{bvec} and \eqref{matrixcol}. If we are solving on a system
 where the rhs and lhs on each patch is zero, the $b$ vector for the Schur complement matrix will
-be $0$, since $0$ is the correct solution for the interfaces. So equation \ref{matrixcol} turns into
+be $0$, since $0$ is the correct solution for the interfaces. So equation \eqref{matrixcol} turns into
 \begin{equation}
     A(:,i) = F_{zero}(e_i)
 \end{equation}
@@ -108,19 +178,6 @@ $F_{zero}(e_i)$, we can  assume that solution on any domain that is not adjacent
 with the $1$ is zero. In other words, we only have to do a solve on the two adjacent domains, rather
 than solving for all the domains.
 
-\paragraph{Indexing of $\gamma$ Values} 
-If the individual values in the $\gamma$ vector are indexed in the following way:
-\begin{itemize}
-    \item If the interface is on the east or west side of the patch, the $\gamma$ values will be indexed consecutively from the bottom up.
-    \item If the interface is on the north or south side of the patch, the $\gamma$ values will be indexed consecutively from left to right.
-\end{itemize}
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=3in]{images/indexing.pdf}
-    \caption{Indexing of $\gamma$ values}
-\end{figure}
-Since the $\gamma$ values on each interface indexed consecutively, the Schur complement matrix takes
-on a block structure, where each block is $n\times n$.
 \paragraph{Sparsity}
 
 Consider the example grid given in Figure \ref{2domain}.
