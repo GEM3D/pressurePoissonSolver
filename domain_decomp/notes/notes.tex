@@ -15,7 +15,7 @@
 \author{Scott Aiton}
 \maketitle
 
-\section{Forming Schur Complement Matrix}
+\section{Formulation of Schur Complement Matrix}
 
 If there is a $\gamma$ for each point on the interface, how to we determine the values?
 \begin{figure}[H]
@@ -40,8 +40,10 @@ that we want to find the zero of. In subroutine form, this would look like:
 \begin{algorithmic}[1]
     \Procedure{F}{$\gamma$}
     \State $\Omega_1.solveWithInterface(\gamma)$
+    \State $result \gets \gamma - \Omega_1.getSolutionEdge(East)$
     \State $\Omega_2.solveWithInterface(\gamma)$
-    \State \Return $2\gamma-(East(\Omega_1)+West(\Omega_1))$
+    \State $result \gets result + \gamma - \Omega_2.getSolutionEdge(West)$
+    \State \Return $result$
     \EndProcedure
 \end{algorithmic}
 \end{algorithm}
@@ -72,16 +74,16 @@ the interface with index $1$ will have the first $n$ values, a interface with in
 the second $n$ values, and so on.
 
 \paragraph{Indexing of Interfaces}
-\begin{figure}[H]
+\begin{figure}
     \centering
     \includegraphics[width=3in]{images/4domain.pdf}
-    \caption{Indexing of $\gamma$ values}
+    \caption{Four domain mesh}
     \label{fourdomain}
 \end{figure}
-\begin{figure}[H]
+\begin{figure}
     \centering
     \includegraphics[width=3in]{images/4domaingraph.pdf}
-    \caption{Four domain mesh}
+    \caption{Indexing of interfaces}
     \label{fourgraph}
 \end{figure}
 Consider the mesh given in figure \ref{fourdomain}. In order to give a unique index to each
@@ -94,7 +96,7 @@ interfaces is shown in algorithm \ref{indexbfs}.
 \begin{algorithm}[H]
 \caption{Interface Indexing}
 \begin{algorithmic}[1]
-    \Procedure{IndexIfacesBFS}{$\Omega_{start}$}
+    \Procedure{IndexInterfacesBFS}{$\Omega_{start}$}
     \State $queue()$ \Comment{queue of domains to visit next}
     \State $queue.pushBack(\Omega_{start})$ \Comment{insert starting domain}
     \State $visited \gets \emptyset$ \Comment{set of visited domains}
@@ -135,6 +137,9 @@ We can index the values on each interface in the following way:
 Since the $\gamma$ values on each interface indexed consecutively, the Schur complement matrix takes
 on a block structure, where each block is $n\times n$.
 
+\paragraph{Generalized Function} 
+Once each interface vlaue has an index, we can use algorithm \ref{genfunc} for the function that we
+want to find the zero of.
 \begin{algorithm}[H]
 \caption{Generalized Function}
 \begin{algorithmic}[1]
@@ -154,20 +159,21 @@ on a block structure, where each block is $n\times n$.
     \State \Return $result$
     \EndProcedure
 \end{algorithmic}
+\label{genfunc}
 \end{algorithm}
 
-\section{Quick Formation of the Schur Complement Matrix}
+\section{Quick Formulation of the Schur Complement Matrix}
 In this section, we can use the process described in equation \eqref{matrixcol} to derive an algorithm
 that allow us to quickly form the Schur compliment matrix.
 \paragraph{The matrix does not depent on the RHS on the domains}
 First, let's reconsider equations  \eqref{bvec} and \eqref{matrixcol}. If we are solving on a system
-where the rhs and lhs on each patch is zero, the $b$ vector for the Schur complement matrix will
+where the solution zero, the $b$ vector for the Schur complement matrix will
 be $0$, since $0$ is the correct solution for the interfaces. So equation \eqref{matrixcol} turns into
 \begin{equation}
     A(:,i) = F_{zero}(e_i)
 \end{equation}
-where $F_{zero}$ is the same as equation \ref{function} but with the rhs on each domain replaced 
-with $0$.
+where $F_{zero}$ is the same as equation \ref{function}, but instead we are solving a system where
+the solution is zero.
 So now we use can use this to reduce the amount of work needed to form the Schur complement matrix.
 \\
 \\
@@ -187,6 +193,89 @@ interfaces,
 $i_{\textnormal{left north}}$, $i_{\textnormal{left south}}$, $i_{\textnormal{left west}}$,
 $i_{\textnormal{right north}}$, $i_{\textnormal{right east}}$, and $i_{\textnormal{right south}}$.
 
+For each 1 that is set along the main interface, the same 7 interface will return non-zero values.
+This means that for each interface, there will be maximum of 7 blocks of size $n \times n$.
+$$
+A(:,j)=
+\begin{bmatrix}
+    \vdots \\
+    \bullet\\
+    \bullet\\
+    \bullet\\
+    \bullet\\
+    \vdots \\
+    \bullet\\
+    \bullet\\
+    \bullet\\
+    \bullet\\
+    \vdots \\
+    \bullet\\
+    \bullet\\
+    \bullet\\
+    \bullet\\
+    \vdots \\
+    \bullet\\
+    \bullet\\
+    \bullet\\
+    \bullet\\
+    \vdots \\
+    \bullet\\
+    \bullet\\
+    \bullet\\
+    \bullet\\
+    \vdots \\
+    \bullet\\
+    \bullet\\
+    \bullet\\
+    \bullet\\
+    \vdots \\
+    \bullet\\
+    \bullet\\
+    \bullet\\
+    \bullet\\
+    \vdots \\
+\end{bmatrix}
+\qquad
+A(:,j:(j+n))=
+\begin{bmatrix}
+    \vdots  & \vdots  & \vdots  & \vdots \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \vdots  & \vdots  & \vdots  & \vdots \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \vdots  & \vdots  & \vdots  & \vdots \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \vdots  & \vdots  & \vdots  & \vdots \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \vdots  & \vdots  & \vdots  & \vdots \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \vdots  & \vdots  & \vdots  & \vdots \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \vdots  & \vdots  & \vdots  & \vdots \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \bullet & \bullet & \bullet & \bullet \\
+    \vdots  & \vdots  & \vdots  & \vdots \\
+\end{bmatrix}
+$$
 \begin{figure}[H]
     \centering
     \includegraphics[width=6in]{images/2domain.pdf}
@@ -194,19 +283,19 @@ $i_{\textnormal{right north}}$, $i_{\textnormal{right east}}$, and $i_{\textnorm
     \label{2domain}
 \end{figure}
 
-\paragraph{Splitting up the work}
-
-If we look at equation \ref{function}, we can split up the work and process the two domains at
-different times.
-\begin{align}
-    F_{left}(\gamma)&=\gamma-L(\gamma) \label{function_left}\\
-    F_{right}(\gamma)&=\gamma-R(\gamma) \label{function_right}
-\end{align}
-
-So, when we process the left and right domains, we use equations \eqref{function_left} and 
-\eqref{function_right}, respectively, for the diagonal blocks ($i_{\textnormal{main}}$).
-When we are forming the matrix, we will insert the diagonal
-block twice, summing the coefficients of one block into the other.
+%\paragraph{Splitting up the work}
+%
+%If we look at equation \ref{function}, we can split up the work and process the two domains at
+%different times.
+%\begin{align}
+%    F_{left}(\gamma)&=\gamma-L(\gamma) \label{function_left}\\
+%    F_{right}(\gamma)&=\gamma-R(\gamma) \label{function_right}
+%\end{align}
+%
+%So, when we process the left and right domains, we use equations \eqref{function_left} and 
+%\eqref{function_right}, respectively, for the diagonal blocks ($i_{\textnormal{main}}$).
+%When we are forming the matrix, we will insert the diagonal
+%block twice, summing the coefficients of one block into the other.
 
 \paragraph{Rotation}
 \begin{figure}
@@ -238,24 +327,43 @@ for the interfaces on the other sides.
 
 Let the north side be our canonical side. If we set each $\gamma$ value along the north interface to
 $1$, we can save the resulting coefficients into four blocks. This is done in algorithm
-\ref{getblocks}.
+\ref{getblocks}. We can reuse these blocks for the other interfaces, but the order of the columns 
+and the rows in each block may be incorrect.
 
-Let's consider part (a) in figure \ref{rotation} where the
-first $\gamma$ value on the north interface is set to $1$. If rotate this domain clockwise by $90$
-degrees, that is equivalent to setting the last $\gamma$ value on the east interface to $1$. If we
-rotate it again, it is equivalent to setting the last $\gamma$ value on the south interface to
-$1$. And if we rotate once more, it would be equivalent to setting the first $\gamma$ value on the
-east interface. What this means is that if we want to reuse the blocks from the north interface 
-for either the east or south interface, we will have to reverse the order of the columns in the 
-blocks.
-
-Another thing that we will have to consider is that order of the rows for the canonical east and
-west blocks will also have to be reversed if we are using them on either the south or west
-interfaces. To illustrate this, let's look at the south interface on figure \ref{rotation}. When we
-are solving along the north interface, the arrows along east and west of the domain are pointing
-towards the interface. But when we look at the south interface, the arrows are pointing away from
-it. This means that when we are 
-
+First, let's consider the order of the columns.
+In part (a) of figure \ref{rotation}, the
+first $\gamma$ value on the north interface is set to $1$. If we rotate this domain clockwise by $90$
+degrees, that is equivalent to setting the last $\gamma$ value on the east interface to $1$. This
+means that the order of the columns of our canonical blocks will be in the wrong order if we want to
+reuse those blocks for the east interface. This is also true for the south interface. A table for
+whether or not to reverse the order of the columns of the canonical blocks is given in table \ref{revcol} 
+\begin{table}[H]
+    \centering
+\begin{tabular}{ cccc }
+                   North & East & South & West \\ \hline
+     False & True & True & False \\
+\end{tabular}
+    \caption{Reversal of columns}
+    \label{revcol}
+\end{table}
+Next, let's consider the order of the rows. If we compare part (a) to part (b) in figure
+\ref{rotation}, we can see that the consecutive ordering of the interface values (the arrows in
+the figures) are pointing the opposite direction. This means that when we get each column of
+coefficients for the north canonical block, the order of the rows of coefficients will be wrong when
+we use them in the other interfaces. A completely worked out logic table for whether or not we need
+to reverse the order of columns in each of the canonical blocks is given in table \ref{revrow}.
+\begin{table}[H]
+    \centering
+\begin{tabular}{ r | cccc }
+                  & North & East  & South & West \\ \hline
+    North Block   & False & True  & True & False \\
+    East  Block   & False & False & True & True  \\
+    South Block   & False & True  & True & False \\
+    West  Block   & False & False & True & True  \\
+\end{tabular}
+    \caption{Reversal of rows}
+    \label{revrow}
+\end{table}
 
 \begin{algorithm}
 \caption{}
@@ -287,100 +395,76 @@ it. This means that when we are
 \end{algorithmic}
 \end{algorithm}
 \paragraph{Algorithm}
+The algorithm for quick matrix formulation will have three steps:
+\begin{enumerate}
+    \item Enumerate a set of interface structs
+    \item Get coefficients for cannonical blocks
+    \item For each interface struct, insert the blocks for that interface into the matrix
+\end{enumerate}
+Algorithm \ref{ifaces} shows how to enumerate a set of inteface structs. Each struct has 
+$side$, $northIndex$, $southIndex$, and $westIndex$ fields. The $side$ field is which side of the
+domain the inteface is on, and each index is relative to that side (see figure \ref{rotation}).
 
-%\begin{algorithm}
-%\caption{Quick Schur Compliment Formation}
 \begin{algorithm}[H]
 \caption{}
 \begin{algorithmic}[1]
     \Procedure{EnumerateIfaceStructs}{Domains}
     \State $ifaces \gets \emptyset$ \Comment{Set of interfaces to be processed}
     \ForAll{$\Omega \in Domains$}
-        \If{$\Omega.northIndex \not= null$}
-            \State $iface()$ \Comment{New iface object}
-            \State $iface.side \gets North$
-            \State $iface.northIndex \gets \Omega.northIndex$
-            \State $iface.eastIndex \gets \Omega.eastIndex$
-            \State $iface.southIndex \gets \Omega.southIndex$
-            \State $iface.westIndex \gets \Omega.westIndex$
-            \State $ifaces.insert(iface)$
-        \EndIf
-        \If{$\Omega.eastIndex \not= null$}
-            \State $iface()$ \Comment{New iface object}
-            \State $iface.side \gets East$
-            \State $iface.northIndex \gets \Omega.eastIndex$
-            \State $iface.eastIndex \gets \Omega.southIndex$
-            \State $iface.southIndex \gets \Omega.westIndex$
-            \State $iface.westIndex \gets \Omega.northIndex$
-            \State $ifaces.insert(iface)$
-        \EndIf
-        \If{$\Omega.southIndex \not= null$}
-            \State $iface()$ \Comment{New iface object}
-            \State $iface.side \gets South$
-            \State $iface.northIndex \gets \Omega.southIndex$
-            \State $iface.eastIndex \gets \Omega.westIndex$
-            \State $iface.southIndex \gets \Omega.northIndex$
-            \State $iface.westIndex \gets \Omega.eastIndex$
-            \State $ifaces.insert(iface)$
-        \EndIf
-        \If{$\Omega.westIndex \not= null$}
-            \State $iface()$ \Comment{New iface object}
-            \State $iface.side \gets West$
-            \State $iface.northIndex \gets \Omega.westIndex$
-            \State $iface.eastIndex \gets \Omega.northIndex$
-            \State $iface.southIndex \gets \Omega.eastIndex$
-            \State $iface.westIndex \gets \Omega.southIndex$
-            \State $ifaces.insert(iface)$
-        \EndIf
+        \For{$side \in \{North,East,South,West\}$}
+            \If{$\Omega.hasNeighbor(side)$}
+                \State $iface()$ \Comment{New iface object}
+                \State $iface.side \gets side$
+                \State $iface.northIndex \gets \Omega.getIndex(side)$
+                \State $iface.eastIndex \gets \Omega.getIndex(\Call{Rotate}{side,90})$
+                \State $iface.southIndex \gets \Omega.getIndex(\Call{Rotate}{side,180})$
+                \State $iface.westIndex \gets \Omega.getIndex(\Call{Rotate}{side,260})$
+                \State $ifaces.insert(iface)$
+            \EndIf
+        \EndFor
     \EndFor
     \State \Return $ifaces$
     \EndProcedure
 \end{algorithmic}
+    \label{ifaces}
 \end{algorithm}
 \begin{algorithm}[H]
-\caption{Matrix Formation}
+\caption{Matrix Formulation}
 \begin{algorithmic}[1]
     \Procedure{FormMatrix}{Domains}
     \State $ifaces \gets \Call{EnumerateIfaceStructs}{Domains}$
     \State $NorthBlock, EastBlock, SouthBlock, WestBlock \gets \Call{getBlocks}{n}$
     \State $A()$ \Comment{Allocate Matrix}
     \ForAll{$iface \in ifaces$} \Comment{Insert Blocks into Matrix}
-        \State $reverseColumns \gets False$
-        \State $reverseRows \gets False$
-        \If {iface.side = East \textbf{or} iface.side = South}
-             \State $reverseColumns \gets True$
-        \EndIf
         \State
+        \State $reverseColumns \gets \Call{RevColTable}{iface.side}$
+        \State $reverseRows \gets \Call{RevRowTable}{iface.side,North}$
         \State $j \gets iface.northIndex$
         \State $A.insertBlock(NorthBlock,j,j,reverseColumns,reverseRows)$
         \State
-        \If{$\Omega.southIndex \not= null$}
-            \State $i \gets iface.southIndex$
-            \State $A.insertBlock(SouthBlock,i,j,reverseColumns,reverseRows)$
-        \EndIf
-        \State
-        \If {iface.side = South \textbf{or} iface.side = West}
-             \State $reverseRows \gets True$
-        \EndIf
-        \State
         \If{$\Omega.eastIndex \not= null$}
+            \State $reverseRows \gets \Call{RevRowTable}{iface.side,East}$
             \State $i \gets iface.eastIndex$
             \State $A.insertBlock(EastBlock,i,j,reverseColumns,reverseRows)$
         \EndIf
         \State
+        \If{$\Omega.southIndex \not= null$}
+            \State $reverseRows \gets \Call{RevRowTable}{iface.side,South}$
+            \State $i \gets iface.southIndex$
+            \State $A.insertBlock(SouthBlock,i,j,reverseColumns,reverseRows)$
+        \EndIf
+        \State
         \If{$\Omega.westIndex \not= null$}
+            \State $reverseRows \gets \Call{RevRowTable}{iface.side,West}$
             \State $i \gets iface.westIndex$
             \State $A.insertBlock(WestBlock,i,j,reverseColumns,reverseRows)$
         \EndIf
         \State
     \EndFor
+    \State \Return $A$
     \EndProcedure
 \end{algorithmic}
 \end{algorithm}
-%\end{algorithm}
-
-
-
 
 \section{Handling Refinement}
 We want the flux going out of the coarse cell to match the fluxes going into 
