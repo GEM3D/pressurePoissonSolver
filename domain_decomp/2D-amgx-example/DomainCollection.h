@@ -11,7 +11,7 @@ struct AmgxCrs{
     int block_dimx=1;
     int block_dimy=1;
     std::vector<int> row_ptrs;
-    std::vector<int64_t>  col_indicies_global;
+    std::vector<int>  cols;
     std::vector<double> data;
   double * diag_data=nullptr;
 };

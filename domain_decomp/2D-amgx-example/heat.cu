@@ -2,6 +2,7 @@
 #include "DomainCollection.h"
 #include "Timer.h"
 #include "args.h"
+#include "amgx_c.h"
 #include <chrono>
 #include <cmath>
 #include <iostream>
@@ -18,6 +19,10 @@
 // =========== //
 
 using namespace std;
+void print_callback(const char *msg, int length)
+{
+    cout << msg;
+}
 int main(int argc, char *argv[])
 {
 	using namespace std::chrono;
@@ -248,6 +253,30 @@ int main(int argc, char *argv[])
 		nfuny = [](double x, double y) { return M_PIl * cosl(M_PIl * y) * cosl(2 * M_PIl * x); };
 	}
 
+    //library handles
+    AMGX_Mode mode;
+    AMGX_config_handle cfg;
+    AMGX_resources_handle rsrc;
+    AMGX_matrix_handle gA;
+    AMGX_vector_handle gb, gx;
+    AMGX_solver_handle solver;
+    mode = AMGX_mode_dDDI;
+    //status handling
+    AMGX_SOLVE_STATUS status;
+    /* init */
+    AMGX_SAFE_CALL(AMGX_initialize());
+    AMGX_SAFE_CALL(AMGX_initialize_plugins());
+    /* system */
+    AMGX_SAFE_CALL(AMGX_register_print_callback(&print_callback));
+    AMGX_SAFE_CALL(AMGX_install_signal_handler());
+    /* create resources, matrix, vector and solver */
+    AMGX_config_create_from_file(&cfg, "amgx.json");
+    AMGX_resources_create_simple(&rsrc, cfg);
+    AMGX_matrix_create(&gA, rsrc, mode);
+    AMGX_vector_create(&gx, rsrc, mode);
+    AMGX_vector_create(&gb, rsrc, mode);
+    AMGX_solver_create(&solver, rsrc, mode, cfg);
+
 	Tools::Timer timer;
 	for (int loop = 0; loop < loop_count; loop++) {
 		timer.start("Domain Initialization");
@@ -273,6 +302,9 @@ int main(int argc, char *argv[])
         int num_rows = nx*dsc.iface_map_vec.size();
 		// Create the gamma and diff vectors
 		double*                   gamma = new double[num_rows];
+            for(int i=0;i<num_rows;i++){
+                gamma[i]=0;
+            }
 		double*                   r     = new double[num_rows];
 		double*                   x     = new double[num_rows];
 		double*                   d     = new double[num_rows];
@@ -287,7 +319,6 @@ int main(int argc, char *argv[])
 		}
 		timer.start("Complete Solve");
 		if (dsc.num_global_domains != 1) {
-		timer.start("Gamma Solve");
 			// do iterative solve
 
 			// Get the b vector
@@ -298,18 +329,28 @@ int main(int argc, char *argv[])
 			///////////////////
 			timer.start("Linear System Setup");
 
-				timer.start("Matrix Formation");
+            timer.start("Matrix Formation");
 
-				A= dc.formCRSMatrix();
+            A= dc.formCRSMatrix();
 
-				timer.stop("Matrix Formation");
+            timer.stop("Matrix Formation");
+            timer.start("AMGX Setup");
+
+            
+            AMGX_SAFE_CALL(AMGX_vector_upload(gb,num_rows,1,(void*)b));
+            AMGX_SAFE_CALL(AMGX_vector_set_zero(gx,num_rows,1));
+            AMGX_SAFE_CALL(AMGX_matrix_upload_all(gA,num_rows,A.nnz,1,1,&A.row_ptrs[0],&A.cols[0],(void*)&A.data[0],nullptr));
+            AMGX_SAFE_CALL(AMGX_solver_setup(solver, gA));
+
+            timer.stop("AMGX Setup");
 
 			timer.stop("Linear System Setup");
 
-                //TODO solve
+		    timer.start("Gamma Solve");
+            AMGX_SAFE_CALL(AMGX_solver_solve_with_0_initial_guess(solver,gb,gx));
+            AMGX_SAFE_CALL(AMGX_vector_download(gx,(void*)gamma));
 
-
-		timer.stop("Gamma Solve");
+		    timer.stop("Gamma Solve");
 		}
 
 		// Do one last solve

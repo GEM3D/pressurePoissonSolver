@@ -127,9 +127,7 @@ cuda_add_executable(heat heat.cu)
 add_library(DomainCollection DomainCollection.cpp)
 add_library(DomainSignatureCollection DomainSignatureCollection.cpp)
 add_library(Domain Domain.cpp)
-add_library(RBMatrix RBMatrix.cpp)
 add_library(FftwSolver FftwSolver.cpp)
-add_library(Factory Factory.cpp)
 file(GLOB fishpack_SRC "fishpack/*.f")
 #add_library(FishpackSolver FishpackSolver.cpp)
 #add_library(Fishpack ${fishpack_SRC})
@@ -143,24 +141,12 @@ file(GLOB fishpack_SRC "fishpack/*.f")
 target_link_libraries(heat
     DomainCollection
     DomainSignatureCollection
-    RBMatrix
     Domain
-    Factory
-  ${MPI_CXX_LIBRARIES} 
-)
-target_link_libraries(Factory
-  ${Trilinos_TPL_LIBRARIES}
-  ${Trilinos_LIBRARIES} 
-)
-target_link_libraries(RBMatrix
-  ${Trilinos_TPL_LIBRARIES}
-  ${Trilinos_LIBRARIES} 
-  ${FFTW_LIB}
   ${MPI_CXX_LIBRARIES} 
 )
 target_link_libraries(DomainCollection
-    RBMatrix 
    Domain
+   ${CMAKE_SOURCE_DIR}/libamgxsh.so
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
   ${FFTW_LIB}

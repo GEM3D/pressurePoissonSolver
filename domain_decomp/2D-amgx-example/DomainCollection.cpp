@@ -4,6 +4,7 @@
 #include <array>
 #include <tuple>
 #ifdef HAVE_VTK
+#include "MyTypeDefs.h"
 #include <vtkCellData.h>
 #include <vtkDoubleArray.h>
 #include <vtkImageData.h>
@@ -12,7 +13,6 @@
 #include <vtkSmartPointer.h>
 #include <vtkXMLMultiBlockDataWriter.h>
 #include <vtkXMLPMultiBlockDataWriter.h>
-#include "MyTypeDefs.h"
 #endif
 using Teuchos::RCP;
 using Teuchos::rcp;
@@ -25,31 +25,31 @@ void dgetrf_(int *M, int *N, double *A, int *lda, int *IPIV, int *INFO);
 void dgetri_(int *N, double *A, int *lda, int *IPIV, double *WORK, int *lwork, int *INFO);
 }
 
-struct TrilinosObjects{
-	Teuchos::RCP<map_type> collection_map;
-	Teuchos::RCP<map_type> matrix_map;
-RCP<const Teuchos::Comm<int>> comm;
+struct TrilinosObjects {
+	Teuchos::RCP<map_type>        collection_map;
+	Teuchos::RCP<map_type>        matrix_map;
+	RCP<const Teuchos::Comm<int>> comm;
 };
 enum axis_enum { X_AXIS, Y_AXIS };
 enum bc_enum { DIRICHLET, NEUMANN, REFINED };
 
 DomainCollection::DomainCollection(DomainSignatureCollection dsc, int n)
 {
-    trilObjs = new TrilinosObjects;
+	trilObjs = new TrilinosObjects;
 	// cerr<< "Low:  " << low << "\n";
 	// cerr<< "High: " << high << "\n";
 	RCP<const Teuchos::Comm<int>> comm = Tpetra::DefaultPlatform::getDefaultPlatform().getComm();
-	trilObjs->comm         = comm;
-	this->n            = n;
-	this->dsc          = dsc;
-	num_global_domains = dsc.num_global_domains;
+	trilObjs->comm                     = comm;
+	this->n                            = n;
+	this->dsc                          = dsc;
+	num_global_domains                 = dsc.num_global_domains;
 	for (auto p : dsc.domains) {
 		DomainSignature ds = p.second;
 		int             i  = ds.id;
 
 		// create a domain
-		Domain* d_ptr = new Domain(ds, n);
-		domains[i]        = d_ptr;
+		Domain *d_ptr = new Domain(ds, n);
+		domains[i]    = d_ptr;
 	}
 }
 
@@ -158,9 +158,10 @@ void DomainCollection::generateMaps()
 		trilObjs->collection_map = Teuchos::rcp(new map_type(1, 0, trilObjs->comm));
 		trilObjs->matrix_map     = Teuchos::rcp(new map_type(1, 0, trilObjs->comm));
 	} else {
-		trilObjs->collection_map = Teuchos::rcp(new map_type(-1, &global[0], global.size(), 0, trilObjs->comm));
-		trilObjs->matrix_map
-		= Teuchos::rcp(new map_type(-1, &matrix_global[0], matrix_global.size(), 0, trilObjs->comm));
+		trilObjs->collection_map
+		= Teuchos::rcp(new map_type(-1, &global[0], global.size(), 0, trilObjs->comm));
+		trilObjs->matrix_map = Teuchos::rcp(
+		new map_type(-1, &matrix_global[0], matrix_global.size(), 0, trilObjs->comm));
 	}
 #ifdef DD_DEBUG
 	auto out = Teuchos::getFancyOStream(Teuchos::rcpFromRef(cerr));
@@ -169,14 +170,18 @@ void DomainCollection::generateMaps()
 #endif
 }
 void DomainCollection::distributeIfaceInfo() {}
-void DomainCollection::solveWithInterface(double* gamma_raw, double* diff_raw)
+void DomainCollection::solveWithInterface(double *gamma_raw, double *diff_raw)
 {
 	// auto out = Teuchos::getFancyOStream (Teuchos::rcpFromRef (std::cout));
 	// if(has_east)std::cout << "Gamma begin\n";
 	// gamma.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
-	vector_type                   gamma = vector_type(trilObjs->matrix_map, 1);
-		vector_type                   diff = vector_type(trilObjs->matrix_map, 1);
+	vector_type gamma = vector_type(trilObjs->matrix_map, 1);
+	vector_type diff  = vector_type(trilObjs->matrix_map, 1);
 	diff.update(1, gamma, 0);
+	auto gamma_view = gamma.getLocalView<Kokkos::HostSpace>();
+    for(int i=0;i<gamma.getLocalLength();i++){
+        gamma_view(i,0)=gamma_raw[i];
+    }
 	Tpetra::Import<> importer(diff.getMap(), trilObjs->collection_map);
 	Tpetra::Export<> exporter(trilObjs->collection_map, diff.getMap());
 	vector_type      local_gamma(trilObjs->collection_map, 1);
@@ -214,6 +219,10 @@ void DomainCollection::solveWithInterface(double* gamma_raw, double* diff_raw)
 	// gamma.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
 	// diff.update(-2, gamma, 1);
 	diff.scale(-1);
+	auto diff_view = diff.getLocalView<Kokkos::HostSpace>();
+    for(int i=0;i<diff.getLocalLength();i++){
+        diff_raw[i]=diff_view(i,0);
+    }
 }
 double DomainCollection::diffNorm()
 {
@@ -379,9 +388,10 @@ AmgxCrs DomainCollection::formCRSMatrix()
 			cols_array.push_back(i * n + j);
 		}
 	}
-	RCP<map_type> col_map = rcp(new map_type(-1, &cols_array[0], cols_array.size(), 0, trilObjs->comm));
+	RCP<map_type> col_map
+	= rcp(new map_type(-1, &cols_array[0], cols_array.size(), 0, trilObjs->comm));
 
-	auto A  = rcp(new matrix_type(trilObjs->matrix_map, col_map, 5 * n));
+	auto A = rcp(new matrix_type(trilObjs->matrix_map, col_map, 5 * n));
 
 	set<pair<int, int>> inserted;
 	valarray<double> shift(n);
@@ -707,10 +717,30 @@ AmgxCrs DomainCollection::formCRSMatrix()
 	}
 
 	A->fillComplete(trilObjs->matrix_map, trilObjs->matrix_map);
+	AmgxCrs Acrs;
+	Acrs.nnz     = A->getNodeNumEntries();
+	int num_rows = A->getNodeNumRows();
+	Acrs.row_ptrs.resize(num_rows+1);
+	Acrs.data.resize(Acrs.nnz);
+	Acrs.cols.resize(Acrs.nnz);
+	int curr_pos = 0;
+		Acrs.row_ptrs[0]=curr_pos;
+	for (int i = 0; i < num_rows; i++) {
+		int     old_pos = curr_pos;
+		int     n;
+		const int *   inds;
+		const double *vals;
+		A->getLocalRowViewRaw(i, n, inds, vals);
+		for (int j = 0; j < n; j++) {
+			Acrs.data[curr_pos]=vals[j];
+			Acrs.cols[curr_pos]=inds[j];
+            curr_pos++;
+		}
 
-	AmgxCrs          Acrs;
-    Acrs.nnz = A->getNodeNumEntries();
-    return Acrs;
+		Acrs.row_ptrs[i+1]=curr_pos;
+	}
+
+	return Acrs;
 }
 
 void DomainCollection::outputSolution(std::ostream &os)
@@ -871,24 +901,25 @@ void DomainCollection::outputClaw()
 	q_file.close();
 }
 void DomainCollection::swapResidSol()
-	{
-		for (auto &p : domains) {
-			p.second->swapResidSol();
-		}
+{
+	for (auto &p : domains) {
+		p.second->swapResidSol();
 	}
-	void DomainCollection::sumResidIntoSol()
-	{
-		for (auto &p : domains) {
-			p.second->sumResidIntoSol();
-		}
+}
+void DomainCollection::sumResidIntoSol()
+{
+	for (auto &p : domains) {
+		p.second->sumResidIntoSol();
 	}
+}
 
-	void DomainCollection::zeroF(double fdiff){
-        for (auto &p : domains) {
-				Domain &d = *p.second;
-				d.f += fdiff;
-			}
-    }
+void DomainCollection::zeroF(double fdiff)
+{
+	for (auto &p : domains) {
+		Domain &d = *p.second;
+		d.f += fdiff;
+	}
+}
 #ifdef HAVE_VTK
 void DomainCollection::outputVTK()
 {
