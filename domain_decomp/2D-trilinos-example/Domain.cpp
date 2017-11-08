@@ -3,8 +3,42 @@
 #include "FftwSolver.h"
 #include "FishpackSolver.h"
 #include <valarray>
+#include <sstream>
 using namespace std;
 SolverType Domain::solver_type = SolverType::fftw;
+void Domain::print(){
+  ostringstream oss;
+	oss << "I am Domain: " << ds.id << "\n";
+	oss << "h:           " << this->h_x << endl;
+	oss << "I start at:  " << ds.x_start << ", " << ds.y_start << "\n";
+	oss << "Length:     " << ds.x_length << ", " << ds.y_length << "\n";
+	oss << "North: " << ds.nbr(Side::north) << ", " << ds.nbrRight(Side::north) << "\n";
+	oss << "Idx:   " << ds.index(Side::north) << ", " << ds.indexCenter(Side::north) << "\n";
+	oss << "       " << indexRefinedLeft(Side::north) << ", " << indexRefinedRight(Side::north)
+	     << "\n";
+	oss << "East:  " << ds.nbr(Side::east) << ", " << ds.nbrRight(Side::east) << "\n";
+	oss << "Idx:   " << ds.index(Side::east) << ", " << ds.indexCenter(Side::east) << "\n";
+	oss << "       " << indexRefinedLeft(Side::east) << ", " << indexRefinedRight(Side::east)
+	     << "\n";
+	oss << "South: " << ds.nbr(Side::south) << ", " << ds.nbrRight(Side::south) << "\n";
+	oss << "Idx:   " << ds.index(Side::south) << ", " << ds.indexCenter(Side::south) << "\n";
+	oss << "       " << indexRefinedLeft(Side::south) << ", " << indexRefinedRight(Side::south)
+	     << "\n";
+	oss << "West:  " << ds.nbr(Side::west) << ", " << ds.nbrRight(Side::west) << "\n";
+	oss << "Idx:   " << ds.index(Side::west) << ", " << ds.indexCenter(Side::west) << "\n";
+	oss << "       " << indexRefinedLeft(Side::west) << ", " << indexRefinedRight(Side::west)
+	     << "\n";
+	cerr << "Flags: " << hasFineNbr(Side::west) << ", " << hasCoarseNbr(Side::west) << ", "
+	     << isCoarseLeft(Side::west) << endl;
+	oss << "Procs:  ";
+    for(int i:ds.proc){
+        oss<< i<<" ";
+    }
+	oss << "\n";
+	oss << "\n";
+    cerr << oss.str();
+
+}
 Domain::Domain(DomainSignature ds, int n)
 {
 	this->n   = n;
@@ -13,28 +47,8 @@ Domain::Domain(DomainSignature ds, int n)
 	this->ds  = ds;
 
 #if DD_DEBUG
-	cerr << "I am Domain: " << ds.id << "\n";
-	cerr << "h:           " << this->h_x << endl;
-	cerr << "I start at:  " << ds.x_start << ", " << ds.y_start << "\n";
-	cerr << "Length:     " << ds.x_length << ", " << ds.y_length << "\n";
-	cerr << "North: " << ds.nbr(Side::north) << ", " << ds.nbrRight(Side::north) << "\n";
-	cerr << "Idx:   " << ds.index(Side::north) << ", " << ds.indexCenter(Side::north) << "\n";
-	cerr << "       " << indexRefinedLeft(Side::north) << ", " << indexRefinedRight(Side::north)
-	     << "\n";
-	cerr << "East:  " << ds.nbr(Side::east) << ", " << ds.nbrRight(Side::east) << "\n";
-	cerr << "Idx:   " << ds.index(Side::east) << ", " << ds.indexCenter(Side::east) << "\n";
-	cerr << "       " << indexRefinedLeft(Side::east) << ", " << indexRefinedRight(Side::east)
-	     << "\n";
-	cerr << "South: " << ds.nbr(Side::south) << ", " << ds.nbrRight(Side::south) << "\n";
-	cerr << "Idx:   " << ds.index(Side::south) << ", " << ds.indexCenter(Side::south) << "\n";
-	cerr << "       " << indexRefinedLeft(Side::south) << ", " << indexRefinedRight(Side::south)
-	     << "\n";
-	cerr << "West:  " << ds.nbr(Side::west) << ", " << ds.nbrRight(Side::west) << "\n";
-	cerr << "Idx:   " << ds.index(Side::west) << ", " << ds.indexCenter(Side::west) << "\n";
-	cerr << "       " << indexRefinedLeft(Side::west) << ", " << indexRefinedRight(Side::west)
-	     << "\n";
-	cerr << "\n";
-#endif
+    print();
+  #endif
 	f      = valarray<double>(n * n);
 	f_back = valarray<double>(n * n);
 	f_comp = valarray<double>(n * n);
@@ -63,27 +77,7 @@ Domain::~Domain()
 {
 	delete solver;
 #if DD_DEBUG
-	cerr << "I am Domain: " << ds.id << "\n";
-	cerr << "h:           " << this->h_x << endl;
-	cerr << "I start at:  " << ds.x_start << ", " << ds.y_start << "\n";
-	cerr << "Length:     " << ds.x_length << ", " << ds.y_length << "\n";
-	cerr << "North: " << ds.nbr(Side::north) << ", " << ds.nbrRight(Side::north) << "\n";
-	cerr << "Idx:   " << index(Side::north) << ", " << indexCenter(Side::north) << "\n";
-	cerr << "Flags: " << hasFineNbr(Side::north) << ", " << hasCoarseNbr(Side::north) << ", "
-	     << isCoarseLeft(Side::north) << endl;
-	cerr << "East:  " << ds.nbr(Side::east) << ", " << ds.nbrRight(Side::east) << "\n";
-	cerr << "Idx:   " << index(Side::east) << ", " << indexCenter(Side::east) << "\n";
-	cerr << "Flags: " << hasFineNbr(Side::east) << ", " << hasCoarseNbr(Side::east) << ", "
-	     << isCoarseLeft(Side::east) << endl;
-	cerr << "South: " << ds.nbr(Side::south) << ", " << ds.nbrRight(Side::south) << "\n";
-	cerr << "Idx:   " << index(Side::south) << ", " << indexCenter(Side::south) << "\n";
-	cerr << "Flags: " << hasFineNbr(Side::south) << ", " << hasCoarseNbr(Side::south) << ", "
-	     << isCoarseLeft(Side::south) << endl;
-	cerr << "West:  " << ds.nbr(Side::west) << ", " << ds.nbrRight(Side::west) << "\n";
-	cerr << "Idx:   " << index(Side::west) << ", " << indexCenter(Side::west) << "\n";
-	cerr << "Flags: " << hasFineNbr(Side::west) << ", " << hasCoarseNbr(Side::west) << ", "
-	     << isCoarseLeft(Side::west) << endl;
-	cerr << "\n";
+    print();
 #endif
 }
 

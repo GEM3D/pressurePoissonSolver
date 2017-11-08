@@ -5,6 +5,9 @@
 #include <bitset>
 #include <map>
 #include <set>
+#include <Teuchos_Comm.hpp>
+#include <Teuchos_GlobalMPISession.hpp>
+#include <Teuchos_RCP.hpp>
 #include <string>
 #include <vector>
 #include <zoltan_cpp.h>
@@ -21,6 +24,9 @@ struct DomainSignature {
 
 	std::array<int, 8> nbr_id           = {{-1, -1, -1, -1, -1, -1, -1, -1}};
 	std::array<int, 8> proc             = {{-1, -1, -1, -1, -1, -1, -1, -1}};
+	std::array<int, 4> g_id             = {{-1, -1, -1, -1}};
+	std::array<int, 4> g_id_center      = {{-1, -1, -1, -1}};
+	std::array<int, 8> g_id_refined     = {{-1, -1, -1, -1, -1, -1, -1, -1}};
 	std::array<int, 4> global_i         = {{-1, -1, -1, -1}};
 	std::array<int, 4> global_i_center  = {{-1, -1, -1, -1}};
 	std::array<int, 8> global_i_refined = {{-1, -1, -1, -1, -1, -1, -1, -1}};
@@ -53,17 +59,18 @@ struct DomainSignature {
 	{
 		return l.id < r.id;
 	}
-	inline int &globalIndex(Side s) { return global_i[static_cast<int>(s)]; }
-	inline int &globalIndexCenter(Side s) { return global_i_center[static_cast<int>(s)]; }
-	inline int &globalIndexRefinedLeft(Side s) { return global_i_refined[2 * static_cast<int>(s)]; }
-	inline int &globalIndexRefinedRight(Side s)
-	{
-		return global_i_refined[1 + 2 * static_cast<int>(s)];
-	}
-	inline int &index(Side s) { return local_i[static_cast<int>(s)]; }
-	inline int &indexCenter(Side s) { return local_i_center[static_cast<int>(s)]; }
-	inline int &indexRefinedLeft(Side s) { return local_i_refined[2 * static_cast<int>(s)]; }
-	inline int &indexRefinedRight(Side s) { return local_i_refined[1 + 2 * static_cast<int>(s)]; }
+	int &gid(Side s) { return g_id[static_cast<int>(s)]; }
+	int &gidCenter(Side s) { return g_id_center[static_cast<int>(s)]; }
+	int &gidRefinedLeft(Side s) { return g_id_refined[2 * static_cast<int>(s)]; }
+	int &gidRefinedRight(Side s) { return g_id_refined[1 + 2 * static_cast<int>(s)]; }
+	int &globalIndex(Side s) { return global_i[static_cast<int>(s)]; }
+	int &globalIndexCenter(Side s) { return global_i_center[static_cast<int>(s)]; }
+	int &globalIndexRefinedLeft(Side s) { return global_i_refined[2 * static_cast<int>(s)]; }
+	int &globalIndexRefinedRight(Side s) { return global_i_refined[1 + 2 * static_cast<int>(s)]; }
+	int &index(Side s) { return local_i[static_cast<int>(s)]; }
+	int &indexCenter(Side s) { return local_i_center[static_cast<int>(s)]; }
+	int &indexRefinedLeft(Side s) { return local_i_refined[2 * static_cast<int>(s)]; }
+	int &indexRefinedRight(Side s) { return local_i_refined[1 + 2 * static_cast<int>(s)]; }
 	inline int &nbr(Side s) { return nbr_id[2 * static_cast<int>(s)]; }
 	inline int &nbrRight(Side s) { return nbr_id[2 * static_cast<int>(s) + 1]; }
 	inline bool hasNbr(Side s) const { return nbr_id[static_cast<int>(s) * 2] != -1; }
@@ -76,18 +83,40 @@ struct DomainSignature {
 	void setLocalIndexes(std::map<int, int> &rev_map)
 	{
 		for (int i = 0; i < 4; i++) {
-			if (global_i[i] != -1) {
-				local_i[i] = rev_map.at(global_i[i]);
+			if (g_id[i] != -1) {
+				local_i[i] = rev_map.at(g_id[i]);
+			}
+		}
+		try {
+			for (int i = 0; i < 4; i++) {
+				if (g_id_center[i] != -1) {
+					local_i_center[i] = rev_map.at(g_id_center[i]);
+				}
+			}
+			for (int i = 0; i < 8; i++) {
+				if (g_id_refined[i] != -1) {
+					local_i_refined[i] = rev_map.at(g_id_refined[i]);
+				}
+			}
+		} catch (std::out_of_range oor) {
+            //do nothing
+		}
+	}
+	void setGlobalIndexes(std::map<int, int> &rev_map)
+	{
+		for (int i = 0; i < 4; i++) {
+			if (g_id[i] != -1) {
+				global_i[i] = rev_map.at(g_id[i]);
 			}
 		}
 		for (int i = 0; i < 4; i++) {
-			if (global_i_center[i] != -1) {
-				local_i_center[i] = rev_map.at(global_i_center[i]);
+			if (g_id_center[i] != -1) {
+				global_i_center[i] = rev_map.at(g_id_center[i]);
 			}
 		}
 		for (int i = 0; i < 8; i++) {
-			if (global_i_refined[i] != -1) {
-				local_i_refined[i] = rev_map.at(global_i_refined[i]);
+			if (g_id_refined[i] != -1) {
+				global_i_refined[i] = rev_map.at(g_id_refined[i]);
 			}
 		}
 	}
@@ -112,6 +141,7 @@ struct DomainSignature {
 		}
 	}
 };
+
 enum class BlockType {
 	plain,
 	fine,
@@ -168,10 +198,13 @@ enum class IfaceType {
 	refined_on_right_left_of_coarse,
 	refined_on_right_right_of_coarse
 };
+using DsMemPtr = int &(DomainSignature::*) (Side);
 struct Iface {
+	std::set<MatrixBlock> getRowBlocks(int *id, DsMemPtr normal);
 	bool            y_axis;
-	int             id       = -1;
-	int             id_local = -1;
+	int             id        = -1;
+	int             id_global = -1;
+	int             id_local  = -1;
 	DomainSignature left, right, extra;
 	IfaceType       type;
 
@@ -198,8 +231,8 @@ struct Iface {
 
 	friend bool operator<(const Iface &l, const Iface &r) { return l.id < r.id; }
 	std::set<MatrixBlock> getRowBlocks();
-	std::set<MatrixBlock> getColBlocks();
 	std::set<MatrixBlock> getGlobalRowBlocks();
+	std::set<MatrixBlock> getGidRowBlocks();
 	std::set<MatrixBlock> getGlobalColBlocks();
 	std::set<int>         getPins();
 	void setLocalIndexes(std::map<int, int> &rev_map)
@@ -208,17 +241,11 @@ struct Iface {
 		right.setLocalIndexes(rev_map);
 		extra.setLocalIndexes(rev_map);
 	}
-	void setNeumann()
+	void setGlobalIndexes(std::map<int, int> &rev_map)
 	{
-		left.setNeumann();
-		right.setNeumann();
-		extra.setNeumann();
-	}
-	void setZeroPatch()
-	{
-		left.setZeroPatch();
-		right.setZeroPatch();
-		extra.setZeroPatch();
+		left.setGlobalIndexes(rev_map);
+		right.setGlobalIndexes(rev_map);
+		extra.setGlobalIndexes(rev_map);
 	}
 };
 
@@ -233,6 +260,7 @@ class DomainSignatureCollection
 {
 	public:
 	int rank;
+    Teuchos::RCP<const Teuchos::Comm<int>> comm;
 	int matrix_j_low;
 	int matrix_j_high;
 	int num_pins;
@@ -252,6 +280,9 @@ class DomainSignatureCollection
 	std::map<int, int>             iface_rev_map;
 	std::vector<int> iface_map_vec;
 	std::vector<int> iface_off_proc_map_vec;
+	std::vector<int> iface_off_proc_vec;
+	std::vector<int> iface_off_proc_map_vec_send;
+	std::vector<int> iface_off_proc_vec_send;
 	std::map<int, int> domain_rev_map;
 	std::vector<int> domain_map_vec;
 
@@ -260,7 +291,6 @@ class DomainSignatureCollection
 	 */
 	DomainSignatureCollection() = default;
 
-	DomainSignatureCollection(std::string file_name, int rank);
 	void enumerateIfaces();
 	void determineCoarseness();
 	void determineAmrLevel();
@@ -273,8 +303,9 @@ class DomainSignatureCollection
 	 * @param d_y number of domains in the y direction.
 	 * @param rank the rank of the MPI process.
 	 */
-	DomainSignatureCollection(int d_x, int d_y, int rank);
-	DomainSignatureCollection(int d_x, int d_y, int rank, bool amr);
+	DomainSignatureCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm,int d_x, int d_y, int rank);
+	DomainSignatureCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm,int d_x, int d_y, int rank, bool amr);
+	DomainSignatureCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm,std::string file_name, int rank);
 	/**
 	 * @brief Balance the domains over processors using Zoltan
 	 */
@@ -286,22 +317,17 @@ class DomainSignatureCollection
 	 */
 	void indexInterfacesBFS();
 	void indexIfacesLocal();
+	void indexIfacesGlobal();
 	void indexDomainIfacesLocal();
 	void setNeumann()
 	{
 		for (auto &p : domains) {
 			p.second.setNeumann();
 		}
-		for (auto &p : ifaces) {
-			p.second.setNeumann();
-		}
 	}
 	void setZeroPatch()
 	{
 		for (auto &p : domains) {
-			p.second.setZeroPatch();
-		}
-		for (auto &p : ifaces) {
 			p.second.setZeroPatch();
 		}
 	}
@@ -331,7 +357,7 @@ struct IfaceZoltanHelper {
 		for (auto &p : dsc->ifaces) {
 			globalID[i]                  = p.first;
 			localID[i]                   = p.first;
-			std::set<MatrixBlock> blocks = p.second.getGlobalRowBlocks();
+			std::set<MatrixBlock> blocks = p.second.getGidRowBlocks();
 			float                 weight = 1.0;
 			for (MatrixBlock b : blocks) {
 				if (b.i != b.j) {
@@ -462,7 +488,23 @@ struct DomainZoltanHelper {
 		DomainSignatureCollection *dsc = (DomainSignatureCollection *) data;
 		*ierr                          = ZOLTAN_OK;
 		for (int i = 0; i < num_ids; i++) {
-			sizes[i] = sizeof(dsc->domains[global_ids[i]]);
+			auto ds         = dsc->domains[global_ids[i]];
+			int  num_ifaces = 0;
+			if (ds.hasCoarseNbr(Side::north)) {
+				num_ifaces += 2;
+			} else if (ds.hasFineNbr(Side::north)) {
+				num_ifaces += 3;
+			} else if (ds.hasNbr(Side::north)) {
+				num_ifaces += 1;
+			}
+			if (ds.hasCoarseNbr(Side::east)) {
+				num_ifaces += 2;
+			} else if (ds.hasFineNbr(Side::east)) {
+				num_ifaces += 3;
+			} else if (ds.hasNbr(Side::east)) {
+				num_ifaces += 1;
+			}
+			sizes[i] = sizeof(int) + sizeof(DomainSignature) + num_ifaces * sizeof(Iface);
 		}
 	}
 	static void pack_objects(void *data, int num_gid_entries, int num_lid_entries, int num_ids,
@@ -481,7 +523,7 @@ struct DomainZoltanHelper {
 			}
 		}
 		for (int i = 0; i < num_ids; i++) {
-			*((DomainSignature *) &buf[idx[i]]) = dsc->domains[global_ids[i]];
+			*((DomainSignature *) &buf[idx[i] + sizeof(int)]) = dsc->domains[global_ids[i]];
 			dsc->domains.erase(global_ids[i]);
 		}
 	}
@@ -491,7 +533,7 @@ struct DomainZoltanHelper {
 		DomainSignatureCollection *dsc = (DomainSignatureCollection *) data;
 		*ierr                          = ZOLTAN_OK;
 		for (int i = 0; i < num_ids; i++) {
-			dsc->domains[global_ids[i]] = *((DomainSignature *) &buf[idx[i]]);
+			dsc->domains[global_ids[i]] = *((DomainSignature *) &buf[idx[i] + sizeof(int)]);
 		}
 	}
 	static int numInterfaces(void *data, int num_gid_entries, int num_lid_entries,

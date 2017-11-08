@@ -185,13 +185,13 @@ int main(int argc, char *argv[])
 	DomainSignatureCollection dsc;
 	if (f_mesh) {
 		string d = args::get(f_mesh);
-		dsc      = DomainSignatureCollection(d, comm->getRank());
+		dsc      = DomainSignatureCollection(comm,d, comm->getRank());
 	} else if (f_amr) {
 		int d = args::get(f_amr);
-		dsc   = DomainSignatureCollection(d, d, comm->getRank(), true);
+		dsc   = DomainSignatureCollection(comm,d, d, comm->getRank(), true);
 	} else {
 		int d = args::get(f_square);
-		dsc   = DomainSignatureCollection(d, d, comm->getRank());
+		dsc   = DomainSignatureCollection(comm,d, d, comm->getRank());
 	}
 	if (f_div) {
 		for (int i = 0; i < args::get(f_div); i++) {

@@ -1,11 +1,19 @@
 #include "DomainSignatureCollection.h"
+#include "MyTypeDefs.h"
+#include <algorithm>
 #include <deque>
 #include <fstream>
 #include <iostream>
 #include <set>
+#include <sstream>
+#include <utility>
 using namespace std;
-DomainSignatureCollection::DomainSignatureCollection(string file_name, int rank)
+using Teuchos::RCP;
+using Teuchos::rcp;
+DomainSignatureCollection::DomainSignatureCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm,
+                                                     string file_name, int rank)
 {
+	this->comm = comm;
 	this->rank = rank;
 	if (rank == 0) {
 		num_global_interfaces = 0;
@@ -53,8 +61,10 @@ DomainSignatureCollection::DomainSignatureCollection(string file_name, int rank)
 	indexInterfacesBFS();
 	MPI_Bcast(&num_global_domains, 1, MPI_INT, 0, MPI_COMM_WORLD);
 }
-DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank)
+DomainSignatureCollection::DomainSignatureCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm,
+                                                     int d_x, int d_y, int rank)
 {
+	this->comm         = comm;
 	this->rank         = rank;
 	num_global_domains = d_x * d_y;
 	if (rank == 0) {
@@ -97,7 +107,7 @@ void DomainSignatureCollection::enumerateIfaces()
 		DomainSignature &ds = p.second;
 		Side             s  = Side::north;
 		do {
-			int index = ds.globalIndex(s);
+			int index = ds.gid(s);
 			if (index != -1 && ifaces.count(index) == 0) {
 				Iface &iface = ifaces[index];
 				iface.id     = index;
@@ -152,10 +162,13 @@ void DomainSignatureCollection::enumerateIfaces()
 		num_pins += p.second.getPins().size();
 	}
 	indexIfacesLocal();
+	indexIfacesGlobal();
 	indexDomainIfacesLocal();
 }
-DomainSignatureCollection::DomainSignatureCollection(int d_x, int d_y, int rank, bool amr)
+DomainSignatureCollection::DomainSignatureCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm,
+                                                     int d_x, int d_y, int rank, bool amr)
 {
+	this->comm         = comm;
 	this->rank         = rank;
 	num_global_domains = d_x * d_y * 5;
 	if (rank == 0) {
@@ -677,9 +690,9 @@ void DomainSignatureCollection::indexInterfacesBFS()
 			visited.insert(curr);
 			Side s = Side::north;
 			do {
-				if (d.hasNbr(s) && d.globalIndex(s) == -1) {
+				if (d.hasNbr(s) && d.gid(s) == -1) {
 					// a new edge that we have not assigned an index to
-					d.globalIndex(s) = curr_i;
+					d.gid(s) = curr_i;
 					curr_i++;
 
 					// fine case
@@ -688,18 +701,18 @@ void DomainSignatureCollection::indexInterfacesBFS()
 						DomainSignature &nbr_right = domains.at(d.nbrRight(s));
 
 						// set center indexes
-						nbr_left.globalIndexCenter(!s)  = d.globalIndex(s);
-						nbr_right.globalIndexCenter(!s) = d.globalIndex(s);
+						nbr_left.gidCenter(!s)  = d.gid(s);
+						nbr_right.gidCenter(!s) = d.gid(s);
 
 						// set left and right indexes index
-						nbr_left.globalIndex(!s) = curr_i;
+						nbr_left.gid(!s) = curr_i;
 						curr_i++;
-						nbr_right.globalIndex(!s) = curr_i;
+						nbr_right.gid(!s) = curr_i;
 						curr_i++;
 
 						// set refined indexes
-						d.globalIndexRefinedLeft(s)  = nbr_left.globalIndex(!s);
-						d.globalIndexRefinedRight(s) = nbr_right.globalIndex(!s);
+						d.gidRefinedLeft(s)  = nbr_left.gid(!s);
+						d.gidRefinedRight(s) = nbr_right.gid(!s);
 
 						// enqueue domains
 						if (enqueued.count(d.nbr(s)) == 0) {
@@ -718,29 +731,29 @@ void DomainSignatureCollection::indexInterfacesBFS()
 							DomainSignature &buddy = domains.at(nbr.nbrRight(!s));
 							buddy_id               = buddy.id;
 
-							nbr.globalIndexRefinedLeft(!s) = d.globalIndex(s);
+							nbr.gidRefinedLeft(!s) = d.gid(s);
 
-							nbr.globalIndexRefinedRight(!s) = curr_i;
-							buddy.globalIndex(s)            = curr_i;
+							nbr.gidRefinedRight(!s) = curr_i;
+							buddy.gid(s)            = curr_i;
 							curr_i++;
 
-							d.globalIndexCenter(s)     = curr_i;
-							nbr.globalIndex(!s)        = curr_i;
-							buddy.globalIndexCenter(s) = curr_i;
+							d.gidCenter(s)     = curr_i;
+							nbr.gid(!s)        = curr_i;
+							buddy.gidCenter(s) = curr_i;
 							curr_i++;
 						} else {
 							DomainSignature &buddy = domains.at(nbr.nbr(!s));
 							buddy_id               = buddy.id;
 
-							nbr.globalIndexRefinedRight(!s) = d.globalIndex(s);
+							nbr.gidRefinedRight(!s) = d.gid(s);
 
-							nbr.globalIndexRefinedLeft(!s) = curr_i;
-							buddy.globalIndex(s)           = curr_i;
+							nbr.gidRefinedLeft(!s) = curr_i;
+							buddy.gid(s)           = curr_i;
 							curr_i++;
 
-							d.globalIndexCenter(s)     = curr_i;
-							nbr.globalIndex(!s)        = curr_i;
-							buddy.globalIndexCenter(s) = curr_i;
+							d.gidCenter(s)     = curr_i;
+							nbr.gid(!s)        = curr_i;
+							buddy.gidCenter(s) = curr_i;
 							curr_i++;
 						}
 
@@ -756,7 +769,7 @@ void DomainSignatureCollection::indexInterfacesBFS()
 						// normal case
 					} else {
 						DomainSignature &nbr = domains.at(d.nbr(s));
-						nbr.globalIndex(!s)  = d.globalIndex(s);
+						nbr.gid(!s)          = d.gid(s);
 						// enqueue domain
 						if (enqueued.count(d.nbr(s)) == 0) {
 							queue.push_back(d.nbr(s));
@@ -776,10 +789,10 @@ void DomainSignatureCollection::indexInterfacesBFS()
 }
 void DomainSignatureCollection::zoltanBalance()
 {
-	zoltanBalanceIfaces();
 	zoltanBalanceDomains();
-	indexIfacesLocal();
 	indexDomainIfacesLocal();
+	zoltanBalanceIfaces();
+	indexIfacesLocal();
 }
 
 void DomainSignatureCollection::zoltanBalanceIfaces()
@@ -838,7 +851,8 @@ void DomainSignatureCollection::zoltanBalanceIfaces()
 		exit(0);
 	}
 	delete zz;
-	cerr << "I have " << ifaces.size() << " ifaces: ";
+	ostringstream oss;
+	oss << "I have " << ifaces.size() << " ifaces: ";
 
 #if DD_DEBUG
 	int  prev  = -100;
@@ -846,17 +860,18 @@ void DomainSignatureCollection::zoltanBalanceIfaces()
 	for (auto &p : ifaces) {
 		int curr = p.second.id;
 		if (curr != prev + 1 && !range) {
-			cout << curr << "-";
+			oss << curr << "-";
 			range = true;
 		} else if (curr != prev + 1 && range) {
-			cout << prev << " " << curr << "-";
+			oss << prev << " " << curr << "-";
 		}
 		prev = curr;
 	}
 
-	cout << prev << "\n";
+	oss << prev << "\n";
 #endif
-	cerr << endl;
+	oss << endl;
+	cerr << oss.str();
 }
 void DomainSignatureCollection::zoltanBalanceDomains()
 {
@@ -932,7 +947,7 @@ void DomainSignatureCollection::zoltanBalanceDomains()
 	cout << endl;
 }
 
-void DomainSignatureCollection::indexIfacesLocal()
+void DomainSignatureCollection::indexIfacesGlobal()
 {
 	vector<int> map_vec;
 	vector<int> off_proc_map_vec;
@@ -948,11 +963,11 @@ void DomainSignatureCollection::indexIfacesLocal()
 			int i = queue.front();
 			queue.pop_front();
 			map_vec.push_back(i);
-			Iface &iface       = ifaces[i];
-			rev_map[i]         = curr_i;
-			ifaces[i].id_local = curr_i;
+			Iface &iface        = ifaces[i];
+			rev_map[i]          = curr_i;
+			ifaces[i].id_global = curr_i;
 			curr_i++;
-			set<MatrixBlock> blocks = iface.getGlobalRowBlocks();
+			set<MatrixBlock> blocks = iface.getGidRowBlocks();
 			for (MatrixBlock b : blocks) {
 				if (!enqueued.count(b.j)) {
 					enqueued.insert(b.j);
@@ -970,54 +985,180 @@ void DomainSignatureCollection::indexIfacesLocal()
 			curr_i++;
 		}
 		for (auto &p : ifaces) {
-			p.second.setLocalIndexes(rev_map);
+			p.second.setGlobalIndexes(rev_map);
 		}
 	}
 	iface_rev_map          = rev_map;
 	iface_map_vec          = map_vec;
 	iface_off_proc_map_vec = off_proc_map_vec;
 }
+void DomainSignatureCollection::indexIfacesLocal()
+{
+	int         curr_i = 0;
+	vector<int> map_vec;
+	vector<int> off_proc_map_vec;
+	vector<int> off_proc_map_vec_send;
+	map<int, int> rev_map;
+	if (!ifaces.empty()) {
+		set<int> todo;
+		for (auto &p : ifaces) {
+			todo.insert(p.first);
+		}
+		while (!todo.empty()) {
+			deque<int> queue;
+			set<int>   enqueued;
+			queue.push_back(*todo.begin());
+			enqueued.insert(*todo.begin());
+			deque<int> off_proc_ifaces;
+			while (!queue.empty()) {
+				int i = queue.front();
+				todo.erase(i);
+				queue.pop_front();
+				map_vec.push_back(i);
+				Iface &iface       = ifaces[i];
+				rev_map[i]         = curr_i;
+				ifaces[i].id_local = curr_i;
+				curr_i++;
+				set<MatrixBlock> blocks = iface.getGidRowBlocks();
+				for (MatrixBlock b : blocks) {
+					if (!enqueued.count(b.j)) {
+						enqueued.insert(b.j);
+						if (ifaces.count(b.j)) {
+							queue.push_back(b.j);
+						} else {
+							off_proc_map_vec.push_back(b.j);
+						}
+					}
+				}
+			}
+		}
+	}
+	// sort off proc indeces by proc that they reside on
+	// creat tpetra map get procs that indeces reside on
+	map_type iface_map = map_type(-1, &map_vec[0], map_vec.size(), 0, comm);
+
+	// RECIEVING
+	{
+		vector<int>             procs(off_proc_map_vec.size());
+		vector<int>             lid(off_proc_map_vec.size());
+		Teuchos::ArrayView<int> inds_view(&off_proc_map_vec[0], off_proc_map_vec.size());
+		Teuchos::ArrayView<int> procs_view(&procs[0], procs.size());
+		Teuchos::ArrayView<int> lid_view(&lid[0], lid.size());
+		iface_map.getRemoteIndexList(inds_view, procs_view, lid_view);
+
+		// sort
+		vector<pair<int, int>> proc_ind(procs.size());
+		for (size_t i = 0; i < off_proc_map_vec.size(); i++) {
+			proc_ind[i] = make_pair(procs[i], off_proc_map_vec[i]);
+		}
+
+		sort(proc_ind.begin(), proc_ind.end());
+
+		for (size_t i = 0; i < proc_ind.size(); i++) {
+			procs[i]            = proc_ind[i].first;
+			off_proc_map_vec[i] = proc_ind[i].second;
+		}
+		iface_off_proc_vec = procs;
+	}
+
+	// map off proc
+	for (int i : off_proc_map_vec) {
+		// TODO map in increasing order of neighboring proc
+		rev_map[i] = curr_i;
+		curr_i++;
+	}
+	for (auto &p : ifaces) {
+		p.second.setLocalIndexes(rev_map);
+	}
+	// SENDING
+	for (auto &p : ifaces) {
+		set<MatrixBlock> blocks = p.second.getGidRowBlocks();
+		set<int>         found;
+		for (MatrixBlock b : blocks) {
+			if (!found.count(b.j)) {
+				found.insert(b.j);
+				if (ifaces.count(b.j) == 0) {
+					off_proc_map_vec_send.push_back(b.j);
+				}
+			}
+		}
+	}
+	// sort
+	{
+		vector<int>             procs(off_proc_map_vec_send.size());
+		vector<int>             lid(off_proc_map_vec_send.size());
+		Teuchos::ArrayView<int> inds_view(&off_proc_map_vec_send[0], off_proc_map_vec_send.size());
+		Teuchos::ArrayView<int> procs_view(&procs[0], procs.size());
+		Teuchos::ArrayView<int> lid_view(&lid[0], lid.size());
+		iface_map.getRemoteIndexList(inds_view, procs_view, lid_view);
+
+		// sort
+		vector<pair<int, int>> proc_ind(procs.size());
+		for (size_t i = 0; i < off_proc_map_vec.size(); i++) {
+			proc_ind[i] = make_pair(procs[i], off_proc_map_vec[i]);
+		}
+
+		sort(proc_ind.begin(), proc_ind.end());
+
+		for (size_t i = 0; i < proc_ind.size(); i++) {
+			procs[i]                 = proc_ind[i].first;
+			off_proc_map_vec_send[i] = proc_ind[i].second;
+		}
+		iface_off_proc_vec_send = procs;
+	}
+	iface_rev_map               = rev_map;
+	iface_map_vec               = map_vec;
+	iface_off_proc_map_vec      = off_proc_map_vec;
+	iface_off_proc_map_vec_send = off_proc_map_vec;
+}
 void DomainSignatureCollection::indexDomainIfacesLocal()
 {
 	vector<int> map_vec;
 	map<int, int> rev_map;
 	if (!domains.empty()) {
-		deque<int> queue;
-		set<int>   enqueued;
-		queue.push_back(domains.begin()->first);
-		enqueued.insert(domains.begin()->first);
-		deque<int> off_proc_ifaces;
-		int        curr_i = 0;
-		while (!queue.empty()) {
-			int i = queue.front();
-			queue.pop_front();
-			DomainSignature &ds = domains[i];
-			for (int global_i : ds.global_i) {
-				if (global_i != -1 && rev_map.count(global_i) == 0) {
-					rev_map[global_i] = curr_i;
-					map_vec.push_back(global_i);
-					curr_i++;
+		int      curr_i = 0;
+		set<int> todo;
+		for (auto &p : domains) {
+			todo.insert(p.first);
+		}
+		while (!todo.empty()) {
+			deque<int> queue;
+			set<int>   enqueued;
+			queue.push_back(*todo.begin());
+			enqueued.insert(*todo.begin());
+			deque<int> off_proc_ifaces;
+			while (!queue.empty()) {
+				int i = queue.front();
+				queue.pop_front();
+				todo.erase(i);
+				DomainSignature &ds = domains[i];
+				for (int g_id : ds.g_id) {
+					if (g_id != -1 && rev_map.count(g_id) == 0) {
+						rev_map[g_id] = curr_i;
+						map_vec.push_back(g_id);
+						curr_i++;
+					}
 				}
-			}
-			for (int global_i : ds.global_i_refined) {
-				if (global_i != -1 && rev_map.count(global_i) == 0) {
-					rev_map[global_i] = curr_i;
-					map_vec.push_back(global_i);
-					curr_i++;
+				for (int g_id : ds.g_id_refined) {
+					if (g_id != -1 && rev_map.count(g_id) == 0) {
+						rev_map[g_id] = curr_i;
+						map_vec.push_back(g_id);
+						curr_i++;
+					}
 				}
-			}
-			for (int global_i : ds.global_i_center) {
-				if (global_i != -1 && rev_map.count(global_i) == 0) {
-					rev_map[global_i] = curr_i;
-					map_vec.push_back(global_i);
-					curr_i++;
+				for (int g_id : ds.g_id_center) {
+					if (g_id != -1 && rev_map.count(g_id) == 0) {
+						rev_map[g_id] = curr_i;
+						map_vec.push_back(g_id);
+						curr_i++;
+					}
 				}
-			}
-			for (int nbr : ds.nbr_id) {
-				if (nbr != -1 && enqueued.count(nbr) == 0) {
-					enqueued.insert(nbr);
-					if (domains.count(nbr)) {
-						queue.push_back(nbr);
+				for (int nbr : ds.nbr_id) {
+					if (nbr != -1 && enqueued.count(nbr) == 0) {
+						enqueued.insert(nbr);
+						if (domains.count(nbr)) {
+							queue.push_back(nbr);
+						}
 					}
 				}
 			}
@@ -1029,7 +1170,7 @@ void DomainSignatureCollection::indexDomainIfacesLocal()
 	domain_rev_map = rev_map;
 	domain_map_vec = map_vec;
 }
-std::set<MatrixBlock> Iface::getGlobalRowBlocks()
+std::set<MatrixBlock> Iface::getRowBlocks(int *id, DsMemPtr normal)
 {
 	std::set<MatrixBlock> blocks;
 	auto getBlockType = [=](bool left) {
@@ -1083,7 +1224,7 @@ std::set<MatrixBlock> Iface::getGlobalRowBlocks()
 		}
 		return ret;
 	};
-	int i = id;
+	int i = *id;
 	// left domain(s)
 	{
 		Side iface_s = Side::north;
@@ -1095,7 +1236,7 @@ std::set<MatrixBlock> Iface::getGlobalRowBlocks()
 			Side           s    = Side::north;
 			Side           main = iface_s + s;
 			std::bitset<4> neumann;
-			int            j = left.globalIndex(main);
+			int            j = (left.*normal)(main);
 			MatrixBlock    b(i, j, iface_s, Side::north, neumann, false, getBlockType(true));
 			blocks.insert(b);
 		}
@@ -1104,7 +1245,7 @@ std::set<MatrixBlock> Iface::getGlobalRowBlocks()
 			Side s    = Side::west;
 			Side rel  = Side::east;
 			Side main = iface_s + rel;
-			int  j    = left.globalIndex(main);
+			int  j    = (left.*normal)(main);
 			if (j != -1) {
 				std::bitset<4> neumann;
 				MatrixBlock    b(i, j, main, s, neumann, false, getBlockType(true));
@@ -1115,7 +1256,7 @@ std::set<MatrixBlock> Iface::getGlobalRowBlocks()
 		{
 			Side s    = Side::south;
 			Side main = iface_s + s;
-			int  j    = left.globalIndex(main);
+			int  j    = (left.*normal)(main);
 			if (j != -1) {
 				std::bitset<4> neumann;
 				MatrixBlock    b(i, j, main, s, neumann, false, getBlockType(true));
@@ -1127,7 +1268,7 @@ std::set<MatrixBlock> Iface::getGlobalRowBlocks()
 			Side s    = Side::east;
 			Side rel  = Side::west;
 			Side main = iface_s + rel;
-			int  j    = left.globalIndex(main);
+			int  j    = (left.*normal)(main);
 			if (j != -1) {
 				std::bitset<4> neumann;
 				MatrixBlock    b(i, j, main, s, neumann, false, getBlockType(true));
@@ -1146,7 +1287,7 @@ std::set<MatrixBlock> Iface::getGlobalRowBlocks()
 			Side           s    = Side::north;
 			Side           main = iface_s + s;
 			std::bitset<4> neumann;
-			int            j = right.globalIndex(main);
+			int            j = (right.*normal)(main);
 			MatrixBlock    b(i, j, iface_s, Side::north, neumann, false, getBlockType(false));
 			blocks.insert(b);
 		}
@@ -1155,7 +1296,7 @@ std::set<MatrixBlock> Iface::getGlobalRowBlocks()
 			Side s    = Side::west;
 			Side rel  = Side::east;
 			Side main = iface_s + rel;
-			int  j    = right.globalIndex(main);
+			int  j    = (right.*normal)(main);
 			if (j != -1) {
 				std::bitset<4> neumann;
 				MatrixBlock    b(i, j, main, s, neumann, false, getBlockType(false));
@@ -1166,7 +1307,7 @@ std::set<MatrixBlock> Iface::getGlobalRowBlocks()
 		{
 			Side s    = Side::south;
 			Side main = iface_s + s;
-			int  j    = right.globalIndex(main);
+			int  j    = (right.*normal)(main);
 			if (j != -1) {
 				std::bitset<4> neumann;
 				MatrixBlock    b(i, j, main, s, neumann, false, getBlockType(false));
@@ -1178,7 +1319,7 @@ std::set<MatrixBlock> Iface::getGlobalRowBlocks()
 			Side s    = Side::east;
 			Side rel  = Side::west;
 			Side main = iface_s + rel;
-			int  j    = right.globalIndex(main);
+			int  j    = (right.*normal)(main);
 			if (j != -1) {
 				std::bitset<4> neumann;
 				MatrixBlock    b(i, j, main, s, neumann, false, getBlockType(false));
@@ -1202,7 +1343,7 @@ std::set<MatrixBlock> Iface::getGlobalRowBlocks()
 			Side           s    = Side::north;
 			Side           main = iface_s + s;
 			std::bitset<4> neumann;
-			int            j = extra.globalIndex(main);
+			int            j = (extra.*normal)(main);
 			MatrixBlock    b(i, j, iface_s, Side::north, neumann, false, BlockType::fine_out_right);
 			blocks.insert(b);
 		}
@@ -1211,7 +1352,7 @@ std::set<MatrixBlock> Iface::getGlobalRowBlocks()
 			Side s    = Side::west;
 			Side rel  = Side::east;
 			Side main = iface_s + rel;
-			int  j    = extra.globalIndex(main);
+			int  j    = (extra.*normal)(main);
 			if (j != -1) {
 				std::bitset<4> neumann;
 				MatrixBlock    b(i, j, main, s, neumann, false, BlockType::fine_out_right);
@@ -1222,7 +1363,7 @@ std::set<MatrixBlock> Iface::getGlobalRowBlocks()
 		{
 			Side s    = Side::south;
 			Side main = iface_s + s;
-			int  j    = extra.globalIndex(main);
+			int  j    = (extra.*normal)(main);
 			if (j != -1) {
 				std::bitset<4> neumann;
 				MatrixBlock    b(i, j, main, s, neumann, false, BlockType::fine_out_right);
@@ -1234,7 +1375,7 @@ std::set<MatrixBlock> Iface::getGlobalRowBlocks()
 			Side s    = Side::east;
 			Side rel  = Side::west;
 			Side main = iface_s + rel;
-			int  j    = extra.globalIndex(main);
+			int  j    = (extra.*normal)(main);
 			if (j != -1) {
 				std::bitset<4> neumann;
 				MatrixBlock    b(i, j, main, s, neumann, false, BlockType::fine_out_right);
@@ -1244,13 +1385,22 @@ std::set<MatrixBlock> Iface::getGlobalRowBlocks()
 	}
 	return blocks;
 }
+std::set<MatrixBlock> Iface::getGidRowBlocks() { return getRowBlocks(&id, &DomainSignature::gid); }
+std::set<MatrixBlock> Iface::getGlobalRowBlocks()
+{
+	return getRowBlocks(&id_global, &DomainSignature::globalIndex);
+}
+std::set<MatrixBlock> Iface::getRowBlocks()
+{
+	return getRowBlocks(&id_local, &DomainSignature::index);
+}
 std::set<MatrixBlock> Iface::getGlobalColBlocks()
 {
 	std::set<MatrixBlock> blocks;
 	auto addBlocks = [&](DomainSignature &ds, Side main, Side s) {
 		std::bitset<4> neumann = ds.neumannRelative(main);
 		int            j       = ds.globalIndex(main);
-		bool zp = ds.zero_patch;
+		bool           zp      = ds.zero_patch;
 		if (ds.hasFineNbr(main + s)) {
 			MatrixBlock b(ds.globalIndex(main + s), j, main, s, neumann, zp, BlockType::coarse);
 			MatrixBlock c(ds.globalIndexRefinedLeft(main + s), j, main, s, neumann, zp,
@@ -1350,340 +1500,12 @@ std::set<MatrixBlock> Iface::getGlobalColBlocks()
 
 	return blocks;
 }
-//*******
-// local
-//*******
-std::set<MatrixBlock> Iface::getRowBlocks()
-{
-	std::set<MatrixBlock> blocks;
-	auto getBlockType = [=](bool left) {
-		BlockType ret = BlockType::plain;
-		switch (type) {
-			case IfaceType::normal:
-				ret = BlockType::plain;
-				break;
-			case IfaceType::coarse_on_left:
-				if (left) {
-					ret = BlockType::coarse;
-				} else {
-					ret = BlockType::fine_out_left;
-				}
-				break;
-			case IfaceType::coarse_on_right:
-				if (left) {
-					ret = BlockType::fine_out_left;
-				} else {
-					ret = BlockType::coarse;
-				}
-				break;
-			case IfaceType::refined_on_left_left_of_coarse:
-				if (left) {
-					ret = BlockType::fine;
-				} else {
-					ret = BlockType::coarse_out_left;
-				}
-				break;
-			case IfaceType::refined_on_left_right_of_coarse:
-				if (left) {
-					ret = BlockType::fine;
-				} else {
-					ret = BlockType::coarse_out_right;
-				}
-				break;
-			case IfaceType::refined_on_right_left_of_coarse:
-				if (left) {
-					ret = BlockType::coarse_out_left;
-				} else {
-					ret = BlockType::fine;
-				}
-				break;
-			case IfaceType::refined_on_right_right_of_coarse:
-				if (left) {
-					ret = BlockType::coarse_out_right;
-				} else {
-					ret = BlockType::fine;
-				}
-				break;
-		}
-		return ret;
-	};
-	int i = id_local;
-	// left domain(s)
-	{
-		bool zp      = left.zero_patch;
-		Side iface_s = Side::north;
-		if (y_axis) {
-			iface_s = Side::east;
-		}
-		// north block
-		{
-			Side           s       = Side::north;
-			Side           main    = iface_s + s;
-			std::bitset<4> neumann = left.neumannRelative(main);
-			int            j       = left.index(main);
-			MatrixBlock    b(i, j, iface_s, Side::north, neumann, zp, getBlockType(true));
-			blocks.insert(b);
-		}
-		// east block
-		{
-			Side s    = Side::west;
-			Side rel  = Side::east;
-			Side main = iface_s + rel;
-			int  j    = left.index(main);
-			if (j != -1) {
-				std::bitset<4> neumann = left.neumannRelative(main);
-				MatrixBlock    b(i, j, main, s, neumann, zp, getBlockType(true));
-				blocks.insert(b);
-			}
-		}
-		// south block
-		{
-			Side s    = Side::south;
-			Side main = iface_s + s;
-			int  j    = left.index(main);
-			if (j != -1) {
-				std::bitset<4> neumann = left.neumannRelative(main);
-				MatrixBlock    b(i, j, main, s, neumann, zp, getBlockType(true));
-				blocks.insert(b);
-			}
-		}
-		// west block
-		{
-			Side s    = Side::east;
-			Side rel  = Side::west;
-			Side main = iface_s + rel;
-			int  j    = left.index(main);
-			if (j != -1) {
-				std::bitset<4> neumann = left.neumannRelative(main);
-				MatrixBlock    b(i, j, main, s, neumann, zp, getBlockType(true));
-				blocks.insert(b);
-			}
-		}
-	}
-	// right domain(s)
-	{
-		bool zp      = right.zero_patch;
-		Side iface_s = Side::south;
-		if (y_axis) {
-			iface_s = Side::west;
-		}
-		// north block
-		{
-			Side           s       = Side::north;
-			Side           main    = iface_s + s;
-			std::bitset<4> neumann = right.neumannRelative(main);
-			int            j       = right.index(main);
-			MatrixBlock    b(i, j, iface_s, Side::north, neumann, zp, getBlockType(false));
-			blocks.insert(b);
-		}
-		// east block
-		{
-			Side s    = Side::west;
-			Side rel  = Side::east;
-			Side main = iface_s + rel;
-			int  j    = right.index(main);
-			if (j != -1) {
-				std::bitset<4> neumann = right.neumannRelative(main);
-				MatrixBlock    b(i, j, main, s, neumann, zp, getBlockType(false));
-				blocks.insert(b);
-			}
-		}
-		// south block
-		{
-			Side s    = Side::south;
-			Side main = iface_s + s;
-			int  j    = right.index(main);
-			if (j != -1) {
-				std::bitset<4> neumann = right.neumannRelative(main);
-				MatrixBlock    b(i, j, main, s, neumann, zp, getBlockType(false));
-				blocks.insert(b);
-			}
-		}
-		// west block
-		{
-			Side s    = Side::east;
-			Side rel  = Side::west;
-			Side main = iface_s + rel;
-			int  j    = right.index(main);
-			if (j != -1) {
-				std::bitset<4> neumann = right.neumannRelative(main);
-				MatrixBlock    b(i, j, main, s, neumann, zp, getBlockType(false));
-				blocks.insert(b);
-			}
-		}
-	}
-	if (type == IfaceType::coarse_on_left || type == IfaceType::coarse_on_right) {
-		bool zp      = extra.zero_patch;
-		Side iface_s = Side::south;
-		if (y_axis) {
-			iface_s = Side::west;
-		}
-		if (type == IfaceType::coarse_on_right) {
-			iface_s = Side::north;
-			if (y_axis) {
-				iface_s = Side::east;
-			}
-		}
-		// north block
-		{
-			Side           s       = Side::north;
-			Side           main    = iface_s + s;
-			std::bitset<4> neumann = extra.neumannRelative(main);
-			int            j       = extra.index(main);
-			MatrixBlock    b(i, j, iface_s, Side::north, neumann, zp, BlockType::fine_out_right);
-			blocks.insert(b);
-		}
-		// east block
-		{
-			Side s    = Side::west;
-			Side rel  = Side::east;
-			Side main = iface_s + rel;
-			int  j    = extra.index(main);
-			if (j != -1) {
-				std::bitset<4> neumann = extra.neumannRelative(main);
-				MatrixBlock    b(i, j, main, s, neumann, zp, BlockType::fine_out_right);
-				blocks.insert(b);
-			}
-		}
-		// south block
-		{
-			Side s    = Side::south;
-			Side main = iface_s + s;
-			int  j    = extra.index(main);
-			if (j != -1) {
-				std::bitset<4> neumann = extra.neumannRelative(main);
-				MatrixBlock    b(i, j, main, s, neumann, zp, BlockType::fine_out_right);
-				blocks.insert(b);
-			}
-		}
-		// west block
-		{
-			Side s    = Side::east;
-			Side rel  = Side::west;
-			Side main = iface_s + rel;
-			int  j    = extra.index(main);
-			if (j != -1) {
-				std::bitset<4> neumann = extra.neumannRelative(main);
-				MatrixBlock    b(i, j, main, s, neumann, zp, BlockType::fine_out_right);
-				blocks.insert(b);
-			}
-		}
-	}
-	return blocks;
-}
-std::set<MatrixBlock> Iface::getColBlocks()
-{
-	std::set<MatrixBlock> blocks;
-	auto addBlocks = [&](DomainSignature &ds, Side main, Side s) {
-		std::bitset<4> neumann = ds.neumannRelative(main);
-		int            j       = ds.index(main);
-		bool           zp      = ds.zero_patch;
-		if (ds.hasFineNbr(main + s)) {
-			MatrixBlock b(ds.index(main + s), j, main, s, neumann, zp, BlockType::coarse);
-			MatrixBlock c(ds.indexRefinedLeft(main + s), j, main, s, neumann, zp,
-			              BlockType::coarse_out_left);
-			MatrixBlock d(ds.indexRefinedRight(main + s), j, main, s, neumann, zp,
-			              BlockType::coarse_out_right);
-			blocks.insert(b);
-			blocks.insert(c);
-			blocks.insert(d);
-		} else if (ds.hasCoarseNbr(main + s)) {
-			MatrixBlock b(ds.index(main + s), j, main, s, neumann, zp, BlockType::fine);
-			blocks.insert(b);
-			if (ds.leftOfCoarse(main + s)) {
-				MatrixBlock c(ds.indexCenter(main + s), j, main, s, neumann, zp,
-				              BlockType::fine_out_left);
-				blocks.insert(c);
-			} else {
-				MatrixBlock c(ds.indexCenter(main + s), j, main, s, neumann, zp,
-				              BlockType::fine_out_right);
-				blocks.insert(c);
-			}
-		} else {
-			MatrixBlock b(ds.index(main + s), j, main, s, neumann, zp, BlockType::plain);
-			blocks.insert(b);
-		}
-	};
-	// left block
-	{
-		Side iface_s = Side::north;
-		if (y_axis) {
-			iface_s = Side::east;
-		}
-		if (left.index(iface_s) == id_local) {
-			// north block
-			{
-				Side s = Side::north;
-				addBlocks(left, iface_s, s);
-			}
-			// east block
-			{
-				Side s = Side::east;
-				if (left.hasNbr(iface_s + s)) {
-					addBlocks(left, iface_s, s);
-				}
-			}
-			// south block
-			{
-				Side s = Side::south;
-				if (left.hasNbr(iface_s + s)) {
-					addBlocks(left, iface_s, s);
-				}
-			}
-			// west block
-			{
-				Side s = Side::west;
-				if (left.hasNbr(iface_s + s)) {
-					addBlocks(left, iface_s, s);
-				}
-			}
-		}
-	}
-	// right block
-	{
-		Side iface_s = Side::south;
-		if (y_axis) {
-			iface_s = Side::west;
-		}
-		if (right.index(iface_s) == id_local) {
-			// north block
-			{
-				Side           s = Side::north;
-				std::bitset<4> neumann;
-				addBlocks(right, iface_s, s);
-			}
-			// east block
-			{
-				Side s = Side::east;
-				if (right.hasNbr(iface_s + s)) {
-					addBlocks(right, iface_s, s);
-				}
-			}
-			// south block
-			{
-				Side s = Side::south;
-				if (right.hasNbr(iface_s + s)) {
-					addBlocks(right, iface_s, s);
-				}
-			}
-			// west block
-			{
-				Side s = Side::west;
-				if (right.hasNbr(iface_s + s)) {
-					addBlocks(right, iface_s, s);
-				}
-			}
-		}
-	}
-
-	return blocks;
-}
 set<int> Iface::getPins()
 {
-	set<MatrixBlock> blocks = getGlobalColBlocks();
+	set<MatrixBlock> blocks = getGidRowBlocks();
 	set<int>         pins;
 	for (MatrixBlock b : blocks) {
-		pins.insert(b.i);
+		pins.insert(b.j);
 	}
 	return pins;
 }
