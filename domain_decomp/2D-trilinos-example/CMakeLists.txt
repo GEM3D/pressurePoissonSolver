@@ -67,6 +67,7 @@ set (CMAKE_CXX_FLAGS_DEBUG  "-g ${CMAKE_CXX_FLAGS}")
   MESSAGE("Setting CXX compiler.")
   SET(CMAKE_CXX_COMPILER ${Trilinos_CXX_COMPILER})
 
+find_package(CUDA)
 # If you haven't already set the C compiler, use the same compiler
 # that was used to build Trilinos on your machine.  You do _not_ 
 # need to edit this line.
@@ -110,6 +111,7 @@ include_directories(SYSTEM ${Trilinos_INCLUDE_DIRS})
 include_directories(SYSTEM ${VTK_INCLUDE_DIRS})
 include_directories(${FFTW_INCLUDES})
 include_directories(${MPI_CXX_INCLUDE_PATH})
+include_directories(${CUDA_INCLUDE_DIRS})
 
 # Add to the library path Trilinos' library path, and the library
 # paths of the third-party libraries (TPLs) with which Trilinos was
@@ -134,6 +136,7 @@ add_library(Factory Factory.cpp)
 file(GLOB fishpack_SRC "fishpack/*.f")
 add_library(FishpackSolver FishpackSolver.cpp)
 add_library(Fishpack ${fishpack_SRC})
+add_library(AmgxWrapper AmgxWrapper.cpp)
 
 #
 # EDIT HERE: Change trilinosExample to the name of the executable
@@ -147,10 +150,16 @@ target_link_libraries(heat
     RBMatrix
     Domain
     Factory
+    AmgxWrapper
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
   ${FFTW_LIB}
   ${MPI_CXX_LIBRARIES} 
+)
+target_link_libraries(AmgxWrapper
+  ${Trilinos_TPL_LIBRARIES}
+  ${Trilinos_LIBRARIES} 
+   ${CMAKE_SOURCE_DIR}/libamgxsh.so
 )
 target_link_libraries(Factory
   ${Trilinos_TPL_LIBRARIES}

@@ -4,6 +4,7 @@
 #include "FunctionWrapper.h"
 #include "MyTypeDefs.h"
 #include "OpShift.h"
+#include "AmgxWrapper.h"
 #include "Timer.h"
 #include "args.h"
 #include <Amesos2.hpp>
@@ -146,6 +147,7 @@ int main(int argc, char *argv[])
 #ifdef __NVCC__
 	args::Flag f_cufft(parser, "cufft", "use CuFFT as the patch solver", {"cufft"});
 #endif
+	args::Flag f_amgx(parser, "amgx", "solve schur compliment system with amgx", {"amgx"});
 
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;
@@ -185,13 +187,13 @@ int main(int argc, char *argv[])
 	DomainSignatureCollection dsc;
 	if (f_mesh) {
 		string d = args::get(f_mesh);
-		dsc      = DomainSignatureCollection(comm,d, comm->getRank());
+		dsc      = DomainSignatureCollection(comm, d, comm->getRank());
 	} else if (f_amr) {
 		int d = args::get(f_amr);
-		dsc   = DomainSignatureCollection(comm,d, d, comm->getRank(), true);
+		dsc   = DomainSignatureCollection(comm, d, d, comm->getRank(), true);
 	} else {
 		int d = args::get(f_square);
-		dsc   = DomainSignatureCollection(comm,d, d, comm->getRank());
+		dsc   = DomainSignatureCollection(comm, d, d, comm->getRank());
 	}
 	if (f_div) {
 		for (int i = 0; i < args::get(f_div); i++) {
@@ -433,123 +435,128 @@ int main(int argc, char *argv[])
 			problem
 			= rcp(new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(
 			op, gamma, b));
+Teuchos::RCP<AmgxWrapper> amgxsolver; 
+			if (f_amgx) {
+			    amgxsolver = rcp(new AmgxWrapper(A));
+			} else {
+				if (f_precmuelu) {
+					timer.start("MueLu Preconditioner Formation");
 
-			if (f_precmuelu) {
-				timer.start("MueLu Preconditioner Formation");
+					Teuchos::RCP<vector_type> xy = dc.getInterfaceCoords();
+					Teuchos::RCP<op_type>     P  = Factory::getAmgPreconditioner(A, xy);
 
-				Teuchos::RCP<vector_type> xy = dc.getInterfaceCoords();
-				Teuchos::RCP<op_type>     P  = Factory::getAmgPreconditioner(A, xy);
+					problem->setLeftPrec(P);
 
-				problem->setLeftPrec(P);
+					timer.stop("MueLu Preconditioner Formation");
 
-				timer.stop("MueLu Preconditioner Formation");
+				} else if (f_riluk) {
+					timer.start("RILUK Preconditioner Formation");
 
-			} else if (f_riluk) {
-				timer.start("RILUK Preconditioner Formation");
+					Teuchos::RCP<Ifpack2::RILUK<Tpetra::RowMatrix<>>> P
+					= rcp(new Ifpack2::RILUK<Tpetra::RowMatrix<>>(rm));
+					P->compute();
 
-				Teuchos::RCP<Ifpack2::RILUK<Tpetra::RowMatrix<>>> P
-				= rcp(new Ifpack2::RILUK<Tpetra::RowMatrix<>>(rm));
-				P->compute();
+					problem->setLeftPrec(P);
 
-				problem->setLeftPrec(P);
+					timer.stop("RILUK Preconditioner Formation");
+				} else if (f_ilu) {
+					timer.start("ILUT Preconditioner Formation");
 
-				timer.stop("RILUK Preconditioner Formation");
-			} else if (f_ilu) {
-				timer.start("ILUT Preconditioner Formation");
+					Teuchos::RCP<Ifpack2::ILUT<Tpetra::RowMatrix<>>> P
+					= rcp(new Ifpack2::ILUT<Tpetra::RowMatrix<>>(rm));
+					Teuchos::ParameterList params;
+					params.set("fact: ilut level-of-fill", 3);
+					params.set("fact: drop tolerance", 0.0);
+					params.set("fact: absolute threshold", 0.1);
+					// P->setParameters(params);
 
-				Teuchos::RCP<Ifpack2::ILUT<Tpetra::RowMatrix<>>> P
-				= rcp(new Ifpack2::ILUT<Tpetra::RowMatrix<>>(rm));
-				Teuchos::ParameterList params;
-				params.set("fact: ilut level-of-fill", 3);
-				params.set("fact: drop tolerance", 0.0);
-				params.set("fact: absolute threshold", 0.1);
-				// P->setParameters(params);
+					P->compute();
+					problem->setLeftPrec(P);
 
-				P->compute();
-				problem->setLeftPrec(P);
+					timer.stop("ILUT Preconditioner Formation");
+				} else if (f_precj) {
+					timer.start("Jacobi Preconditioner Formation");
 
-				timer.stop("ILUT Preconditioner Formation");
-			} else if (f_precj) {
-				timer.start("Jacobi Preconditioner Formation");
+					// Create the relaxation.  You could also do this using
+					// Ifpack2::Factory (the preconditioner factory) if you like.
+					RCP<precond_type> prec = rcp(new Ifpack2::Relaxation<Tpetra::RowMatrix<>>(A));
+					// Make the list of relaxation parameters.
+					Teuchos::ParameterList params;
+					// Do symmetric SOR / Gauss-Seidel.
+					params.set("relaxation: type", "Jacobi");
+					// Two sweeps (of symmetric SOR / Gauss-Seidel) per apply() call.
+					params.set("relaxation: sweeps", 1);
+					// ... Set any other parameters you want to set ...
 
-				// Create the relaxation.  You could also do this using
-				// Ifpack2::Factory (the preconditioner factory) if you like.
-				RCP<precond_type> prec = rcp(new Ifpack2::Relaxation<Tpetra::RowMatrix<>>(A));
-				// Make the list of relaxation parameters.
-				Teuchos::ParameterList params;
-				// Do symmetric SOR / Gauss-Seidel.
-				params.set("relaxation: type", "Jacobi");
-				// Two sweeps (of symmetric SOR / Gauss-Seidel) per apply() call.
-				params.set("relaxation: sweeps", 1);
-				// ... Set any other parameters you want to set ...
+					// Set parameters.
+					prec->setParameters(params);
+					// Prepare the relaxation instance for use.
+					prec->initialize();
+					prec->compute();
 
-				// Set parameters.
-				prec->setParameters(params);
-				// Prepare the relaxation instance for use.
-				prec->initialize();
-				prec->compute();
+					timer.stop("Jacobi Preconditioner Formation");
+				} else if (f_precblockj) {
+					timer.start("Block Jacobi Preconditioner Formation");
 
-				timer.stop("Jacobi Preconditioner Formation");
-			} else if (f_precblockj) {
-				timer.start("Block Jacobi Preconditioner Formation");
+					RCP<BlockJacobiRelaxer> P = rcp(new BlockJacobiRelaxer(RBA, s));
+					problem->setLeftPrec(P);
 
-				RCP<BlockJacobiRelaxer> P = rcp(new BlockJacobiRelaxer(RBA, s));
-				problem->setLeftPrec(P);
+					timer.stop("Block Jacobi Preconditioner Formation");
+				} else if (f_precddmg) {
+					timer.start("DDMG Preconditioner Formation");
 
-				timer.stop("Block Jacobi Preconditioner Formation");
-			} else if (f_precddmg) {
-				timer.start("DDMG Preconditioner Formation");
+					RCP<DDMultiGrid> P = rcp(new DDMultiGrid(&dc, RBA));
 
-				RCP<DDMultiGrid> P = rcp(new DDMultiGrid(&dc, RBA));
+					problem->setRightPrec(P);
 
-				problem->setRightPrec(P);
+					timer.stop("DDMG Preconditioner Formation");
+				} else if (f_prec) {
+					timer.start("Block Diagonal Preconditioner Formation");
 
-				timer.stop("DDMG Preconditioner Formation");
-			} else if (f_prec) {
-				timer.start("Block Diagonal Preconditioner Formation");
+					// Create the relaxation.  You could also do this using
+					// Ifpack2::Factory (the preconditioner factory) if you like.
+					RCP<precond_type> prec
+					= rcp(new Ifpack2::BlockRelaxation<Tpetra::RowMatrix<>>(A));
+					// Make the list of relaxation parameters.
+					Teuchos::ParameterList params;
+					// Do symmetric SOR / Gauss-Seidel.
+					params.set("relaxation: type", "Jacobi");
+					// Two sweeps (of symmetric SOR / Gauss-Seidel) per apply() call.
+					params.set("relaxation: sweeps", 1);
+					params.set("relaxation: container", "Dense");
+					// ... Set any other parameters you want to set ...
+					params.set("partitioner: local parts", dsc.matrix_j_high - dsc.matrix_j_low);
 
-				// Create the relaxation.  You could also do this using
-				// Ifpack2::Factory (the preconditioner factory) if you like.
-				RCP<precond_type> prec = rcp(new Ifpack2::BlockRelaxation<Tpetra::RowMatrix<>>(A));
-				// Make the list of relaxation parameters.
-				Teuchos::ParameterList params;
-				// Do symmetric SOR / Gauss-Seidel.
-				params.set("relaxation: type", "Jacobi");
-				// Two sweeps (of symmetric SOR / Gauss-Seidel) per apply() call.
-				params.set("relaxation: sweeps", 1);
-				params.set("relaxation: container", "Dense");
-				// ... Set any other parameters you want to set ...
-				params.set("partitioner: local parts", dsc.matrix_j_high - dsc.matrix_j_low);
+					// Set parameters.
+					prec->setParameters(params);
+					// Prepare the relaxation instance for use.
+					prec->initialize();
+					prec->compute();
 
-				// Set parameters.
-				prec->setParameters(params);
-				// Prepare the relaxation instance for use.
-				prec->initialize();
-				prec->compute();
-
-				timer.stop("Block Diagonal Preconditioner Formation");
-			}
-
-			if (direct_solve) {
-				timer.start("LU Factorization");
-				string name;
-				if (f_lu) {
-					name = "KLU2";
-				}
-				if (f_mumps) {
-					name = "mumps";
-				}
-				if (f_superlu) {
-					name = "superlu_dist";
-				}
-				if (f_basker) {
-					name = "Basker";
+					timer.stop("Block Diagonal Preconditioner Formation");
 				}
 
-				dsolver = Amesos2::create<matrix_type, vector_type>(name, A);
+				if (direct_solve) {
+					timer.start("LU Factorization");
+					string name;
+					if (f_lu) {
+						name = "KLU2";
+					}
+					if (f_mumps) {
+						name = "mumps";
+					}
+					if (f_superlu) {
+						name = "superlu_dist";
+					}
+					if (f_basker) {
+						name = "Basker";
+					}
 
-				dsolver->symbolicFactorization().numericFactorization();
-				timer.stop("LU Factorization");
+					dsolver = Amesos2::create<matrix_type, vector_type>(name, A);
+
+					dsolver->symbolicFactorization().numericFactorization();
+					timer.stop("LU Factorization");
+				}
 			}
 			///////////////////
 			// setup end
@@ -562,7 +569,10 @@ int main(int argc, char *argv[])
 			timer.start("Complete Solve");
 
 			timer.start("Gamma Solve");
-			if (f_read_gamma) {
+			if (f_amgx) {
+				// solve
+				amgxsolver->solve(gamma, b);
+			} else if (f_read_gamma) {
 				gamma = Tpetra::MatrixMarket::Reader<matrix_type>::readDenseFile(
 				args::get(f_read_gamma), comm, matrix_map_const);
 			} else if (f_lu || f_superlu || f_mumps || f_basker) {
