@@ -13,6 +13,8 @@
 enum class SolverType { fftw, fishpack,cufft };
 class Domain
 {
+    private:
+	void print();
 	public:
 	Solver *               solver;
 	DomainSignature        ds;
