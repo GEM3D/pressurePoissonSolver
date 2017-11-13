@@ -12,8 +12,7 @@ we are considering :
 
 * Grady Wright
 * Donna Calhoun
-* Joseph McNeal
-* Scott Aiton
+* Scott Aiton (Undergraduate)
 
 # Examples to date :
 
