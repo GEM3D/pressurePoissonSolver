@@ -10,6 +10,7 @@
 using namespace std;
 using Teuchos::RCP;
 using Teuchos::rcp;
+using Teuchos::ArrayRCP;
 DomainSignatureCollection::DomainSignatureCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm,
                                                      string file_name, int rank)
 {
@@ -1035,16 +1036,17 @@ void DomainSignatureCollection::indexIfacesLocal()
 	}
 	// sort off proc indeces by proc that they reside on
 	// creat tpetra map get procs that indeces reside on
+	cerr << "MapVec size: " << map_vec.size() << endl;
 	map_type iface_map = map_type(-1, &map_vec[0], map_vec.size(), 0, comm);
 
+	set<int> neighbors;
+	map<int, set<int>> proc_recv;
 	// RECIEVING
 	{
 		vector<int>             procs(off_proc_map_vec.size());
-		vector<int>             lid(off_proc_map_vec.size());
 		Teuchos::ArrayView<int> inds_view(&off_proc_map_vec[0], off_proc_map_vec.size());
 		Teuchos::ArrayView<int> procs_view(&procs[0], procs.size());
-		Teuchos::ArrayView<int> lid_view(&lid[0], lid.size());
-		iface_map.getRemoteIndexList(inds_view, procs_view, lid_view);
+		iface_map.getRemoteIndexList(inds_view, procs_view);
 
 		// sort
 		vector<pair<int, int>> proc_ind(procs.size());
@@ -1057,6 +1059,8 @@ void DomainSignatureCollection::indexIfacesLocal()
 		for (size_t i = 0; i < proc_ind.size(); i++) {
 			procs[i]            = proc_ind[i].first;
 			off_proc_map_vec[i] = proc_ind[i].second;
+			neighbors.insert(procs[i]);
+			proc_recv[procs[i]].insert(off_proc_map_vec[i]);
 		}
 		iface_off_proc_vec = procs;
 	}
@@ -1071,45 +1075,122 @@ void DomainSignatureCollection::indexIfacesLocal()
 		p.second.setLocalIndexes(rev_map);
 	}
 	// SENDING
+	vector<int> src;
+	vector<int> dest;
+	set<int>    uniq_dest;
 	for (auto &p : ifaces) {
-		set<MatrixBlock> blocks = p.second.getGidRowBlocks();
-		set<int>         found;
+		set<MatrixBlock> blocks = p.second.getGlobalColBlocks();
 		for (MatrixBlock b : blocks) {
-			if (!found.count(b.j)) {
-				found.insert(b.j);
-				if (ifaces.count(b.j) == 0) {
-					off_proc_map_vec_send.push_back(b.j);
-				}
+			if (ifaces.count(b.i) == 0) {
+				src.push_back(b.j);
+				dest.push_back(b.i);
+				uniq_dest.insert(b.i);
 			}
 		}
 	}
-	// sort
+	// get procs
+	map<int, set<int>> proc_send;
 	{
-		vector<int>             procs(off_proc_map_vec_send.size());
-		vector<int>             lid(off_proc_map_vec_send.size());
-		Teuchos::ArrayView<int> inds_view(&off_proc_map_vec_send[0], off_proc_map_vec_send.size());
+		vector<int> inds;
+		for (int i : uniq_dest) {
+			inds.push_back(i);
+		}
+		vector<int>             procs(inds.size());
+		Teuchos::ArrayView<int> inds_view(&inds[0], inds.size());
 		Teuchos::ArrayView<int> procs_view(&procs[0], procs.size());
-		Teuchos::ArrayView<int> lid_view(&lid[0], lid.size());
-		iface_map.getRemoteIndexList(inds_view, procs_view, lid_view);
+		cerr << "DSIZE: " << dest.size() << endl;
+		iface_map.getRemoteIndexList(inds_view, procs_view);
 
-		// sort
-		vector<pair<int, int>> proc_ind(procs.size());
-		for (size_t i = 0; i < off_proc_map_vec.size(); i++) {
-			proc_ind[i] = make_pair(procs[i], off_proc_map_vec[i]);
+		map<int, int> ind_proc;
+		for (size_t i = 0; i < procs.size(); i++) {
+			ind_proc[inds[i]] = procs[i];
 		}
-
-		sort(proc_ind.begin(), proc_ind.end());
-
-		for (size_t i = 0; i < proc_ind.size(); i++) {
-			procs[i]                 = proc_ind[i].first;
-			off_proc_map_vec_send[i] = proc_ind[i].second;
+		// separate into procs
+		for (size_t i = 0; i < dest.size(); i++) {
+			int d = dest[i];
+			int p = ind_proc[d];
+			proc_send[p].insert(src[i]);
+			neighbors.insert(p);
 		}
-		iface_off_proc_vec_send = procs;
+	}
+
+	// create amgxmap
+	amgxmap = AmgxMap(neighbors.size());
+	map<int, int> neighbors_rev;
+	int n_i = 0;
+	for (int proc : neighbors) {
+		amgxmap.neighbors[n_i] = proc;
+		neighbors_rev[proc]    = n_i;
+		n_i++;
+	}
+	// create send maps
+	for (auto &p : proc_send) {
+		int n_i                 = neighbors_rev[p.first];
+		int size                = p.second.size();
+		amgxmap.send_sizes[n_i] = size;
+		ArrayRCP<int> lmap(size);
+		int           i = 0;
+		for (int ind : p.second) {
+			lmap[i] = rev_map.at(ind);
+			i++;
+		}
+		amgxmap.send_maps[n_i] = &lmap[0];
+		amgxmap.arrays.insert(lmap);
+	}
+	// create recv maps
+	for (auto &p : proc_recv) {
+		int n_i                 = neighbors_rev[p.first];
+		int size                = p.second.size();
+		amgxmap.recv_sizes[n_i] = size;
+		ArrayRCP<int> lmap(size);
+		int           i = 0;
+		for (int ind : p.second) {
+			lmap[i] = rev_map.at(ind);
+			i++;
+		}
+		amgxmap.recv_maps[n_i] = &lmap[0];
+		amgxmap.arrays.insert(lmap);
 	}
 	iface_rev_map               = rev_map;
 	iface_map_vec               = map_vec;
 	iface_off_proc_map_vec      = off_proc_map_vec;
-	iface_off_proc_map_vec_send = off_proc_map_vec;
+	iface_off_proc_map_vec_send = off_proc_map_vec_send;
+}
+AmgxMap::AmgxMap(const AmgxMap &orig, int n) : AmgxMap(orig.num_neighbors)
+{
+	neighbors = orig.neighbors;
+	for (size_t i = 0; i < orig.recv_sizes.size(); i++) {
+		recv_sizes[i] = orig.recv_sizes[i] * n;
+	}
+	for (size_t i = 0; i < orig.send_sizes.size(); i++) {
+		send_sizes[i] = orig.send_sizes[i] * n;
+	}
+	for (int i = 0; i < num_neighbors; i++) {
+		int size = orig.recv_sizes[i];
+		if (size != 0) {
+			ArrayRCP<int> lmap(size * n);
+			for (int j = 0; j < size; j++) {
+				int ind = orig.recv_maps[i][j];
+				for (int k = 0; k < n; k++) {
+					lmap[j * n + k] = ind * n + k;
+				}
+			}
+			recv_maps[i] = &lmap[0];
+			arrays.insert(lmap);
+		}
+		size = orig.send_sizes[i];
+		if (size != 0) {
+			ArrayRCP<int> lmap(size * n);
+			for (int j = 0; j < size; j++) {
+				int ind = orig.send_maps[i][j];
+				for (int k = 0; k < n; k++) {
+					lmap[j * n + k] = ind * n + k;
+				}
+			}
+			send_maps[i] = &lmap[0];
+			arrays.insert(lmap);
+		}
+	}
 }
 void DomainSignatureCollection::indexDomainIfacesLocal()
 {

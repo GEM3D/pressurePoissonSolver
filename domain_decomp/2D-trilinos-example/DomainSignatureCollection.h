@@ -11,6 +11,25 @@
 #include <string>
 #include <vector>
 #include <zoltan_cpp.h>
+struct AmgxMap {
+    int num_neighbors;
+    std::vector<int> neighbors;
+    std::vector<int> send_sizes;
+    std::vector<const int*> send_maps;
+    std::vector<int> recv_sizes;
+    std::vector<const int*> recv_maps;
+    std::set<Teuchos::ArrayRCP<int>> arrays;
+    AmgxMap(){}
+    AmgxMap(int num_neighbors){
+        this->num_neighbors = num_neighbors;
+        neighbors.resize(num_neighbors);
+        send_sizes.resize(num_neighbors);
+        send_maps.resize(num_neighbors);
+        recv_sizes.resize(num_neighbors);
+        recv_maps.resize(num_neighbors);
+    }
+    AmgxMap(const AmgxMap& orig, int n);
+};
 /**
  * @brief A structure that represents a domain and its relation to other domains.
  */
@@ -259,6 +278,7 @@ struct Iface {
 class DomainSignatureCollection
 {
 	public:
+    AmgxMap amgxmap;
 	int rank;
     Teuchos::RCP<const Teuchos::Comm<int>> comm;
 	int matrix_j_low;

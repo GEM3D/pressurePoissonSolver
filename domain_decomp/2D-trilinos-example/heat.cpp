@@ -437,7 +437,7 @@ int main(int argc, char *argv[])
 			op, gamma, b));
 Teuchos::RCP<AmgxWrapper> amgxsolver; 
 			if (f_amgx) {
-			    amgxsolver = rcp(new AmgxWrapper(A));
+			    amgxsolver = rcp(new AmgxWrapper(A,dsc,nx));
 			} else {
 				if (f_precmuelu) {
 					timer.start("MueLu Preconditioner Formation");
