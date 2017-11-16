@@ -1036,7 +1036,6 @@ void DomainSignatureCollection::indexIfacesLocal()
 	}
 	// sort off proc indeces by proc that they reside on
 	// creat tpetra map get procs that indeces reside on
-	cerr << "MapVec size: " << map_vec.size() << endl;
 	map_type iface_map = map_type(-1, &map_vec[0], map_vec.size(), 0, comm);
 
 	set<int> neighbors;
@@ -1098,7 +1097,6 @@ void DomainSignatureCollection::indexIfacesLocal()
 		vector<int>             procs(inds.size());
 		Teuchos::ArrayView<int> inds_view(&inds[0], inds.size());
 		Teuchos::ArrayView<int> procs_view(&procs[0], procs.size());
-		cerr << "DSIZE: " << dest.size() << endl;
 		iface_map.getRemoteIndexList(inds_view, procs_view);
 
 		map<int, int> ind_proc;
@@ -1178,6 +1176,7 @@ AmgxMap::AmgxMap(const AmgxMap &orig, int n) : AmgxMap(orig.num_neighbors)
 			recv_maps[i] = &lmap[0];
 			arrays.insert(lmap);
 		}
+        cerr << endl;
 		size = orig.send_sizes[i];
 		if (size != 0) {
 			ArrayRCP<int> lmap(size * n);
@@ -1190,6 +1189,7 @@ AmgxMap::AmgxMap(const AmgxMap &orig, int n) : AmgxMap(orig.num_neighbors)
 			send_maps[i] = &lmap[0];
 			arrays.insert(lmap);
 		}
+        cerr << endl;
 	}
 }
 void DomainSignatureCollection::indexDomainIfacesLocal()
@@ -1480,31 +1480,31 @@ std::set<MatrixBlock> Iface::getGlobalColBlocks()
 	std::set<MatrixBlock> blocks;
 	auto addBlocks = [&](DomainSignature &ds, Side main, Side s) {
 		std::bitset<4> neumann = ds.neumannRelative(main);
-		int            j       = ds.globalIndex(main);
+		int            j       = ds.gid(main);
 		bool           zp      = ds.zero_patch;
 		if (ds.hasFineNbr(main + s)) {
-			MatrixBlock b(ds.globalIndex(main + s), j, main, s, neumann, zp, BlockType::coarse);
-			MatrixBlock c(ds.globalIndexRefinedLeft(main + s), j, main, s, neumann, zp,
+			MatrixBlock b(ds.gid(main + s), j, main, s, neumann, zp, BlockType::coarse);
+			MatrixBlock c(ds.gidRefinedLeft(main + s), j, main, s, neumann, zp,
 			              BlockType::coarse_out_left);
-			MatrixBlock d(ds.globalIndexRefinedRight(main + s), j, main, s, neumann, zp,
+			MatrixBlock d(ds.gidRefinedRight(main + s), j, main, s, neumann, zp,
 			              BlockType::coarse_out_right);
 			blocks.insert(b);
 			blocks.insert(c);
 			blocks.insert(d);
 		} else if (ds.hasCoarseNbr(main + s)) {
-			MatrixBlock b(ds.globalIndex(main + s), j, main, s, neumann, zp, BlockType::fine);
+			MatrixBlock b(ds.gid(main + s), j, main, s, neumann, zp, BlockType::fine);
 			blocks.insert(b);
 			if (ds.leftOfCoarse(main + s)) {
-				MatrixBlock c(ds.globalIndexCenter(main + s), j, main, s, neumann, zp,
+				MatrixBlock c(ds.gidCenter(main + s), j, main, s, neumann, zp,
 				              BlockType::fine_out_left);
 				blocks.insert(c);
 			} else {
-				MatrixBlock c(ds.globalIndexCenter(main + s), j, main, s, neumann, zp,
+				MatrixBlock c(ds.gidCenter(main + s), j, main, s, neumann, zp,
 				              BlockType::fine_out_right);
 				blocks.insert(c);
 			}
 		} else {
-			MatrixBlock b(ds.globalIndex(main + s), j, main, s, neumann, zp, BlockType::plain);
+			MatrixBlock b(ds.gid(main + s), j, main, s, neumann, zp, BlockType::plain);
 			blocks.insert(b);
 		}
 	};
@@ -1514,7 +1514,7 @@ std::set<MatrixBlock> Iface::getGlobalColBlocks()
 		if (y_axis) {
 			iface_s = Side::east;
 		}
-		if (left.globalIndex(iface_s) == id) {
+		if (left.gid(iface_s) == id) {
 			// north block
 			{
 				Side s = Side::north;
@@ -1549,7 +1549,7 @@ std::set<MatrixBlock> Iface::getGlobalColBlocks()
 		if (y_axis) {
 			iface_s = Side::west;
 		}
-		if (right.globalIndex(iface_s) == id) {
+		if (right.gid(iface_s) == id) {
 			// north block
 			{
 				Side s = Side::north;

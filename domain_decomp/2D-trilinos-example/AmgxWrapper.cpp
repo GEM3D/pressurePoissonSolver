@@ -76,6 +76,6 @@ void AmgxWrapper::solve(Teuchos::RCP<vector_type> x, Teuchos::RCP<vector_type> b
 {
 	AMGX_vector_upload(gb, num_rows, 1, (void *) b->get1dViewNonConst().get());
 	AMGX_vector_upload(gx, num_rows, 1, (void *) x->get1dViewNonConst().get());
-	AMGX_solver_solve_with_0_initial_guess(solver, gb, gx);
+	AMGX_solver_solve(solver, gb, gx);
 	AMGX_vector_download(gx, (void *) x->get1dViewNonConst().get());
 }
