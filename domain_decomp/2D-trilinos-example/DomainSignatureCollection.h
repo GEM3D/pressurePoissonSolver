@@ -125,18 +125,22 @@ struct DomainSignature {
 	{
 		for (int i = 0; i < 4; i++) {
 			if (g_id[i] != -1) {
-				global_i[i] = rev_map.at(g_id[i]);
+				global_i[i] = rev_map.at(local_i[i]);
 			}
 		}
+		try {
 		for (int i = 0; i < 4; i++) {
 			if (g_id_center[i] != -1) {
-				global_i_center[i] = rev_map.at(g_id_center[i]);
+				global_i_center[i] = rev_map.at(local_i_center[i]);
 			}
 		}
 		for (int i = 0; i < 8; i++) {
 			if (g_id_refined[i] != -1) {
-				global_i_refined[i] = rev_map.at(g_id_refined[i]);
+				global_i_refined[i] = rev_map.at(local_i_refined[i]);
 			}
+		}
+		} catch (std::out_of_range oor) {
+            //do nothing
 		}
 	}
 	void setNeumann()

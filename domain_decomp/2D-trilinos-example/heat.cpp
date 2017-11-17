@@ -4,7 +4,9 @@
 #include "FunctionWrapper.h"
 #include "MyTypeDefs.h"
 #include "OpShift.h"
+#ifdef ENABLE_AMGX
 #include "AmgxWrapper.h"
+#endif
 #include "Timer.h"
 #include "args.h"
 #include <Amesos2.hpp>
@@ -435,9 +437,13 @@ int main(int argc, char *argv[])
 			problem
 			= rcp(new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(
 			op, gamma, b));
-Teuchos::RCP<AmgxWrapper> amgxsolver; 
+#ifdef ENABLE_AMGX
+			Teuchos::RCP<AmgxWrapper> amgxsolver;
+#endif
 			if (f_amgx) {
-			    amgxsolver = rcp(new AmgxWrapper(A,dsc,nx));
+#ifdef ENABLE_AMGX
+				amgxsolver = rcp(new AmgxWrapper(A, dsc, nx));
+#endif
 			} else {
 				if (f_precmuelu) {
 					timer.start("MueLu Preconditioner Formation");
@@ -571,7 +577,9 @@ Teuchos::RCP<AmgxWrapper> amgxsolver;
 			timer.start("Gamma Solve");
 			if (f_amgx) {
 				// solve
+#ifdef ENABLE_AMGX
 				amgxsolver->solve(gamma, b);
+#endif
 			} else if (f_read_gamma) {
 				gamma = Tpetra::MatrixMarket::Reader<matrix_type>::readDenseFile(
 				args::get(f_read_gamma), comm, matrix_map_const);

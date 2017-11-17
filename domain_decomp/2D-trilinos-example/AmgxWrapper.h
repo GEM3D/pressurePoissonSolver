@@ -26,6 +26,7 @@ class AmgxWrapper
 
 	public:
 	AmgxWrapper(Teuchos::RCP<matrix_type> A, const DomainSignatureCollection &dsc, int n);
+	~AmgxWrapper();
 	void solve(Teuchos::RCP<vector_type> x, Teuchos::RCP<vector_type> b);
 };
 #endif

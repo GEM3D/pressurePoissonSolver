@@ -61,6 +61,9 @@ IF(VTK_FOUND)
 ELSE()
   MESSAGE("VTK not found, disabling vtk output")
 ENDIF()
+if(ENABLE_AMGX)
+    SET(CMAKE_CXX_FLAGS "-DENABLE_AMGX ${CMAKE_CXX_FLAGS}")
+endif()
 find_package(MPI REQUIRED)
 set (CMAKE_CXX_FLAGS "-Wall -g ${Trilinos_CXX_COMPILER_FLAGS} ${CMAKE_CXX_FLAGS}")
 set (CMAKE_CXX_FLAGS_DEBUG  "-g ${CMAKE_CXX_FLAGS}")
@@ -111,7 +114,9 @@ include_directories(SYSTEM ${Trilinos_INCLUDE_DIRS})
 include_directories(SYSTEM ${VTK_INCLUDE_DIRS})
 include_directories(${FFTW_INCLUDES})
 include_directories(${MPI_CXX_INCLUDE_PATH})
+if(CUDA_FOUND)
 include_directories(${CUDA_INCLUDE_DIRS})
+endif()
 
 # Add to the library path Trilinos' library path, and the library
 # paths of the third-party libraries (TPLs) with which Trilinos was
@@ -136,7 +141,6 @@ add_library(Factory Factory.cpp)
 file(GLOB fishpack_SRC "fishpack/*.f")
 add_library(FishpackSolver FishpackSolver.cpp)
 add_library(Fishpack ${fishpack_SRC})
-add_library(AmgxWrapper AmgxWrapper.cpp)
 
 #
 # EDIT HERE: Change trilinosExample to the name of the executable
@@ -150,17 +154,21 @@ target_link_libraries(heat
     RBMatrix
     Domain
     Factory
-    AmgxWrapper
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
   ${FFTW_LIB}
   ${MPI_CXX_LIBRARIES} 
 )
+if(ENABLE_AMGX)
+add_library(AmgxWrapper AmgxWrapper.cpp)
+target_link_libraries(heat
+    AmgxWrapper)
 target_link_libraries(AmgxWrapper
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
    ${CMAKE_SOURCE_DIR}/libamgxsh.so
 )
+endif()
 target_link_libraries(Factory
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 

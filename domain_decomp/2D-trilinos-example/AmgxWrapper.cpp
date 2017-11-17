@@ -4,15 +4,15 @@
 #include <vector>
 using namespace std;
 struct AmgxCrs {
-	int                 n_global;
-	int                 n;
-	int                 nnz;
-	int                 block_dimx = 1;
-	int                 block_dimy = 1;
-	std::vector<int>    row_ptrs;
-	std::vector<int>    cols;
-	std::vector<double> data;
-	double *            diag_data = nullptr;
+	int                  n_global;
+	int                  n;
+	int                  nnz;
+	int                  block_dimx = 1;
+	int                  block_dimy = 1;
+	std::vector<int>     row_ptrs;
+	std::vector<int64_t> cols;
+	std::vector<double>  data;
+	double *             diag_data = nullptr;
 };
 
 AmgxWrapper::AmgxWrapper(Teuchos::RCP<matrix_type> A, const DomainSignatureCollection &dsc, int n)
@@ -27,18 +27,22 @@ AmgxWrapper::AmgxWrapper(Teuchos::RCP<matrix_type> A, const DomainSignatureColle
 	int curr_pos     = 0;
 	Acrs.row_ptrs[0] = curr_pos;
 	for (int i = 0; i < num_rows; i++) {
-		int           n;
-		const int *   inds;
-		const double *vals;
-		A->getLocalRowViewRaw(i, n, inds, vals);
-		for (int j = 0; j < n; j++) {
-			Acrs.data[curr_pos] = vals[j];
-			Acrs.cols[curr_pos] = inds[j];
+		size_t n;
+		n                              = A->getNumEntriesInLocalRow(i);
+		int                        row = A->getRowMap()->getGlobalElement(i);
+		vector<int>                cols(n);
+		vector<double>             data(n);
+		Teuchos::ArrayView<int>    inds_view(&cols[0], n);
+		Teuchos::ArrayView<double> vals_view(&data[0], n);
+		A->getGlobalRowCopy(row, inds_view, vals_view, n);
+		for (size_t j = 0; j < n; j++) {
+			Acrs.data[curr_pos] = data[j];
+			Acrs.cols[curr_pos] = cols[j];
 			curr_pos++;
 		}
-
 		Acrs.row_ptrs[i + 1] = curr_pos;
 	}
+
 	/* init */
 	AMGX_SAFE_CALL(AMGX_initialize());
 	AMGX_SAFE_CALL(AMGX_initialize_plugins());
@@ -47,30 +51,40 @@ AmgxWrapper::AmgxWrapper(Teuchos::RCP<matrix_type> A, const DomainSignatureColle
 	AMGX_SAFE_CALL(AMGX_install_signal_handler());
 	/* create resources, matrix, vector and solver */
 	AMGX_config_create_from_file(&cfg, "amgx.json");
-     AMGX_SAFE_CALL(AMGX_config_add_parameters(&cfg, "exception_handling=1"));
+	AMGX_SAFE_CALL(AMGX_config_add_parameters(&cfg, "exception_handling=1"));
 	MPI_Comm AMGX_MPI_Comm = MPI_COMM_WORLD;
 	// app must know how to provide a mapping
-	int devices[]   = {/*get_device_id_for_this_rank()*/ 0};
-	int num_devices = 1;
-	int rank        = 0;
+	//int devices[]   = {/*get_device_id_for_this_rank()*/ 0};
+	//int num_devices = 1;
+	int rank        = 0; // dsc.comm->getRank()%2;
 	AMGX_resources_create(&rsrc, cfg, &AMGX_MPI_Comm, 1, &rank);
 	AMGX_matrix_create(&gA, rsrc, mode);
 	AMGX_vector_create(&gx, rsrc, mode);
 	AMGX_vector_create(&gb, rsrc, mode);
 	AMGX_solver_create(&solver, rsrc, mode, cfg);
 
-	// create communication pattern
-	AmgxMap am(dsc.amgxmap, n);
+	int nrings = 0;
+	AMGX_config_get_default_number_of_rings(cfg, &nrings);
+	int n_global = A->getGlobalNumRows();
+	AMGX_matrix_upload_all_global(gA, n_global, num_rows, Acrs.nnz, 1, 1, &Acrs.row_ptrs[0],
+	                              &Acrs.cols[0], (void *) &Acrs.data[0], nullptr, nrings, nrings,
+	                              nullptr);
 
-	AMGX_matrix_comm_from_maps_one_ring(gA, 1, am.num_neighbors, &am.neighbors[0],
-	                                          &am.send_sizes[0], &am.send_maps[0], &am.recv_sizes[0],
-	                                          &am.recv_maps[0]);
 	AMGX_vector_bind(gx, gA);
 	AMGX_vector_bind(gb, gA);
 
-	AMGX_matrix_upload_all(gA, num_rows, Acrs.nnz, 1, 1, &Acrs.row_ptrs[0],
-	                                      &Acrs.cols[0], (void *) &Acrs.data[0], nullptr);
 	AMGX_solver_setup(solver, gA);
+}
+AmgxWrapper::~AmgxWrapper()
+{
+	AMGX_solver_destroy(solver);
+	AMGX_matrix_destroy(gA);
+	AMGX_vector_destroy(gx);
+	AMGX_vector_destroy(gb);
+	AMGX_resources_destroy(rsrc);
+	AMGX_config_destroy(cfg);
+    AMGX_finalize_plugins();
+    AMGX_finalize();
 }
 void AmgxWrapper::solve(Teuchos::RCP<vector_type> x, Teuchos::RCP<vector_type> b)
 {
