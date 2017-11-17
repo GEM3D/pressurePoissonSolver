@@ -85,6 +85,12 @@ if(CCACHE_FOUND)
    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
 endif(CCACHE_FOUND)
+find_package(HYPRE)
+if(HYPRE_FOUND)
+SET(CMAKE_CXX_FLAGS "-DENABLE_HYPRE ${CMAKE_CXX_FLAGS}")
+include_directories(${HYPRE_INCLUDES})
+link_directories("${HYPRE_DIR}/lib")
+endif()
 #
 # EDIT HERE: Replace TrilinosExample with your project's name.
 #
@@ -159,6 +165,17 @@ target_link_libraries(heat
   ${FFTW_LIB}
   ${MPI_CXX_LIBRARIES} 
 )
+if(HYPRE_FOUND)
+target_link_libraries(heat
+    HypreWrapper
+    )
+add_library(HypreWrapper HypreWrapper.cpp)
+target_link_libraries(HypreWrapper
+  ${Trilinos_TPL_LIBRARIES}
+  ${Trilinos_LIBRARIES} 
+  ${HYPRE_LIBRARIES} 
+)
+endif()
 if(ENABLE_AMGX)
 add_library(AmgxWrapper AmgxWrapper.cpp)
 target_link_libraries(heat

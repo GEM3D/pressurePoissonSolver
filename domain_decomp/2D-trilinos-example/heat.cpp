@@ -7,6 +7,9 @@
 #ifdef ENABLE_AMGX
 #include "AmgxWrapper.h"
 #endif
+#ifdef ENABLE_HYPRE
+#include "HypreWrapper.h"
+#endif
 #include "Timer.h"
 #include "args.h"
 #include <Amesos2.hpp>
@@ -150,6 +153,7 @@ int main(int argc, char *argv[])
 	args::Flag f_cufft(parser, "cufft", "use CuFFT as the patch solver", {"cufft"});
 #endif
 	args::Flag f_amgx(parser, "amgx", "solve schur compliment system with amgx", {"amgx"});
+	args::Flag f_hypre(parser, "hypre", "solve schur compliment system with hypre", {"hypre"});
 
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;
@@ -440,9 +444,16 @@ int main(int argc, char *argv[])
 #ifdef ENABLE_AMGX
 			Teuchos::RCP<AmgxWrapper> amgxsolver;
 #endif
+#ifdef ENABLE_HYPRE
+			Teuchos::RCP<HypreWrapper> hypresolver;
+#endif
 			if (f_amgx) {
 #ifdef ENABLE_AMGX
 				amgxsolver = rcp(new AmgxWrapper(A, dsc, nx));
+#endif
+            }else	if (f_hypre) {
+#ifdef ENABLE_HYPRE
+				hypresolver = rcp(new HypreWrapper(A, dsc, nx,tol));
 #endif
 			} else {
 				if (f_precmuelu) {
@@ -579,6 +590,10 @@ int main(int argc, char *argv[])
 				// solve
 #ifdef ENABLE_AMGX
 				amgxsolver->solve(gamma, b);
+#endif
+            }else if(f_hypre){
+#ifdef ENABLE_HYPRE
+				hypresolver->solve(gamma, b);
 #endif
 			} else if (f_read_gamma) {
 				gamma = Tpetra::MatrixMarket::Reader<matrix_type>::readDenseFile(
