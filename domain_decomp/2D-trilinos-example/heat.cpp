@@ -227,7 +227,7 @@ int main(int argc, char *argv[])
 		dsc.zoltanBalance();
 	}
 
-	scalar_type tol = 1e-10;
+	scalar_type tol = 1e-12;
 	if (f_t) {
 		tol = args::get(f_t);
 	}
@@ -451,9 +451,9 @@ int main(int argc, char *argv[])
 #ifdef ENABLE_AMGX
 				amgxsolver = rcp(new AmgxWrapper(A, dsc, nx));
 #endif
-            }else	if (f_hypre) {
+			} else if (f_hypre) {
 #ifdef ENABLE_HYPRE
-				hypresolver = rcp(new HypreWrapper(A, dsc, nx,tol));
+				hypresolver = rcp(new HypreWrapper(A, dsc, nx, tol));
 #endif
 			} else {
 				if (f_precmuelu) {
@@ -587,11 +587,11 @@ int main(int argc, char *argv[])
 
 			timer.start("Gamma Solve");
 			if (f_amgx) {
-				// solve
+// solve
 #ifdef ENABLE_AMGX
 				amgxsolver->solve(gamma, b);
 #endif
-            }else if(f_hypre){
+			} else if (f_hypre) {
 #ifdef ENABLE_HYPRE
 				hypresolver->solve(gamma, b);
 #endif

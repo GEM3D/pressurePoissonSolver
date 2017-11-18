@@ -1059,9 +1059,9 @@ void DomainSignatureCollection::indexIfacesLocal()
 	for (auto &p : ifaces) {
 		p.second.setLocalIndexes(rev_map);
 	}
-	iface_rev_map               = rev_map;
-	iface_map_vec               = map_vec;
-	iface_off_proc_map_vec      = off_proc_map_vec;
+	iface_rev_map          = rev_map;
+	iface_map_vec          = map_vec;
+	iface_off_proc_map_vec = off_proc_map_vec;
 	indexIfacesGlobal();
 }
 AmgxMap::AmgxMap(const AmgxMap &orig, int n) : AmgxMap(orig.num_neighbors)
@@ -1216,17 +1216,17 @@ std::set<MatrixBlock> Iface::getRowBlocks(int *id, DsMemPtr normal)
 	int i = *id;
 	// left domain(s)
 	{
-		Side iface_s = Side::north;
+		std::bitset<4> neumann = left.neumann;
+		Side           iface_s = Side::north;
 		if (y_axis) {
 			iface_s = Side::east;
 		}
 		// north block
 		{
-			Side           s    = Side::north;
-			Side           main = iface_s + s;
-			std::bitset<4> neumann;
-			int            j = (left.*normal)(main);
-			MatrixBlock    b(i, j, iface_s, Side::north, neumann, false, getBlockType(true));
+			Side        s    = Side::north;
+			Side        main = iface_s + s;
+			int         j    = (left.*normal)(main);
+			MatrixBlock b(i, j, iface_s, Side::north, neumann, left.zero_patch, getBlockType(true));
 			blocks.insert(b);
 		}
 		// east block
@@ -1236,8 +1236,7 @@ std::set<MatrixBlock> Iface::getRowBlocks(int *id, DsMemPtr normal)
 			Side main = iface_s + rel;
 			int  j    = (left.*normal)(main);
 			if (j != -1) {
-				std::bitset<4> neumann;
-				MatrixBlock    b(i, j, main, s, neumann, false, getBlockType(true));
+				MatrixBlock b(i, j, main, s, neumann, left.zero_patch, getBlockType(true));
 				blocks.insert(b);
 			}
 		}
@@ -1247,8 +1246,7 @@ std::set<MatrixBlock> Iface::getRowBlocks(int *id, DsMemPtr normal)
 			Side main = iface_s + s;
 			int  j    = (left.*normal)(main);
 			if (j != -1) {
-				std::bitset<4> neumann;
-				MatrixBlock    b(i, j, main, s, neumann, false, getBlockType(true));
+				MatrixBlock b(i, j, main, s, neumann, left.zero_patch, getBlockType(true));
 				blocks.insert(b);
 			}
 		}
@@ -1259,25 +1257,25 @@ std::set<MatrixBlock> Iface::getRowBlocks(int *id, DsMemPtr normal)
 			Side main = iface_s + rel;
 			int  j    = (left.*normal)(main);
 			if (j != -1) {
-				std::bitset<4> neumann;
-				MatrixBlock    b(i, j, main, s, neumann, false, getBlockType(true));
+				MatrixBlock b(i, j, main, s, neumann, left.zero_patch, getBlockType(true));
 				blocks.insert(b);
 			}
 		}
 	}
 	// right domain(s)
 	{
-		Side iface_s = Side::south;
+		std::bitset<4> neumann = right.neumann;
+		Side           iface_s = Side::south;
 		if (y_axis) {
 			iface_s = Side::west;
 		}
 		// north block
 		{
-			Side           s    = Side::north;
-			Side           main = iface_s + s;
-			std::bitset<4> neumann;
-			int            j = (right.*normal)(main);
-			MatrixBlock    b(i, j, iface_s, Side::north, neumann, false, getBlockType(false));
+			Side        s    = Side::north;
+			Side        main = iface_s + s;
+			int         j    = (right.*normal)(main);
+			MatrixBlock b(i, j, iface_s, Side::north, neumann, right.zero_patch,
+			              getBlockType(false));
 			blocks.insert(b);
 		}
 		// east block
@@ -1287,8 +1285,7 @@ std::set<MatrixBlock> Iface::getRowBlocks(int *id, DsMemPtr normal)
 			Side main = iface_s + rel;
 			int  j    = (right.*normal)(main);
 			if (j != -1) {
-				std::bitset<4> neumann;
-				MatrixBlock    b(i, j, main, s, neumann, false, getBlockType(false));
+				MatrixBlock b(i, j, main, s, neumann, right.zero_patch, getBlockType(false));
 				blocks.insert(b);
 			}
 		}
@@ -1298,8 +1295,7 @@ std::set<MatrixBlock> Iface::getRowBlocks(int *id, DsMemPtr normal)
 			Side main = iface_s + s;
 			int  j    = (right.*normal)(main);
 			if (j != -1) {
-				std::bitset<4> neumann;
-				MatrixBlock    b(i, j, main, s, neumann, false, getBlockType(false));
+				MatrixBlock b(i, j, main, s, neumann, right.zero_patch, getBlockType(false));
 				blocks.insert(b);
 			}
 		}
@@ -1310,14 +1306,14 @@ std::set<MatrixBlock> Iface::getRowBlocks(int *id, DsMemPtr normal)
 			Side main = iface_s + rel;
 			int  j    = (right.*normal)(main);
 			if (j != -1) {
-				std::bitset<4> neumann;
-				MatrixBlock    b(i, j, main, s, neumann, false, getBlockType(false));
+				MatrixBlock b(i, j, main, s, neumann, right.zero_patch, getBlockType(false));
 				blocks.insert(b);
 			}
 		}
 	}
 	if (type == IfaceType::coarse_on_left || type == IfaceType::coarse_on_right) {
-		Side iface_s = Side::south;
+		std::bitset<4> neumann = extra.neumann;
+		Side           iface_s = Side::south;
 		if (y_axis) {
 			iface_s = Side::west;
 		}
@@ -1329,11 +1325,11 @@ std::set<MatrixBlock> Iface::getRowBlocks(int *id, DsMemPtr normal)
 		}
 		// north block
 		{
-			Side           s    = Side::north;
-			Side           main = iface_s + s;
-			std::bitset<4> neumann;
-			int            j = (extra.*normal)(main);
-			MatrixBlock    b(i, j, iface_s, Side::north, neumann, false, BlockType::fine_out_right);
+			Side        s    = Side::north;
+			Side        main = iface_s + s;
+			int         j    = (extra.*normal)(main);
+			MatrixBlock b(i, j, iface_s, Side::north, neumann, extra.zero_patch,
+			              BlockType::fine_out_right);
 			blocks.insert(b);
 		}
 		// east block
@@ -1343,8 +1339,7 @@ std::set<MatrixBlock> Iface::getRowBlocks(int *id, DsMemPtr normal)
 			Side main = iface_s + rel;
 			int  j    = (extra.*normal)(main);
 			if (j != -1) {
-				std::bitset<4> neumann;
-				MatrixBlock    b(i, j, main, s, neumann, false, BlockType::fine_out_right);
+				MatrixBlock b(i, j, main, s, neumann, extra.zero_patch, BlockType::fine_out_right);
 				blocks.insert(b);
 			}
 		}
@@ -1354,8 +1349,7 @@ std::set<MatrixBlock> Iface::getRowBlocks(int *id, DsMemPtr normal)
 			Side main = iface_s + s;
 			int  j    = (extra.*normal)(main);
 			if (j != -1) {
-				std::bitset<4> neumann;
-				MatrixBlock    b(i, j, main, s, neumann, false, BlockType::fine_out_right);
+				MatrixBlock b(i, j, main, s, neumann, extra.zero_patch, BlockType::fine_out_right);
 				blocks.insert(b);
 			}
 		}
@@ -1366,8 +1360,7 @@ std::set<MatrixBlock> Iface::getRowBlocks(int *id, DsMemPtr normal)
 			Side main = iface_s + rel;
 			int  j    = (extra.*normal)(main);
 			if (j != -1) {
-				std::bitset<4> neumann;
-				MatrixBlock    b(i, j, main, s, neumann, false, BlockType::fine_out_right);
+				MatrixBlock b(i, j, main, s, neumann, extra.zero_patch, BlockType::fine_out_right);
 				blocks.insert(b);
 			}
 		}

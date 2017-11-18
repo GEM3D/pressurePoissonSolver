@@ -4,26 +4,12 @@
 #include <set>
 #include <vector>
 using namespace std;
-struct AmgxCrs {
-	int                  n_global;
-	int                  n;
-	int                  nnz;
-	int                  block_dimx = 1;
-	int                  block_dimy = 1;
-	std::vector<int>     row_ptrs;
-	std::vector<int64_t> cols;
-	std::vector<double>  data;
-	double *             diag_data = nullptr;
-};
-
 HypreWrapper::HypreWrapper(Teuchos::RCP<matrix_type> A, const DomainSignatureCollection &dsc, int n,
                            double tol)
 {
 	int ilower = A->getRowMap()->getMinGlobalIndex();
 	int iupper = A->getRowMap()->getMaxGlobalIndex();
-	int jlower = A->getColMap()->getMinGlobalIndex();
-	int jupper = A->getColMap()->getMaxGlobalIndex();
-	HYPRE_IJMatrixCreate(MPI_COMM_WORLD, ilower, iupper, jlower, jupper, &Aij);
+	HYPRE_IJMatrixCreate(MPI_COMM_WORLD, ilower, iupper, ilower, iupper, &Aij);
 	HYPRE_IJMatrixSetObjectType(Aij, HYPRE_PARCSR);
 	HYPRE_IJMatrixInitialize(Aij);
 
@@ -72,7 +58,7 @@ HypreWrapper::HypreWrapper(Teuchos::RCP<matrix_type> A, const DomainSignatureCol
 	// set preconditioner
 	HYPRE_ParCSRGMRESSetPrecond(solver, HYPRE_BoomerAMGSolve, HYPRE_BoomerAMGSetup, precond);
 
-    HYPRE_ParCSRGMRESSetup(solver, par_A, par_b, par_x);
+	HYPRE_ParCSRGMRESSetup(solver, par_A, par_b, par_x);
 }
 HypreWrapper::~HypreWrapper()
 {
@@ -82,17 +68,17 @@ HypreWrapper::~HypreWrapper()
 }
 void HypreWrapper::solve(Teuchos::RCP<vector_type> x, Teuchos::RCP<vector_type> b)
 {
-	double* xvals = x->get1dViewNonConst().get();
-    auto xinds = x->getMap()->getMyGlobalIndices();
-    HYPRE_IJVectorSetValues(xij,num_rows,&xinds[0],xvals);
+	double *xvals = x->get1dViewNonConst().get();
+	auto    xinds = x->getMap()->getMyGlobalIndices();
+	HYPRE_IJVectorSetValues(xij, num_rows, &xinds[0], xvals);
 	HYPRE_IJVectorAssemble(xij);
 
-	double* bvals = b->get1dViewNonConst().get();
-    auto binds = b->getMap()->getMyGlobalIndices();
-    HYPRE_IJVectorSetValues(bij,num_rows,&binds[0],bvals);
+	double *bvals = b->get1dViewNonConst().get();
+	auto    binds = b->getMap()->getMyGlobalIndices();
+	HYPRE_IJVectorSetValues(bij, num_rows, &binds[0], bvals);
 	HYPRE_IJVectorAssemble(bij);
 
 	HYPRE_ParCSRGMRESSolve(solver, par_A, par_b, par_x);
 
-    HYPRE_IJVectorGetValues(xij,num_rows,&xinds[0],xvals);
+	HYPRE_IJVectorGetValues(xij, num_rows, &xinds[0], xvals);
 }

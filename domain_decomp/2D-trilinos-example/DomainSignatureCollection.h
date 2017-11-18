@@ -1,34 +1,35 @@
 #ifndef DOMAINSIGNATURECOLLECTION_H
 #define DOMAINSIGNATURECOLLECTION_H
 #include "Side.h"
+#include <Teuchos_Comm.hpp>
+#include <Teuchos_GlobalMPISession.hpp>
+#include <Teuchos_RCP.hpp>
 #include <array>
 #include <bitset>
 #include <map>
 #include <set>
-#include <Teuchos_Comm.hpp>
-#include <Teuchos_GlobalMPISession.hpp>
-#include <Teuchos_RCP.hpp>
 #include <string>
 #include <vector>
 #include <zoltan_cpp.h>
 struct AmgxMap {
-    int num_neighbors;
-    std::vector<int> neighbors;
-    std::vector<int> send_sizes;
-    std::vector<const int*> send_maps;
-    std::vector<int> recv_sizes;
-    std::vector<const int*> recv_maps;
-    std::set<Teuchos::ArrayRCP<int>> arrays;
-    AmgxMap(){}
-    AmgxMap(int num_neighbors){
-        this->num_neighbors = num_neighbors;
-        neighbors.resize(num_neighbors);
-        send_sizes.resize(num_neighbors);
-        send_maps.resize(num_neighbors);
-        recv_sizes.resize(num_neighbors);
-        recv_maps.resize(num_neighbors);
-    }
-    AmgxMap(const AmgxMap& orig, int n);
+	int                              num_neighbors;
+	std::vector<int>                 neighbors;
+	std::vector<int>                 send_sizes;
+	std::vector<const int *>         send_maps;
+	std::vector<int>                 recv_sizes;
+	std::vector<const int *>         recv_maps;
+	std::set<Teuchos::ArrayRCP<int>> arrays;
+	AmgxMap() {}
+	AmgxMap(int num_neighbors)
+	{
+		this->num_neighbors = num_neighbors;
+		neighbors.resize(num_neighbors);
+		send_sizes.resize(num_neighbors);
+		send_maps.resize(num_neighbors);
+		recv_sizes.resize(num_neighbors);
+		recv_maps.resize(num_neighbors);
+	}
+	AmgxMap(const AmgxMap &orig, int n);
 };
 /**
  * @brief A structure that represents a domain and its relation to other domains.
@@ -118,7 +119,7 @@ struct DomainSignature {
 				}
 			}
 		} catch (std::out_of_range oor) {
-            //do nothing
+			// do nothing
 		}
 	}
 	void setGlobalIndexes(std::map<int, int> &rev_map)
@@ -129,18 +130,18 @@ struct DomainSignature {
 			}
 		}
 		try {
-		for (int i = 0; i < 4; i++) {
-			if (g_id_center[i] != -1) {
-				global_i_center[i] = rev_map.at(local_i_center[i]);
+			for (int i = 0; i < 4; i++) {
+				if (g_id_center[i] != -1) {
+					global_i_center[i] = rev_map.at(local_i_center[i]);
+				}
 			}
-		}
-		for (int i = 0; i < 8; i++) {
-			if (g_id_refined[i] != -1) {
-				global_i_refined[i] = rev_map.at(local_i_refined[i]);
+			for (int i = 0; i < 8; i++) {
+				if (g_id_refined[i] != -1) {
+					global_i_refined[i] = rev_map.at(local_i_refined[i]);
+				}
 			}
-		}
 		} catch (std::out_of_range oor) {
-            //do nothing
+			// do nothing
 		}
 	}
 	void setNeumann()
@@ -192,12 +193,14 @@ struct MatrixBlock {
 	MatrixBlock(int i, int j, Side main, Side aux, std::bitset<4> neumann, bool zero_patch,
 	            BlockType type)
 	{
-		this->i          = i;
-		this->j          = j;
-		this->flip_i     = flip_i_table[static_cast<int>(main)][static_cast<int>(aux)];
-		this->flip_j     = flip_j_table[static_cast<int>(main)][static_cast<int>(aux)];
-		this->right      = main == Side::south || main == Side::west;
-		this->neumann    = neumann;
+		this->i      = i;
+		this->j      = j;
+		this->flip_i = flip_i_table[static_cast<int>(main)][static_cast<int>(aux)];
+		this->flip_j = flip_j_table[static_cast<int>(main)][static_cast<int>(aux)];
+		this->right  = main == Side::south || main == Side::west;
+		for (int q = 0; q < 4; q++) {
+			this->neumann[q] = neumann[(static_cast<int>(main) + q) % 4];
+		}
 		this->zero_patch = zero_patch;
 		this->type       = type;
 		this->s          = aux;
@@ -270,6 +273,18 @@ struct Iface {
 		right.setGlobalIndexes(rev_map);
 		extra.setGlobalIndexes(rev_map);
 	}
+	void setZeroPatch()
+	{
+		left.setZeroPatch();
+		right.setZeroPatch();
+		extra.setZeroPatch();
+	}
+	void setNeumann()
+	{
+		left.setNeumann();
+		right.setNeumann();
+		extra.setNeumann();
+	}
 };
 
 /**
@@ -282,12 +297,12 @@ struct Iface {
 class DomainSignatureCollection
 {
 	public:
-    AmgxMap amgxmap;
-	int rank;
-    Teuchos::RCP<const Teuchos::Comm<int>> comm;
-	int matrix_j_low;
-	int matrix_j_high;
-	int num_pins;
+	AmgxMap                                amgxmap;
+	int                                    rank;
+	Teuchos::RCP<const Teuchos::Comm<int>> comm;
+	int                                    matrix_j_low;
+	int                                    matrix_j_high;
+	int                                    num_pins;
 	/**
 	 * @brief Number of total domains.
 	 */
@@ -327,9 +342,12 @@ class DomainSignatureCollection
 	 * @param d_y number of domains in the y direction.
 	 * @param rank the rank of the MPI process.
 	 */
-	DomainSignatureCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm,int d_x, int d_y, int rank);
-	DomainSignatureCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm,int d_x, int d_y, int rank, bool amr);
-	DomainSignatureCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm,std::string file_name, int rank);
+	DomainSignatureCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm, int d_x, int d_y,
+	                          int rank);
+	DomainSignatureCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm, int d_x, int d_y,
+	                          int rank, bool amr);
+	DomainSignatureCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm, std::string file_name,
+	                          int rank);
 	/**
 	 * @brief Balance the domains over processors using Zoltan
 	 */
@@ -348,10 +366,16 @@ class DomainSignatureCollection
 		for (auto &p : domains) {
 			p.second.setNeumann();
 		}
+		for (auto &p : ifaces) {
+			p.second.setNeumann();
+		}
 	}
 	void setZeroPatch()
 	{
 		for (auto &p : domains) {
+			p.second.setZeroPatch();
+		}
+		for (auto &p : ifaces) {
 			p.second.setZeroPatch();
 		}
 	}

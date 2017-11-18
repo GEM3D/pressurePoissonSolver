@@ -147,8 +147,8 @@ void DomainCollection::generateMaps()
 	// points
 	if (num_global_domains == 1) {
 		// this is a special case for when there is only one domain
-		collection_map           = Teuchos::rcp(new map_type(1, 0, comm));
-		matrix_map               = Teuchos::rcp(new map_type(1, 0, comm));
+		collection_map = Teuchos::rcp(new map_type(1, 0, comm));
+		matrix_map     = Teuchos::rcp(new map_type(1, 0, comm));
 	} else {
 		collection_map = Teuchos::rcp(new map_type(-1, &global[0], global.size(), 0, this->comm));
 		matrix_map
@@ -492,7 +492,7 @@ void DomainCollection::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<ma
 				ds.nbr_id[q * 2] = 1;
 			}
 		}
-        ds.neumann = curr_type.neumann;
+		ds.neumann    = curr_type.neumann;
 		ds.zero_patch = curr_type.zero_patch;
 		Domain d(ds, n);
 

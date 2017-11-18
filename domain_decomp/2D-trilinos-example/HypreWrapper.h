@@ -1,5 +1,5 @@
-#ifndef AMGXWRAPPER_H
-#define AMGXWRAPPER_H
+#ifndef HYPREWRAPPER_H
+#define HYPREWRAPPER_H
 #include "DomainSignatureCollection.h"
 #include "MyTypeDefs.h"
 #include <HYPRE.h>
