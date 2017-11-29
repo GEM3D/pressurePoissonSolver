@@ -1,6 +1,7 @@
 #ifndef DOMAINSIGNATURECOLLECTION_H
 #define DOMAINSIGNATURECOLLECTION_H
 #include "Side.h"
+#include "MyTypeDefs.h"
 #include <Teuchos_Comm.hpp>
 #include <Teuchos_GlobalMPISession.hpp>
 #include <Teuchos_RCP.hpp>
@@ -11,26 +12,6 @@
 #include <string>
 #include <vector>
 #include <zoltan_cpp.h>
-struct AmgxMap {
-	int                              num_neighbors;
-	std::vector<int>                 neighbors;
-	std::vector<int>                 send_sizes;
-	std::vector<const int *>         send_maps;
-	std::vector<int>                 recv_sizes;
-	std::vector<const int *>         recv_maps;
-	std::set<Teuchos::ArrayRCP<int>> arrays;
-	AmgxMap() {}
-	AmgxMap(int num_neighbors)
-	{
-		this->num_neighbors = num_neighbors;
-		neighbors.resize(num_neighbors);
-		send_sizes.resize(num_neighbors);
-		send_maps.resize(num_neighbors);
-		recv_sizes.resize(num_neighbors);
-		recv_maps.resize(num_neighbors);
-	}
-	AmgxMap(const AmgxMap &orig, int n);
-};
 /**
  * @brief A structure that represents a domain and its relation to other domains.
  */
@@ -39,6 +20,8 @@ struct DomainSignature {
 	 * @brief The domain's own id
 	 */
 	int id = -1;
+	int id_local  = -1;
+	int id_global = -1;
 
 	int refine_level = 1;
 
@@ -296,12 +279,17 @@ struct Iface {
  */
 class DomainSignatureCollection
 {
+    private:
+	void enumerateIfaces();
+	void determineCoarseness();
+	void determineAmrLevel();
+	void determineXY();
+	void zoltanBalanceIfaces();
+	void zoltanBalanceDomains();
 	public:
-	AmgxMap                                amgxmap;
 	int                                    rank;
+    int n=4;
 	Teuchos::RCP<const Teuchos::Comm<int>> comm;
-	int                                    matrix_j_low;
-	int                                    matrix_j_high;
 	int                                    num_pins;
 	/**
 	 * @brief Number of total domains.
@@ -316,13 +304,10 @@ class DomainSignatureCollection
 	 */
 	std::map<int, DomainSignature> domains;
 	std::map<int, Iface>           ifaces;
-	std::map<int, int>             iface_rev_map;
+
 	std::vector<int> iface_map_vec;
 	std::vector<int> iface_off_proc_map_vec;
-	std::vector<int> iface_off_proc_vec;
-	std::vector<int> iface_off_proc_map_vec_send;
-	std::vector<int> iface_off_proc_vec_send;
-	std::map<int, int> domain_rev_map;
+    std::vector<int> iface_dist_map_vec;
 	std::vector<int> domain_map_vec;
 
 	/**
@@ -330,11 +315,6 @@ class DomainSignatureCollection
 	 */
 	DomainSignatureCollection() = default;
 
-	void enumerateIfaces();
-	void determineCoarseness();
-	void determineAmrLevel();
-	void determineXY();
-	void divide();
 	/**
 	 * @brief Generate a grid of domains.
 	 *
@@ -352,15 +332,19 @@ class DomainSignatureCollection
 	 * @brief Balance the domains over processors using Zoltan
 	 */
 	void zoltanBalance();
-	void zoltanBalanceIfaces();
-	void zoltanBalanceDomains();
+	void divide();
 	/**
 	 * @brief Index the interfaces using a Breadth First Search.
 	 */
 	void indexInterfacesBFS();
+
 	void indexIfacesLocal();
 	void indexIfacesGlobal();
+
+	void indexDomainsLocal();
+
 	void indexDomainIfacesLocal();
+
 	void setNeumann()
 	{
 		for (auto &p : domains) {
@@ -379,6 +363,9 @@ class DomainSignatureCollection
 			p.second.setZeroPatch();
 		}
 	}
+    Teuchos::RCP<map_type> getSchurRowMap(int n);
+    Teuchos::RCP<map_type> getSchurDistMap(int n);
+    Teuchos::RCP<map_type> getDomainRowMap(int n);
 };
 struct IfaceZoltanHelper {
 	// query functions that respond to requests from Zoltan

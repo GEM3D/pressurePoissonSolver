@@ -15,22 +15,15 @@
 using Teuchos::RCP;
 using Teuchos::rcp;
 using namespace std;
-extern "C" {
-// LU decomoposition of a general matrix
-void dgetrf_(int *M, int *N, double *A, int *lda, int *IPIV, int *INFO);
-
-// generate inverse of a matrix given its LU decomposition
-void dgetri_(int *N, double *A, int *lda, int *IPIV, double *WORK, int *lwork, int *INFO);
-}
-
 enum axis_enum { X_AXIS, Y_AXIS };
 enum bc_enum { DIRICHLET, NEUMANN, REFINED };
 
+void DomainCollection::setPatchSolver(RCP<PatchSolver> psolver){
+    solver=psolver;
+}
 DomainCollection::DomainCollection(DomainSignatureCollection dsc, int n,
                                    RCP<const Teuchos::Comm<int>> comm)
 {
-	// cerr<< "Low:  " << low << "\n";
-	// cerr<< "High: " << high << "\n";
 	this->comm         = comm;
 	this->n            = n;
 	this->dsc          = dsc;
@@ -131,61 +124,25 @@ void DomainCollection::initDirichlet(function<double(double, double)> ffun,
 void DomainCollection::generateMaps()
 {
 	vector<int> global;
-	for (int i : dsc.domain_map_vec) {
+	for (int i : dsc.iface_dist_map_vec) {
 		for (int j = 0; j < n; j++) {
 			global.push_back(i * n + j);
 		}
 	}
-	vector<int> matrix_global;
-	for (int i : dsc.iface_map_vec) {
-		for (int j = 0; j < n; j++) {
-			matrix_global.push_back(i * n + j);
-		}
-	}
-
 	// Now that the global indices have been calculated, we can create a map for the interface
 	// points
 	if (num_global_domains == 1) {
 		// this is a special case for when there is only one domain
 		collection_map = Teuchos::rcp(new map_type(1, 0, comm));
-		matrix_map     = Teuchos::rcp(new map_type(1, 0, comm));
 	} else {
 		collection_map = Teuchos::rcp(new map_type(-1, &global[0], global.size(), 0, this->comm));
-		matrix_map
-		= Teuchos::rcp(new map_type(-1, &matrix_global[0], matrix_global.size(), 0, this->comm));
 	}
-#ifdef DD_DEBUG
-	auto out = Teuchos::getFancyOStream(Teuchos::rcpFromRef(cerr));
-	matrix_map->describe(*out);
-	collection_map->describe(*out);
-#endif
-}
-RCP<map_type> DomainCollection::formMatrixMap(int n)
-{
-	vector<int> matrix_global;
-	for (int i = n * dsc.matrix_j_low; i < n * dsc.matrix_j_high; i++) {
-		matrix_global.push_back(i);
-	}
-	return Teuchos::rcp(new map_type(-1, &matrix_global[0], matrix_global.size(), 0, this->comm));
 }
 void DomainCollection::distributeIfaceInfo() {}
-void DomainCollection::getFluxDiff(vector_type &diff)
-{
-	Tpetra::Import<> importer(diff.getMap(), collection_map);
-	vector_type      local_diff(collection_map, 1);
-
-	// solve over domains on this proc
-	for (auto &p : domains) {
-		p.second->getFluxDiff(local_diff);
-	}
-
-	diff.scale(0);
-	diff.doExport(local_diff, importer, Tpetra::CombineMode::ADD);
-}
 RCP<vector_type> DomainCollection::getInterfaceCoords()
 {
-	RCP<vector_type> xy = rcp(new vector_type(matrix_map, 2));
-	Tpetra::Import<> importer(matrix_map, collection_map);
+	RCP<vector_type> xy = rcp(new vector_type(dsc.getSchurRowMap(n), 2));
+	Tpetra::Import<> importer(dsc.getSchurRowMap(n), collection_map);
 	vector_type      local_xy(collection_map, 2);
 
 	// solve over domains on this proc
@@ -196,7 +153,7 @@ RCP<vector_type> DomainCollection::getInterfaceCoords()
 	xy->doExport(local_xy, importer, Tpetra::CombineMode::ADD);
 	return xy;
 }
-void DomainCollection::solveWithInterface(const vector_type &gamma, vector_type &diff)
+void DomainCollection::solveWithInterface(const vector_type &f, vector_type &u,const vector_type &gamma, vector_type &diff)
 {
 	// auto out = Teuchos::getFancyOStream (Teuchos::rcpFromRef (std::cout));
 	// if(has_east)std::cout << "Gamma begin\n";
@@ -211,8 +168,10 @@ void DomainCollection::solveWithInterface(const vector_type &gamma, vector_type 
 	// solve over domains on this proc
 	for (auto &p : domains) {
 		Domain &d = *p.second;
+        solver->solve(d.ds,f,u,gamma);
 		d.solveWithInterface(local_gamma);
 	}
+    
 
 	if (neumann && zero_u) {
 		// make avarage of solution be zero
@@ -285,11 +244,11 @@ double DomainCollection::exactNorm(double eavg)
 double DomainCollection::residual()
 {
 	vector_type ghost(collection_map, 2);
-	vector_type one_ghost(matrix_map, 2);
+	vector_type one_ghost(dsc.getSchurRowMap(n), 2);
 	for (auto &p : domains) {
 		p.second->putGhostCells(ghost);
 	}
-	Tpetra::Export<> exporter(collection_map, matrix_map);
+	Tpetra::Export<> exporter(collection_map, dsc.getSchurRowMap(n));
 	one_ghost.doExport(ghost, exporter, Tpetra::CombineMode::ADD);
 	ghost.putScalar(0);
 	ghost.doImport(one_ghost, exporter, Tpetra::CombineMode::ADD);
@@ -305,11 +264,11 @@ double DomainCollection::residual()
 double DomainCollection::integrateF()
 {
 	vector_type ghost(collection_map, 2);
-	vector_type one_ghost(matrix_map, 2);
+	vector_type one_ghost(dsc.getSchurRowMap(n), 2);
 	for (auto &p : domains) {
 		p.second->putGhostCells(ghost);
 	}
-	Tpetra::Export<> exporter(collection_map, matrix_map);
+	Tpetra::Export<> exporter(collection_map, dsc.getSchurRowMap(n));
 	one_ghost.doExport(ghost, exporter, Tpetra::CombineMode::ADD);
 	ghost.putScalar(0);
 	ghost.doImport(one_ghost, exporter, Tpetra::CombineMode::ADD);
@@ -365,11 +324,11 @@ double DomainCollection::integrateExact()
 double DomainCollection::integrateAU()
 {
 	vector_type ghost(collection_map, 2);
-	vector_type one_ghost(matrix_map, 2);
+	vector_type one_ghost(dsc.getSchurRowMap(n), 2);
 	for (auto &p : domains) {
 		p.second->putGhostCells(ghost);
 	}
-	Tpetra::Export<> exporter(collection_map, matrix_map);
+	Tpetra::Export<> exporter(collection_map, dsc.getSchurRowMap(n));
 	one_ghost.doExport(ghost, exporter, Tpetra::CombineMode::ADD);
 	ghost.putScalar(0);
 	ghost.doImport(one_ghost, exporter, Tpetra::CombineMode::ADD);
@@ -382,8 +341,8 @@ double DomainCollection::integrateAU()
 	Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &sum, &retval);
 	return retval;
 }
-void DomainCollection::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<matrix_type> &A,
-                                     Teuchos::RCP<single_vector_type> *s, int n, bool transpose)
+void DomainCollection::assembleMatrix(inserter insertBlock,
+                                     int n)
 {
 	set<MatrixBlock> blocks;
 	for (auto p : dsc.ifaces) {
@@ -394,71 +353,6 @@ void DomainCollection::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<ma
 	if (n == -1) {
 		n = this->n;
 	}
-	vector<int> cols_array;
-	for (int i : dsc.iface_map_vec) {
-		for (int j = 0; j < n; j++) {
-			cols_array.push_back(i * n + j);
-		}
-	}
-	for (int i : dsc.iface_off_proc_map_vec) {
-		for (int j = 0; j < n; j++) {
-			cols_array.push_back(i * n + j);
-		}
-	}
-	RCP<map_type> col_map = rcp(new map_type(-1, &cols_array[0], cols_array.size(), 0, this->comm));
-
-	A  = rcp(new matrix_type(matrix_map, col_map, 5 * n));
-	*s = rcp(new single_vector_type(map));
-
-	set<pair<int, int>> inserted;
-	valarray<double> shift(n);
-	valarray<double> shift_rev(n);
-	auto insertBlock = [&](int i, int j, RCP<valarray<double>> block, bool flip_i, bool flip_j) {
-		if (i == j) {
-			if (flip_j) {
-				for (int q = 0; q < n; q++) {
-					(*s)->sumIntoGlobalValue(j * n + q, shift_rev[q]);
-				}
-			} else {
-				for (int q = 0; q < n; q++) {
-					(*s)->sumIntoGlobalValue(j * n + q, shift[q]);
-				}
-			}
-		}
-		int local_i = i * n;
-		int local_j = j * n;
-
-		valarray<double> &orig = *block;
-		valarray<double>  copy(n * n);
-		for (int i = 0; i < n; i++) {
-			int block_i = i;
-			if (flip_i) {
-				block_i = n - i - 1;
-			}
-			for (int j = 0; j < n; j++) {
-				int block_j = j;
-				if (flip_j) {
-					block_j = n - j - 1;
-				}
-				copy[i * n + j] = orig[block_i * n + block_j];
-			}
-		}
-		vector<int> inds(n);
-		for (int q = 0; q < n; q++) {
-			inds[q] = local_j + q;
-		}
-		if (inserted.count(make_pair(i, j)) == 0) {
-			for (int q = 0; q < n; q++) {
-				A->insertLocalValues(local_i + q, n, &copy[q * n], &inds[0]);
-			}
-		} else {
-			inserted.insert(make_pair(i, j));
-			for (int q = 0; q < n; q++) {
-				A->sumIntoLocalValues(local_i + q, n, &copy[q * n], &inds[0]);
-			}
-		}
-	};
-
 	int num_types = 0;
 	while (!blocks.empty()) {
 		num_types++;
@@ -576,9 +470,6 @@ void DomainCollection::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<ma
 		for (int i = 0; i < n; i++) {
 			d.boundary_north[i] = 1;
 			d.solve();
-
-			shift[i]             = d.u.sum() * 2 / (num_global_domains * n * n);
-			shift_rev[n - 1 - i] = shift[i];
 
 			// fill the blocks
 			n_b[slice(i, n, n)] = d.getDiff(Side::north);
@@ -744,11 +635,66 @@ void DomainCollection::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<ma
 		}
 	}
 
-	A->fillComplete(map, map);
 }
-void DomainCollection::formRBMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<RBMatrix> &A,
-                                    Teuchos::RCP<single_vector_type> *s, int n)
+void DomainCollection::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<matrix_type> &A,
+                                     int n)
 {
+	if (n == -1) {
+		n = this->n;
+	}
+	vector<int> cols_array;
+	for (int i : dsc.iface_map_vec) {
+		for (int j = 0; j < n; j++) {
+			cols_array.push_back(i * n + j);
+		}
+	}
+	for (int i : dsc.iface_off_proc_map_vec) {
+		for (int j = 0; j < n; j++) {
+			cols_array.push_back(i * n + j);
+		}
+	}
+	RCP<map_type> col_map = rcp(new map_type(-1, &cols_array[0], cols_array.size(), 0, this->comm));
+
+	A  = rcp(new matrix_type(dsc.getSchurRowMap(n), col_map, 5 * n));
+
+	set<pair<int, int>> inserted;
+	auto insertBlock = [&](int i, int j, RCP<valarray<double>> block, bool flip_i, bool flip_j) {
+		int local_i = i * n;
+		int local_j = j * n;
+
+		valarray<double> &orig = *block;
+		valarray<double>  copy(n * n);
+		for (int i = 0; i < n; i++) {
+			int block_i = i;
+			if (flip_i) {
+				block_i = n - i - 1;
+			}
+			for (int j = 0; j < n; j++) {
+				int block_j = j;
+				if (flip_j) {
+					block_j = n - j - 1;
+				}
+				copy[i * n + j] = orig[block_i * n + block_j];
+			}
+		}
+		vector<int> inds(n);
+		for (int q = 0; q < n; q++) {
+			inds[q] = local_j + q;
+		}
+		if (inserted.count(make_pair(i, j)) == 0) {
+			for (int q = 0; q < n; q++) {
+				A->insertLocalValues(local_i + q, n, &copy[q * n], &inds[0]);
+			}
+		} else {
+			inserted.insert(make_pair(i, j));
+			for (int q = 0; q < n; q++) {
+				A->sumIntoLocalValues(local_i + q, n, &copy[q * n], &inds[0]);
+			}
+		}
+	};
+
+    assembleMatrix(insertBlock,n);
+	A->fillComplete(map, map);
 }
 
 void DomainCollection::outputSolution(std::ostream &os)

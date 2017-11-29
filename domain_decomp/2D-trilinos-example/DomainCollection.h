@@ -3,7 +3,7 @@
 #include "Domain.h"
 #include "DomainSignatureCollection.h"
 #include "MyTypeDefs.h"
-#include "RBMatrix.h"
+#include "PatchSolver.h"
 /**
  * @brief This class represents a collection of domains that a single processor owns.
  *
@@ -16,8 +16,9 @@
 class DomainCollection
 {
 	private:
-	bool neumann = false;
-	bool zero_u  = false;
+	Teuchos::RCP<PatchSolver> solver;
+	bool                      neumann = false;
+	bool                      zero_u  = false;
 	/**
 	 * @brief A map of domain ids to the domain objects.
 	 */
@@ -33,6 +34,7 @@ class DomainCollection
 	int num_global_domains;
 
 	public:
+	void setPatchSolver(Teuchos::RCP<PatchSolver> psolver);
 	/**
 	 * @brief The number of cells in a single dimension.
 	 *
@@ -52,10 +54,6 @@ class DomainCollection
 	 */
 	Teuchos::RCP<map_type> collection_iface_map;
 	Teuchos::RCP<map_type> collection_row_iface_map;
-	/**
-	 * @brief Tpetra map for interface values used in Schur complement matrix
-	 */
-	Teuchos::RCP<map_type> matrix_map;
 	/**
 	 * @brief Tpetra map use for interface information.
 	 */
@@ -126,13 +124,13 @@ class DomainCollection
 	 * @param gamma the interface values to use
 	 * @param diff the resulting difference
 	 */
-	void solveWithInterface(const vector_type &gamma, vector_type &diff);
+	void solveWithInterface(const vector_type &f, vector_type &u, const vector_type &gamma,
+	                        vector_type &diff);
 
 	/**
 	 * @brief get the difference in flux on refined boundaries
 	 */
-	void getFluxDiff(vector_type &diff);
-    Teuchos::RCP<vector_type> getInterfaceCoords();
+	Teuchos::RCP<vector_type> getInterfaceCoords();
 
 	/**
 	 * @brief Generate Tpetra maps
@@ -205,12 +203,10 @@ class DomainCollection
 	 *
 	 * @return the formed matrix
 	 */
-	Teuchos::RCP<map_type> formMatrixMap(int n);
-	void formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<matrix_type> &A,
-	                   Teuchos::RCP<single_vector_type> *s = nullptr, int n = -1,
-	                   bool transpose = false);
-	void formRBMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<RBMatrix> &A,
-	                  Teuchos::RCP<single_vector_type> *s = nullptr, int n = -1);
+
+	typedef std::function<void(int, int, Teuchos::RCP<std::valarray<double>>, bool, bool)> inserter;
+	void assembleMatrix(inserter insertBlock, int n = -1);
+	void formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<matrix_type> &A, int n = -1);
 
 	void swapResidSol()
 	{
@@ -228,6 +224,6 @@ class DomainCollection
 #ifdef HAVE_VTK
 	void outputVTK();
 #endif
-	int  getGlobalNumCells() { return num_global_domains * n * n; }
+	int getGlobalNumCells() { return num_global_domains * n * n; }
 };
 #endif

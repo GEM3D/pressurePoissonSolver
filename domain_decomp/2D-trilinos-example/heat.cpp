@@ -1,9 +1,10 @@
-#include "BlockJacobiRelaxer.h"
 #include "DomainSignatureCollection.h"
+#include "DomainCollection.h"
 #include "Factory.h"
-#include "FunctionWrapper.h"
+//#include "FunctionWrapper.h"
 #include "MyTypeDefs.h"
-#include "OpShift.h"
+#include "Init.h"
+#include "FftwPatchSolver.h"
 #ifdef ENABLE_AMGX
 #include "AmgxWrapper.h"
 #endif
@@ -49,8 +50,6 @@
 #define M_PIl 3.141592653589793238462643383279502884L /* pi */
 #endif
 
-#include "DDMultiGrid.h"
-
 using Teuchos::RCP;
 using Teuchos::rcp;
 
@@ -59,6 +58,7 @@ using Teuchos::rcp;
 // =========== //
 
 using namespace std;
+
 int main(int argc, char *argv[])
 {
 	//    using Belos::FuncWrap;
@@ -106,10 +106,6 @@ int main(int argc, char *argv[])
 	                            {'g'});
 	args::ValueFlag<string> f_read_gamma(parser, "gamma filename",
 	                                     "the file to read gamma vector from", {"readgamma"});
-	args::ValueFlag<string> f_flux(parser, "flux filename", "the file to write flux difference to",
-	                               {"flux"});
-	args::ValueFlag<string> f_p(parser, "preconditioner filename",
-	                            "the file to write the preconditioner to", {'p'});
 	args::ValueFlag<double> f_t(
 	parser, "tolerance", "set the tolerance of the iterative solver (default is 1e-10)", {'t'});
 	args::ValueFlag<double> f_omega(
@@ -128,7 +124,6 @@ int main(int argc, char *argv[])
 	                        {"precblockj"});
 	args::Flag f_precj(parser, "prec", "use block diagonal jacobi preconditioner", {"precj"});
 	args::Flag f_precmuelu(parser, "prec", "use AMG preconditioner", {"muelu"});
-	args::Flag f_precddmg(parser, "prec", "use AMG preconditioner", {"ddmg"});
 	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {"neumann"});
 	args::Flag f_cg(parser, "gmres", "use CG for iterative solver", {"cg"});
 	args::Flag f_gmres(parser, "gmres", "use GMRES for iterative solver", {"gmres"});
@@ -188,7 +183,6 @@ int main(int argc, char *argv[])
 #endif
 
 	bool direct_solve = (f_lu || f_superlu || f_mumps || f_basker);
-	bool use_crs = (f_crs || direct_solve || f_ilu || f_riluk || f_precj || f_precmuelu || f_prec);
 
 	DomainSignatureCollection dsc;
 	if (f_mesh) {
@@ -215,6 +209,7 @@ int main(int argc, char *argv[])
 	// Set the number of discretization points in the x and y direction.
 	int nx          = args::get(f_n);
 	int ny          = args::get(f_n);
+    dsc.n = nx;
 	int total_cells = dsc.num_global_domains * nx * ny;
 	cerr << "Total cells: " << total_cells << endl;
 
@@ -230,10 +225,6 @@ int main(int argc, char *argv[])
 	scalar_type tol = 1e-12;
 	if (f_t) {
 		tol = args::get(f_t);
-	}
-
-	if (f_omega) {
-		BlockJacobiRelaxer::omega = args::get(f_omega);
 	}
 
 	int loop_count = 1;
@@ -273,11 +264,6 @@ int main(int argc, char *argv[])
 		save_gamma_file = args::get(f_g);
 	}
 
-	string save_prec_file = "";
-	if (f_p) {
-		save_prec_file = args::get(f_p);
-	}
-
 	// the functions that we are using
 	function<double(double, double)> ffun;
 	function<double(double, double)> gfun;
@@ -315,29 +301,41 @@ int main(int argc, char *argv[])
 		nfuny = [](double x, double y) { return M_PIl * cosl(M_PIl * y) * cosl(2 * M_PIl * x); };
 	}
 
+    //set the patch solver
+    RCP<PatchSolver> psolver = rcp(new FftwPatchSolver(dsc));
 	Tools::Timer timer;
 	for (int loop = 0; loop < loop_count; loop++) {
 		timer.start("Domain Initialization");
 
 		DomainCollection dc(dsc, nx, comm);
+        dc.setPatchSolver(psolver);
 		if (f_neumann) {
 			if (f_neumann && f_zerou) {
 				dc.setZeroU();
 			}
 		}
 
+		RCP<map_type>       domain_map       = dsc.getDomainRowMap(nx);
+		RCP<vector_type>                   u     = rcp(new vector_type(domain_map, 1));
+		RCP<vector_type>                   exact = rcp(new vector_type(domain_map, 1));
+		RCP<vector_type>                   f     = rcp(new vector_type(domain_map, 1));
+
 		if (f_neumann) {
 			dc.initNeumann(ffun, gfun, nfunx, nfuny, f_amr);
 		} else {
-			dc.initDirichlet(ffun, gfun);
+            double*f_ptr = &f->get1dViewNonConst()[0];
+            double*exact_ptr = &exact->get1dViewNonConst()[0];
+            Init::initDirichlet(dsc,nx,f_ptr,exact_ptr,ffun, gfun);
+            dc.initDirichlet(ffun, gfun);
 			dc.amr = f_amr;
 		}
 
 		timer.stop("Domain Initialization");
 
+
 		// Create a map that will be used in the iterative solver
-		RCP<map_type>       matrix_map       = dc.matrix_map;
-		RCP<const map_type> matrix_map_const = dc.matrix_map;
+		RCP<map_type>       matrix_map       = dsc.getSchurRowMap(nx);
+		RCP<const map_type> matrix_map_const = matrix_map;
 
 		// Create the gamma and diff vectors
 		RCP<vector_type>                   gamma = rcp(new vector_type(matrix_map, 1));
@@ -346,7 +344,6 @@ int main(int argc, char *argv[])
 		RCP<vector_type>                   d     = rcp(new vector_type(matrix_map, 1));
 		RCP<vector_type>                   diff  = rcp(new vector_type(matrix_map, 1));
 		RCP<vector_type>                   b     = rcp(new vector_type(matrix_map, 1));
-		RCP<RBMatrix>                      RBA;
 		RCP<matrix_type>                   A;
 		RCP<single_vector_type>            s;
 		RCP<Tpetra::Operator<scalar_type>> op;
@@ -373,7 +370,7 @@ int main(int argc, char *argv[])
 			// do iterative solve
 
 			// Get the b vector
-			dc.solveWithInterface(*gamma, *b);
+			dc.solveWithInterface(*f,*u,*gamma, *b);
 
 			if (save_rhs_file != "") {
 				Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_rhs_file, b, "", "");
@@ -384,58 +381,22 @@ int main(int argc, char *argv[])
 			///////////////////
 			timer.start("Linear System Setup");
 
-			if (use_crs) {
+			if (f_wrapper) {
+				// Create a function wrapper
+				//op = rcp(new FuncWrap(b, &dc));
+            }else {
 				timer.start("Matrix Formation");
 
-				dc.formCRSMatrix(matrix_map, A, &s);
+				dc.formCRSMatrix(matrix_map, A);
 
 				timer.stop("Matrix Formation");
 
-				if (f_neumann && f_zerou) {
-					RCP<OpShift> os = rcp(new OpShift(A, s));
-					op              = os;
-				} else {
-					op = A;
-				}
+				op = A;
 				rm = A;
 
 				if (save_matrix_file != "")
 					Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A,
 					                                                           "", "");
-			} else if (f_wrapper) {
-				// Create a function wrapper
-				op = rcp(new FuncWrap(b, &dc));
-			} else {
-				// Form the matrix
-				timer.start("Matrix Formation");
-
-				dc.formRBMatrix(matrix_map, RBA, &s);
-
-				timer.stop("Matrix Formation");
-
-				if (save_matrix_file != "") {
-					comm->barrier();
-					steady_clock::time_point write_start = steady_clock::now();
-
-					ofstream out_file(save_matrix_file);
-					out_file << *RBA;
-					out_file.close();
-
-					// Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(
-					// save_matrix_file + ".s", RBA->shift_vec, "", "");
-
-					comm->barrier();
-					duration<double> write_time = steady_clock::now() - write_start;
-					if (my_global_rank == 0)
-						cout << "Time to write matrix to file: " << write_time.count() << endl;
-				}
-
-				if (f_neumann && f_zerou) {
-					RCP<OpShift> os = rcp(new OpShift(RBA, s));
-					op              = os;
-				} else {
-					op = RBA;
-				}
 			}
 
 			problem
@@ -512,21 +473,6 @@ int main(int argc, char *argv[])
 					prec->compute();
 
 					timer.stop("Jacobi Preconditioner Formation");
-				} else if (f_precblockj) {
-					timer.start("Block Jacobi Preconditioner Formation");
-
-					RCP<BlockJacobiRelaxer> P = rcp(new BlockJacobiRelaxer(RBA, s));
-					problem->setLeftPrec(P);
-
-					timer.stop("Block Jacobi Preconditioner Formation");
-				} else if (f_precddmg) {
-					timer.start("DDMG Preconditioner Formation");
-
-					RCP<DDMultiGrid> P = rcp(new DDMultiGrid(&dc, RBA));
-
-					problem->setRightPrec(P);
-
-					timer.stop("DDMG Preconditioner Formation");
 				} else if (f_prec) {
 					timer.start("Block Diagonal Preconditioner Formation");
 
@@ -542,7 +488,6 @@ int main(int argc, char *argv[])
 					params.set("relaxation: sweeps", 1);
 					params.set("relaxation: container", "Dense");
 					// ... Set any other parameters you want to set ...
-					params.set("partitioner: local parts", dsc.matrix_j_high - dsc.matrix_j_low);
 
 					// Set parameters.
 					prec->setParameters(params);
@@ -652,7 +597,7 @@ int main(int argc, char *argv[])
 		// Do one last solve
 		timer.start("Patch Solve");
 
-		dc.solveWithInterface(*gamma, *diff);
+		dc.solveWithInterface(*f,*u,*gamma, *diff);
 
 		timer.stop("Patch Solve");
 
@@ -670,6 +615,7 @@ int main(int argc, char *argv[])
 				std::cout << u8"∮ du/dn - ΣAu: " << bflux - ausum2 << endl;
 			}
 		}
+        /*
 		if (f_iter && !direct_solve) {
 			timer.start("Iterative Refinement Step");
 			dc.residual();
@@ -693,6 +639,7 @@ int main(int argc, char *argv[])
 			dc.sumResidIntoSol();
 			timer.stop("Iterative Refinement Step");
 		}
+        */
 
 		///////////////////
 		// solve end
@@ -739,6 +686,11 @@ int main(int argc, char *argv[])
 			//}
 			cout.unsetf(std::ios_base::floatfield);
 		}
+        u->update(-1.0,*exact,1.0);
+        double un = u->getVector(0)->norm2();
+        double en = exact->getVector(0)->norm2();
+        double fn = f->getVector(0)->norm2();
+        cout << "NEW NORM2: " <<  un/en << endl;
 		if (save_solution_file != "") {
 			ofstream out_file(save_solution_file);
 			dc.outputSolution(out_file);
@@ -771,11 +723,6 @@ int main(int argc, char *argv[])
 		}
 		if (save_gamma_file != "") {
 			Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_gamma_file, gamma, "",
-			                                                          "");
-		}
-		if (f_flux) {
-			dc.getFluxDiff(*gamma);
-			Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(args::get(f_flux), gamma, "",
 			                                                          "");
 		}
 		if (f_outclaw) {

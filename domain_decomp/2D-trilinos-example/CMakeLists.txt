@@ -140,13 +140,14 @@ add_executable(heat heat.cpp)
 add_library(DomainCollection DomainCollection.cpp)
 add_library(DomainSignatureCollection DomainSignatureCollection.cpp)
 add_library(Domain Domain.cpp)
-add_library(RBMatrix RBMatrix.cpp)
 add_library(FftwSolver FftwSolver.cpp)
+add_library(FftwPatchSolver FftwPatchSolver.cpp)
 add_library(CufftSolver CufftSolver.cpp)
 add_library(Factory Factory.cpp)
 file(GLOB fishpack_SRC "fishpack/*.f")
 add_library(FishpackSolver FishpackSolver.cpp)
 add_library(Fishpack ${fishpack_SRC})
+add_library(Init Init.cpp)
 
 #
 # EDIT HERE: Change trilinosExample to the name of the executable
@@ -157,9 +158,10 @@ add_library(Fishpack ${fishpack_SRC})
 target_link_libraries(heat
     DomainCollection
     DomainSignatureCollection
-    RBMatrix
     Domain
     Factory
+    Init
+    FftwPatchSolver
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
   ${FFTW_LIB}
@@ -190,14 +192,7 @@ target_link_libraries(Factory
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
 )
-target_link_libraries(RBMatrix
-  ${Trilinos_TPL_LIBRARIES}
-  ${Trilinos_LIBRARIES} 
-  ${FFTW_LIB}
-  ${MPI_CXX_LIBRARIES} 
-)
 target_link_libraries(DomainCollection
-    RBMatrix 
    Domain
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
@@ -220,6 +215,9 @@ target_link_libraries(FishpackSolver
 )
 target_link_libraries(FftwSolver
     Domain
+)
+target_link_libraries(FftwSolver
+  ${FFTW_LIB}
 )
 target_link_libraries(CufftSolver
     Domain

@@ -50,6 +50,9 @@ HypreWrapper::HypreWrapper(Teuchos::RCP<matrix_type> A, const DomainSignatureCol
 
 	HYPRE_BoomerAMGCreate(&precond);
 	HYPRE_BoomerAMGSetStrongThreshold(precond, .25);
+	HYPRE_BoomerAMGSetMaxRowSum(precond, 0.9);
+	HYPRE_BoomerAMGSetRelaxType(precond, 0);
+	HYPRE_BoomerAMGSetCycleRelaxType(precond, 0,3);
 	HYPRE_BoomerAMGSetCoarsenType(precond, 6);
 	HYPRE_BoomerAMGSetTol(precond, 0.0);
 	HYPRE_BoomerAMGSetPrintLevel(precond, 1);
