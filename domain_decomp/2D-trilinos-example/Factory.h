@@ -19,8 +19,6 @@ typedef Tpetra::Operator<scalar_type> op_type;
 class Factory
 {
 	public:
-	static Teuchos::RCP<op_type> getAmgPreconditioner(Teuchos::RCP<op_type>     A,
-	                                                  Teuchos::RCP<vector_type> xy);
-	static Teuchos::RCP<matrix_type> blockInverse(Teuchos::RCP<matrix_type> A, int n);
+	static Teuchos::RCP<op_type> getAmgPreconditioner(Teuchos::RCP<op_type> A);
 };
 #endif

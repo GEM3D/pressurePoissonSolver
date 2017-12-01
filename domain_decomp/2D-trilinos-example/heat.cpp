@@ -1,16 +1,22 @@
-#include "DomainSignatureCollection.h"
 #include "DomainCollection.h"
+#include "DomainSignatureCollection.h"
 #include "Factory.h"
 //#include "FunctionWrapper.h"
-#include "MyTypeDefs.h"
-#include "Init.h"
 #include "FftwPatchSolver.h"
+#include "FivePtPatchOperator.h"
+#include "Init.h"
+#include "MMWriter.h"
+#include "ClawWriter.h"
+#include "MyTypeDefs.h"
 #include "QuadInterpolator.h"
 #ifdef ENABLE_AMGX
 #include "AmgxWrapper.h"
 #endif
 #ifdef ENABLE_HYPRE
 #include "HypreWrapper.h"
+#endif
+#ifdef HAVE_VTK
+#include "VtkWriter.h"
 #endif
 #include "Timer.h"
 #include "args.h"
@@ -208,9 +214,12 @@ int main(int argc, char *argv[])
 		}
 	}
 	// Set the number of discretization points in the x and y direction.
-	int nx          = args::get(f_n);
-	int ny          = args::get(f_n);
-    dsc.n = nx;
+	int nx = args::get(f_n);
+	int ny = args::get(f_n);
+	dsc.n  = nx;
+	for (auto &p : dsc.domains) {
+		p.second.n = nx;
+	}
 	int total_cells = dsc.num_global_domains * nx * ny;
 	cerr << "Total cells: " << total_cells << endl;
 
@@ -231,11 +240,6 @@ int main(int argc, char *argv[])
 	int loop_count = 1;
 	if (f_l) {
 		loop_count = args::get(f_l);
-	}
-
-	int del = -1;
-	if (f_d) {
-		del = args::get(f_d);
 	}
 
 	string save_matrix_file = "";
@@ -302,41 +306,36 @@ int main(int argc, char *argv[])
 		nfuny = [](double x, double y) { return M_PIl * cosl(M_PIl * y) * cosl(2 * M_PIl * x); };
 	}
 
-    //set the patch solver
-    RCP<PatchSolver> psolver = rcp(new FftwPatchSolver(dsc));
-	Tools::Timer timer;
+	// set the patch solver
+	RCP<PatchSolver> psolver = rcp(new FftwPatchSolver(dsc));
+	Tools::Timer     timer;
 	for (int loop = 0; loop < loop_count; loop++) {
 		timer.start("Domain Initialization");
 
-		DomainCollection dc(dsc, nx, comm);
-        dc.setPatchSolver(psolver);
-        dc.interpolator = rcp(new QuadInterpolator(nx));
-		if (f_neumann) {
-			if (f_neumann && f_zerou) {
-				dc.setZeroU();
-			}
-		}
+		DomainCollection dc(dsc, comm);
+		dc.setPatchSolver(psolver);
+		dc.interpolator = rcp(new QuadInterpolator(nx));
+		dc.op           = rcp(new FivePtPatchOperator());
 
-		RCP<map_type>       domain_map       = dsc.getDomainRowMap(nx);
-		RCP<vector_type>                   u     = rcp(new vector_type(domain_map, 1));
-		RCP<vector_type>                   exact = rcp(new vector_type(domain_map, 1));
-		RCP<vector_type>                   f     = rcp(new vector_type(domain_map, 1));
+		RCP<map_type>    domain_map = dsc.getDomainRowMap();
+		RCP<vector_type> u          = rcp(new vector_type(domain_map, 1));
+		RCP<vector_type> exact      = rcp(new vector_type(domain_map, 1));
+		RCP<vector_type> f          = rcp(new vector_type(domain_map, 1));
 
 		if (f_neumann) {
-			dc.initNeumann(ffun, gfun, nfunx, nfuny, f_amr);
+			// double *f_ptr     = &f->get1dViewNonConst()[0];
+			// double *exact_ptr = &exact->get1dViewNonConst()[0];
+			// Init::initDirichlet(dsc, nx, f_ptr, exact_ptr, ffun, gfun);
 		} else {
-            double*f_ptr = &f->get1dViewNonConst()[0];
-            double*exact_ptr = &exact->get1dViewNonConst()[0];
-            Init::initDirichlet(dsc,nx,f_ptr,exact_ptr,ffun, gfun);
-            dc.initDirichlet(ffun, gfun);
-			dc.amr = f_amr;
+			double *f_ptr     = &f->get1dViewNonConst()[0];
+			double *exact_ptr = &exact->get1dViewNonConst()[0];
+			Init::initDirichlet(dsc, nx, f_ptr, exact_ptr, ffun, gfun);
 		}
 
 		timer.stop("Domain Initialization");
 
-
 		// Create a map that will be used in the iterative solver
-		RCP<map_type>       matrix_map       = dsc.getSchurRowMap(nx);
+		RCP<map_type>       matrix_map       = dsc.getSchurRowMap();
 		RCP<const map_type> matrix_map_const = matrix_map;
 
 		// Create the gamma and diff vectors
@@ -360,20 +359,20 @@ int main(int argc, char *argv[])
 		typedef Ifpack2::Preconditioner<scalar_type> Preconditioner;
 		RCP<Preconditioner>                          prec;
 		if (f_neumann && !f_nozerof) {
-			double fdiff = (dc.integrateBoundaryFlux() - dc.integrateF()) / dc.area();
+			double fdiff = (dc.integrate(*f)) / dc.area();
 			if (my_global_rank == 0) cout << "Fdiff: " << fdiff << endl;
-			for (auto &p : dc.domains) {
-				Domain &d = *p.second;
-				d.f += fdiff;
-			}
+
+			RCP<vector_type> diff = rcp(new vector_type(domain_map, 1));
+			diff->putScalar(fdiff);
+			f->update(1.0, *diff, 1.0);
 		}
 		steady_clock::time_point tsolve_start;
 		if (dsc.num_global_domains != 1) {
 			// do iterative solve
 
 			// Get the b vector
-			dc.solveWithInterface(*f,*u,*gamma, *b);
-            b->scale(-1.0);
+			dc.solveWithInterface(*f, *u, *gamma, *b);
+			b->scale(-1.0);
 
 			if (save_rhs_file != "") {
 				Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_rhs_file, b, "", "");
@@ -386,8 +385,8 @@ int main(int argc, char *argv[])
 
 			if (f_wrapper) {
 				// Create a function wrapper
-				//op = rcp(new FuncWrap(b, &dc));
-            }else {
+				// op = rcp(new FuncWrap(b, &dc));
+			} else {
 				timer.start("Matrix Formation");
 
 				dc.formCRSMatrix(matrix_map, A);
@@ -423,8 +422,7 @@ int main(int argc, char *argv[])
 				if (f_precmuelu) {
 					timer.start("MueLu Preconditioner Formation");
 
-					Teuchos::RCP<vector_type> xy = dc.getInterfaceCoords();
-					Teuchos::RCP<op_type>     P  = Factory::getAmgPreconditioner(A, xy);
+					Teuchos::RCP<op_type> P = Factory::getAmgPreconditioner(A);
 
 					problem->setLeftPrec(P);
 
@@ -600,49 +598,50 @@ int main(int argc, char *argv[])
 		// Do one last solve
 		timer.start("Patch Solve");
 
-		dc.solveWithInterface(*f,*u,*gamma, *diff);
+		dc.solveWithInterface(*f, *u, *gamma, *diff);
 
 		timer.stop("Patch Solve");
 
-		dc.residual();
+		/*
 		double ausum2 = dc.integrateAU();
 		double fsum2  = dc.integrateF();
 		double bflux  = dc.integrateBoundaryFlux();
 		if (my_global_rank == 0) {
-			std::cout << u8"Σf-Au: " << fsum2 - ausum2 << endl;
-			std::cout << u8"Σf: " << fsum2 << endl;
-			std::cout << u8"ΣAu: " << ausum2 << endl;
-			if (f_neumann) {
-				std::cout << u8"∮ du/dn: " << bflux << endl;
-				std::cout << u8"∮ du/dn - Σf: " << bflux - fsum2 << endl;
-				std::cout << u8"∮ du/dn - ΣAu: " << bflux - ausum2 << endl;
-			}
+		    std::cout << u8"Σf-Au: " << fsum2 - ausum2 << endl;
+		    std::cout << u8"Σf: " << fsum2 << endl;
+		    std::cout << u8"ΣAu: " << ausum2 << endl;
+		    if (f_neumann) {
+		        std::cout << u8"∮ du/dn: " << bflux << endl;
+		        std::cout << u8"∮ du/dn - Σf: " << bflux - fsum2 << endl;
+		        std::cout << u8"∮ du/dn - ΣAu: " << bflux - ausum2 << endl;
+		    }
 		}
-        /*
+		*/
+		/*
 		if (f_iter && !direct_solve) {
-			timer.start("Iterative Refinement Step");
-			dc.residual();
-			dc.swapResidSol();
+		    timer.start("Iterative Refinement Step");
+		    dc.residual();
+		    dc.swapResidSol();
 
-			if (dsc.num_global_domains != 1) {
-				x->putScalar(0);
-				dc.solveWithInterface(*x, *r);
-				// op->apply(*gamma, *r);
-				// r->update(1.0, *b, -1.0);
+		    if (dsc.num_global_domains != 1) {
+		        x->putScalar(0);
+		        dc.solveWithInterface(*x, *r);
+		        // op->apply(*gamma, *r);
+		        // r->update(1.0, *b, -1.0);
 
-				solver->reset(Belos::ResetType::Problem);
-				if (f_wrapper) {
-					((FuncWrap *) op.getRawPtr())->setB(r);
-				}
-				problem->setProblem(x, r);
-				solver->setProblem(problem);
-				solver->solve();
-			}
-			dc.solveWithInterface(*x, *d);
-			dc.sumResidIntoSol();
-			timer.stop("Iterative Refinement Step");
+		        solver->reset(Belos::ResetType::Problem);
+		        if (f_wrapper) {
+		            ((FuncWrap *) op.getRawPtr())->setB(r);
+		        }
+		        problem->setProblem(x, r);
+		        solver->setProblem(problem);
+		        solver->solve();
+		    }
+		    dc.solveWithInterface(*x, *d);
+		    dc.sumResidIntoSol();
+		    timer.stop("Iterative Refinement Step");
 		}
-        */
+		*/
 
 		///////////////////
 		// solve end
@@ -650,90 +649,70 @@ int main(int argc, char *argv[])
 		timer.stop("Complete Solve");
 
 		// Calcuate error
-		RCP<map_type>    err_map = rcp(new map_type(-1, 1, 0, comm));
-		Tpetra::Vector<> exact_norm(err_map);
-		Tpetra::Vector<> diff_norm(err_map);
-
 		if (f_neumann) {
-			double uavg = dc.integrateU() / dc.area();
-			double eavg = dc.integrateExact() / dc.area();
+			double uavg = dc.integrate(*u) / dc.area();
+			double eavg = dc.integrate(*exact) / dc.area();
 
 			if (my_global_rank == 0) {
 				cout << "Average of computed solution: " << uavg << endl;
 				cout << "Average of exact solution: " << eavg << endl;
 			}
 
-			exact_norm.getDataNonConst()[0] = dc.exactNorm(eavg);
-			diff_norm.getDataNonConst()[0]  = dc.diffNorm(uavg, eavg);
 		} else {
-			exact_norm.getDataNonConst()[0] = dc.exactNorm();
-			diff_norm.getDataNonConst()[0]  = dc.diffNorm();
 		}
-		double global_diff_norm;
-		double global_exact_norm;
-		global_diff_norm  = diff_norm.norm2();
-		global_exact_norm = exact_norm.norm2();
 
-		double residual = dc.residual();
-		double fnorm    = dc.fNorm();
-		double ausum    = dc.integrateAU();
-		double fsum     = dc.integrateF();
+		// norms
+		if (f_neumann) {
+			// shift average of computed solution match exact solution
+		}
+
+		// residual
+		RCP<vector_type> resid = rcp(new vector_type(domain_map, 1));
+		RCP<vector_type> au    = rcp(new vector_type(domain_map, 1));
+		dc.applyWithInterface(*u, *gamma, *au);
+		resid->update(-1.0, *f, 1.0, *au, 0.0);
+		Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile("resid.mm", resid, "", "");
+		double residual = resid->getVector(0)->norm2();
+		double fnorm    = f->getVector(0)->norm2();
+
+		// error
+		RCP<vector_type> error = rcp(new vector_type(domain_map, 1));
+		error->update(-1.0, *exact, 1.0, *u, 0.0);
+		double error_norm = error->getVector(0)->norm2();
+		double exact_norm = exact->getVector(0)->norm2();
+
+		double ausum = dc.integrate(*au);
+		double fsum  = dc.integrate(*f);
 		if (my_global_rank == 0) {
 			std::cout << std::scientific;
 			std::cout.precision(13);
-			std::cout << "Error: " << global_diff_norm / global_exact_norm << endl;
+			std::cout << "Error: " << error_norm / exact_norm << endl;
 			std::cout << "Residual: " << residual / fnorm << endl;
 			std::cout << u8"ΣAu-Σf: " << ausum - fsum << endl;
-			// if (f_neumann) {
-			//	std::cout << u8"∮ du/dn - ΣAu: " << dc.sumBoundaryFlux() - ausum << endl;
-			//}
 			cout.unsetf(std::ios_base::floatfield);
 		}
-        u->update(-1.0,*exact,1.0);
-        double un = u->getVector(0)->norm2();
-        double en = exact->getVector(0)->norm2();
-        double fn = f->getVector(0)->norm2();
-        cout << "NEW NORM2: " <<  un/en << endl;
+		MMWriter mmwriter(dsc, f_amr);
 		if (save_solution_file != "") {
-			ofstream out_file(save_solution_file);
-			dc.outputSolution(out_file);
-			out_file.close();
-			if (f_amr) {
-				ofstream out_file(save_solution_file + ".amr");
-				dc.outputSolutionRefined(out_file);
-				out_file.close();
-			}
+			mmwriter.write(*u, save_solution_file);
 		}
 		if (save_residual_file != "") {
-			ofstream out_file(save_residual_file);
-			dc.outputResidual(out_file);
-			out_file.close();
-			if (f_amr) {
-				ofstream out_file(save_residual_file + ".amr");
-				dc.outputResidualRefined(out_file);
-				out_file.close();
-			}
+			mmwriter.write(*resid, save_solution_file);
 		}
 		if (save_error_file != "") {
-			ofstream out_file(save_error_file);
-			dc.outputError(out_file);
-			out_file.close();
-			if (f_amr) {
-				ofstream out_file(save_error_file + ".amr");
-				dc.outputErrorRefined(out_file);
-				out_file.close();
-			}
+			mmwriter.write(*error, save_solution_file);
 		}
 		if (save_gamma_file != "") {
 			Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_gamma_file, gamma, "",
 			                                                          "");
 		}
 		if (f_outclaw) {
-			dc.outputClaw();
+            ClawWriter writer(dsc);
+            writer.write(*u,*resid);
 		}
 #ifdef HAVE_VTK
 		if (f_outvtk) {
-			dc.outputVTK();
+            VtkWriter writer(dsc);
+            writer.write(*u,*error,*resid);
 		}
 #endif
 		cout.unsetf(std::ios_base::floatfield);

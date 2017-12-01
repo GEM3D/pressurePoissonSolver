@@ -1505,7 +1505,7 @@ set<int> Iface::getPins()
 	return pins;
 }
 
-Teuchos::RCP<map_type> DomainSignatureCollection::getSchurRowMap(int n)
+Teuchos::RCP<map_type> DomainSignatureCollection::getSchurRowMap()
 {
 	vector<int> schur_rows;
 	for (int i : iface_map_vec) {
@@ -1520,7 +1520,7 @@ Teuchos::RCP<map_type> DomainSignatureCollection::getSchurRowMap(int n)
 		return Teuchos::rcp(new map_type(-1, &schur_rows[0], schur_rows.size(), 0, this->comm));
 	}
 }
-Teuchos::RCP<map_type> DomainSignatureCollection::getSchurDistMap(int n)
+Teuchos::RCP<map_type> DomainSignatureCollection::getSchurDistMap()
 {
 	vector<int> schur_rows;
 	for (int i : iface_dist_map_vec) {
@@ -1535,7 +1535,7 @@ Teuchos::RCP<map_type> DomainSignatureCollection::getSchurDistMap(int n)
 		return Teuchos::rcp(new map_type(-1, &schur_rows[0], schur_rows.size(), 0, this->comm));
 	}
 }
-Teuchos::RCP<map_type> DomainSignatureCollection::getDomainRowMap(int n)
+Teuchos::RCP<map_type> DomainSignatureCollection::getDomainRowMap()
 {
 	vector<int> domain_rows;
 	for (int i : domain_map_vec) {

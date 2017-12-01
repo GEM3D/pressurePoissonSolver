@@ -22,6 +22,7 @@ struct DomainSignature {
 	int id = -1;
 	int id_local  = -1;
 	int id_global = -1;
+    int n=10;
 
 	int refine_level = 1;
 
@@ -80,6 +81,7 @@ struct DomainSignature {
 	inline bool hasFineNbr(Side s) const { return nbr_fine[static_cast<int>(s)]; }
 	inline bool hasCoarseNbr(Side s) const { return nbr_coarse[static_cast<int>(s)]; }
 	inline bool leftOfCoarse(Side s) const { return left_of_coarse[static_cast<int>(s)]; }
+	inline bool isNeumann(Side s) const { return neumann[static_cast<int>(s)]; }
 	inline void setHasFineNbr(Side s) { nbr_fine[static_cast<int>(s)] = true; }
 	inline void setHasCoarseNbr(Side s) { nbr_coarse[static_cast<int>(s)] = true; }
 	inline void setLeftOfCoarse(Side s) { left_of_coarse[static_cast<int>(s)] = true; }
@@ -363,9 +365,10 @@ class DomainSignatureCollection
 			p.second.setZeroPatch();
 		}
 	}
-    Teuchos::RCP<map_type> getSchurRowMap(int n);
-    Teuchos::RCP<map_type> getSchurDistMap(int n);
-    Teuchos::RCP<map_type> getDomainRowMap(int n);
+    Teuchos::RCP<map_type> getSchurRowMap();
+    Teuchos::RCP<map_type> getSchurDistMap();
+    Teuchos::RCP<map_type> getDomainRowMap();
+	int getGlobalNumCells() { return num_global_domains * n * n; }
 };
 struct IfaceZoltanHelper {
 	// query functions that respond to requests from Zoltan

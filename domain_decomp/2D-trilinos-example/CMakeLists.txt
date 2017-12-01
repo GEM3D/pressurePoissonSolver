@@ -54,7 +54,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 # to edit this line.
 project(DomainDecomp)
 find_package(FFTW REQUIRED)
-find_package(VTK)
+find_package(VTK NO_MODULE)
+message("${VTK_LIBRARIES}")
 IF(VTK_FOUND)
     SET(CMAKE_CXX_FLAGS "-DHAVE_VTK ${CMAKE_CXX_FLAGS}")
   MESSAGE("VTK found, enabling vtk output")
@@ -149,6 +150,8 @@ add_library(FishpackSolver FishpackSolver.cpp)
 add_library(Fishpack ${fishpack_SRC})
 add_library(Interpolators QuadInterpolator.cpp)
 add_library(Init Init.cpp)
+add_library(MMWriter MMWriter.cpp)
+add_library(ClawWriter ClawWriter.cpp)
 
 #
 # EDIT HERE: Change trilinosExample to the name of the executable
@@ -164,11 +167,36 @@ target_link_libraries(heat
     Init
     FftwPatchSolver
     Interpolators
+    MMWriter
+    ClawWriter
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
   ${FFTW_LIB}
   ${MPI_CXX_LIBRARIES} 
 )
+target_link_libraries(MMWriter
+    DomainSignatureCollection
+  ${Trilinos_TPL_LIBRARIES}
+  ${Trilinos_LIBRARIES} 
+    )
+target_link_libraries(ClawWriter
+    DomainSignatureCollection
+  ${Trilinos_TPL_LIBRARIES}
+  ${Trilinos_LIBRARIES} 
+    )
+if(VTK_FOUND)
+target_link_libraries(heat
+    VtkWriter
+    )
+add_library(VtkWriter VtkWriter.cpp)
+target_link_libraries(VtkWriter
+    DomainSignatureCollection
+  ${Trilinos_TPL_LIBRARIES}
+  ${Trilinos_LIBRARIES} 
+  ${MPI_CXX_LIBRARIES} 
+  ${VTK_LIBRARIES} 
+)
+endif()
 if(HYPRE_FOUND)
 target_link_libraries(heat
     HypreWrapper
@@ -200,7 +228,6 @@ target_link_libraries(DomainCollection
   ${Trilinos_LIBRARIES} 
   ${FFTW_LIB}
   ${MPI_CXX_LIBRARIES} 
-  ${VTK_LIBRARIES} 
 )
 target_link_libraries(Domain
     FftwSolver
