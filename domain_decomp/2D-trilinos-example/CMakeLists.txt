@@ -147,6 +147,7 @@ add_library(Factory Factory.cpp)
 file(GLOB fishpack_SRC "fishpack/*.f")
 add_library(FishpackSolver FishpackSolver.cpp)
 add_library(Fishpack ${fishpack_SRC})
+add_library(Interpolators QuadInterpolator.cpp)
 add_library(Init Init.cpp)
 
 #
@@ -162,6 +163,7 @@ target_link_libraries(heat
     Factory
     Init
     FftwPatchSolver
+    Interpolators
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
   ${FFTW_LIB}

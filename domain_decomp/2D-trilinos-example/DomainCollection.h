@@ -4,6 +4,7 @@
 #include "DomainSignatureCollection.h"
 #include "MyTypeDefs.h"
 #include "PatchSolver.h"
+#include "Interpolator.h"
 /**
  * @brief This class represents a collection of domains that a single processor owns.
  *
@@ -34,6 +35,7 @@ class DomainCollection
 	int num_global_domains;
 
 	public:
+    Teuchos::RCP<Interpolator> interpolator;
 	void setPatchSolver(Teuchos::RCP<PatchSolver> psolver);
 	/**
 	 * @brief The number of cells in a single dimension.
@@ -48,7 +50,6 @@ class DomainCollection
 	/**
 	 * @brief Tpetra map that assures each domains has access to it's interface values
 	 */
-	Teuchos::RCP<map_type> collection_map;
 	/**
 	 * @brief Tpetra map that assures each domains has access to it's interface information values
 	 */

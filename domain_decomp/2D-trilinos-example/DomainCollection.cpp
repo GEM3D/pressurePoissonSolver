@@ -123,27 +123,13 @@ void DomainCollection::initDirichlet(function<double(double, double)> ffun,
 
 void DomainCollection::generateMaps()
 {
-	vector<int> global;
-	for (int i : dsc.iface_dist_map_vec) {
-		for (int j = 0; j < n; j++) {
-			global.push_back(i * n + j);
-		}
-	}
-	// Now that the global indices have been calculated, we can create a map for the interface
-	// points
-	if (num_global_domains == 1) {
-		// this is a special case for when there is only one domain
-		collection_map = Teuchos::rcp(new map_type(1, 0, comm));
-	} else {
-		collection_map = Teuchos::rcp(new map_type(-1, &global[0], global.size(), 0, this->comm));
-	}
 }
 void DomainCollection::distributeIfaceInfo() {}
 RCP<vector_type> DomainCollection::getInterfaceCoords()
 {
 	RCP<vector_type> xy = rcp(new vector_type(dsc.getSchurRowMap(n), 2));
-	Tpetra::Import<> importer(dsc.getSchurRowMap(n), collection_map);
-	vector_type      local_xy(collection_map, 2);
+	Tpetra::Import<> importer(dsc.getSchurRowMap(n), dsc.getSchurDistMap(n));
+	vector_type      local_xy(dsc.getSchurDistMap(n), 2);
 
 	// solve over domains on this proc
 	for (auto &p : domains) {
@@ -155,49 +141,31 @@ RCP<vector_type> DomainCollection::getInterfaceCoords()
 }
 void DomainCollection::solveWithInterface(const vector_type &f, vector_type &u,const vector_type &gamma, vector_type &diff)
 {
-	// auto out = Teuchos::getFancyOStream (Teuchos::rcpFromRef (std::cout));
-	// if(has_east)std::cout << "Gamma begin\n";
-	// gamma.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
+    // initilize our local variables
 	diff.update(1, gamma, 0);
-	Tpetra::Import<> importer(diff.getMap(), collection_map);
-	Tpetra::Export<> exporter(collection_map, diff.getMap());
-	vector_type      local_gamma(collection_map, 1);
-	vector_type      local_diff(collection_map, 1);
+	Tpetra::Import<> importer(diff.getMap(), dsc.getSchurDistMap(n));
+	Tpetra::Export<> exporter(dsc.getSchurDistMap(n), diff.getMap());
+	vector_type      local_gamma(dsc.getSchurDistMap(n), 1);
+	vector_type      local_diff(dsc.getSchurDistMap(n), 1);
+	vector_type      local_interp(dsc.getSchurDistMap(n), 1);
 	local_gamma.doImport(gamma, importer, Tpetra::CombineMode::INSERT);
 
 	// solve over domains on this proc
 	for (auto &p : domains) {
 		Domain &d = *p.second;
-        solver->solve(d.ds,f,u,gamma);
+        solver->solve(d.ds,f,u,local_gamma);
 		d.solveWithInterface(local_gamma);
 	}
     
-
-	if (neumann && zero_u) {
-		// make avarage of solution be zero
-		double avg = integrateU() / area();
-		for (auto &p : domains) {
-			Domain &d = *p.second;
-			d.u -= avg;
-		}
-	}
+    // interplate to interface points
 	for (auto &p : domains) {
-		p.second->getDiff(local_diff);
+        interpolator->interpolate(p.second->ds,u,local_interp);
 	}
-	// export diff vector
 
-	// if(has_east)std::cout <<"LOCAL AFEr\n";
-	// local_vector.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
+	// export diff vector
 	diff.scale(0);
-	// if(has_east)std::cout <<"DIFFBEFORE\n";
-	// diff.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
-	diff.doExport(local_diff, importer, Tpetra::CombineMode::ADD);
-	// if(has_east)std::cout <<"DIFF\n";
-	// diff.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
-	// if(has_east)std::cout <<"GAMMA\n";
-	// gamma.describe(*out,Teuchos::EVerbosityLevel::VERB_EXTREME);
-	// diff.update(-2, gamma, 1);
-	diff.scale(-1);
+	diff.doExport(local_interp, importer, Tpetra::CombineMode::ADD);
+	diff.update(2.0,gamma,-2.0);
 }
 double DomainCollection::diffNorm()
 {
@@ -243,12 +211,12 @@ double DomainCollection::exactNorm(double eavg)
 }
 double DomainCollection::residual()
 {
-	vector_type ghost(collection_map, 2);
+	vector_type ghost(dsc.getSchurDistMap(n), 2);
 	vector_type one_ghost(dsc.getSchurRowMap(n), 2);
 	for (auto &p : domains) {
 		p.second->putGhostCells(ghost);
 	}
-	Tpetra::Export<> exporter(collection_map, dsc.getSchurRowMap(n));
+	Tpetra::Export<> exporter(dsc.getSchurDistMap(n), dsc.getSchurRowMap(n));
 	one_ghost.doExport(ghost, exporter, Tpetra::CombineMode::ADD);
 	ghost.putScalar(0);
 	ghost.doImport(one_ghost, exporter, Tpetra::CombineMode::ADD);
@@ -263,12 +231,12 @@ double DomainCollection::residual()
 }
 double DomainCollection::integrateF()
 {
-	vector_type ghost(collection_map, 2);
+	vector_type ghost(dsc.getSchurDistMap(n), 2);
 	vector_type one_ghost(dsc.getSchurRowMap(n), 2);
 	for (auto &p : domains) {
 		p.second->putGhostCells(ghost);
 	}
-	Tpetra::Export<> exporter(collection_map, dsc.getSchurRowMap(n));
+	Tpetra::Export<> exporter(dsc.getSchurDistMap(n), dsc.getSchurRowMap(n));
 	one_ghost.doExport(ghost, exporter, Tpetra::CombineMode::ADD);
 	ghost.putScalar(0);
 	ghost.doImport(one_ghost, exporter, Tpetra::CombineMode::ADD);
@@ -323,12 +291,12 @@ double DomainCollection::integrateExact()
 }
 double DomainCollection::integrateAU()
 {
-	vector_type ghost(collection_map, 2);
+	vector_type ghost(dsc.getSchurDistMap(n), 2);
 	vector_type one_ghost(dsc.getSchurRowMap(n), 2);
 	for (auto &p : domains) {
 		p.second->putGhostCells(ghost);
 	}
-	Tpetra::Export<> exporter(collection_map, dsc.getSchurRowMap(n));
+	Tpetra::Export<> exporter(dsc.getSchurDistMap(n), dsc.getSchurRowMap(n));
 	one_ghost.doExport(ghost, exporter, Tpetra::CombineMode::ADD);
 	ghost.putScalar(0);
 	ghost.doImport(one_ghost, exporter, Tpetra::CombineMode::ADD);

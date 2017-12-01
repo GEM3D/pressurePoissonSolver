@@ -997,8 +997,8 @@ void DomainSignatureCollection::indexIfacesGlobal()
 		for (auto &p : domains) {
 			p.second.setGlobalIndexes(rev_map);
 		}
-		for (size_t i = 0; i < domain_map_vec.size(); i++) {
-			domain_map_vec[i] = local_vec[i];
+		for (size_t i = 0; i < iface_dist_map_vec.size(); i++) {
+			iface_dist_map_vec[i] = local_vec[i];
 		}
 	}
 }

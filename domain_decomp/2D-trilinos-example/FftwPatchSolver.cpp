@@ -10,7 +10,6 @@ FftwPatchSolver::FftwPatchSolver(DomainSignatureCollection &dsc)
 }
 void FftwPatchSolver::addDomain(DomainSignature &d)
 {
-	cerr << "N: " << n << endl;
 	if (!initialized) {
 		initialized = true;
 		f_copy.resize(n * n);
@@ -87,7 +86,6 @@ void FftwPatchSolver::addDomain(DomainSignature &d)
 		ones = 1;
 
 		if (d.neumann.none()) {
-			cerr << "ALLDIRICLET" << endl;
 			for (int xi = 0; xi < n; xi++) {
 				denom[slice(xi, n, n)]
 				-= 4 / (h_y * h_y) * pow(sin((xi + 1) * M_PI / (2 * n)), 2) * ones;

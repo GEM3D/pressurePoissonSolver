@@ -5,6 +5,7 @@
 #include "MyTypeDefs.h"
 #include "Init.h"
 #include "FftwPatchSolver.h"
+#include "QuadInterpolator.h"
 #ifdef ENABLE_AMGX
 #include "AmgxWrapper.h"
 #endif
@@ -309,6 +310,7 @@ int main(int argc, char *argv[])
 
 		DomainCollection dc(dsc, nx, comm);
         dc.setPatchSolver(psolver);
+        dc.interpolator = rcp(new QuadInterpolator(nx));
 		if (f_neumann) {
 			if (f_neumann && f_zerou) {
 				dc.setZeroU();
@@ -371,6 +373,7 @@ int main(int argc, char *argv[])
 
 			// Get the b vector
 			dc.solveWithInterface(*f,*u,*gamma, *b);
+            b->scale(-1.0);
 
 			if (save_rhs_file != "") {
 				Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_rhs_file, b, "", "");
