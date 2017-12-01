@@ -1,11 +1,11 @@
 #ifndef DOMAINCOLLECTION_H
 #define DOMAINCOLLECTION_H
-#include "Domain.h"
 #include "DomainSignatureCollection.h"
 #include "Interpolator.h"
 #include "MyTypeDefs.h"
 #include "PatchOperator.h"
 #include "PatchSolver.h"
+#include <valarray>
 /**
  * @brief This class represents a collection of domains that a single processor owns.
  *

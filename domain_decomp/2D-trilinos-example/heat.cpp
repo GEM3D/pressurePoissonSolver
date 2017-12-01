@@ -180,15 +180,6 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	if (f_fish) {
-		Domain::solver_type = SolverType::fishpack;
-	}
-#ifdef __NVCC__
-	if (f_cufft) {
-		Domain::solver_type = SolverType::cufft;
-	}
-#endif
-
 	bool direct_solve = (f_lu || f_superlu || f_mumps || f_basker);
 
 	DomainSignatureCollection dsc;

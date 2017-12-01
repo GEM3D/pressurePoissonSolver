@@ -1,5 +1,4 @@
 #include "DomainCollection.h"
-#include <Tpetra_Experimental_BlockCrsMatrix_def.hpp>
 #include <array>
 #include <tuple>
 using Teuchos::RCP;
@@ -12,8 +11,8 @@ void DomainCollection::setPatchSolver(RCP<PatchSolver> psolver) { solver = psolv
 DomainCollection::DomainCollection(DomainSignatureCollection     dsc,
                                    RCP<const Teuchos::Comm<int>> comm)
 {
-	this->comm         = comm;
-	this->dsc          = dsc;
+	this->comm = comm;
+	this->dsc  = dsc;
 }
 
 void DomainCollection::solveWithInterface(const vector_type &f, vector_type &u,
@@ -87,6 +86,21 @@ double DomainCollection::area()
 	Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &sum, &retval);
 	return retval;
 }
+struct BlockKey {
+	InterpCase type;
+	Side       s;
+
+	BlockKey() {}
+	BlockKey(const MatrixBlock &b)
+	{
+		s    = b.s;
+		type = b.type;
+	}
+	friend bool operator<(const BlockKey &l, const BlockKey &r)
+	{
+		return std::tie(l.s, l.type) < std::tie(r.s, r.type);
+	}
+};
 void DomainCollection::assembleMatrix(inserter insertBlock)
 {
 	int              n = dsc.n;
@@ -96,7 +110,15 @@ void DomainCollection::assembleMatrix(inserter insertBlock)
 		set<MatrixBlock> row_blocks = iface.getRowBlocks();
 		blocks.insert(row_blocks.begin(), row_blocks.end());
 	}
-	int num_types = 0;
+	int                 num_types       = 0;
+	RCP<const map_type> local_map       = Tpetra::createLocalMap<int, int>(n * n, comm);
+	RCP<const map_type> gamma_local_map = Tpetra::createLocalMap<int, int>(n, comm);
+	vector_type         u(local_map, 1);
+	vector_type         f(local_map, 1);
+	vector_type         gamma(gamma_local_map, 1);
+	vector_type         interp(gamma_local_map, 1);
+	auto                interp_view = interp.get1dView();
+	auto                gamma_view  = gamma.get1dViewNonConst();
 	while (!blocks.empty()) {
 		num_types++;
 		// the first in the set is the type of interface that we are going to solve for
@@ -109,9 +131,6 @@ void DomainCollection::assembleMatrix(inserter insertBlock)
 			if (*iter == curr_type) {
 				todo.insert(*iter);
 				to_be_deleted.insert(*iter);
-
-				// TODO fix this iterator
-				// iter=ifaces.begin();
 			}
 		}
 		for (MatrixBlock i : to_be_deleted) {
@@ -120,261 +139,62 @@ void DomainCollection::assembleMatrix(inserter insertBlock)
 
 		// create domain representing curr_type
 		DomainSignature ds;
-		ds.x_length = n;
-		ds.y_length = n;
-		for (int q = 0; q < 4; q++) {
-			if (curr_type.neumann[q]) {
-				ds.nbr_id[q * 2] = -1;
-			} else {
-				ds.nbr_id[q * 2] = 1;
+		ds.n               = n;
+		ds.id              = 0;
+		ds.x_length        = n;
+		ds.y_length        = n;
+		ds.nbr_id[0]       = 1;
+		ds.neumann         = curr_type.neumann;
+		ds.zero_patch      = curr_type.zero_patch;
+		ds.local_i         = {{0, 0, 0, 0}};
+		ds.local_i_center  = {{0, 0, 0, 0}};
+		ds.local_i_refined = {{0, 0, 0, 0, 0, 0, 0}};
+		solver->addDomain(ds);
+
+		map<BlockKey, RCP<valarray<double>>> coeffs;
+		// allocate blocks of coefficients
+		for (const MatrixBlock &b : todo) {
+			RCP<valarray<double>> ptr = coeffs[b];
+			if (ptr.is_null()) {
+				coeffs[b] = rcp(new valarray<double>(n * n));
 			}
 		}
-		ds.neumann    = curr_type.neumann;
-		ds.zero_patch = curr_type.zero_patch;
-		Domain d(ds, n);
 
-		d.boundary_north = valarray<double>(n);
-		d.boundary_east  = valarray<double>(n);
-		d.boundary_south = valarray<double>(n);
-		d.boundary_west  = valarray<double>(n);
-		d.planNeumann();
-
-		// solve over south interface, and save results
-		RCP<valarray<double>> n_ptr = rcp(new valarray<double>(n * n));
-		RCP<valarray<double>> e_ptr = rcp(new valarray<double>(n * n));
-		RCP<valarray<double>> s_ptr = rcp(new valarray<double>(n * n));
-		RCP<valarray<double>> w_ptr = rcp(new valarray<double>(n * n));
-
-		valarray<double> &n_b = *n_ptr;
-		valarray<double> &e_b = *e_ptr;
-		valarray<double> &s_b = *s_ptr;
-		valarray<double> &w_b = *w_ptr;
-
-		RCP<valarray<double>> nf_ptr = rcp(new valarray<double>(n * n));
-		RCP<valarray<double>> ef_ptr = rcp(new valarray<double>(n * n));
-		RCP<valarray<double>> sf_ptr = rcp(new valarray<double>(n * n));
-		RCP<valarray<double>> wf_ptr = rcp(new valarray<double>(n * n));
-
-		valarray<double> &nf_b = *nf_ptr;
-		valarray<double> &ef_b = *ef_ptr;
-		valarray<double> &sf_b = *sf_ptr;
-		valarray<double> &wf_b = *wf_ptr;
-
-		RCP<valarray<double>> nfl_ptr = rcp(new valarray<double>(n * n));
-		RCP<valarray<double>> efl_ptr = rcp(new valarray<double>(n * n));
-		RCP<valarray<double>> sfl_ptr = rcp(new valarray<double>(n * n));
-		RCP<valarray<double>> wfl_ptr = rcp(new valarray<double>(n * n));
-
-		valarray<double> &nfl_b = *nfl_ptr;
-		valarray<double> &efl_b = *efl_ptr;
-		valarray<double> &sfl_b = *sfl_ptr;
-		valarray<double> &wfl_b = *wfl_ptr;
-
-		RCP<valarray<double>> nfr_ptr = rcp(new valarray<double>(n * n));
-		RCP<valarray<double>> efr_ptr = rcp(new valarray<double>(n * n));
-		RCP<valarray<double>> sfr_ptr = rcp(new valarray<double>(n * n));
-		RCP<valarray<double>> wfr_ptr = rcp(new valarray<double>(n * n));
-
-		valarray<double> &nfr_b = *nfr_ptr;
-		valarray<double> &efr_b = *efr_ptr;
-		valarray<double> &sfr_b = *sfr_ptr;
-		valarray<double> &wfr_b = *wfr_ptr;
-
-		RCP<valarray<double>> nc_ptr = rcp(new valarray<double>(n * n));
-		RCP<valarray<double>> ec_ptr = rcp(new valarray<double>(n * n));
-		RCP<valarray<double>> sc_ptr = rcp(new valarray<double>(n * n));
-		RCP<valarray<double>> wc_ptr = rcp(new valarray<double>(n * n));
-
-		valarray<double> &nc_b = *nc_ptr;
-		valarray<double> &ec_b = *ec_ptr;
-		valarray<double> &sc_b = *sc_ptr;
-		valarray<double> &wc_b = *wc_ptr;
-
-		RCP<valarray<double>> ncl_ptr = rcp(new valarray<double>(n * n));
-		RCP<valarray<double>> ecl_ptr = rcp(new valarray<double>(n * n));
-		RCP<valarray<double>> scl_ptr = rcp(new valarray<double>(n * n));
-		RCP<valarray<double>> wcl_ptr = rcp(new valarray<double>(n * n));
-
-		valarray<double> &ncl_b = *ncl_ptr;
-		valarray<double> &ecl_b = *ecl_ptr;
-		valarray<double> &scl_b = *scl_ptr;
-		valarray<double> &wcl_b = *wcl_ptr;
-
-		RCP<valarray<double>> ncr_ptr = rcp(new valarray<double>(n * n));
-		RCP<valarray<double>> ecr_ptr = rcp(new valarray<double>(n * n));
-		RCP<valarray<double>> scr_ptr = rcp(new valarray<double>(n * n));
-		RCP<valarray<double>> wcr_ptr = rcp(new valarray<double>(n * n));
-
-		valarray<double> &ncr_b = *ncr_ptr;
-		valarray<double> &ecr_b = *ecr_ptr;
-		valarray<double> &scr_b = *scr_ptr;
-		valarray<double> &wcr_b = *wcr_ptr;
-
-		for (int i = 0; i < n; i++) {
-			d.boundary_north[i] = 1;
-			d.solve();
+		for (int j = 0; j < n; j++) {
+			gamma_view[j] = 1;
+			solver->solve(ds, f, u, gamma);
+			gamma_view[j] = 0;
 
 			// fill the blocks
-			n_b[slice(i, n, n)] = d.getDiff(Side::north);
-			e_b[slice(i, n, n)] = d.getDiff(Side::east);
-			s_b[slice(i, n, n)] = d.getDiff(Side::south);
-			w_b[slice(i, n, n)] = d.getDiff(Side::west);
-
-			nf_b[slice(i, n, n)] = d.getDiffFine(Side::north);
-			ef_b[slice(i, n, n)] = d.getDiffFine(Side::east);
-			sf_b[slice(i, n, n)] = d.getDiffFine(Side::south);
-			wf_b[slice(i, n, n)] = d.getDiffFine(Side::west);
-
-			nfl_b[slice(i, n, n)] = d.getDiffFineToCoarseLeft(Side::north);
-			efl_b[slice(i, n, n)] = d.getDiffFineToCoarseLeft(Side::east);
-			sfl_b[slice(i, n, n)] = d.getDiffFineToCoarseLeft(Side::south);
-			wfl_b[slice(i, n, n)] = d.getDiffFineToCoarseLeft(Side::west);
-
-			nfr_b[slice(i, n, n)] = d.getDiffFineToCoarseRight(Side::north);
-			efr_b[slice(i, n, n)] = d.getDiffFineToCoarseRight(Side::east);
-			sfr_b[slice(i, n, n)] = d.getDiffFineToCoarseRight(Side::south);
-			wfr_b[slice(i, n, n)] = d.getDiffFineToCoarseRight(Side::west);
-
-			nc_b[slice(i, n, n)] = d.getDiffCoarse(Side::north);
-			ec_b[slice(i, n, n)] = d.getDiffCoarse(Side::east);
-			sc_b[slice(i, n, n)] = d.getDiffCoarse(Side::south);
-			wc_b[slice(i, n, n)] = d.getDiffCoarse(Side::west);
-
-			ncl_b[slice(i, n, n)] = d.getDiffCoarseToFineLeft(Side::north);
-			ecl_b[slice(i, n, n)] = d.getDiffCoarseToFineLeft(Side::east);
-			scl_b[slice(i, n, n)] = d.getDiffCoarseToFineLeft(Side::south);
-			wcl_b[slice(i, n, n)] = d.getDiffCoarseToFineLeft(Side::west);
-
-			ncr_b[slice(i, n, n)] = d.getDiffCoarseToFineRight(Side::north);
-			ecr_b[slice(i, n, n)] = d.getDiffCoarseToFineRight(Side::east);
-			scr_b[slice(i, n, n)] = d.getDiffCoarseToFineRight(Side::south);
-			wcr_b[slice(i, n, n)] = d.getDiffCoarseToFineRight(Side::west);
-
-			d.boundary_north[i] = 0;
+			for (auto &p : coeffs) {
+				Side       s    = p.first.s;
+				InterpCase type = p.first.type;
+				interp.putScalar(0);
+				interpolator->interpolate(ds, s, type, u, interp);
+				valarray<double> &block = *p.second;
+				for (int i = 0; i < n; i++) {
+					block[i * n + j] = -2 * interp_view[i];
+				}
+				if (s == Side::north) {
+					switch (type) {
+						case InterpCase::normal:
+							block[n * j + j] += 1;
+							break;
+						case InterpCase::coarse_from_coarse:
+						case InterpCase::fine_from_fine_on_left:
+						case InterpCase::fine_from_fine_on_right:
+							block[n * j + j] += 2;
+							break;
+						default:
+							break;
+					}
+				}
+			}
 		}
 
-		auto getBlock = [&](const MatrixBlock &b) {
-			RCP<valarray<double>> ret;
-			switch (b.type) {
-				case BlockType::plain:
-					switch (b.s) {
-						case Side::north:
-							ret = n_ptr;
-							break;
-						case Side::east:
-							ret = e_ptr;
-							break;
-						case Side::south:
-							ret = s_ptr;
-							break;
-						case Side::west:
-							ret = w_ptr;
-					}
-					break;
-				// fine in
-				case BlockType::fine:
-					switch (b.s) {
-						case Side::north:
-							ret = nf_ptr;
-							break;
-						case Side::east:
-							ret = ef_ptr;
-							break;
-						case Side::south:
-							ret = sf_ptr;
-							break;
-						case Side::west:
-							ret = wf_ptr;
-					}
-					break;
-				// fine out
-				// left
-				case BlockType::fine_out_left:
-					switch (b.s) {
-						case Side::north:
-							ret = nfl_ptr;
-							break;
-						case Side::east:
-							ret = efl_ptr;
-							break;
-						case Side::south:
-							ret = sfl_ptr;
-							break;
-						case Side::west:
-							ret = wfl_ptr;
-					}
-					break;
-				// right
-				case BlockType::fine_out_right:
-					switch (b.s) {
-						case Side::north:
-							ret = nfr_ptr;
-							break;
-						case Side::east:
-							ret = efr_ptr;
-							break;
-						case Side::south:
-							ret = sfr_ptr;
-							break;
-						case Side::west:
-							ret = wfr_ptr;
-					}
-					break;
-
-				// coarse in
-				case BlockType::coarse:
-					switch (b.s) {
-						case Side::north:
-							ret = nc_ptr;
-							break;
-						case Side::east:
-							ret = ec_ptr;
-							break;
-						case Side::south:
-							ret = sc_ptr;
-							break;
-						case Side::west:
-							ret = wc_ptr;
-					}
-					break;
-				// coarse out
-				// left
-				case BlockType::coarse_out_left:
-					switch (b.s) {
-						case Side::north:
-							ret = ncl_ptr;
-							break;
-						case Side::east:
-							ret = ecl_ptr;
-							break;
-						case Side::south:
-							ret = scl_ptr;
-							break;
-						case Side::west:
-							ret = wcl_ptr;
-					}
-					break;
-				// right
-				case BlockType::coarse_out_right:
-					switch (b.s) {
-						case Side::north:
-							ret = ncr_ptr;
-							break;
-						case Side::east:
-							ret = ecr_ptr;
-							break;
-						case Side::south:
-							ret = scr_ptr;
-							break;
-						case Side::west:
-							ret = wcr_ptr;
-					}
-			}
-			return ret;
-		};
 		// now insert these results into the matrix for each interface
 		for (MatrixBlock block : todo) {
-			insertBlock(block.i, block.j, getBlock(block), block.flip_i, block.flip_j);
+			insertBlock(block.i, block.j, coeffs[block], block.flip_i, block.flip_j);
 		}
 	}
 }

@@ -1081,20 +1081,20 @@ void DomainSignatureCollection::indexDomainsLocal()
 				todo.erase(i);
 				queue.pop_front();
 				map_vec.push_back(i);
-				DomainSignature &d       = domains[i];
+				DomainSignature &d = domains[i];
 				rev_map[i]         = curr_i;
-				d.id_local = curr_i;
+				d.id_local         = curr_i;
 				curr_i++;
-				for (int i :d.nbr_id) {
-                    if(i!=-1){
-					if (!enqueued.count(i)) {
-						enqueued.insert(i);
-						if (ifaces.count(i)) {
-							queue.push_back(i);
-						} else {
-							off_proc_map_vec.push_back(i);
+				for (int i : d.nbr_id) {
+					if (i != -1) {
+						if (!enqueued.count(i)) {
+							enqueued.insert(i);
+							if (ifaces.count(i)) {
+								queue.push_back(i);
+							} else {
+								off_proc_map_vec.push_back(i);
+							}
 						}
-					}
 					}
 				}
 			}
@@ -1108,11 +1108,11 @@ void DomainSignatureCollection::indexDomainsLocal()
 		curr_i++;
 	}
 	for (auto &p : ifaces) {
-//		p.second.setLocalIndexes(rev_map);
+		//		p.second.setLocalIndexes(rev_map);
 	}
-	//domain_rev_map          = rev_map;
-	domain_map_vec          = map_vec;
-	//domain_off_proc_map_vec = off_proc_map_vec;
+	// domain_rev_map          = rev_map;
+	domain_map_vec = map_vec;
+	// domain_off_proc_map_vec = off_proc_map_vec;
 }
 void DomainSignatureCollection::indexDomainIfacesLocal()
 {
@@ -1176,51 +1176,51 @@ std::set<MatrixBlock> Iface::getRowBlocks(int *id, DsMemPtr normal)
 {
 	std::set<MatrixBlock> blocks;
 	auto getBlockType = [=](bool left) {
-		BlockType ret = BlockType::plain;
+		InterpCase ret = InterpCase::normal;
 		switch (type) {
 			case IfaceType::normal:
-				ret = BlockType::plain;
+				ret = InterpCase::normal;
 				break;
 			case IfaceType::coarse_on_left:
 				if (left) {
-					ret = BlockType::coarse;
+					ret = InterpCase::coarse_from_coarse;
 				} else {
-					ret = BlockType::fine_out_left;
+					ret = InterpCase::coarse_from_fine_on_left;
 				}
 				break;
 			case IfaceType::coarse_on_right:
 				if (left) {
-					ret = BlockType::fine_out_left;
+					ret = InterpCase::coarse_from_fine_on_left;
 				} else {
-					ret = BlockType::coarse;
+					ret = InterpCase::coarse_from_coarse;
 				}
 				break;
 			case IfaceType::refined_on_left_left_of_coarse:
 				if (left) {
-					ret = BlockType::fine;
+					ret = InterpCase::fine_from_fine_on_left;
 				} else {
-					ret = BlockType::coarse_out_left;
+					ret = InterpCase::fine_from_coarse_to_fine_on_left;
 				}
 				break;
 			case IfaceType::refined_on_left_right_of_coarse:
 				if (left) {
-					ret = BlockType::fine;
+					ret = InterpCase::fine_from_fine_on_right;
 				} else {
-					ret = BlockType::coarse_out_right;
+					ret = InterpCase::fine_from_coarse_to_fine_on_right;
 				}
 				break;
 			case IfaceType::refined_on_right_left_of_coarse:
 				if (left) {
-					ret = BlockType::coarse_out_left;
+					ret = InterpCase::fine_from_coarse_to_fine_on_left;
 				} else {
-					ret = BlockType::fine;
+					ret = InterpCase::fine_from_fine_on_left;
 				}
 				break;
 			case IfaceType::refined_on_right_right_of_coarse:
 				if (left) {
-					ret = BlockType::coarse_out_right;
+					ret = InterpCase::fine_from_coarse_to_fine_on_right;
 				} else {
-					ret = BlockType::fine;
+					ret = InterpCase::fine_from_fine_on_right;
 				}
 				break;
 		}
@@ -1342,7 +1342,7 @@ std::set<MatrixBlock> Iface::getRowBlocks(int *id, DsMemPtr normal)
 			Side        main = iface_s + s;
 			int         j    = (extra.*normal)(main);
 			MatrixBlock b(i, j, iface_s, Side::north, neumann, extra.zero_patch,
-			              BlockType::fine_out_right);
+			              InterpCase::coarse_from_fine_on_right);
 			blocks.insert(b);
 		}
 		// east block
@@ -1352,7 +1352,8 @@ std::set<MatrixBlock> Iface::getRowBlocks(int *id, DsMemPtr normal)
 			Side main = iface_s + rel;
 			int  j    = (extra.*normal)(main);
 			if (j != -1) {
-				MatrixBlock b(i, j, main, s, neumann, extra.zero_patch, BlockType::fine_out_right);
+				MatrixBlock b(i, j, main, s, neumann, extra.zero_patch,
+				              InterpCase::coarse_from_fine_on_right);
 				blocks.insert(b);
 			}
 		}
@@ -1362,7 +1363,8 @@ std::set<MatrixBlock> Iface::getRowBlocks(int *id, DsMemPtr normal)
 			Side main = iface_s + s;
 			int  j    = (extra.*normal)(main);
 			if (j != -1) {
-				MatrixBlock b(i, j, main, s, neumann, extra.zero_patch, BlockType::fine_out_right);
+				MatrixBlock b(i, j, main, s, neumann, extra.zero_patch,
+				              InterpCase::coarse_from_fine_on_right);
 				blocks.insert(b);
 			}
 		}
@@ -1373,7 +1375,8 @@ std::set<MatrixBlock> Iface::getRowBlocks(int *id, DsMemPtr normal)
 			Side main = iface_s + rel;
 			int  j    = (extra.*normal)(main);
 			if (j != -1) {
-				MatrixBlock b(i, j, main, s, neumann, extra.zero_patch, BlockType::fine_out_right);
+				MatrixBlock b(i, j, main, s, neumann, extra.zero_patch,
+				              InterpCase::coarse_from_fine_on_right);
 				blocks.insert(b);
 			}
 		}
@@ -1388,112 +1391,6 @@ std::set<MatrixBlock> Iface::getGlobalRowBlocks()
 std::set<MatrixBlock> Iface::getRowBlocks()
 {
 	return getRowBlocks(&id_local, &DomainSignature::index);
-}
-std::set<MatrixBlock> Iface::getGlobalColBlocks()
-{
-	std::set<MatrixBlock> blocks;
-	auto addBlocks = [&](DomainSignature &ds, Side main, Side s) {
-		std::bitset<4> neumann = ds.neumannRelative(main);
-		int            j       = ds.gid(main);
-		bool           zp      = ds.zero_patch;
-		if (ds.hasFineNbr(main + s)) {
-			MatrixBlock b(ds.gid(main + s), j, main, s, neumann, zp, BlockType::coarse);
-			MatrixBlock c(ds.gidRefinedLeft(main + s), j, main, s, neumann, zp,
-			              BlockType::coarse_out_left);
-			MatrixBlock d(ds.gidRefinedRight(main + s), j, main, s, neumann, zp,
-			              BlockType::coarse_out_right);
-			blocks.insert(b);
-			blocks.insert(c);
-			blocks.insert(d);
-		} else if (ds.hasCoarseNbr(main + s)) {
-			MatrixBlock b(ds.gid(main + s), j, main, s, neumann, zp, BlockType::fine);
-			blocks.insert(b);
-			if (ds.leftOfCoarse(main + s)) {
-				MatrixBlock c(ds.gidCenter(main + s), j, main, s, neumann, zp,
-				              BlockType::fine_out_left);
-				blocks.insert(c);
-			} else {
-				MatrixBlock c(ds.gidCenter(main + s), j, main, s, neumann, zp,
-				              BlockType::fine_out_right);
-				blocks.insert(c);
-			}
-		} else {
-			MatrixBlock b(ds.gid(main + s), j, main, s, neumann, zp, BlockType::plain);
-			blocks.insert(b);
-		}
-	};
-	// left block
-	{
-		Side iface_s = Side::north;
-		if (y_axis) {
-			iface_s = Side::east;
-		}
-		if (left.gid(iface_s) == id) {
-			// north block
-			{
-				Side s = Side::north;
-				addBlocks(left, iface_s, s);
-			}
-			// east block
-			{
-				Side s = Side::east;
-				if (left.hasNbr(iface_s + s)) {
-					addBlocks(left, iface_s, s);
-				}
-			}
-			// south block
-			{
-				Side s = Side::south;
-				if (left.hasNbr(iface_s + s)) {
-					addBlocks(left, iface_s, s);
-				}
-			}
-			// west block
-			{
-				Side s = Side::west;
-				if (left.hasNbr(iface_s + s)) {
-					addBlocks(left, iface_s, s);
-				}
-			}
-		}
-	}
-	// right block
-	{
-		Side iface_s = Side::south;
-		if (y_axis) {
-			iface_s = Side::west;
-		}
-		if (right.gid(iface_s) == id) {
-			// north block
-			{
-				Side s = Side::north;
-				addBlocks(right, iface_s, s);
-			}
-			// east block
-			{
-				Side s = Side::east;
-				if (right.hasNbr(iface_s + s)) {
-					addBlocks(right, iface_s, s);
-				}
-			}
-			// south block
-			{
-				Side s = Side::south;
-				if (right.hasNbr(iface_s + s)) {
-					addBlocks(right, iface_s, s);
-				}
-			}
-			// west block
-			{
-				Side s = Side::west;
-				if (right.hasNbr(iface_s + s)) {
-					addBlocks(right, iface_s, s);
-				}
-			}
-		}
-	}
-
-	return blocks;
 }
 set<int> Iface::getPins()
 {
@@ -1539,8 +1436,8 @@ Teuchos::RCP<map_type> DomainSignatureCollection::getDomainRowMap()
 {
 	vector<int> domain_rows;
 	for (int i : domain_map_vec) {
-		for (int j = 0; j < n*n; j++) {
-			domain_rows.push_back(i * n *n+ j);
+		for (int j = 0; j < n * n; j++) {
+			domain_rows.push_back(i * n * n + j);
 		}
 	}
 	if (num_global_domains == 1) {

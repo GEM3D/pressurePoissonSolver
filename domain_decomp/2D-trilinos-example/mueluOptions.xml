@@ -19,8 +19,7 @@
     <Parameter name="aggregation: drop tol" type="double" value="-0.06"/>
     <Parameter name="aggregation: min agg size" type="int" value="2"/>
     <Parameter name="aggregation: max agg size" type="int" value="4"/>
-    <Parameter name="repartition: enable" type="bool" value="true"/>
+    <Parameter name="repartition: enable" type="bool" value="false"/>
     <Parameter name="repartition: start level" type="int" value="1"/>
-    <Parameter name="repartition: remap parts" type="bool" value="true"/>
     <Parameter name="repartition: max imbalance" type="double" value="1.0"/>
 </ParameterList>

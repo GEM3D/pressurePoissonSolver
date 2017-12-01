@@ -2,6 +2,7 @@
 #define DOMAINSIGNATURECOLLECTION_H
 #include "Side.h"
 #include "MyTypeDefs.h"
+#include "InterpCase.h"
 #include <Teuchos_Comm.hpp>
 #include <Teuchos_GlobalMPISession.hpp>
 #include <Teuchos_RCP.hpp>
@@ -174,9 +175,9 @@ struct MatrixBlock {
 	bool           zero_patch;
 	std::bitset<4> neumann;
 	Side           s;
-	BlockType      type;
+	InterpCase      type;
 	MatrixBlock(int i, int j, Side main, Side aux, std::bitset<4> neumann, bool zero_patch,
-	            BlockType type)
+	            InterpCase type)
 	{
 		this->i      = i;
 		this->j      = j;
@@ -244,7 +245,6 @@ struct Iface {
 	std::set<MatrixBlock> getRowBlocks();
 	std::set<MatrixBlock> getGlobalRowBlocks();
 	std::set<MatrixBlock> getGidRowBlocks();
-	std::set<MatrixBlock> getGlobalColBlocks();
 	std::set<int>         getPins();
 	void setLocalIndexes(std::map<int, int> &rev_map)
 	{
@@ -395,36 +395,7 @@ struct IfaceZoltanHelper {
 		for (auto &p : dsc->ifaces) {
 			globalID[i]                  = p.first;
 			localID[i]                   = p.first;
-			std::set<MatrixBlock> blocks = p.second.getGidRowBlocks();
 			float                 weight = 1.0;
-			for (MatrixBlock b : blocks) {
-				if (b.i != b.j) {
-					switch (b.type) {
-						case BlockType::plain:
-							weight += 1.0;
-							break;
-						case BlockType::fine:
-							weight += 1.0;
-							break;
-						case BlockType::fine_out_left:
-							weight += 0.5;
-							break;
-						case BlockType::fine_out_right:
-							weight += 0.5;
-							break;
-						case BlockType::coarse:
-							weight += 1.0;
-							break;
-						case BlockType::coarse_out_left:
-							weight += 1.0;
-							break;
-						case BlockType::coarse_out_right:
-							weight += 1.0;
-							break;
-					}
-				}
-			}
-			weight      = 1.0;
 			obj_wgts[i] = weight;
 			i++;
 		}

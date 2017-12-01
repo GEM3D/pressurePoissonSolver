@@ -140,13 +140,9 @@ link_directories(${VTK_LIBRARY_DIRS})
 add_executable(heat heat.cpp)
 add_library(DomainCollection DomainCollection.cpp)
 add_library(DomainSignatureCollection DomainSignatureCollection.cpp)
-add_library(Domain Domain.cpp)
-add_library(FftwSolver FftwSolver.cpp)
 add_library(FftwPatchSolver FftwPatchSolver.cpp)
-add_library(CufftSolver CufftSolver.cpp)
 add_library(Factory Factory.cpp)
 file(GLOB fishpack_SRC "fishpack/*.f")
-add_library(FishpackSolver FishpackSolver.cpp)
 add_library(Fishpack ${fishpack_SRC})
 add_library(Interpolators QuadInterpolator.cpp)
 add_library(Init Init.cpp)
@@ -162,7 +158,6 @@ add_library(ClawWriter ClawWriter.cpp)
 target_link_libraries(heat
     DomainCollection
     DomainSignatureCollection
-    Domain
     Factory
     Init
     FftwPatchSolver
@@ -223,33 +218,13 @@ target_link_libraries(Factory
   ${Trilinos_LIBRARIES} 
 )
 target_link_libraries(DomainCollection
-   Domain
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
   ${FFTW_LIB}
   ${MPI_CXX_LIBRARIES} 
 )
-target_link_libraries(Domain
-    FftwSolver
-    FishpackSolver
-    CufftSolver
-  ${Trilinos_TPL_LIBRARIES}
-  ${Trilinos_LIBRARIES} 
+target_link_libraries(FftwPatchSolver
   ${FFTW_LIB}
-  ${MPI_CXX_LIBRARIES} 
-)
-target_link_libraries(FishpackSolver
-    Domain
-    Fishpack
-)
-target_link_libraries(FftwSolver
-    Domain
-)
-target_link_libraries(FftwSolver
-  ${FFTW_LIB}
-)
-target_link_libraries(CufftSolver
-    Domain
 )
 target_link_libraries(DomainSignatureCollection
   ${Trilinos_TPL_LIBRARIES}
