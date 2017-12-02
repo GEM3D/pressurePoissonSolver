@@ -23,7 +23,7 @@ class DirichletSH : public StencilHelper
 	DirichletSH(Domain &d, Side s)
 	{
 		double h   = 0;
-		int    idx = d.id * d.n * d.n;
+		int    idx = d.id_global * d.n * d.n;
 		switch (s) {
 			case Side::north:
 				h      = d.x_length / d.n;
@@ -69,7 +69,7 @@ class NeumannSH : public StencilHelper
 	NeumannSH(Domain &d, Side s)
 	{
 		double h   = 0;
-		int    idx = d.id * d.n * d.n;
+		int    idx = d.id_global * d.n * d.n;
 		switch (s) {
 			case Side::north:
 				h      = d.x_length / d.n;
@@ -116,8 +116,8 @@ class NormalSH : public StencilHelper
 	NormalSH(Domain &d, Side s)
 	{
 		double h       = 0;
-		int    idx     = d.id * d.n * d.n;
-		int    nbr_idx = d.nbr(s) * d.n * d.n;
+		int    idx     = d.id_global * d.n * d.n;
+		int    nbr_idx = d.globalNbr(s) * d.n * d.n;
 		switch (s) {
 			case Side::north:
 				h         = d.x_length / d.n;
@@ -175,9 +175,9 @@ class CoarseSH : public StencilHelper
 	{
 		n                    = d.n;
 		double h             = 0;
-		int    idx           = d.id * d.n * d.n;
-		int    nbr_idx_left  = d.nbr(s) * d.n * d.n;
-		int    nbr_idx_right = d.nbrRight(s) * d.n * d.n;
+		int    idx           = d.id_global * d.n * d.n;
+		int    nbr_idx_left  = d.globalNbr(s) * d.n * d.n;
+		int    nbr_idx_right = d.globalNbrRight(s) * d.n * d.n;
 		switch (s) {
 			case Side::north:
 				h             = d.x_length / d.n;
@@ -292,8 +292,8 @@ class FineSH : public StencilHelper
 	{
 		n              = d.n;
 		double h       = 0;
-		int    idx     = d.id * d.n * d.n;
-		int    nbr_idx = d.nbr(s) * d.n * d.n;
+		int    idx     = d.id_global * d.n * d.n;
+		int    nbr_idx = d.globalNbr(s) * d.n * d.n;
 		switch (s) {
 			case Side::north:
 				h         = d.x_length / d.n;

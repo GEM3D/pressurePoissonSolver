@@ -15,7 +15,7 @@ Teuchos::RCP<matrix_type> MatrixHelper::formCRSMatrix()
 		int     n     = d.n;
 		double  h_x   = d.x_length / n;
 		double  h_y   = d.y_length / n;
-		int     start = n * n * d.id;
+		int     start = n * n * d.id_global;
 
 		// center coeffs
 		double coeff = -2.0 / (h_x * h_x) - 2.0 / (h_y * h_y);

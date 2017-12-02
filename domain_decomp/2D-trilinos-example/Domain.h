@@ -20,6 +20,7 @@ struct Domain {
 
 	std::array<int, 8> nbr_id           = {{-1, -1, -1, -1, -1, -1, -1, -1}};
 	std::array<int, 8> nbr_id_local     = {{-1, -1, -1, -1, -1, -1, -1, -1}};
+	std::array<int, 8> nbr_id_global    = {{-1, -1, -1, -1, -1, -1, -1, -1}};
 	std::array<int, 8> proc             = {{-1, -1, -1, -1, -1, -1, -1, -1}};
 	std::array<int, 4> g_id             = {{-1, -1, -1, -1}};
 	std::array<int, 4> g_id_center      = {{-1, -1, -1, -1}};
@@ -67,6 +68,8 @@ struct Domain {
 	int &indexRefinedRight(Side s) { return local_i_refined[1 + 2 * static_cast<int>(s)]; }
 	inline int &nbr(Side s) { return nbr_id[2 * static_cast<int>(s)]; }
 	inline int &nbrRight(Side s) { return nbr_id[2 * static_cast<int>(s) + 1]; }
+	inline int &globalNbr(Side s) { return nbr_id_global[2 * static_cast<int>(s)]; }
+	inline int &globalNbrRight(Side s) { return nbr_id_global[2 * static_cast<int>(s) + 1]; }
 	inline bool hasNbr(Side s) const { return nbr_id[static_cast<int>(s) * 2] != -1; }
 	inline bool hasFineNbr(Side s) const { return nbr_fine[static_cast<int>(s)]; }
 	inline bool hasCoarseNbr(Side s) const { return nbr_coarse[static_cast<int>(s)]; }
@@ -106,6 +109,7 @@ struct Domain {
 			}
 		}
 	}
+
 	void setGlobalIndexes(std::map<int, int> &rev_map)
 	{
 		for (int i = 0; i < 4; i++) {
@@ -126,6 +130,15 @@ struct Domain {
 			}
 		} catch (std::out_of_range oor) {
 			// do nothing
+		}
+	}
+	void setGlobalNeighborIndexes(std::map<int, int> &rev_map)
+	{
+		id_global = rev_map.at(id_local);
+		for (int i = 0; i < 8; i++) {
+			if (nbr_id_local[i] != -1) {
+				nbr_id_global[i] = rev_map.at(nbr_id_local[i]);
+			}
 		}
 	}
 	void setNeumann()

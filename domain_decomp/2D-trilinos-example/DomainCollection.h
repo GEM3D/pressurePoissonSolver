@@ -172,6 +172,7 @@ class DomainCollection
 	std::vector<int> iface_off_proc_map_vec;
 	std::vector<int> iface_dist_map_vec;
 	std::vector<int> domain_map_vec;
+	std::vector<int> domain_off_proc_map_vec;
 
 	/**
 	 * @brief Default empty constructor.
@@ -203,6 +204,7 @@ class DomainCollection
 	void indexIfacesGlobal();
 
 	void indexDomainsLocal();
+	void indexDomainsGlobal();
 
 	void indexDomainIfacesLocal();
 

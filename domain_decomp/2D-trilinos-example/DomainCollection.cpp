@@ -1059,6 +1059,43 @@ void DomainCollection::indexIfacesLocal()
 	iface_off_proc_map_vec = off_proc_map_vec;
 	indexIfacesGlobal();
 }
+void DomainCollection::indexDomainsGlobal()
+{
+	RCP<const map_type> global_map = Tpetra::createContigMap<int, int>(-1, domains.size(), comm);
+	RCP<map_type>       gid_map
+	= rcp(new map_type(-1, &domain_map_vec[0], domain_map_vec.size(), 0, comm));
+
+	int_vector_type source(gid_map, 1);
+	auto            vec            = source.get1dViewNonConst();
+	auto            global_map_vec = global_map->getMyGlobalIndices();
+	for (int i = 0; i < vec.size(); i++) {
+		vec[i] = global_map_vec[i];
+	}
+
+	vector<int> domain_map_vec_dist = domain_map_vec;
+	for (int i : domain_off_proc_map_vec) {
+		domain_map_vec_dist.push_back(i);
+	}
+	RCP<map_type> gid_map_dist
+	= rcp(new map_type(-1, &domain_map_vec_dist[0], domain_map_vec_dist.size(), 0, comm));
+	int_vector_type  dest(gid_map_dist, 1);
+	Tpetra::Import<> importer(gid_map, gid_map_dist);
+	dest.doImport(source, importer, Tpetra::CombineMode::INSERT);
+	auto local_vec = dest.get1dViewNonConst();
+	map<int, int> rev_map;
+	for (int i = 0; i < local_vec.size(); i++) {
+		rev_map[i] = local_vec[i];
+	}
+	for (auto &p : domains) {
+		p.second.setGlobalNeighborIndexes(rev_map);
+	}
+	for (size_t i = 0; i < domain_map_vec.size(); i++) {
+		domain_map_vec[i] = local_vec[i];
+	}
+	for (size_t i = 0; i < domain_off_proc_map_vec.size(); i++) {
+		domain_off_proc_map_vec[i] = local_vec[domain_map_vec.size() + i];
+	}
+}
 void DomainCollection::indexDomainsLocal()
 {
 	int         curr_i = 0;
@@ -1108,8 +1145,9 @@ void DomainCollection::indexDomainsLocal()
 		p.second.setLocalNeighborIndexes(rev_map);
 	}
 	// domain_rev_map          = rev_map;
-	domain_map_vec = map_vec;
-	// domain_off_proc_map_vec = off_proc_map_vec;
+	domain_map_vec          = map_vec;
+	domain_off_proc_map_vec = off_proc_map_vec;
+	indexDomainsGlobal();
 }
 void DomainCollection::indexDomainIfacesLocal()
 {
