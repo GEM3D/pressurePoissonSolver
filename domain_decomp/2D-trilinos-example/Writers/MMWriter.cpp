@@ -31,7 +31,7 @@ void MMWriter::write(const vector_type &u, string filename)
 			int domain_i   = i / n;
 			int internal_i = i % n;
 			int id         = domain_i * d_x + domain_j;
-			int start      = n * n * id;
+			int start      = n * n * dc.domains[id].id_local;
 			os << u_view[start + internal_i * n + internal_j] << '\n';
 		}
 	}
@@ -51,7 +51,7 @@ void MMWriter::write(const vector_type &u, string filename)
 				int domain_i   = i / n;
 				int internal_i = i % n;
 				int id         = d_x * d_x / 4 + domain_i * d_x + domain_j;
-				int start      = n * n * id;
+				int start      = n * n * dc.domains[id].id_local;
 				os << u_view[start + internal_i * n + internal_j] << '\n';
 			}
 		}

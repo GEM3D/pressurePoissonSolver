@@ -76,10 +76,18 @@ if(CCACHE_FOUND)
 endif(CCACHE_FOUND)
 find_package(HYPRE)
 if(HYPRE_FOUND)
-SET(CMAKE_CXX_FLAGS "-DENABLE_HYPRE ${CMAKE_CXX_FLAGS}")
-include_directories(${HYPRE_INCLUDES})
-link_directories("${HYPRE_DIR}/lib")
+    SET(CMAKE_CXX_FLAGS "-DENABLE_HYPRE ${CMAKE_CXX_FLAGS}")
+    include_directories(${HYPRE_INCLUDES})
+    link_directories("${HYPRE_DIR}/lib")
 endif()
+find_package(VTK NO_MODULE)
+IF(VTK_FOUND)
+    SET(CMAKE_CXX_FLAGS "-DHAVE_VTK ${CMAKE_CXX_FLAGS}")
+    MESSAGE("VTK found, enabling vtk output")
+ELSE()
+    MESSAGE("VTK not found, disabling vtk output")
+ENDIF()
+
 #
 # EDIT HERE: Replace TrilinosExample with your project's name.
 #
@@ -123,7 +131,9 @@ link_directories(${Trilinos_TPL_LIBRARY_DIRS})
 # file(s) to use to build the executable.
 #
 add_executable(heat heat.cpp)
+add_executable(heat-nodd heat-nodd.cpp)
 add_library(SchurHelper SchurHelper.cpp)
+add_library(MatrixHelper MatrixHelper.cpp)
 add_library(DomainCollection DomainCollection.cpp)
 add_library(Factory Factory.cpp)
 add_library(Interpolators QuadInterpolator.cpp)
@@ -149,10 +159,26 @@ target_link_libraries(heat
   ${Trilinos_LIBRARIES} 
   ${MPI_CXX_LIBRARIES} 
 )
+if(VTK_FOUND)
+    target_link_libraries(heat VtkWriter)
+endif(VTK_FOUND)
+target_link_libraries(heat-nodd
+    MatrixHelper
+    DomainCollection
+    Factory
+    Init
+    MMWriter
+    ClawWriter
+  ${Trilinos_TPL_LIBRARIES}
+  ${Trilinos_LIBRARIES} 
+  ${MPI_CXX_LIBRARIES} 
+)
+if(VTK_FOUND)
+    target_link_libraries(heat-nodd VtkWriter)
+endif(VTK_FOUND)
 if(HYPRE_FOUND)
-target_link_libraries(heat
-    HypreWrapper
-    )
+target_link_libraries(heat HypreWrapper)
+target_link_libraries(heat-nodd HypreWrapper)
 add_library(HypreWrapper HypreWrapper.cpp)
 target_link_libraries(HypreWrapper
   ${Trilinos_TPL_LIBRARIES}
@@ -162,8 +188,8 @@ target_link_libraries(HypreWrapper
 endif()
 if(ENABLE_AMGX)
 add_library(AmgxWrapper AmgxWrapper.cpp)
-target_link_libraries(heat
-    AmgxWrapper)
+target_link_libraries(heat AmgxWrapper)
+target_link_libraries(heat-nodd AmgxWrapper)
 target_link_libraries(AmgxWrapper
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
@@ -175,6 +201,12 @@ target_link_libraries(Factory
   ${Trilinos_LIBRARIES} 
 )
 target_link_libraries(SchurHelper
+  ${Trilinos_TPL_LIBRARIES}
+  ${Trilinos_LIBRARIES} 
+  ${MPI_CXX_LIBRARIES} 
+)
+
+target_link_libraries(MatrixHelper
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
   ${MPI_CXX_LIBRARIES} 

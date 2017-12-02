@@ -1434,12 +1434,7 @@ Teuchos::RCP<map_type> DomainCollection::getDomainRowMap()
 			domain_rows.push_back(i * n * n + j);
 		}
 	}
-	if (num_global_domains == 1) {
-		// this is a special case for when there is only one domain
-		return Teuchos::rcp(new map_type(1, 0, comm));
-	} else {
-		return Teuchos::rcp(new map_type(-1, &domain_rows[0], domain_rows.size(), 0, this->comm));
-	}
+	return Teuchos::rcp(new map_type(-1, &domain_rows[0], domain_rows.size(), 0, this->comm));
 }
 double DomainCollection::integrate(const vector_type &u)
 {

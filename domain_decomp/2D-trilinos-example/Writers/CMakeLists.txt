@@ -12,17 +12,8 @@ target_link_libraries(ClawWriter
     ${Trilinos_LIBRARIES} 
 )
 
-find_package(VTK NO_MODULE)
-
-IF(VTK_FOUND)
-    SET(CMAKE_CXX_FLAGS "-DHAVE_VTK ${CMAKE_CXX_FLAGS}")
-    MESSAGE("VTK found, enabling vtk output")
-ELSE()
-    MESSAGE("VTK not found, disabling vtk output")
-ENDIF()
 
 if(VTK_FOUND)
-    target_link_libraries(heat VtkWriter)
     add_library(VtkWriter VtkWriter.cpp)
     link_directories(${VTK_LIBRARY_DIRS})
     include_directories(SYSTEM ${VTK_INCLUDE_DIRS})

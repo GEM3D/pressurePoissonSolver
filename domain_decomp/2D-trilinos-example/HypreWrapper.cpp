@@ -5,7 +5,7 @@
 #include <vector>
 using namespace std;
 HypreWrapper::HypreWrapper(Teuchos::RCP<matrix_type> A, const DomainCollection &dsc, int n,
-                           double tol)
+                           double tol, bool schur)
 {
 	int ilower = A->getRowMap()->getMinGlobalIndex();
 	int iupper = A->getRowMap()->getMaxGlobalIndex();
@@ -42,21 +42,39 @@ HypreWrapper::HypreWrapper(Teuchos::RCP<matrix_type> A, const DomainCollection &
 	HYPRE_IJVectorAssemble(bij);
 	HYPRE_IJVectorGetObject(bij, (void **) &par_b);
 
-	HYPRE_ParCSRGMRESCreate(MPI_COMM_WORLD, &solver);
-	HYPRE_ParCSRGMRESSetMaxIter(solver, 1000);
-	HYPRE_ParCSRGMRESSetTol(solver, tol);
-	HYPRE_ParCSRGMRESSetPrintLevel(solver, 3);
-	HYPRE_ParCSRGMRESSetLogging(solver, 1);
+	if (schur) {
+		HYPRE_ParCSRGMRESCreate(MPI_COMM_WORLD, &solver);
+		HYPRE_ParCSRGMRESSetMaxIter(solver, 1000);
+		HYPRE_ParCSRGMRESSetTol(solver, tol);
+		HYPRE_ParCSRGMRESSetPrintLevel(solver, 3);
+		HYPRE_ParCSRGMRESSetLogging(solver, 1);
 
-	HYPRE_BoomerAMGCreate(&precond);
-	HYPRE_BoomerAMGSetStrongThreshold(precond, .25);
-	HYPRE_BoomerAMGSetMaxRowSum(precond, 0.9);
-	HYPRE_BoomerAMGSetRelaxType(precond, 0);
-	HYPRE_BoomerAMGSetCycleRelaxType(precond, 0, 3);
-	HYPRE_BoomerAMGSetCoarsenType(precond, 6);
-	HYPRE_BoomerAMGSetTol(precond, 0.0);
-	HYPRE_BoomerAMGSetPrintLevel(precond, 1);
-	HYPRE_BoomerAMGSetMaxIter(precond, 1);
+		HYPRE_BoomerAMGCreate(&precond);
+		HYPRE_BoomerAMGSetStrongThreshold(precond, .25);
+		HYPRE_BoomerAMGSetMaxRowSum(precond, 0.9);
+		HYPRE_BoomerAMGSetRelaxType(precond, 0);
+		HYPRE_BoomerAMGSetCycleRelaxType(precond, 0, 3);
+		HYPRE_BoomerAMGSetCoarsenType(precond, 6);
+		HYPRE_BoomerAMGSetTol(precond, 0.0);
+		HYPRE_BoomerAMGSetPrintLevel(precond, 1);
+		HYPRE_BoomerAMGSetMaxIter(precond, 1);
+	} else {
+		HYPRE_ParCSRGMRESCreate(MPI_COMM_WORLD, &solver);
+		HYPRE_ParCSRGMRESSetMaxIter(solver, 1000);
+		HYPRE_ParCSRGMRESSetTol(solver, tol);
+		HYPRE_ParCSRGMRESSetPrintLevel(solver, 3);
+		HYPRE_ParCSRGMRESSetLogging(solver, 1);
+
+		HYPRE_BoomerAMGCreate(&precond);
+		HYPRE_BoomerAMGSetStrongThreshold(precond, .25);
+		HYPRE_BoomerAMGSetMaxRowSum(precond, 0.9);
+		HYPRE_BoomerAMGSetRelaxType(precond, 3);
+		HYPRE_BoomerAMGSetCycleRelaxType(precond, 3, 3);
+		HYPRE_BoomerAMGSetCoarsenType(precond, 6);
+		HYPRE_BoomerAMGSetTol(precond, 0.0);
+		HYPRE_BoomerAMGSetPrintLevel(precond, 1);
+		HYPRE_BoomerAMGSetMaxIter(precond, 1);
+	}
 
 	// set preconditioner
 	HYPRE_ParCSRGMRESSetPrecond(solver, HYPRE_BoomerAMGSolve, HYPRE_BoomerAMGSetup, precond);

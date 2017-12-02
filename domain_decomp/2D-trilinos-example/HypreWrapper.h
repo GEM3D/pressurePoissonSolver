@@ -23,7 +23,8 @@ class HypreWrapper
 	int num_cols;
 
 	public:
-	HypreWrapper(Teuchos::RCP<matrix_type> A, const DomainCollection &dsc, int n, double tol);
+	HypreWrapper(Teuchos::RCP<matrix_type> A, const DomainCollection &dsc, int n, double tol,
+	             bool schur);
 	~HypreWrapper();
 	void solve(Teuchos::RCP<vector_type> x, Teuchos::RCP<vector_type> b);
 };
