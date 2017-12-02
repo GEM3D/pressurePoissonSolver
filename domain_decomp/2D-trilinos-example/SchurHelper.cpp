@@ -7,11 +7,15 @@ using namespace std;
 enum axis_enum { X_AXIS, Y_AXIS };
 enum bc_enum { DIRICHLET, NEUMANN, REFINED };
 
-void SchurHelper::setPatchSolver(RCP<PatchSolver> psolver) { solver = psolver; }
-SchurHelper::SchurHelper(DomainCollection dc, RCP<const Teuchos::Comm<int>> comm)
+SchurHelper::SchurHelper(DomainCollection dc, Teuchos::RCP<const Teuchos::Comm<int>> comm,
+                         Teuchos::RCP<PatchSolver> solver, Teuchos::RCP<PatchOperator> op,
+                         Teuchos::RCP<Interpolator> interpolator)
 {
-	this->comm = comm;
-	this->dc   = dc;
+	this->dc           = dc;
+	this->comm         = comm;
+	this->solver       = solver;
+	this->op           = op;
+	this->interpolator = interpolator;
 }
 
 void SchurHelper::solveWithInterface(const vector_type &f, vector_type &u, const vector_type &gamma,
@@ -20,9 +24,7 @@ void SchurHelper::solveWithInterface(const vector_type &f, vector_type &u, const
 	// initilize our local variables
 	diff.update(1, gamma, 0);
 	Tpetra::Import<> importer(diff.getMap(), dc.getSchurDistMap());
-	Tpetra::Export<> exporter(dc.getSchurDistMap(), diff.getMap());
 	vector_type      local_gamma(dc.getSchurDistMap(), 1);
-	vector_type      local_diff(dc.getSchurDistMap(), 1);
 	vector_type      local_interp(dc.getSchurDistMap(), 1);
 	local_gamma.doImport(gamma, importer, Tpetra::CombineMode::INSERT);
 
@@ -36,7 +38,7 @@ void SchurHelper::solveWithInterface(const vector_type &f, vector_type &u, const
 	// export diff vector
 	diff.scale(0);
 	diff.doExport(local_interp, importer, Tpetra::CombineMode::ADD);
-	diff.update(2.0, gamma, -2.0);
+	diff.update(1.0, gamma, -1.0);
 }
 void SchurHelper::applyWithInterface(const vector_type &u, const vector_type &gamma, vector_type &f)
 {
@@ -138,17 +140,17 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 				interpolator->interpolate(ds, s, type, u, interp);
 				valarray<double> &block = *p.second;
 				for (int i = 0; i < n; i++) {
-					block[i * n + j] = -2 * interp_view[i];
+					block[i * n + j] = -interp_view[i];
 				}
 				if (s == Side::north) {
 					switch (type) {
 						case InterpCase::normal:
-							block[n * j + j] += 1;
+							block[n * j + j] += 0.5;
 							break;
 						case InterpCase::coarse_from_coarse:
 						case InterpCase::fine_from_fine_on_left:
 						case InterpCase::fine_from_fine_on_right:
-							block[n * j + j] += 2;
+							block[n * j + j] += 1;
 							break;
 						default:
 							break;
@@ -163,7 +165,7 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 		}
 	}
 }
-void SchurHelper::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<matrix_type> &A)
+Teuchos::RCP<matrix_type> SchurHelper::formCRSMatrix()
 {
 	int         n = dc.n;
 	vector<int> cols_array;
@@ -179,7 +181,7 @@ void SchurHelper::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<matrix_
 	}
 	RCP<map_type> col_map = rcp(new map_type(-1, &cols_array[0], cols_array.size(), 0, this->comm));
 
-	A = rcp(new matrix_type(dc.getSchurRowMap(), col_map, 5 * n));
+	RCP<matrix_type> A = rcp(new matrix_type(dc.getSchurRowMap(), col_map, 5 * n));
 
 	set<pair<int, int>> inserted;
 	auto insertBlock = [&](int i, int j, RCP<valarray<double>> block, bool flip_i, bool flip_j) {
@@ -218,5 +220,6 @@ void SchurHelper::formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<matrix_
 	};
 
 	assembleMatrix(insertBlock);
-	A->fillComplete(map, map);
+	A->fillComplete(dc.getSchurRowMap(), dc.getSchurRowMap());
+	return A;
 }

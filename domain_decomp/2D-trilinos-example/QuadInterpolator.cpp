@@ -57,7 +57,6 @@ Slice getInnerSlice(Domain &d, int n, const vector_type &u, Side s)
 	}
 	return retval;
 }
-QuadInterpolator::QuadInterpolator(int n) { this->n = n; }
 void QuadInterpolator::interpolate(Domain &d, const vector_type &u, vector_type &interp)
 {
 	Side s = Side::north;
@@ -84,6 +83,7 @@ void QuadInterpolator::interpolate(Domain &d, const vector_type &u, vector_type 
 void QuadInterpolator::interpolate(Domain &d, Side s, InterpCase icase, const vector_type &u,
                                    vector_type &interp)
 {
+	int  n           = d.n;
 	auto interp_view = interp.get1dViewNonConst();
 	int  right       = -1;
 	int  ctfidx      = -1;

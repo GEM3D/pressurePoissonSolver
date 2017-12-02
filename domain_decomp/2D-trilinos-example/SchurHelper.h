@@ -1,5 +1,5 @@
-#ifndef SHURHELPER_H
-#define SHURHELPER_H
+#ifndef SCHURHELPER_H
+#define SCHURHELPER_H
 #include "DomainCollection.h"
 #include "Interpolator.h"
 #include "MyTypeDefs.h"
@@ -18,54 +18,67 @@
 class SchurHelper
 {
 	private:
-	Teuchos::RCP<PatchSolver> solver;
+	DomainCollection dc;
+
 	/**
 	 * @brief The MPI communicator used.
 	 */
 	Teuchos::RCP<const Teuchos::Comm<int>> comm;
-	int                                    num_cols = 0;
+
+	/**
+	 * @brief Interpolates to interface values
+	 */
+	Teuchos::RCP<Interpolator> interpolator;
+
+	/**
+	 * @brief The patch operator
+	 */
+	Teuchos::RCP<PatchOperator> op;
+
+	/**
+	 * @brief The patch solver
+	 */
+	Teuchos::RCP<PatchSolver> solver;
 
 	typedef std::function<void(int, int, Teuchos::RCP<std::valarray<double>>, bool, bool)> inserter;
 	void assembleMatrix(inserter insertBlock);
 
 	public:
-	Teuchos::RCP<Interpolator> interpolator;
-
-	Teuchos::RCP<PatchOperator> op;
-
-	void setPatchSolver(Teuchos::RCP<PatchSolver> psolver);
-
-	DomainCollection dc;
-
 	/**
 	 * @brief Create a SchurHelper from a given DomainCollection
 	 *
 	 * @param dc the DomainCollection
-	 * @param n number of cells in each direction for each domain
-	 * @param h_x the x spacing
-	 * @param h_y the y spacing
 	 * @param comm the teuchos communicator
 	 */
-	SchurHelper(DomainCollection dc, Teuchos::RCP<const Teuchos::Comm<int>> comm);
+	SchurHelper(DomainCollection dc, Teuchos::RCP<const Teuchos::Comm<int>> comm,
+	            Teuchos::RCP<PatchSolver> solver, Teuchos::RCP<PatchOperator> op,
+	            Teuchos::RCP<Interpolator> interpolator);
 
 	/**
 	 * @brief Solve with a given set of interface values
 	 *
+	 * @param f the rhs vector
+	 * @param u the vector to put solution in
 	 * @param gamma the interface values to use
 	 * @param diff the resulting difference
 	 */
 	void solveWithInterface(const vector_type &f, vector_type &u, const vector_type &gamma,
 	                        vector_type &diff);
 
+	/**
+	 * @brief Apply patch operator with a given set of interface values
+	 *
+	 * @param u the solution vector to use
+	 * @param gamma the interface values to use
+	 * @param f the resulting rhs vector
+	 */
 	void applyWithInterface(const vector_type &u, const vector_type &gamma, vector_type &f);
 
 	/**
 	 * @brief Form the Schur complement matrix
 	 *
-	 * @param map the map used in the matrix
-	 *
 	 * @return the formed matrix
 	 */
-	void formCRSMatrix(Teuchos::RCP<map_type> map, Teuchos::RCP<matrix_type> &A);
+	Teuchos::RCP<matrix_type> formCRSMatrix();
 };
 #endif

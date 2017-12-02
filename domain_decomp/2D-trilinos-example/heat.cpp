@@ -296,20 +296,24 @@ int main(int argc, char *argv[])
 	}
 
 	// set the patch solver
-	RCP<PatchSolver> psolver;
+	RCP<PatchSolver> p_solver;
 	if (f_fish) {
-		psolver = rcp(new FishpackPatchSolver());
+		p_solver = rcp(new FishpackPatchSolver());
 	} else {
-		psolver = rcp(new FftwPatchSolver(dc));
+		p_solver = rcp(new FftwPatchSolver(dc));
 	}
+
+	// patch operator
+	RCP<PatchOperator> p_operator = rcp(new FivePtPatchOperator());
+
+	// interface interpolator
+	RCP<Interpolator> p_interp = rcp(new QuadInterpolator());
+
 	Tools::Timer timer;
 	for (int loop = 0; loop < loop_count; loop++) {
 		timer.start("Domain Initialization");
 
-		SchurHelper sch(dc, comm);
-		sch.setPatchSolver(psolver);
-		sch.interpolator = rcp(new QuadInterpolator(nx));
-		sch.op           = rcp(new FivePtPatchOperator());
+		SchurHelper sch(dc, comm, p_solver, p_operator, p_interp);
 
 		RCP<map_type>    domain_map = dc.getDomainRowMap();
 		RCP<vector_type> u          = rcp(new vector_type(domain_map, 1));
@@ -334,13 +338,9 @@ int main(int argc, char *argv[])
 
 		// Create the gamma and diff vectors
 		RCP<vector_type>                   gamma = rcp(new vector_type(matrix_map, 1));
-		RCP<vector_type>                   r     = rcp(new vector_type(matrix_map, 1));
-		RCP<vector_type>                   x     = rcp(new vector_type(matrix_map, 1));
-		RCP<vector_type>                   d     = rcp(new vector_type(matrix_map, 1));
 		RCP<vector_type>                   diff  = rcp(new vector_type(matrix_map, 1));
 		RCP<vector_type>                   b     = rcp(new vector_type(matrix_map, 1));
 		RCP<matrix_type>                   A;
-		RCP<single_vector_type>            s;
 		RCP<Tpetra::Operator<scalar_type>> op;
 		RCP<const Tpetra::RowMatrix<>>     rm;
 		RCP<Amesos2::Solver<matrix_type, vector_type>> dsolver;
@@ -383,7 +383,7 @@ int main(int argc, char *argv[])
 			} else {
 				timer.start("Matrix Formation");
 
-				sch.formCRSMatrix(matrix_map, A);
+				A = sch.formCRSMatrix();
 
 				timer.stop("Matrix Formation");
 
@@ -540,16 +540,6 @@ int main(int argc, char *argv[])
 				args::get(f_read_gamma), comm, matrix_map_const);
 			} else if (f_lu || f_superlu || f_mumps || f_basker) {
 				dsolver->solve(&*gamma, &*b);
-				if (f_iter) {
-					x->putScalar(0);
-					A->apply(*gamma, *r);
-					r->update(1.0, *b, -1.0);
-
-					dsolver->solve(&*x, &*r);
-
-					gamma->update(1.0, *x, 1.0);
-				}
-
 			} else {
 				problem->setProblem();
 
