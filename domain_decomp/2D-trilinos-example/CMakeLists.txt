@@ -141,6 +141,7 @@ add_executable(heat heat.cpp)
 add_library(DomainCollection DomainCollection.cpp)
 add_library(DomainSignatureCollection DomainSignatureCollection.cpp)
 add_library(FftwPatchSolver FftwPatchSolver.cpp)
+add_library(FishpackPatchSolver FishpackPatchSolver.cpp)
 add_library(Factory Factory.cpp)
 file(GLOB fishpack_SRC "fishpack/*.f")
 add_library(Fishpack ${fishpack_SRC})
@@ -161,6 +162,7 @@ target_link_libraries(heat
     Factory
     Init
     FftwPatchSolver
+    FishpackPatchSolver
     Interpolators
     MMWriter
     ClawWriter
@@ -225,6 +227,9 @@ target_link_libraries(DomainCollection
 )
 target_link_libraries(FftwPatchSolver
   ${FFTW_LIB}
+)
+target_link_libraries(FishpackPatchSolver
+    Fishpack
 )
 target_link_libraries(DomainSignatureCollection
   ${Trilinos_TPL_LIBRARIES}

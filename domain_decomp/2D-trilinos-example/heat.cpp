@@ -4,6 +4,7 @@
 //#include "FunctionWrapper.h"
 #include "ClawWriter.h"
 #include "FftwPatchSolver.h"
+#include "FishpackPatchSolver.h"
 #include "FivePtPatchOperator.h"
 #include "Init.h"
 #include "MMWriter.h"
@@ -295,8 +296,13 @@ int main(int argc, char *argv[])
 	}
 
 	// set the patch solver
-	RCP<PatchSolver> psolver = rcp(new FftwPatchSolver(dsc));
-	Tools::Timer     timer;
+	RCP<PatchSolver> psolver;
+	if (f_fish) {
+		psolver = rcp(new FishpackPatchSolver());
+	} else {
+		psolver = rcp(new FftwPatchSolver(dsc));
+	}
+	Tools::Timer timer;
 	for (int loop = 0; loop < loop_count; loop++) {
 		timer.start("Domain Initialization");
 
@@ -650,7 +656,6 @@ int main(int argc, char *argv[])
 		if (f_neumann) {
 			double uavg = dc.integrate(*u) / dc.area();
 			double eavg = dc.integrate(*exact) / dc.area();
-			cerr << "AREA: " << dc.area() << endl;
 
 			if (my_global_rank == 0) {
 				cout << "Average of computed solution: " << uavg << endl;
