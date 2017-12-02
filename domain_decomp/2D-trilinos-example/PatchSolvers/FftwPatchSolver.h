@@ -1,7 +1,7 @@
 #ifndef FFTWPATCHSOLVER_H
 #define FFTWPATCHSOLVER_H
 #include "DomainCollection.h"
-#include "PatchSolver.h"
+#include "PatchSolvers/PatchSolver.h"
 #include <bitset>
 #include <fftw3.h>
 #include <map>

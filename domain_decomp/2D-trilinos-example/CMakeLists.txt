@@ -4,7 +4,6 @@
 # before reading this example; in particular, you should know how to
 # add C++ source files and header files to your project.
 #
-enable_language(Fortran)
 
 # You need CMake version >= 2.8 to use this example.
 cmake_minimum_required(VERSION 2.8)
@@ -53,7 +52,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 # that was used to build Trilinos on your machine.  You do _not_ need
 # to edit this line.
 project(DomainDecomp)
-find_package(FFTW REQUIRED)
 find_package(VTK NO_MODULE)
 message("${VTK_LIBRARIES}")
 IF(VTK_FOUND)
@@ -78,7 +76,6 @@ find_package(CUDA)
   MESSAGE("Setting C compiler.")
   SET(CMAKE_C_COMPILE ${Trilinos_C_COMPILER})
 
-set (CMAKE_Fortran_FLAGS "-fdefault-real-8 -O3 ${CMAKE_Fortran_FLAGS}")
 
 find_program(CCACHE_FOUND ccache)
 if(CCACHE_FOUND)
@@ -119,7 +116,6 @@ include_directories(".")
 include_directories(SYSTEM ${Trilinos_TPL_INCLUDE_DIRS})
 include_directories(SYSTEM ${Trilinos_INCLUDE_DIRS})
 include_directories(SYSTEM ${VTK_INCLUDE_DIRS})
-include_directories(${FFTW_INCLUDES})
 include_directories(${MPI_CXX_INCLUDE_PATH})
 if(CUDA_FOUND)
 include_directories(${CUDA_INCLUDE_DIRS})
@@ -140,11 +136,7 @@ link_directories(${VTK_LIBRARY_DIRS})
 add_executable(heat heat.cpp)
 add_library(SchurHelper SchurHelper.cpp)
 add_library(DomainCollection DomainCollection.cpp)
-add_library(FftwPatchSolver FftwPatchSolver.cpp)
-add_library(FishpackPatchSolver FishpackPatchSolver.cpp)
 add_library(Factory Factory.cpp)
-file(GLOB fishpack_SRC "fishpack/*.f")
-add_library(Fishpack ${fishpack_SRC})
 add_library(Interpolators QuadInterpolator.cpp)
 add_library(Init Init.cpp)
 add_library(MMWriter MMWriter.cpp)
@@ -168,7 +160,6 @@ target_link_libraries(heat
     ClawWriter
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
-  ${FFTW_LIB}
   ${MPI_CXX_LIBRARIES} 
 )
 target_link_libraries(MMWriter
@@ -222,16 +213,12 @@ target_link_libraries(Factory
 target_link_libraries(SchurHelper
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
-  ${FFTW_LIB}
   ${MPI_CXX_LIBRARIES} 
 )
-target_link_libraries(FftwPatchSolver
-  ${FFTW_LIB}
-)
-target_link_libraries(FishpackPatchSolver
-    Fishpack
-)
+
 target_link_libraries(DomainCollection
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
 )
+
+add_subdirectory(PatchSolvers)

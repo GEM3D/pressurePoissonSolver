@@ -1,6 +1,6 @@
 #ifndef FISHPACKPATCHSOLVER_H
 #define FISHPACKPATCHSOLVER_H
-#include "PatchSolver.h"
+#include "PatchSolvers/PatchSolver.h"
 class FishpackPatchSolver : public PatchSolver
 {
 	public:
