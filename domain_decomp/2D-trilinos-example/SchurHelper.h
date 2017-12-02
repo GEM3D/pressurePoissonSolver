@@ -58,9 +58,6 @@ class SchurHelper
 	                        vector_type &diff);
 
 	void applyWithInterface(const vector_type &u, const vector_type &gamma, vector_type &f);
-	double integrate(const vector_type &u);
-
-	double area();
 
 	/**
 	 * @brief Form the Schur complement matrix

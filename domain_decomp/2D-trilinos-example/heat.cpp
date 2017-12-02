@@ -353,7 +353,7 @@ int main(int argc, char *argv[])
 		typedef Ifpack2::Preconditioner<scalar_type> Preconditioner;
 		RCP<Preconditioner>                          prec;
 		if (f_neumann && !f_nozerof) {
-			double fdiff = (sch.integrate(*f)) / sch.area();
+			double fdiff = (dc.integrate(*f)) / dc.area();
 			if (my_global_rank == 0) cout << "Fdiff: " << fdiff << endl;
 
 			RCP<vector_type> diff = rcp(new vector_type(domain_map, 1));
@@ -654,8 +654,8 @@ int main(int argc, char *argv[])
 		RCP<vector_type> error = rcp(new vector_type(domain_map, 1));
 		error->update(-1.0, *exact, 1.0, *u, 0.0);
 		if (f_neumann) {
-			double uavg = sch.integrate(*u) / sch.area();
-			double eavg = sch.integrate(*exact) / sch.area();
+			double uavg = dc.integrate(*u) / dc.area();
+			double eavg = dc.integrate(*exact) / dc.area();
 
 			if (my_global_rank == 0) {
 				cout << "Average of computed solution: " << uavg << endl;
@@ -669,8 +669,8 @@ int main(int argc, char *argv[])
 		double error_norm = error->getVector(0)->norm2();
 		double exact_norm = exact->getVector(0)->norm2();
 
-		double ausum = sch.integrate(*au);
-		double fsum  = sch.integrate(*f);
+		double ausum = dc.integrate(*au);
+		double fsum  = dc.integrate(*f);
 		if (my_global_rank == 0) {
 			std::cout << std::scientific;
 			std::cout.precision(13);

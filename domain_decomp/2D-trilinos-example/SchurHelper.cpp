@@ -49,39 +49,7 @@ void SchurHelper::applyWithInterface(const vector_type &u, const vector_type &ga
 		op->apply(d, u, local_gamma, f);
 	}
 }
-double SchurHelper::integrate(const vector_type &u)
-{
-	double sum    = 0;
-	auto   u_view = u.get1dView();
 
-	for (auto &p : dc.domains) {
-		Domain &d     = p.second;
-		int     start = d.n * d.n * d.id_local;
-
-		double patch_sum = 0;
-		for (int i = 0; i < d.n * d.n; i++) {
-			patch_sum += u_view[start + i];
-		}
-
-		patch_sum *= d.x_length * d.y_length / (d.n * d.n);
-
-		sum += patch_sum;
-	}
-	double retval;
-	Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &sum, &retval);
-	return retval;
-}
-double SchurHelper::area()
-{
-	double sum = 0;
-	for (auto &p : dc.domains) {
-		Domain &d = p.second;
-		sum += d.x_length * d.y_length;
-	}
-	double retval;
-	Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &sum, &retval);
-	return retval;
-}
 struct BlockKey {
 	InterpCase type;
 	Side       s;

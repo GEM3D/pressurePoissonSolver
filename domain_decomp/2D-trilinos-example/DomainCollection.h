@@ -227,7 +227,10 @@ class DomainCollection
 	Teuchos::RCP<map_type> getSchurRowMap();
 	Teuchos::RCP<map_type> getSchurDistMap();
 	Teuchos::RCP<map_type> getDomainRowMap();
-	int                    getGlobalNumCells() { return num_global_domains * n * n; }
+
+	int    getGlobalNumCells() { return num_global_domains * n * n; }
+	double integrate(const vector_type &u);
+	double area();
 };
 struct IfaceZoltanHelper {
 	// query functions that respond to requests from Zoltan
