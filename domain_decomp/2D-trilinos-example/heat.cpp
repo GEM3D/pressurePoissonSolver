@@ -2,11 +2,11 @@
 #include "DomainSignatureCollection.h"
 #include "Factory.h"
 //#include "FunctionWrapper.h"
+#include "ClawWriter.h"
 #include "FftwPatchSolver.h"
 #include "FivePtPatchOperator.h"
 #include "Init.h"
 #include "MMWriter.h"
-#include "ClawWriter.h"
 #include "MyTypeDefs.h"
 #include "QuadInterpolator.h"
 #ifdef ENABLE_AMGX
@@ -200,9 +200,6 @@ int main(int argc, char *argv[])
 	}
 	if (f_neumann) {
 		dsc.setNeumann();
-		if (!f_pingamma && !f_zerou) {
-			dsc.setZeroPatch();
-		}
 	}
 	// Set the number of discretization points in the x and y direction.
 	int nx = args::get(f_n);
@@ -314,9 +311,9 @@ int main(int argc, char *argv[])
 		RCP<vector_type> f          = rcp(new vector_type(domain_map, 1));
 
 		if (f_neumann) {
-			// double *f_ptr     = &f->get1dViewNonConst()[0];
-			// double *exact_ptr = &exact->get1dViewNonConst()[0];
-			// Init::initDirichlet(dsc, nx, f_ptr, exact_ptr, ffun, gfun);
+			double *f_ptr     = &f->get1dViewNonConst()[0];
+			double *exact_ptr = &exact->get1dViewNonConst()[0];
+			Init::initNeumann(dsc, nx, f_ptr, exact_ptr, ffun, gfun, nfunx, nfuny);
 		} else {
 			double *f_ptr     = &f->get1dViewNonConst()[0];
 			double *exact_ptr = &exact->get1dViewNonConst()[0];
@@ -639,36 +636,31 @@ int main(int argc, char *argv[])
 		///////////////////
 		timer.stop("Complete Solve");
 
-		// Calcuate error
-		if (f_neumann) {
-			double uavg = dc.integrate(*u) / dc.area();
-			double eavg = dc.integrate(*exact) / dc.area();
-
-			if (my_global_rank == 0) {
-				cout << "Average of computed solution: " << uavg << endl;
-				cout << "Average of exact solution: " << eavg << endl;
-			}
-
-		} else {
-		}
-
-		// norms
-		if (f_neumann) {
-			// shift average of computed solution match exact solution
-		}
-
 		// residual
 		RCP<vector_type> resid = rcp(new vector_type(domain_map, 1));
 		RCP<vector_type> au    = rcp(new vector_type(domain_map, 1));
 		dc.applyWithInterface(*u, *gamma, *au);
 		resid->update(-1.0, *f, 1.0, *au, 0.0);
-		Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile("resid.mm", resid, "", "");
 		double residual = resid->getVector(0)->norm2();
 		double fnorm    = f->getVector(0)->norm2();
 
 		// error
 		RCP<vector_type> error = rcp(new vector_type(domain_map, 1));
 		error->update(-1.0, *exact, 1.0, *u, 0.0);
+		if (f_neumann) {
+			double uavg = dc.integrate(*u) / dc.area();
+			double eavg = dc.integrate(*exact) / dc.area();
+			cerr << "AREA: " << dc.area() << endl;
+
+			if (my_global_rank == 0) {
+				cout << "Average of computed solution: " << uavg << endl;
+				cout << "Average of exact solution: " << eavg << endl;
+			}
+
+			vector_type ones(domain_map, 1);
+			ones.putScalar(1);
+			error->update(eavg - uavg, ones, 1.0);
+		}
 		double error_norm = error->getVector(0)->norm2();
 		double exact_norm = exact->getVector(0)->norm2();
 
@@ -687,23 +679,23 @@ int main(int argc, char *argv[])
 			mmwriter.write(*u, save_solution_file);
 		}
 		if (save_residual_file != "") {
-			mmwriter.write(*resid, save_solution_file);
+			mmwriter.write(*resid, save_residual_file);
 		}
 		if (save_error_file != "") {
-			mmwriter.write(*error, save_solution_file);
+			mmwriter.write(*error, save_error_file);
 		}
 		if (save_gamma_file != "") {
 			Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_gamma_file, gamma, "",
 			                                                          "");
 		}
 		if (f_outclaw) {
-            ClawWriter writer(dsc);
-            writer.write(*u,*resid);
+			ClawWriter writer(dsc);
+			writer.write(*u, *resid);
 		}
 #ifdef HAVE_VTK
 		if (f_outvtk) {
-            VtkWriter writer(dsc);
-            writer.write(*u,*error,*resid);
+			VtkWriter writer(dsc);
+			writer.write(*u, *error, *resid);
 		}
 #endif
 		cout.unsetf(std::ios_base::floatfield);

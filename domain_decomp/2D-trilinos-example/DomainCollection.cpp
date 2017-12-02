@@ -67,7 +67,7 @@ double DomainCollection::integrate(const vector_type &u)
 
 		double h_x = d.x_length / d.n;
 		double h_y = d.y_length / d.n;
-		patch_sum *= h_x * h_y;
+		patch_sum *= d.x_length*d.y_length/(d.n*d.n);
 
 		sum += patch_sum;
 	}
