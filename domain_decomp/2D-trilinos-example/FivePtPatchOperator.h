@@ -4,7 +4,7 @@
 class FivePtPatchOperator : public PatchOperator
 {
 	public:
-	void apply(DomainSignature &d, const vector_type &u, const vector_type &gamma, vector_type &f)
+	void apply(Domain &d, const vector_type &u, const vector_type &gamma, vector_type &f)
 	{
 		int           n              = d.n;
 		double        h_x            = d.x_length / n;

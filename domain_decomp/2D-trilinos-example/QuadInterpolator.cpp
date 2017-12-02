@@ -15,7 +15,7 @@ class Slice
 
 	const double &operator[](size_t idx) { return start[stride * idx]; }
 };
-Slice getSlice(DomainSignature &d, int n, const vector_type &u, Side s)
+Slice getSlice(Domain &d, int n, const vector_type &u, Side s)
 {
 	auto  u_view = u.get1dView();
 	int   start  = d.id * n * n;
@@ -36,7 +36,7 @@ Slice getSlice(DomainSignature &d, int n, const vector_type &u, Side s)
 	}
 	return retval;
 }
-Slice getInnerSlice(DomainSignature &d, int n, const vector_type &u, Side s)
+Slice getInnerSlice(Domain &d, int n, const vector_type &u, Side s)
 {
 	auto  u_view = u.get1dView();
 	int   start  = d.id * n * n;
@@ -58,7 +58,7 @@ Slice getInnerSlice(DomainSignature &d, int n, const vector_type &u, Side s)
 	return retval;
 }
 QuadInterpolator::QuadInterpolator(int n) { this->n = n; }
-void QuadInterpolator::interpolate(DomainSignature &d, const vector_type &u, vector_type &interp)
+void QuadInterpolator::interpolate(Domain &d, const vector_type &u, vector_type &interp)
 {
 	Side s = Side::north;
 	do {
@@ -81,8 +81,8 @@ void QuadInterpolator::interpolate(DomainSignature &d, const vector_type &u, vec
 		s++;
 	} while (s != Side::north);
 }
-void QuadInterpolator::interpolate(DomainSignature &d, Side s, InterpCase icase,
-                                   const vector_type &u, vector_type &interp)
+void QuadInterpolator::interpolate(Domain &d, Side s, InterpCase icase, const vector_type &u,
+                                   vector_type &interp)
 {
 	auto interp_view = interp.get1dViewNonConst();
 	int  right       = -1;

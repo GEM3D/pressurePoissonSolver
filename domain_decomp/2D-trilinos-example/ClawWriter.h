@@ -1,15 +1,15 @@
 #ifndef CLAWWRITER_H
 #define CLAWWRITER_H
-#include "DomainSignatureCollection.h"
+#include "DomainCollection.h"
 #include "MyTypeDefs.h"
 class ClawWriter
 {
 	private:
-	DomainSignatureCollection dsc;
-	void writePatch(DomainSignature &d, std::ostream &os, vector_type &u, vector_type &resid);
+	DomainCollection dc;
+	void writePatch(Domain &d, std::ostream &os, vector_type &u, vector_type &resid);
 
 	public:
-	ClawWriter(DomainSignatureCollection &dsc);
+	ClawWriter(DomainCollection &dc);
 	void write(vector_type &u, vector_type &resid);
 };
 #endif

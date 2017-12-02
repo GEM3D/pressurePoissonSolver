@@ -6,7 +6,7 @@ void hstcrt_(double *a, double *b, int *m, int *mbdcnd, const double *bda, const
              double *elmbda, double *f, int *idimf, double *pertrb, int *ierror, double *w);
 }
 using namespace std;
-void FishpackPatchSolver::solve(DomainSignature &d, const vector_type &f, vector_type &u,
+void FishpackPatchSolver::solve(Domain &d, const vector_type &f, vector_type &u,
                                 const vector_type &gamma)
 {
 	auto             gamma_view = gamma.get1dView();

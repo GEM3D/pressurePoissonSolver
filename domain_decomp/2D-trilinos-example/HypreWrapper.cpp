@@ -4,7 +4,7 @@
 #include <set>
 #include <vector>
 using namespace std;
-HypreWrapper::HypreWrapper(Teuchos::RCP<matrix_type> A, const DomainSignatureCollection &dsc, int n,
+HypreWrapper::HypreWrapper(Teuchos::RCP<matrix_type> A, const DomainCollection &dsc, int n,
                            double tol)
 {
 	int ilower = A->getRowMap()->getMinGlobalIndex();
@@ -52,7 +52,7 @@ HypreWrapper::HypreWrapper(Teuchos::RCP<matrix_type> A, const DomainSignatureCol
 	HYPRE_BoomerAMGSetStrongThreshold(precond, .25);
 	HYPRE_BoomerAMGSetMaxRowSum(precond, 0.9);
 	HYPRE_BoomerAMGSetRelaxType(precond, 0);
-	HYPRE_BoomerAMGSetCycleRelaxType(precond, 0,3);
+	HYPRE_BoomerAMGSetCycleRelaxType(precond, 0, 3);
 	HYPRE_BoomerAMGSetCoarsenType(precond, 6);
 	HYPRE_BoomerAMGSetTol(precond, 0.0);
 	HYPRE_BoomerAMGSetPrintLevel(precond, 1);

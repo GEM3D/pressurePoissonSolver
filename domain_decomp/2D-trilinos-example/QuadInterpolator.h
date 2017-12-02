@@ -8,8 +8,8 @@ class QuadInterpolator : public Interpolator
 
 	public:
 	QuadInterpolator(int n);
-	void interpolate(DomainSignature &d, const vector_type &u, vector_type &interp);
-	void interpolate(DomainSignature &d, Side s, InterpCase icase, const vector_type &u,
+	void interpolate(Domain &d, const vector_type &u, vector_type &interp);
+	void interpolate(Domain &d, Side s, InterpCase icase, const vector_type &u,
 	                 vector_type &interp);
 };
 #endif

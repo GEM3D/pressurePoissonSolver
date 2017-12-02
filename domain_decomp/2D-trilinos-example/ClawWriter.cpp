@@ -1,14 +1,14 @@
 #include "ClawWriter.h"
 #include <fstream>
 using namespace std;
-ClawWriter::ClawWriter(DomainSignatureCollection &dsc) { this->dsc = dsc; }
+ClawWriter::ClawWriter(DomainCollection &dc) { this->dc = dc; }
 void ClawWriter::write(vector_type &u, vector_type &resid)
 {
 	ofstream     t_file("fort.t0000");
 	const string tab = "\t";
 	t_file << 0.0 << tab << "time" << endl;
 	t_file << 2 << tab << "meqn" << endl;
-	t_file << dsc.domains.size() << tab << "ngrids" << endl;
+	t_file << dc.domains.size() << tab << "ngrids" << endl;
 	t_file << 2 << tab << "num_aux" << endl;
 	t_file << 2 << tab << "num_dim" << endl;
 	t_file.close();
@@ -16,14 +16,13 @@ void ClawWriter::write(vector_type &u, vector_type &resid)
 
 	q_file.precision(10);
 	q_file << scientific;
-	for (auto &p : dsc.domains) {
-		DomainSignature &d = p.second;
+	for (auto &p : dc.domains) {
+		Domain &d = p.second;
 		writePatch(d, q_file, u, resid);
 	}
 	q_file.close();
 }
-void ClawWriter::writePatch(DomainSignature &d, std::ostream &os, vector_type &u,
-                            vector_type &resid)
+void ClawWriter::writePatch(Domain &d, std::ostream &os, vector_type &u, vector_type &resid)
 {
 	const string tab = "\t";
 	os << d.id << tab << "grid_number" << endl;

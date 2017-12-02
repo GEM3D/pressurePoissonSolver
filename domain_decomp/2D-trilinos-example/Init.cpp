@@ -1,12 +1,12 @@
 #include "Init.h"
 using namespace std;
-void Init::initNeumann(DomainSignatureCollection &dsc, int n, double *f_vec, double *exact_vec,
+void Init::initNeumann(DomainCollection &dc, int n, double *f_vec, double *exact_vec,
                        function<double(double, double)> ffun, function<double(double, double)> efun,
                        function<double(double, double)> nfunx,
                        function<double(double, double)> nfuny)
 {
-	for (auto &p : dsc.domains) {
-		DomainSignature &d = p.second;
+	for (auto &p : dc.domains) {
+		Domain &d = p.second;
 
 		// Generate RHS vector
 		double *f     = f_vec + d.id * n * n;
@@ -48,17 +48,18 @@ void Init::initNeumann(DomainSignatureCollection &dsc, int n, double *f_vec, dou
 		if (!d.hasNbr(Side::north)) {
 			for (int xi = 0; xi < n; xi++) {
 				double x = d.x_start + h_x / 2.0 + d.x_length * xi / n;
-				f[n * (n - 1) + xi] -= nfuny(x, d.y_start+d.y_length) / h_y;
+				f[n * (n - 1) + xi] -= nfuny(x, d.y_start + d.y_length) / h_y;
 			}
 		}
 	}
 }
-void Init::initDirichlet(DomainSignatureCollection &dsc, int n, double *f_vec, double *exact_vec,
-                       function<double(double, double)> ffun, function<double(double, double)> efun)
+void Init::initDirichlet(DomainCollection &dc, int n, double *f_vec, double *exact_vec,
+                         function<double(double, double)> ffun,
+                         function<double(double, double)> efun)
 {
-    n = dsc.n;
-	for (auto &p : dsc.domains) {
-		DomainSignature &d = p.second;
+	n = dc.n;
+	for (auto &p : dc.domains) {
+		Domain &d = p.second;
 
 		// Generate RHS vector
 		double *f     = f_vec + d.id * n * n;
@@ -79,28 +80,28 @@ void Init::initDirichlet(DomainSignatureCollection &dsc, int n, double *f_vec, d
 		if (!d.hasNbr(Side::west)) {
 			for (int yi = 0; yi < n; yi++) {
 				double y = d.y_start + h_y / 2.0 + d.y_length * yi / n;
-				f[yi * n] -= efun(d.x_start, y)*2 / (h_x*h_x);
+				f[yi * n] -= efun(d.x_start, y) * 2 / (h_x * h_x);
 			}
 		}
 		// east
 		if (!d.hasNbr(Side::east)) {
 			for (int yi = 0; yi < n; yi++) {
 				double y = d.y_start + h_y / 2.0 + d.y_length * yi / n;
-				f[yi * n + n - 1] -= efun(d.x_start + d.x_length, y) *2 / (h_x*h_x);
+				f[yi * n + n - 1] -= efun(d.x_start + d.x_length, y) * 2 / (h_x * h_x);
 			}
 		}
 		// south
 		if (!d.hasNbr(Side::south)) {
 			for (int xi = 0; xi < n; xi++) {
 				double x = d.x_start + h_x / 2.0 + d.x_length * xi / n;
-				f[xi] -= efun(x, d.y_start)*2 / (h_y*h_y);
+				f[xi] -= efun(x, d.y_start) * 2 / (h_y * h_y);
 			}
 		}
 		// north
 		if (!d.hasNbr(Side::north)) {
 			for (int xi = 0; xi < n; xi++) {
 				double x = d.x_start + h_x / 2.0 + d.x_length * xi / n;
-				f[n * (n - 1) + xi] -= efun(x, d.y_start+d.y_length)*2 / (h_y*h_y);
+				f[n * (n - 1) + xi] -= efun(x, d.y_start + d.y_length) * 2 / (h_y * h_y);
 			}
 		}
 	}

@@ -4,9 +4,9 @@
 #include <BelosLinearProblem.hpp>
 #include <BelosTpetraAdapter.hpp>
 #include <Teuchos_RCP.hpp>
-#include <valarray>
-#include <map>
 #include <iostream>
+#include <map>
+#include <valarray>
 class Block
 {
 	public:
@@ -40,7 +40,7 @@ class Block
 };
 class RBMatrix : public Tpetra::Operator<scalar_type>
 {
-    private:
+	private:
 	Teuchos::RCP<map_type>         domain;
 	Teuchos::RCP<map_type>         range;
 	Teuchos::RCP<Tpetra::Export<>> exporter;
@@ -53,13 +53,13 @@ class RBMatrix : public Tpetra::Operator<scalar_type>
 
 	std::map<std::pair<Block, Block>, Block> combos;
 
-	int block_size;
-	int num_blocks;
-    int nz = 0;
+	int  block_size;
+	int  num_blocks;
+	int  nz     = 0;
 	bool zero_u = false;
 
 	public:
-	int                                skip_index = -1;
+	int skip_index = -1;
 
 	RBMatrix(Teuchos::RCP<map_type> map, int block_size, int num_blocks);
 
@@ -74,9 +74,9 @@ class RBMatrix : public Tpetra::Operator<scalar_type>
 	Teuchos::RCP<RBMatrix>              invBlockDiag();
 	Teuchos::RCP<RBMatrix>              invBlockDiagR();
 	Teuchos::RCP<std::valarray<double>> blkCopy(Block in);
-	Teuchos::RCP<std::valarray<double>> getBlock(int i,int j);
-	int  getNumBlocks() { return num_blocks; }
-	int  getBlockSize() { return block_size; }
+	Teuchos::RCP<std::valarray<double>> getBlock(int i, int j);
+	int                  getNumBlocks() { return num_blocks; }
+	int                  getBlockSize() { return block_size; }
 	friend std::ostream &operator<<(std::ostream &os, const RBMatrix &A);
 };
 

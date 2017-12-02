@@ -1,6 +1,6 @@
 #include "DomainCollection.h"
-#include "DomainSignatureCollection.h"
 #include "Factory.h"
+#include "SchurHelper.h"
 //#include "FunctionWrapper.h"
 #include "ClawWriter.h"
 #include "FftwPatchSolver.h"
@@ -183,42 +183,42 @@ int main(int argc, char *argv[])
 
 	bool direct_solve = (f_lu || f_superlu || f_mumps || f_basker);
 
-	DomainSignatureCollection dsc;
+	DomainCollection dc;
 	if (f_mesh) {
 		string d = args::get(f_mesh);
-		dsc      = DomainSignatureCollection(comm, d, comm->getRank());
+		dc       = DomainCollection(comm, d, comm->getRank());
 	} else if (f_amr) {
 		int d = args::get(f_amr);
-		dsc   = DomainSignatureCollection(comm, d, d, comm->getRank(), true);
+		dc    = DomainCollection(comm, d, d, comm->getRank(), true);
 	} else {
 		int d = args::get(f_square);
-		dsc   = DomainSignatureCollection(comm, d, d, comm->getRank());
+		dc    = DomainCollection(comm, d, d, comm->getRank());
 	}
 	if (f_div) {
 		for (int i = 0; i < args::get(f_div); i++) {
-			dsc.divide();
+			dc.divide();
 		}
 	}
 	if (f_neumann) {
-		dsc.setNeumann();
+		dc.setNeumann();
 	}
 	// Set the number of discretization points in the x and y direction.
 	int nx = args::get(f_n);
 	int ny = args::get(f_n);
-	dsc.n  = nx;
-	for (auto &p : dsc.domains) {
+	dc.n   = nx;
+	for (auto &p : dc.domains) {
 		p.second.n = nx;
 	}
-	int total_cells = dsc.num_global_domains * nx * ny;
+	int total_cells = dc.num_global_domains * nx * ny;
 	cerr << "Total cells: " << total_cells << endl;
 
-	if (dsc.num_global_domains < num_procs) {
+	if (dc.num_global_domains < num_procs) {
 		std::cerr << "number of domains must be greater than or equal to the number of processes\n";
 		return 1;
 	}
 	// partition domains
 	if (num_procs > 1) {
-		dsc.zoltanBalance();
+		dc.zoltanBalance();
 	}
 
 	scalar_type tol = 1e-12;
@@ -300,18 +300,18 @@ int main(int argc, char *argv[])
 	if (f_fish) {
 		psolver = rcp(new FishpackPatchSolver());
 	} else {
-		psolver = rcp(new FftwPatchSolver(dsc));
+		psolver = rcp(new FftwPatchSolver(dc));
 	}
 	Tools::Timer timer;
 	for (int loop = 0; loop < loop_count; loop++) {
 		timer.start("Domain Initialization");
 
-		DomainCollection dc(dsc, comm);
-		dc.setPatchSolver(psolver);
-		dc.interpolator = rcp(new QuadInterpolator(nx));
-		dc.op           = rcp(new FivePtPatchOperator());
+		SchurHelper sch(dc, comm);
+		sch.setPatchSolver(psolver);
+		sch.interpolator = rcp(new QuadInterpolator(nx));
+		sch.op           = rcp(new FivePtPatchOperator());
 
-		RCP<map_type>    domain_map = dsc.getDomainRowMap();
+		RCP<map_type>    domain_map = dc.getDomainRowMap();
 		RCP<vector_type> u          = rcp(new vector_type(domain_map, 1));
 		RCP<vector_type> exact      = rcp(new vector_type(domain_map, 1));
 		RCP<vector_type> f          = rcp(new vector_type(domain_map, 1));
@@ -319,17 +319,17 @@ int main(int argc, char *argv[])
 		if (f_neumann) {
 			double *f_ptr     = &f->get1dViewNonConst()[0];
 			double *exact_ptr = &exact->get1dViewNonConst()[0];
-			Init::initNeumann(dsc, nx, f_ptr, exact_ptr, ffun, gfun, nfunx, nfuny);
+			Init::initNeumann(dc, nx, f_ptr, exact_ptr, ffun, gfun, nfunx, nfuny);
 		} else {
 			double *f_ptr     = &f->get1dViewNonConst()[0];
 			double *exact_ptr = &exact->get1dViewNonConst()[0];
-			Init::initDirichlet(dsc, nx, f_ptr, exact_ptr, ffun, gfun);
+			Init::initDirichlet(dc, nx, f_ptr, exact_ptr, ffun, gfun);
 		}
 
 		timer.stop("Domain Initialization");
 
 		// Create a map that will be used in the iterative solver
-		RCP<map_type>       matrix_map       = dsc.getSchurRowMap();
+		RCP<map_type>       matrix_map       = dc.getSchurRowMap();
 		RCP<const map_type> matrix_map_const = matrix_map;
 
 		// Create the gamma and diff vectors
@@ -353,7 +353,7 @@ int main(int argc, char *argv[])
 		typedef Ifpack2::Preconditioner<scalar_type> Preconditioner;
 		RCP<Preconditioner>                          prec;
 		if (f_neumann && !f_nozerof) {
-			double fdiff = (dc.integrate(*f)) / dc.area();
+			double fdiff = (sch.integrate(*f)) / sch.area();
 			if (my_global_rank == 0) cout << "Fdiff: " << fdiff << endl;
 
 			RCP<vector_type> diff = rcp(new vector_type(domain_map, 1));
@@ -361,11 +361,11 @@ int main(int argc, char *argv[])
 			f->update(1.0, *diff, 1.0);
 		}
 		steady_clock::time_point tsolve_start;
-		if (dsc.num_global_domains != 1) {
+		if (dc.num_global_domains != 1) {
 			// do iterative solve
 
 			// Get the b vector
-			dc.solveWithInterface(*f, *u, *gamma, *b);
+			sch.solveWithInterface(*f, *u, *gamma, *b);
 			b->scale(-1.0);
 
 			if (save_rhs_file != "") {
@@ -383,7 +383,7 @@ int main(int argc, char *argv[])
 			} else {
 				timer.start("Matrix Formation");
 
-				dc.formCRSMatrix(matrix_map, A);
+				sch.formCRSMatrix(matrix_map, A);
 
 				timer.stop("Matrix Formation");
 
@@ -406,11 +406,11 @@ int main(int argc, char *argv[])
 #endif
 			if (f_amgx) {
 #ifdef ENABLE_AMGX
-				amgxsolver = rcp(new AmgxWrapper(A, dsc, nx));
+				amgxsolver = rcp(new AmgxWrapper(A, dc, nx));
 #endif
 			} else if (f_hypre) {
 #ifdef ENABLE_HYPRE
-				hypresolver = rcp(new HypreWrapper(A, dsc, nx, tol));
+				hypresolver = rcp(new HypreWrapper(A, dc, nx, tol));
 #endif
 			} else {
 				if (f_precmuelu) {
@@ -592,14 +592,14 @@ int main(int argc, char *argv[])
 		// Do one last solve
 		timer.start("Patch Solve");
 
-		dc.solveWithInterface(*f, *u, *gamma, *diff);
+		sch.solveWithInterface(*f, *u, *gamma, *diff);
 
 		timer.stop("Patch Solve");
 
 		/*
-		double ausum2 = dc.integrateAU();
-		double fsum2  = dc.integrateF();
-		double bflux  = dc.integrateBoundaryFlux();
+		double ausum2 = sch.integrateAU();
+		double fsum2  = sch.integrateF();
+		double bflux  = sch.integrateBoundaryFlux();
 		if (my_global_rank == 0) {
 		    std::cout << u8"Σf-Au: " << fsum2 - ausum2 << endl;
 		    std::cout << u8"Σf: " << fsum2 << endl;
@@ -614,12 +614,12 @@ int main(int argc, char *argv[])
 		/*
 		if (f_iter && !direct_solve) {
 		    timer.start("Iterative Refinement Step");
-		    dc.residual();
-		    dc.swapResidSol();
+		    sch.residual();
+		    sch.swapResidSol();
 
-		    if (dsc.num_global_domains != 1) {
+		    if (dc.num_global_domains != 1) {
 		        x->putScalar(0);
-		        dc.solveWithInterface(*x, *r);
+		        sch.solveWithInterface(*x, *r);
 		        // op->apply(*gamma, *r);
 		        // r->update(1.0, *b, -1.0);
 
@@ -631,8 +631,8 @@ int main(int argc, char *argv[])
 		        solver->setProblem(problem);
 		        solver->solve();
 		    }
-		    dc.solveWithInterface(*x, *d);
-		    dc.sumResidIntoSol();
+		    sch.solveWithInterface(*x, *d);
+		    sch.sumResidIntoSol();
 		    timer.stop("Iterative Refinement Step");
 		}
 		*/
@@ -645,7 +645,7 @@ int main(int argc, char *argv[])
 		// residual
 		RCP<vector_type> resid = rcp(new vector_type(domain_map, 1));
 		RCP<vector_type> au    = rcp(new vector_type(domain_map, 1));
-		dc.applyWithInterface(*u, *gamma, *au);
+		sch.applyWithInterface(*u, *gamma, *au);
 		resid->update(-1.0, *f, 1.0, *au, 0.0);
 		double residual = resid->getVector(0)->norm2();
 		double fnorm    = f->getVector(0)->norm2();
@@ -654,8 +654,8 @@ int main(int argc, char *argv[])
 		RCP<vector_type> error = rcp(new vector_type(domain_map, 1));
 		error->update(-1.0, *exact, 1.0, *u, 0.0);
 		if (f_neumann) {
-			double uavg = dc.integrate(*u) / dc.area();
-			double eavg = dc.integrate(*exact) / dc.area();
+			double uavg = sch.integrate(*u) / sch.area();
+			double eavg = sch.integrate(*exact) / sch.area();
 
 			if (my_global_rank == 0) {
 				cout << "Average of computed solution: " << uavg << endl;
@@ -669,8 +669,8 @@ int main(int argc, char *argv[])
 		double error_norm = error->getVector(0)->norm2();
 		double exact_norm = exact->getVector(0)->norm2();
 
-		double ausum = dc.integrate(*au);
-		double fsum  = dc.integrate(*f);
+		double ausum = sch.integrate(*au);
+		double fsum  = sch.integrate(*f);
 		if (my_global_rank == 0) {
 			std::cout << std::scientific;
 			std::cout.precision(13);
@@ -679,7 +679,7 @@ int main(int argc, char *argv[])
 			std::cout << u8"ΣAu-Σf: " << ausum - fsum << endl;
 			cout.unsetf(std::ios_base::floatfield);
 		}
-		MMWriter mmwriter(dsc, f_amr);
+		MMWriter mmwriter(dc, f_amr);
 		if (save_solution_file != "") {
 			mmwriter.write(*u, save_solution_file);
 		}
@@ -694,12 +694,12 @@ int main(int argc, char *argv[])
 			                                                          "");
 		}
 		if (f_outclaw) {
-			ClawWriter writer(dsc);
+			ClawWriter writer(dc);
 			writer.write(*u, *resid);
 		}
 #ifdef HAVE_VTK
 		if (f_outvtk) {
-			VtkWriter writer(dsc);
+			VtkWriter writer(dc);
 			writer.write(*u, *error, *resid);
 		}
 #endif

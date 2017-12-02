@@ -1,6 +1,6 @@
 #ifndef AMGXWRAPPER_H
 #define AMGXWRAPPER_H
-#include "DomainSignatureCollection.h"
+#include "DomainCollection.h"
 #include "MyTypeDefs.h"
 #include "amgx_c.h"
 class AmgxWrapper
@@ -25,7 +25,7 @@ class AmgxWrapper
 	int               num_cols;
 
 	public:
-	AmgxWrapper(Teuchos::RCP<matrix_type> A, const DomainSignatureCollection &dsc, int n);
+	AmgxWrapper(Teuchos::RCP<matrix_type> A, const DomainCollection &dc, int n);
 	~AmgxWrapper();
 	void solve(Teuchos::RCP<vector_type> x, Teuchos::RCP<vector_type> b);
 };

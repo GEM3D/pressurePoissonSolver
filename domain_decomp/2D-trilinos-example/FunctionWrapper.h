@@ -15,9 +15,7 @@ class FuncWrap : public Tpetra::Operator<scalar_type>
 		this->b  = b;
 		this->dc = dc;
 	}
-    void setB(Teuchos::RCP<vector_type> b){
-		this->b  = b;
-    }
+	void setB(Teuchos::RCP<vector_type> b) { this->b = b; }
 	void apply(const vector_type &x, vector_type &y, Teuchos::ETransp mode = Teuchos::NO_TRANS,
 	           scalar_type alpha = Teuchos::ScalarTraits<scalar_type>::one(),
 	           scalar_type beta  = Teuchos::ScalarTraits<scalar_type>::zero()) const

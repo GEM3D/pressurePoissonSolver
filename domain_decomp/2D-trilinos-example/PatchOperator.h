@@ -1,12 +1,11 @@
 #ifndef PATCHOPERATOR_H
 #define PATCHOPERATOR_H
-#include "DomainSignatureCollection.h"
+#include "Domain.h"
 class PatchOperator
 {
 	public:
 	virtual ~PatchOperator() {}
-	virtual void apply(DomainSignature &d, const vector_type &u, const vector_type &gamma,
-	                   vector_type &f)
+	virtual void apply(Domain &d, const vector_type &u, const vector_type &gamma, vector_type &f)
 	= 0;
 };
 #endif

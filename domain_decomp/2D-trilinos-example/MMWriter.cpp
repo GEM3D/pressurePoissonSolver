@@ -1,24 +1,24 @@
 #include "MMWriter.h"
 #include <fstream>
 using namespace std;
-MMWriter::MMWriter(DomainSignatureCollection &dsc, bool amr)
+MMWriter::MMWriter(DomainCollection &dc, bool amr)
 {
 	this->amr = amr;
-	this->dsc = dsc;
+	this->dc  = dc;
 }
 void MMWriter::write(const vector_type &u, string filename)
 {
-	int      n = dsc.n;
+	int      n = dc.n;
 	ofstream os(filename);
 	int      num_i, num_j, d_x;
 	if (amr) {
-		num_i = n * sqrt(dsc.domains.size() / 5);
-		num_j = n * sqrt(dsc.domains.size() / 5);
-		d_x   = sqrt(dsc.domains.size() / 5);
+		num_i = n * sqrt(dc.domains.size() / 5);
+		num_j = n * sqrt(dc.domains.size() / 5);
+		d_x   = sqrt(dc.domains.size() / 5);
 	} else {
-		num_i = n * sqrt(dsc.domains.size());
-		num_j = n * sqrt(dsc.domains.size());
-		d_x   = sqrt(dsc.domains.size());
+		num_i = n * sqrt(dc.domains.size());
+		num_j = n * sqrt(dc.domains.size());
+		d_x   = sqrt(dc.domains.size());
 	}
 	os << "%%MatrixMarket matrix array real general\n";
 	os << num_i << ' ' << num_j << '\n';
@@ -38,9 +38,9 @@ void MMWriter::write(const vector_type &u, string filename)
 	os.close();
 	if (amr) {
 		ofstream os(filename + ".amr");
-		int      num_i = 2 * n * sqrt(dsc.domains.size() / 5);
-		int      num_j = 2 * n * sqrt(dsc.domains.size() / 5);
-		int      d_x   = 2 * sqrt(dsc.domains.size() / 5);
+		int      num_i = 2 * n * sqrt(dc.domains.size() / 5);
+		int      num_j = 2 * n * sqrt(dc.domains.size() / 5);
+		int      d_x   = 2 * sqrt(dc.domains.size() / 5);
 		os << "%%MatrixMarket matrix array real general\n";
 		os << num_i << ' ' << num_j << '\n';
 		os.precision(15);

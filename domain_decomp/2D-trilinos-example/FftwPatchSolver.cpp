@@ -1,14 +1,14 @@
 #include "FftwPatchSolver.h"
 using namespace std;
 
-FftwPatchSolver::FftwPatchSolver(DomainSignatureCollection &dsc)
+FftwPatchSolver::FftwPatchSolver(DomainCollection &dc)
 {
-	n = dsc.n;
-	for (auto &p : dsc.domains) {
+	n = dc.n;
+	for (auto &p : dc.domains) {
 		addDomain(p.second);
 	}
 }
-void FftwPatchSolver::addDomain(DomainSignature &d)
+void FftwPatchSolver::addDomain(Domain &d)
 {
 	if (!initialized) {
 		initialized = true;
@@ -119,7 +119,7 @@ FftwPatchSolver::~FftwPatchSolver()
 		fftw_destroy_plan(p.second);
 	}
 }
-void FftwPatchSolver::solve(DomainSignature &d, const vector_type &f, vector_type &u,
+void FftwPatchSolver::solve(Domain &d, const vector_type &f, vector_type &u,
                             const vector_type &gamma)
 {
 	double h_x = d.x_length / n;

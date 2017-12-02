@@ -1,5 +1,6 @@
 #ifndef FFTWPATCHSOLVER_H
 #define FFTWPATCHSOLVER_H
+#include "DomainCollection.h"
 #include "PatchSolver.h"
 #include <bitset>
 #include <fftw3.h>
@@ -11,7 +12,7 @@ struct DomainK {
 	double h_y     = 0;
 
 	DomainK() {}
-	DomainK(const DomainSignature &d)
+	DomainK(const Domain &d)
 	{
 		this->neumann = d.neumann.to_ulong();
 		this->h_x     = d.x_length;
@@ -37,10 +38,10 @@ class FftwPatchSolver : public PatchSolver
 	std::map<DomainK, std::valarray<double>> denoms;
 
 	public:
-	FftwPatchSolver(DomainSignatureCollection &dsc);
+	FftwPatchSolver(DomainCollection &dsc);
 	~FftwPatchSolver();
-	void solve(DomainSignature &d, const vector_type &f, vector_type &u, const vector_type &gamma);
-	void solve(DomainSignature &d, const vector_type &f, vector_type u, const vector_type &gamma);
-	void addDomain(DomainSignature &d);
+	void solve(Domain &d, const vector_type &f, vector_type &u, const vector_type &gamma);
+	void solve(Domain &d, const vector_type &f, vector_type u, const vector_type &gamma);
+	void addDomain(Domain &d);
 };
 #endif

@@ -138,8 +138,8 @@ link_directories(${VTK_LIBRARY_DIRS})
 # file(s) to use to build the executable.
 #
 add_executable(heat heat.cpp)
+add_library(SchurHelper SchurHelper.cpp)
 add_library(DomainCollection DomainCollection.cpp)
-add_library(DomainSignatureCollection DomainSignatureCollection.cpp)
 add_library(FftwPatchSolver FftwPatchSolver.cpp)
 add_library(FishpackPatchSolver FishpackPatchSolver.cpp)
 add_library(Factory Factory.cpp)
@@ -157,8 +157,8 @@ add_library(ClawWriter ClawWriter.cpp)
 # (TPLs) with which Trilinos was built.
 #
 target_link_libraries(heat
+    SchurHelper
     DomainCollection
-    DomainSignatureCollection
     Factory
     Init
     FftwPatchSolver
@@ -172,12 +172,12 @@ target_link_libraries(heat
   ${MPI_CXX_LIBRARIES} 
 )
 target_link_libraries(MMWriter
-    DomainSignatureCollection
+    DomainCollection
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
     )
 target_link_libraries(ClawWriter
-    DomainSignatureCollection
+    DomainCollection
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
     )
@@ -187,7 +187,7 @@ target_link_libraries(heat
     )
 add_library(VtkWriter VtkWriter.cpp)
 target_link_libraries(VtkWriter
-    DomainSignatureCollection
+    DomainCollection
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
   ${MPI_CXX_LIBRARIES} 
@@ -219,7 +219,7 @@ target_link_libraries(Factory
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
 )
-target_link_libraries(DomainCollection
+target_link_libraries(SchurHelper
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
   ${FFTW_LIB}
@@ -231,7 +231,7 @@ target_link_libraries(FftwPatchSolver
 target_link_libraries(FishpackPatchSolver
     Fishpack
 )
-target_link_libraries(DomainSignatureCollection
+target_link_libraries(DomainCollection
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
 )

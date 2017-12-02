@@ -9,7 +9,7 @@
 #include <vtkXMLPMultiBlockDataWriter.h>
 
 using namespace std;
-VtkWriter::VtkWriter(DomainSignatureCollection &dsc) { this->dsc = dsc; }
+VtkWriter::VtkWriter(DomainCollection &dc) { this->dc = dc; }
 void VtkWriter::write(vector_type &u, vector_type &error, vector_type &resid)
 {
 	int rank, size;
@@ -24,19 +24,19 @@ void VtkWriter::write(vector_type &u, vector_type &error, vector_type &resid)
 	vtkSmartPointer<vtkMultiBlockDataSet> block = vtkSmartPointer<vtkMultiBlockDataSet>::New();
 	vtkSmartPointer<vtkMultiPieceDataSet> data  = vtkSmartPointer<vtkMultiPieceDataSet>::New();
 
-	data->SetNumberOfPieces(dsc.domains.size());
+	data->SetNumberOfPieces(dc.domains.size());
 
 	auto u_view     = u.get1dView();
 	auto error_view = error.get1dView();
 	auto resid_view = resid.get1dView();
 
 	int i = 0;
-	for (auto &p : dsc.domains) {
-		DomainSignature &d     = p.second;
-		int              n     = d.n;
-		double           h_x   = d.x_length / n;
-		double           h_y   = d.y_length / n;
-		int              start = d.id * n * n;
+	for (auto &p : dc.domains) {
+		Domain &d     = p.second;
+		int     n     = d.n;
+		double  h_x   = d.x_length / n;
+		double  h_y   = d.y_length / n;
+		int     start = d.id * n * n;
 
 		// create image object
 		vtkSmartPointer<vtkImageData> image = vtkSmartPointer<vtkImageData>::New();

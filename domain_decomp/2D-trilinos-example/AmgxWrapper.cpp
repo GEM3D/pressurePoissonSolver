@@ -15,7 +15,7 @@ struct AmgxCrs {
 	double *             diag_data = nullptr;
 };
 
-AmgxWrapper::AmgxWrapper(Teuchos::RCP<matrix_type> A, const DomainSignatureCollection &dsc, int n)
+AmgxWrapper::AmgxWrapper(Teuchos::RCP<matrix_type> A, const DomainCollection &dc, int n)
 {
 	AmgxCrs Acrs;
 	Acrs.nnz = A->getNodeNumEntries();
@@ -54,9 +54,9 @@ AmgxWrapper::AmgxWrapper(Teuchos::RCP<matrix_type> A, const DomainSignatureColle
 	AMGX_SAFE_CALL(AMGX_config_add_parameters(&cfg, "exception_handling=1"));
 	MPI_Comm AMGX_MPI_Comm = MPI_COMM_WORLD;
 	// app must know how to provide a mapping
-	//int devices[]   = {/*get_device_id_for_this_rank()*/ 0};
-	//int num_devices = 1;
-	int rank        = 0; // dsc.comm->getRank()%2;
+	// int devices[]   = {/*get_device_id_for_this_rank()*/ 0};
+	// int num_devices = 1;
+	int rank = 0; // dc.comm->getRank()%2;
 	AMGX_resources_create(&rsrc, cfg, &AMGX_MPI_Comm, 1, &rank);
 	AMGX_matrix_create(&gA, rsrc, mode);
 	AMGX_vector_create(&gx, rsrc, mode);
@@ -83,8 +83,8 @@ AmgxWrapper::~AmgxWrapper()
 	AMGX_vector_destroy(gb);
 	AMGX_resources_destroy(rsrc);
 	AMGX_config_destroy(cfg);
-    AMGX_finalize_plugins();
-    AMGX_finalize();
+	AMGX_finalize_plugins();
+	AMGX_finalize();
 }
 void AmgxWrapper::solve(Teuchos::RCP<vector_type> x, Teuchos::RCP<vector_type> b)
 {

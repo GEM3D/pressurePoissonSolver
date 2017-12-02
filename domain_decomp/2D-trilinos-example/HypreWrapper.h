@@ -1,6 +1,6 @@
 #ifndef HYPREWRAPPER_H
 #define HYPREWRAPPER_H
-#include "DomainSignatureCollection.h"
+#include "DomainCollection.h"
 #include "MyTypeDefs.h"
 #include <HYPRE.h>
 #include <HYPRE_IJ_mv.h>
@@ -23,8 +23,7 @@ class HypreWrapper
 	int num_cols;
 
 	public:
-	HypreWrapper(Teuchos::RCP<matrix_type> A, const DomainSignatureCollection &dsc, int n,
-	             double tol);
+	HypreWrapper(Teuchos::RCP<matrix_type> A, const DomainCollection &dsc, int n, double tol);
 	~HypreWrapper();
 	void solve(Teuchos::RCP<vector_type> x, Teuchos::RCP<vector_type> b);
 };
