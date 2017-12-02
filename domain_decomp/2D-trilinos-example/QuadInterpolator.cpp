@@ -18,7 +18,7 @@ class Slice
 Slice getSlice(Domain &d, int n, const vector_type &u, Side s)
 {
 	auto  u_view = u.get1dView();
-	int   start  = d.id * n * n;
+	int   start  = d.id_local * n * n;
 	Slice retval;
 	switch (s) {
 		case Side::north:
@@ -39,7 +39,7 @@ Slice getSlice(Domain &d, int n, const vector_type &u, Side s)
 Slice getInnerSlice(Domain &d, int n, const vector_type &u, Side s)
 {
 	auto  u_view = u.get1dView();
-	int   start  = d.id * n * n;
+	int   start  = d.id_local * n * n;
 	Slice retval;
 	switch (s) {
 		case Side::north:

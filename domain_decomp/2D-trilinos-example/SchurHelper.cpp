@@ -56,15 +56,13 @@ double SchurHelper::integrate(const vector_type &u)
 
 	for (auto &p : dc.domains) {
 		Domain &d     = p.second;
-		int     start = d.n * d.n * d.id;
+		int     start = d.n * d.n * d.id_local;
 
 		double patch_sum = 0;
 		for (int i = 0; i < d.n * d.n; i++) {
 			patch_sum += u_view[start + i];
 		}
 
-		double h_x = d.x_length / d.n;
-		double h_y = d.y_length / d.n;
 		patch_sum *= d.x_length * d.y_length / (d.n * d.n);
 
 		sum += patch_sum;
@@ -139,6 +137,7 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 		Domain ds;
 		ds.n               = n;
 		ds.id              = 0;
+		ds.id_local        = 0;
 		ds.x_length        = n;
 		ds.y_length        = n;
 		ds.nbr_id[0]       = 1;

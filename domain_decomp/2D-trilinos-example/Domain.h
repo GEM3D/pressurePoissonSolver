@@ -19,6 +19,7 @@ struct Domain {
 	int refine_level = 1;
 
 	std::array<int, 8> nbr_id           = {{-1, -1, -1, -1, -1, -1, -1, -1}};
+	std::array<int, 8> nbr_id_local     = {{-1, -1, -1, -1, -1, -1, -1, -1}};
 	std::array<int, 8> proc             = {{-1, -1, -1, -1, -1, -1, -1, -1}};
 	std::array<int, 4> g_id             = {{-1, -1, -1, -1}};
 	std::array<int, 4> g_id_center      = {{-1, -1, -1, -1}};
@@ -94,6 +95,15 @@ struct Domain {
 			}
 		} catch (std::out_of_range oor) {
 			// do nothing
+		}
+	}
+	void setLocalNeighborIndexes(std::map<int, int> &rev_map)
+	{
+		id_local = rev_map.at(id);
+		for (int i = 0; i < 8; i++) {
+			if (nbr_id[i] != -1) {
+				nbr_id_local[i] = rev_map.at(nbr_id[i]);
+			}
 		}
 	}
 	void setGlobalIndexes(std::map<int, int> &rev_map)

@@ -57,7 +57,7 @@ void FishpackPatchSolver::solve(Domain &d, const vector_type &f, vector_type &u,
 		bdd = &gamma_view[d.index(Side::north) * d.n];
 	}
 
-	int     start  = d.id * d.n * d.n;
+	int     start  = d.id_local * d.n * d.n;
 	double  elmbda = 0;
 	double *f_ptr  = &u_view[start];
 	for (int i = 0; i < m * n; i++) {

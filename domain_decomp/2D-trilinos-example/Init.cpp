@@ -9,8 +9,8 @@ void Init::initNeumann(DomainCollection &dc, int n, double *f_vec, double *exact
 		Domain &d = p.second;
 
 		// Generate RHS vector
-		double *f     = f_vec + d.id * n * n;
-		double *exact = exact_vec + d.id * n * n;
+		double *f     = f_vec + d.id_local * n * n;
+		double *exact = exact_vec + d.id_local * n * n;
 
 		double h_x = d.x_length / n;
 		double h_y = d.y_length / n;
@@ -62,8 +62,8 @@ void Init::initDirichlet(DomainCollection &dc, int n, double *f_vec, double *exa
 		Domain &d = p.second;
 
 		// Generate RHS vector
-		double *f     = f_vec + d.id * n * n;
-		double *exact = exact_vec + d.id * n * n;
+		double *f     = f_vec + d.id_local * n * n;
+		double *exact = exact_vec + d.id_local * n * n;
 
 		double h_x = d.x_length / n;
 		double h_y = d.y_length / n;

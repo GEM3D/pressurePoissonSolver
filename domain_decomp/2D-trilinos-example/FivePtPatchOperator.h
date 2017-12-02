@@ -9,7 +9,7 @@ class FivePtPatchOperator : public PatchOperator
 		int           n              = d.n;
 		double        h_x            = d.x_length / n;
 		double        h_y            = d.y_length / n;
-		int           start          = n * n * d.id;
+		int           start          = n * n * d.id_local;
 		auto          u_ptr          = &(u.get1dView()[start]);
 		auto          f_ptr          = &(f.get1dViewNonConst()[start]);
 		auto          gamma_view     = gamma.get1dView();

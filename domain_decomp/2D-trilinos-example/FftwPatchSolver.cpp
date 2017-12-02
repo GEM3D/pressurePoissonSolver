@@ -128,7 +128,7 @@ void FftwPatchSolver::solve(Domain &d, const vector_type &f, vector_type &u,
 	auto f_view     = f.get1dView();
 	auto gamma_view = gamma.get1dView();
 
-	int start = d.id * n * n;
+	int start = d.id_local * n * n;
 	for (int i = 0; i < n * n; i++) {
 		f_copy[i] = f_view[start + i];
 	}

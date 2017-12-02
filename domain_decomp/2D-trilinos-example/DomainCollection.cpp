@@ -790,6 +790,7 @@ void DomainCollection::zoltanBalance()
 {
 	zoltanBalanceDomains();
 	indexDomainIfacesLocal();
+	indexDomainsLocal();
 	zoltanBalanceIfaces();
 	indexIfacesLocal();
 }
@@ -1048,7 +1049,6 @@ void DomainCollection::indexIfacesLocal()
 	map<int, set<int>> proc_recv;
 	// map off proc
 	for (int i : off_proc_map_vec) {
-		// TODO map in increasing order of neighboring proc
 		rev_map[i] = curr_i;
 		curr_i++;
 	}
@@ -1065,7 +1065,7 @@ void DomainCollection::indexDomainsLocal()
 	vector<int> map_vec;
 	vector<int> off_proc_map_vec;
 	map<int, int> rev_map;
-	if (!ifaces.empty()) {
+	if (!domains.empty()) {
 		set<int> todo;
 		for (auto &p : domains) {
 			todo.insert(p.first);
@@ -1075,7 +1075,6 @@ void DomainCollection::indexDomainsLocal()
 			set<int>   enqueued;
 			queue.push_back(*todo.begin());
 			enqueued.insert(*todo.begin());
-			deque<int> off_proc_ifaces;
 			while (!queue.empty()) {
 				int i = queue.front();
 				todo.erase(i);
@@ -1089,7 +1088,7 @@ void DomainCollection::indexDomainsLocal()
 					if (i != -1) {
 						if (!enqueued.count(i)) {
 							enqueued.insert(i);
-							if (ifaces.count(i)) {
+							if (domains.count(i)) {
 								queue.push_back(i);
 							} else {
 								off_proc_map_vec.push_back(i);
@@ -1100,15 +1099,13 @@ void DomainCollection::indexDomainsLocal()
 			}
 		}
 	}
-	map<int, set<int>> proc_recv;
 	// map off proc
 	for (int i : off_proc_map_vec) {
-		// TODO map in increasing order of neighboring proc
 		rev_map[i] = curr_i;
 		curr_i++;
 	}
-	for (auto &p : ifaces) {
-		//		p.second.setLocalIndexes(rev_map);
+	for (auto &p : domains) {
+		p.second.setLocalNeighborIndexes(rev_map);
 	}
 	// domain_rev_map          = rev_map;
 	domain_map_vec = map_vec;
