@@ -345,9 +345,11 @@ int main(int argc, char *argv[])
 		///////////////////
 		timer.start("Linear System Setup");
 
+		timer.start("Matrix Assembly");
 		A  = sch.formCRSMatrix();
 		op = A;
 		rm = A;
+		timer.stop("Matrix Assembly");
 
 		if (save_matrix_file != "")
 			Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A, "", "");
@@ -364,11 +366,15 @@ int main(int argc, char *argv[])
 
 		if (f_amgx) {
 #ifdef ENABLE_AMGX
+			timer.start("AMGX Preconditioner Setup");
 			amgxsolver = rcp(new AmgxWrapper(A, dc, nx));
+			timer.stop("AMGX Preconditioner Setup");
 #endif
 		} else if (f_hypre) {
 #ifdef ENABLE_HYPRE
+			timer.start("Hypre Preconditioner Setup");
 			hypresolver = rcp(new HypreWrapper(A, dc, nx, tol, false));
+			timer.stop("Hypre Preconditioner Setup");
 #endif
 		} else {
 			if (f_precmuelu) {
@@ -533,7 +539,7 @@ int main(int argc, char *argv[])
 		///////////////////
 		// solve end
 		///////////////////
-		timer.stop("Complete Solve");
+		timer.stop("Linear Solve");
 
 		// residual
 		RCP<vector_type> resid = rcp(new vector_type(domain_map, 1));

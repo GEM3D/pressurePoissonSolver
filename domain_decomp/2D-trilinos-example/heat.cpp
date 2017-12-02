@@ -363,6 +363,14 @@ int main(int argc, char *argv[])
 			diff->putScalar(fdiff);
 			f->update(1.0, *diff, 1.0);
 		}
+
+#ifdef ENABLE_AMGX
+		Teuchos::RCP<AmgxWrapper> amgxsolver;
+#endif
+#ifdef ENABLE_HYPRE
+		Teuchos::RCP<HypreWrapper> hypresolver;
+#endif
+
 		steady_clock::time_point tsolve_start;
 		if (dc.num_global_domains != 1) {
 			// do iterative solve
@@ -401,19 +409,17 @@ int main(int argc, char *argv[])
 			problem
 			= rcp(new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(
 			op, gamma, b));
-#ifdef ENABLE_AMGX
-			Teuchos::RCP<AmgxWrapper> amgxsolver;
-#endif
-#ifdef ENABLE_HYPRE
-			Teuchos::RCP<HypreWrapper> hypresolver;
-#endif
 			if (f_amgx) {
 #ifdef ENABLE_AMGX
+				timer.start("AMGX Setup");
 				amgxsolver = rcp(new AmgxWrapper(A, dc, nx));
+				timer.stop("AMGX Setup");
 #endif
 			} else if (f_hypre) {
 #ifdef ENABLE_HYPRE
+				timer.start("Hypre Setup");
 				hypresolver = rcp(new HypreWrapper(A, dc, nx, tol, true));
+				timer.stop("Hypre Setup");
 #endif
 			} else {
 				if (f_precmuelu) {
@@ -522,12 +528,13 @@ int main(int argc, char *argv[])
 			// setup end
 			///////////////////
 			timer.stop("Linear System Setup");
+		}
+		///////////////////
+		// solve start
+		///////////////////
+		timer.start("Complete Solve");
 
-			///////////////////
-			// solve start
-			///////////////////
-			timer.start("Complete Solve");
-
+		if (dc.num_global_domains != 1) {
 			timer.start("Gamma Solve");
 			if (f_amgx) {
 // solve
@@ -579,8 +586,8 @@ int main(int argc, char *argv[])
 				}
 				solver->solve();
 			}
+			timer.stop("Gamma Solve");
 		}
-		timer.stop("Gamma Solve");
 
 		// Do one last solve
 		timer.start("Patch Solve");

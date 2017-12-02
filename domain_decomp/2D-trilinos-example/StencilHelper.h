@@ -57,6 +57,52 @@ class DirichletSH : public StencilHelper
 		return &col;
 	}
 };
+class NeumannSH : public StencilHelper
+{
+	private:
+	double coeff;
+	int    col;
+	int    start;
+	int    stride;
+
+	public:
+	NeumannSH(Domain &d, Side s)
+	{
+		double h   = 0;
+		int    idx = d.id * d.n * d.n;
+		switch (s) {
+			case Side::north:
+				h      = d.x_length / d.n;
+				start  = idx + (d.n - 1) * d.n;
+				stride = 1;
+				break;
+			case Side::east:
+				h      = d.y_length / d.n;
+				start  = idx + (d.n - 1);
+				stride = d.n;
+				break;
+			case Side::south:
+				h      = d.x_length / d.n;
+				start  = idx;
+				stride = 1;
+				break;
+			case Side::west:
+				h      = d.y_length / d.n;
+				start  = idx;
+				stride = d.n;
+				break;
+		}
+		coeff = 1.0 / (h * h);
+	}
+	int row(int i) { return start + stride * i; }
+	int size(int i) { return 1; }
+	double *coeffs(int i) { return &coeff; }
+	int *cols(int i)
+	{
+		col = start + stride * i;
+		return &col;
+	}
+};
 class NormalSH : public StencilHelper
 {
 	private:
@@ -362,7 +408,11 @@ StencilHelper *getStencilHelper(Domain &d, Side s)
 			retval = new NormalSH(d, s);
 		}
 	} else {
-		retval = new DirichletSH(d, s);
+		if (d.isNeumann(s)) {
+			retval = new NeumannSH(d, s);
+		} else {
+			retval = new DirichletSH(d, s);
+		}
 	}
 	return retval;
 }
