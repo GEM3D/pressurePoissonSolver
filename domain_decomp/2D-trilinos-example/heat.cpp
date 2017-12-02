@@ -83,10 +83,21 @@ int main(int argc, char *argv[])
 
 	// parse input
 	args::ArgumentParser parser("");
-	args::HelpFlag       help(parser, "help", "Display this help menu", {'h', "help"});
 
+	// program options
+	args::HelpFlag       help(parser, "help", "Display this help menu", {'h', "help"});
 	args::ValueFlag<int> f_n(parser, "n", "number of cells in the x direction, in each domain",
 	                         {'n'});
+	args::ValueFlag<int> f_l(parser, "n", "run the program n times and print out the average",
+	                         {'l'});
+	args::Flag           f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
+	args::ValueFlag<int> f_div(parser, "divide", "use iterative method", {"divide"});
+	args::Flag f_nozerof(parser, "zerou", "don't  make the rhs match the boundary conditions",
+	                     {"nozerof"});
+	args::ValueFlag<double> f_t(
+	parser, "tolerance", "set the tolerance of the iterative solver (default is 1e-10)", {'t'});
+
+	// mesh options
 	args::ValueFlag<string> f_mesh(parser, "file_name", "read in a mesh", {"mesh"});
 	args::ValueFlag<int>    f_square(parser, "num_domains",
 	                              "create a num_domains x num_domains square of grids", {"square"});
@@ -94,12 +105,12 @@ int main(int argc, char *argv[])
 	                                                  "of grids, and a num_domains*2 x "
 	                                                  "num_domains*2 refined square next to it",
 	                           {"amr"});
+
+	// output options
 	args::Flag f_outclaw(parser, "outclaw", "output amrclaw ascii file", {"outclaw"});
 #ifdef HAVE_VTK
 	args::Flag f_outvtk(parser, "", "output to vtk format", {"outvtk"});
 #endif
-	args::ValueFlag<int> f_l(parser, "n", "run the program n times and print out the average",
-	                         {'l'});
 	args::ValueFlag<string> f_m(parser, "matrix filename", "the file to write the matrix to",
 	                            {'m'});
 	args::ValueFlag<string> f_s(parser, "solution filename", "the file to write the solution to",
@@ -114,36 +125,24 @@ int main(int argc, char *argv[])
 	                            {'g'});
 	args::ValueFlag<string> f_read_gamma(parser, "gamma filename",
 	                                     "the file to read gamma vector from", {"readgamma"});
-	args::ValueFlag<double> f_t(
-	parser, "tolerance", "set the tolerance of the iterative solver (default is 1e-10)", {'t'});
-	args::ValueFlag<double> f_omega(
-	parser, "tolerance", "set the tolerance of the iterative solver (default is 1e-10)", {"omega"});
-	args::ValueFlag<int> f_d(
-	parser, "row", "pin gamma value to zero (by modifying that row of the schur compliment matrix)",
-	{'z'});
-	args::ValueFlag<int> f_div(parser, "divide", "use iterative method", {"divide"});
-	args::Flag           f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
-	args::Flag           f_blockcrs(parser, "wrapper", "use a function wrapper", {"blockcrs"});
-	args::Flag           f_crs(parser, "wrapper", "use a function wrapper", {"crs"});
-	args::Flag           f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
-	args::Flag           f_zero(parser, "gauss", "solve gaussian function", {"zero"});
-	args::Flag           f_prec(parser, "prec", "use block diagonal preconditioner", {"prec"});
-	args::Flag           f_precblockj(parser, "prec", "use block diagonal jacobi preconditioner",
-	                        {"precblockj"});
-	args::Flag f_precj(parser, "prec", "use block diagonal jacobi preconditioner", {"precj"});
-	args::Flag f_precmuelu(parser, "prec", "use AMG preconditioner", {"muelu"});
+
+	// problem options
+	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
+	args::Flag f_zero(parser, "zero", "solve zero function", {"zero"});
+
+	// preconditioners
+	args::Flag f_precj(parser, "prec", "use jacobi preconditioner", {"precj"});
+	args::Flag f_prec(parser, "prec", "use block diagonal jacobi preconditioner", {"prec"});
+	args::Flag f_precmuelu(parser, "prec", "use MueLu AMG preconditioner", {"muelu"});
 	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {"neumann"});
 	args::Flag f_cg(parser, "gmres", "use CG for iterative solver", {"cg"});
 	args::Flag f_gmres(parser, "gmres", "use GMRES for iterative solver", {"gmres"});
-	args::Flag f_lsqr(parser, "gmres", "use GMRES for iterative solver", {"lsqr"});
+	args::Flag f_lsqr(parser, "gmres", "use least squares for iterative solver", {"lsqr"});
 	args::Flag f_rgmres(parser, "rgmres", "use GCRO-DR (Recycling GMRES) for iterative solver",
 	                    {"rgmres"});
 	args::Flag f_bicg(parser, "gmres", "use BiCGStab for iterative solver", {"bicg"});
-	args::Flag f_zerou(parser, "zerou", "modify matrix so that the sum of the solution is zero",
-	                   {"nozerou"});
-	args::Flag f_nozerof(parser, "zerou", "don't  make the rhs match the boundary conditions",
-	                     {"nozerof"});
-	args::Flag f_pingamma(parser, "pingamma", "pin the first gamma to zero", {"pingamma"});
+
+	// direct solvers
 	args::Flag f_lu(parser, "lu", "use KLU solver", {"klu"});
 	args::Flag f_mumps(parser, "lu", "use MUMPS solver", {"mumps"});
 	args::Flag f_basker(parser, "lu", "use Basker solver", {"basker"});
@@ -151,10 +150,14 @@ int main(int argc, char *argv[])
 	args::Flag f_ilu(parser, "ilu", "use incomplete LU preconditioner", {"ilu"});
 	args::Flag f_riluk(parser, "ilu", "use RILUK preconditioner", {"riluk"});
 	args::Flag f_iter(parser, "iterative", "use iterative method", {"iterative"});
+
+	// patch solvers
 	args::Flag f_fish(parser, "fishpack", "use fishpack as the patch solver", {"fishpack"});
 #ifdef __NVCC__
 	args::Flag f_cufft(parser, "cufft", "use CuFFT as the patch solver", {"cufft"});
 #endif
+
+	// third-party preconditioners
 	args::Flag f_amgx(parser, "amgx", "solve schur compliment system with amgx", {"amgx"});
 	args::Flag f_hypre(parser, "hypre", "solve schur compliment system with hypre", {"hypre"});
 
