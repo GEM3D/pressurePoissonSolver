@@ -2,14 +2,14 @@
 #include "Factory.h"
 #include "SchurHelper.h"
 //#include "FunctionWrapper.h"
-#include "ClawWriter.h"
-#include "PatchSolvers/FftwPatchSolver.h"
-#include "PatchSolvers/FishpackPatchSolver.h"
 #include "FivePtPatchOperator.h"
 #include "Init.h"
-#include "MMWriter.h"
 #include "MyTypeDefs.h"
+#include "PatchSolvers/FftwPatchSolver.h"
+#include "PatchSolvers/FishpackPatchSolver.h"
 #include "QuadInterpolator.h"
+#include "Writers/ClawWriter.h"
+#include "Writers/MMWriter.h"
 #ifdef ENABLE_AMGX
 #include "AmgxWrapper.h"
 #endif
@@ -17,7 +17,7 @@
 #include "HypreWrapper.h"
 #endif
 #ifdef HAVE_VTK
-#include "VtkWriter.h"
+#include "Writers/VtkWriter.h"
 #endif
 #include "Timer.h"
 #include "args.h"

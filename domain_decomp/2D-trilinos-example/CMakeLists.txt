@@ -35,8 +35,7 @@ IF(Trilinos_FOUND)
    MESSAGE("   Trilinos_Fortran_COMPILER = ${Trilinos_Fortran_COMPILER}")
    MESSAGE("   Trilinos_CXX_COMPILER_FLAGS = ${Trilinos_CXX_COMPILER_FLAGS}")
    MESSAGE("   Trilinos_C_COMPILER_FLAGS = ${Trilinos_C_COMPILER_FLAGS}")
-   MESSAGE("   Trilinos_Fortran_COMPILER_FLAGS =
-     ${Trilinos_Fortran_COMPILER_FLAGS}")
+   MESSAGE("   Trilinos_Fortran_COMPILER_FLAGS = ${Trilinos_Fortran_COMPILER_FLAGS}")
    MESSAGE("   Trilinos_LINKER = ${Trilinos_LINKER}")
    MESSAGE("   Trilinos_EXTRA_LD_FLAGS = ${Trilinos_EXTRA_LD_FLAGS}")
    MESSAGE("   Trilinos_AR = ${Trilinos_AR}")
@@ -52,14 +51,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 # that was used to build Trilinos on your machine.  You do _not_ need
 # to edit this line.
 project(DomainDecomp)
-find_package(VTK NO_MODULE)
-message("${VTK_LIBRARIES}")
-IF(VTK_FOUND)
-    SET(CMAKE_CXX_FLAGS "-DHAVE_VTK ${CMAKE_CXX_FLAGS}")
-  MESSAGE("VTK found, enabling vtk output")
-ELSE()
-  MESSAGE("VTK not found, disabling vtk output")
-ENDIF()
 if(ENABLE_AMGX)
     SET(CMAKE_CXX_FLAGS "-DENABLE_AMGX ${CMAKE_CXX_FLAGS}")
 endif()
@@ -115,7 +106,6 @@ set(SOURCES
 include_directories(".")
 include_directories(SYSTEM ${Trilinos_TPL_INCLUDE_DIRS})
 include_directories(SYSTEM ${Trilinos_INCLUDE_DIRS})
-include_directories(SYSTEM ${VTK_INCLUDE_DIRS})
 include_directories(${MPI_CXX_INCLUDE_PATH})
 if(CUDA_FOUND)
 include_directories(${CUDA_INCLUDE_DIRS})
@@ -126,7 +116,6 @@ endif()
 # built.  
 link_directories(${Trilinos_LIBRARY_DIRS})
 link_directories(${Trilinos_TPL_LIBRARY_DIRS})
-link_directories(${VTK_LIBRARY_DIRS})
 
 # 
 # EDIT HERE: Change trilinosExample to the name of the executable
@@ -139,8 +128,6 @@ add_library(DomainCollection DomainCollection.cpp)
 add_library(Factory Factory.cpp)
 add_library(Interpolators QuadInterpolator.cpp)
 add_library(Init Init.cpp)
-add_library(MMWriter MMWriter.cpp)
-add_library(ClawWriter ClawWriter.cpp)
 
 #
 # EDIT HERE: Change trilinosExample to the name of the executable
@@ -162,29 +149,6 @@ target_link_libraries(heat
   ${Trilinos_LIBRARIES} 
   ${MPI_CXX_LIBRARIES} 
 )
-target_link_libraries(MMWriter
-    DomainCollection
-  ${Trilinos_TPL_LIBRARIES}
-  ${Trilinos_LIBRARIES} 
-    )
-target_link_libraries(ClawWriter
-    DomainCollection
-  ${Trilinos_TPL_LIBRARIES}
-  ${Trilinos_LIBRARIES} 
-    )
-if(VTK_FOUND)
-target_link_libraries(heat
-    VtkWriter
-    )
-add_library(VtkWriter VtkWriter.cpp)
-target_link_libraries(VtkWriter
-    DomainCollection
-  ${Trilinos_TPL_LIBRARIES}
-  ${Trilinos_LIBRARIES} 
-  ${MPI_CXX_LIBRARIES} 
-  ${VTK_LIBRARIES} 
-)
-endif()
 if(HYPRE_FOUND)
 target_link_libraries(heat
     HypreWrapper
@@ -222,3 +186,4 @@ target_link_libraries(DomainCollection
 )
 
 add_subdirectory(PatchSolvers)
+add_subdirectory(Writers)
