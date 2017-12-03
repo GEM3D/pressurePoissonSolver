@@ -2,6 +2,7 @@
 #include <vtkCellData.h>
 #include <vtkDoubleArray.h>
 #include <vtkImageData.h>
+#include <vtkMPIController.h>
 #include <vtkMultiBlockDataSet.h>
 #include <vtkMultiPieceDataSet.h>
 #include <vtkSmartPointer.h>
@@ -16,27 +17,30 @@ void VtkWriter::write(vector_type &u, vector_type &error, vector_type &resid)
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 
+	vtkMultiProcessController *Controller;
+	Controller = vtkMPIController::New();
+	Controller->Initialize(0,0,1);
 	set<vtkSmartPointer<vtkImageData>>   images;
 	set<vtkSmartPointer<vtkDoubleArray>> arrays;
 	// create MultiPieceDataSet and fill with patch information
-	vtkSmartPointer<vtkXMLMultiBlockDataWriter> writer
-	= vtkSmartPointer<vtkXMLMultiBlockDataWriter>::New();
+	vtkSmartPointer<vtkXMLPMultiBlockDataWriter> writer
+	= vtkSmartPointer<vtkXMLPMultiBlockDataWriter>::New();
+	writer->SetController(Controller);
 	vtkSmartPointer<vtkMultiBlockDataSet> block = vtkSmartPointer<vtkMultiBlockDataSet>::New();
 	vtkSmartPointer<vtkMultiPieceDataSet> data  = vtkSmartPointer<vtkMultiPieceDataSet>::New();
 
-	data->SetNumberOfPieces(dc.domains.size());
+	data->SetNumberOfPieces(dc.num_global_domains);
 
 	auto u_view     = u.get1dView();
 	auto error_view = error.get1dView();
 	auto resid_view = resid.get1dView();
 
-	int i = 0;
 	for (auto &p : dc.domains) {
 		Domain &d     = p.second;
 		int     n     = d.n;
 		double  h_x   = d.x_length / n;
 		double  h_y   = d.y_length / n;
-		int     start = d.id * n * n;
+		int     start = d.id_local * n * n;
 
 		// create image object
 		vtkSmartPointer<vtkImageData> image = vtkSmartPointer<vtkImageData>::New();
@@ -82,19 +86,22 @@ void VtkWriter::write(vector_type &u, vector_type &error, vector_type &resid)
 		image->GetCellData()->AddArray(resid);
 
 		// add image to dataset
-		data->SetPiece(i, image);
-		i++;
+		data->SetPiece(d.id_global, image);
 	}
 
 	block->SetNumberOfBlocks(1);
 	block->SetBlock(0, data);
 
 	writer->SetFileName("blah.vtmb");
-	// writer->SetNumberOfPieces(1);
-	// writer->SetStartPiece(0);
+	writer->SetNumberOfPieces(1);
+	writer->SetStartPiece(0);
 	writer->SetInputData(block);
+if(rank==0){
+writer->SetWriteMetaFile(1);
+}
 	writer->Update();
 
 	// write data
 	writer->Write();
+	Controller->Delete();
 }
