@@ -88,22 +88,6 @@ ELSE()
     MESSAGE("VTK not found, disabling vtk output")
 ENDIF()
 
-#
-# EDIT HERE: Replace TrilinosExample with your project's name.
-#
-
-# 
-# EDIT HERE: 
-#
-# Source file(s) in your project.  Here, we include one source file, 
-# main.cpp, which contains the main() function.  You may also want to 
-# set HEADERS to the list of header files in your project, if there 
-# are any.
-#
-set(SOURCES 
-  heat.cpp
-  )
-
 # 
 # EDIT HERE:
 #
@@ -130,8 +114,8 @@ link_directories(${Trilinos_TPL_LIBRARY_DIRS})
 # file that you want to build.  This line tells CMake which source
 # file(s) to use to build the executable.
 #
-add_executable(heat heat.cpp)
-add_executable(heat-nodd heat-nodd.cpp)
+add_executable(steady steady.cpp)
+add_executable(steady-nodd steady-nodd.cpp)
 add_library(SchurHelper SchurHelper.cpp)
 add_library(MatrixHelper MatrixHelper.cpp)
 add_library(DomainCollection DomainCollection.cpp)
@@ -145,7 +129,7 @@ add_library(Init Init.cpp)
 # with the Trilinos libraries, and with the third-party libraries 
 # (TPLs) with which Trilinos was built.
 #
-target_link_libraries(heat
+target_link_libraries(steady
     SchurHelper
     DomainCollection
     Factory
@@ -160,9 +144,9 @@ target_link_libraries(heat
   ${MPI_CXX_LIBRARIES} 
 )
 if(VTK_FOUND)
-    target_link_libraries(heat VtkWriter)
+    target_link_libraries(steady VtkWriter)
 endif(VTK_FOUND)
-target_link_libraries(heat-nodd
+target_link_libraries(steady-nodd
     MatrixHelper
     DomainCollection
     Factory
@@ -174,11 +158,11 @@ target_link_libraries(heat-nodd
   ${MPI_CXX_LIBRARIES} 
 )
 if(VTK_FOUND)
-    target_link_libraries(heat-nodd VtkWriter)
+    target_link_libraries(steady-nodd VtkWriter)
 endif(VTK_FOUND)
 if(HYPRE_FOUND)
-target_link_libraries(heat HypreWrapper)
-target_link_libraries(heat-nodd HypreWrapper)
+target_link_libraries(steady HypreWrapper)
+target_link_libraries(steady-nodd HypreWrapper)
 add_library(HypreWrapper HypreWrapper.cpp)
 target_link_libraries(HypreWrapper
   ${Trilinos_TPL_LIBRARIES}
@@ -188,8 +172,8 @@ target_link_libraries(HypreWrapper
 endif()
 if(ENABLE_AMGX)
 add_library(AmgxWrapper AmgxWrapper.cpp)
-target_link_libraries(heat AmgxWrapper)
-target_link_libraries(heat-nodd AmgxWrapper)
+target_link_libraries(steady AmgxWrapper)
+target_link_libraries(steady-nodd AmgxWrapper)
 target_link_libraries(AmgxWrapper
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
