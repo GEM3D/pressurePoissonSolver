@@ -1102,6 +1102,7 @@ void DomainCollection::indexDomainsLocal()
 	vector<int> map_vec;
 	vector<int> off_proc_map_vec;
 	map<int, int> rev_map;
+	set<int> offs;
 	if (!domains.empty()) {
 		set<int> todo;
 		for (auto &p : domains) {
@@ -1128,7 +1129,10 @@ void DomainCollection::indexDomainsLocal()
 							if (domains.count(i)) {
 								queue.push_back(i);
 							} else {
-								off_proc_map_vec.push_back(i);
+								if (!offs.count(i)) {
+									offs.insert(i);
+									off_proc_map_vec.push_back(i);
+								}
 							}
 						}
 					}
