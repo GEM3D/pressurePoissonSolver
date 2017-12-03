@@ -52,11 +52,14 @@ class Timer
 				average /= times.size();
 
 				os << "average (sec): " << average << endl;
-				os << "  times (sec):";
-				for (double t : times) {
-					os << " " << t;
+				if (times.size() < 10) {
+					os << "  times (sec):";
+					for (double t : times) {
+						os << " " << t;
+					}
+					os << endl;
 				}
-				os << endl << endl;
+				os << endl;
 			}
 		}
 		return os;

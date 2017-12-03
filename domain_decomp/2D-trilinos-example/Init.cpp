@@ -106,3 +106,24 @@ void Init::initDirichlet(DomainCollection &dc, int n, double *f_vec, double *exa
 		}
 	}
 }
+void Init::fillSolution(DomainCollection &dc, vector_type& u,
+                        function<double(double, double, double)> fun, double time)
+{
+	double *vec                  = &u.get1dViewNonConst()[0];
+	int n = dc.n;
+	for (auto &p : dc.domains) {
+		Domain &d = p.second;
+
+		double *f = vec + d.id_local * n * n;
+
+		double h_x = d.x_length / n;
+		double h_y = d.y_length / n;
+		for (int yi = 0; yi < n; yi++) {
+			for (int xi = 0; xi < n; xi++) {
+				double x       = d.x_start + h_x / 2.0 + d.x_length * xi / n;
+				double y       = d.y_start + h_y / 2.0 + d.y_length * yi / n;
+				f[yi * n + xi] = fun(x, y, time);
+			}
+		}
+	}
+}

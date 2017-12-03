@@ -11,4 +11,6 @@ class Init
 	static void initDirichlet(DomainCollection &dc, int n, double *f_vec, double *exact_vec,
 	                          std::function<double(double, double)> ffun,
 	                          std::function<double(double, double)> efun);
+	static void fillSolution(DomainCollection &dc, vector_type &u,
+	                         std::function<double(double, double, double)> fun, double time);
 };

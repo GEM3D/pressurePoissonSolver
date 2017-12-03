@@ -58,7 +58,7 @@ void FftwPatchSolver::addDomain(Domain &d)
 		valarray<double> &denom = denoms[d];
 		denom.resize(n * n);
 		// create denom vector
-		if (!d.neumann.to_ulong()) {
+		if (d.neumann.none()) {
 			for (int yi = 0; yi < n; yi++) {
 				denom[slice(yi * n, n, 1)]
 				= -4 / (h_x * h_x) * pow(sin((yi + 1) * M_PI / (2 * n)), 2);

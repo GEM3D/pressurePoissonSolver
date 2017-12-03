@@ -58,7 +58,7 @@ void FishpackPatchSolver::solve(Domain &d, const vector_type &f, vector_type &u,
 	}
 
 	int     start  = d.id_local * d.n * d.n;
-	double  elmbda = 0;
+	double  elmbda = lambda;
 	double *f_ptr  = &u_view[start];
 	for (int i = 0; i < m * n; i++) {
 		f_ptr[i] = f_view[start + i];
@@ -70,4 +70,7 @@ void FishpackPatchSolver::solve(Domain &d, const vector_type &f, vector_type &u,
 	w[0] = 30.5;
 	hstcrt_(&a, &b, &m, &mbcdnd, bda, bdb, &c, &d2, &n, &nbcdnd, bdc, bdd, &elmbda, f_ptr, &idimf,
 	        &pertrb, &ierror, &w[0]);
+	if (ierror != 0) {
+		cerr << "IERROR: " << ierror << endl;
+	}
 }

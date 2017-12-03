@@ -594,8 +594,11 @@ int main(int argc, char *argv[])
 		}
 #ifdef HAVE_VTK
 		if (f_outvtk) {
-			VtkWriter writer(dc);
-			writer.write(args::get(f_outvtk), *u, *error, *resid);
+			VtkWriter writer(dc, args::get(f_outvtk));
+			writer.add(*u, "Solution");
+			writer.add(*error, "Error");
+			writer.add(*resid, "Residual");
+			writer.write();
 		}
 #endif
 		cout.unsetf(std::ios_base::floatfield);

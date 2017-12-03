@@ -22,7 +22,6 @@ void SchurHelper::solveWithInterface(const vector_type &f, vector_type &u, const
                                      vector_type &diff)
 {
 	// initilize our local variables
-	diff.update(1, gamma, 0);
 	Tpetra::Import<> importer(diff.getMap(), dc.getSchurDistMap());
 	vector_type      local_gamma(dc.getSchurDistMap(), 1);
 	vector_type      local_interp(dc.getSchurDistMap(), 1);
@@ -36,7 +35,7 @@ void SchurHelper::solveWithInterface(const vector_type &f, vector_type &u, const
 	}
 
 	// export diff vector
-	diff.scale(0);
+	diff.putScalar(0);
 	diff.doExport(local_interp, importer, Tpetra::CombineMode::ADD);
 	diff.update(1.0, gamma, -1.0);
 }
