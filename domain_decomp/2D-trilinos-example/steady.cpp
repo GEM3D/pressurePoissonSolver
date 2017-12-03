@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
 	// output options
 	args::Flag f_outclaw(parser, "outclaw", "output amrclaw ascii file", {"outclaw"});
 #ifdef HAVE_VTK
-	args::Flag f_outvtk(parser, "", "output to vtk format", {"outvtk"});
+	args::ValueFlag<string> f_outvtk(parser, "", "output to vtk format", {"outvtk"});
 #endif
 	args::ValueFlag<string> f_m(parser, "matrix filename", "the file to write the matrix to",
 	                            {'m'});
@@ -700,7 +700,7 @@ int main(int argc, char *argv[])
 #ifdef HAVE_VTK
 		if (f_outvtk) {
 			VtkWriter writer(dc);
-			writer.write(*u, *error, *resid);
+			writer.write(args::get(f_outvtk), *u, *error, *resid);
 		}
 #endif
 		cout.unsetf(std::ios_base::floatfield);

@@ -11,7 +11,7 @@
 
 using namespace std;
 VtkWriter::VtkWriter(DomainCollection &dc) { this->dc = dc; }
-void VtkWriter::write(vector_type &u, vector_type &error, vector_type &resid)
+void VtkWriter::write(string file_name, vector_type &u, vector_type &error, vector_type &resid)
 {
 	int rank, size;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -19,7 +19,7 @@ void VtkWriter::write(vector_type &u, vector_type &error, vector_type &resid)
 
 	vtkMultiProcessController *Controller;
 	Controller = vtkMPIController::New();
-	Controller->Initialize(0,0,1);
+	Controller->Initialize(0, 0, 1);
 	set<vtkSmartPointer<vtkImageData>>   images;
 	set<vtkSmartPointer<vtkDoubleArray>> arrays;
 	// create MultiPieceDataSet and fill with patch information
@@ -92,13 +92,14 @@ void VtkWriter::write(vector_type &u, vector_type &error, vector_type &resid)
 	block->SetNumberOfBlocks(1);
 	block->SetBlock(0, data);
 
-	writer->SetFileName("blah.vtmb");
+	string out = file_name + ".vtmb";
+	writer->SetFileName(out.c_str());
 	writer->SetNumberOfPieces(1);
 	writer->SetStartPiece(0);
 	writer->SetInputData(block);
-if(rank==0){
-writer->SetWriteMetaFile(1);
-}
+	if (rank == 0) {
+		writer->SetWriteMetaFile(1);
+	}
 	writer->Update();
 
 	// write data

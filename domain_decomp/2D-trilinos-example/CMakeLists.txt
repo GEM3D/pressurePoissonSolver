@@ -115,6 +115,7 @@ link_directories(${Trilinos_TPL_LIBRARY_DIRS})
 # file(s) to use to build the executable.
 #
 add_executable(steady steady.cpp)
+add_executable(heat heat.cpp)
 add_executable(steady-nodd steady-nodd.cpp)
 add_library(SchurHelper SchurHelper.cpp)
 add_library(MatrixHelper MatrixHelper.cpp)
@@ -143,8 +144,23 @@ target_link_libraries(steady
   ${Trilinos_LIBRARIES} 
   ${MPI_CXX_LIBRARIES} 
 )
+target_link_libraries(heat
+    SchurHelper
+    DomainCollection
+    Factory
+    Init
+    FftwPatchSolver
+    FishpackPatchSolver
+    Interpolators
+    MMWriter
+    ClawWriter
+  ${Trilinos_TPL_LIBRARIES}
+  ${Trilinos_LIBRARIES} 
+  ${MPI_CXX_LIBRARIES} 
+)
 if(VTK_FOUND)
     target_link_libraries(steady VtkWriter)
+    target_link_libraries(heat VtkWriter)
 endif(VTK_FOUND)
 target_link_libraries(steady-nodd
     MatrixHelper
@@ -162,6 +178,7 @@ if(VTK_FOUND)
 endif(VTK_FOUND)
 if(HYPRE_FOUND)
 target_link_libraries(steady HypreWrapper)
+target_link_libraries(heat HypreWrapper)
 target_link_libraries(steady-nodd HypreWrapper)
 add_library(HypreWrapper HypreWrapper.cpp)
 target_link_libraries(HypreWrapper
@@ -173,6 +190,7 @@ endif()
 if(ENABLE_AMGX)
 add_library(AmgxWrapper AmgxWrapper.cpp)
 target_link_libraries(steady AmgxWrapper)
+target_link_libraries(heat AmgxWrapper)
 target_link_libraries(steady-nodd AmgxWrapper)
 target_link_libraries(AmgxWrapper
   ${Trilinos_TPL_LIBRARIES}
