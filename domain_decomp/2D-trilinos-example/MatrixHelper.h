@@ -24,11 +24,13 @@ class MatrixHelper
 	 */
 	MatrixHelper(DomainCollection dc, Teuchos::RCP<const Teuchos::Comm<int>> comm);
 
+	Teuchos::RCP<matrix_type> getIdentity();
+
 	/**
 	 * @brief Form the matrix
 	 *
 	 * @return the formed matrix
 	 */
-	Teuchos::RCP<matrix_type> formCRSMatrix();
+	Teuchos::RCP<matrix_type> formCRSMatrix(double lambda=0);
 };
 #endif

@@ -147,6 +147,7 @@ target_link_libraries(steady
 )
 target_link_libraries(heat
     SchurHelper
+    MatrixHelper
     DomainCollection
     Factory
     Init

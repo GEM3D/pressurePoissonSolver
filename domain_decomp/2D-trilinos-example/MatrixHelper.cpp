@@ -7,7 +7,18 @@ MatrixHelper::MatrixHelper(DomainCollection dc, Teuchos::RCP<const Teuchos::Comm
 	this->dc   = dc;
 	this->comm = comm;
 }
-Teuchos::RCP<matrix_type> MatrixHelper::formCRSMatrix()
+Teuchos::RCP<matrix_type> MatrixHelper::getIdentity()
+{
+	auto                      row_map = dc.getDomainRowMap();
+	Teuchos::RCP<matrix_type> A       = Teuchos::rcp(new matrix_type(row_map, 1));
+	double                    one     = 1;
+	for (int row = row_map->getMinGlobalIndex(); row <= row_map->getMaxGlobalIndex(); row++) {
+		A->insertGlobalValues(row, 1, &one, &row);
+	}
+	A->fillComplete();
+	return A;
+}
+Teuchos::RCP<matrix_type> MatrixHelper::formCRSMatrix(double lambda)
 {
 	Teuchos::RCP<matrix_type> A = Teuchos::rcp(new matrix_type(dc.getDomainRowMap(), 10));
 	for (auto &p : dc.domains) {
@@ -18,7 +29,7 @@ Teuchos::RCP<matrix_type> MatrixHelper::formCRSMatrix()
 		int     start = n * n * d.id_global;
 
 		// center coeffs
-		double coeff = -2.0 / (h_x * h_x) - 2.0 / (h_y * h_y);
+		double coeff = -2.0 / (h_x * h_x) - 2.0 / (h_y * h_y)+lambda;
 		for (int y_i = 0; y_i < n; y_i++) {
 			for (int x_i = 0; x_i < n; x_i++) {
 				int row = start + x_i + n * y_i;

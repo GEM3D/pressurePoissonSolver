@@ -1,5 +1,6 @@
 #include "DomainCollection.h"
 #include "Factory.h"
+#include "MatrixHelper.h"
 #include "SchurHelper.h"
 //#include "FunctionWrapper.h"
 #include "FivePtPatchOperator.h"
@@ -91,6 +92,8 @@ int main(int argc, char *argv[])
 	args::ValueFlag<double> f_out_every(parser, "tolerance", "time step size", {"outevery"});
 	args::ValueFlag<double> f_tend(parser, "", "stop time", {"tend"});
 	args::ValueFlag<double> f_alpha(parser, "", "diffusivity coefficient", {"alpha"});
+	args::Flag              f_schur(parser, "", "use schur compliment method for solve", {"schur"});
+	args::Flag              f_bdf2(parser, "", "use bdf2 time stepping", {"bdf2"});
 
 	// mesh options
 	args::ValueFlag<string> f_mesh(parser, "file_name", "read in a mesh", {"mesh"});
@@ -177,7 +180,6 @@ int main(int argc, char *argv[])
 			dc.divide();
 		}
 	}
-	dc.setNeumann();
 	// Set the number of discretization points in the x and y direction.
 	int nx = args::get(f_n);
 	int ny = args::get(f_n);
@@ -234,10 +236,13 @@ int main(int argc, char *argv[])
 	// the functions that we are using
 
 	auto efun = [=](double x, double y, double t) {
-		return 100 * exp(-8 * M_PI * M_PI * alpha * t) * sin(2 * M_PI * y) * sin(2 * M_PI * x);
+		return exp(-8 * M_PI * M_PI * alpha * t) * sin(2 * M_PI * y) * sin(2 * M_PI * x);
 	};
 	// set the patch solver
-	double           lambda   = -1.0 / (alpha * dt);
+	double lambda = -1.0 / (alpha * dt);
+	if (f_bdf2) {
+		lambda = -3.0 / (2.0 * alpha * dt);
+	}
 	RCP<PatchSolver> p_solver = rcp(new FishpackPatchSolver(lambda));
 
 	// patch operator
@@ -249,13 +254,24 @@ int main(int argc, char *argv[])
 	Tools::Timer timer;
 	timer.start("Domain Initialization");
 
-	SchurHelper sch(dc, comm, p_solver, p_operator, p_interp);
+	SchurHelper  sch(dc, comm, p_solver, p_operator, p_interp);
+	MatrixHelper mh(dc, comm);
 
 	RCP<map_type>    domain_map = dc.getDomainRowMap();
-	RCP<vector_type> u          = rcp(new vector_type(domain_map, 1));
 	RCP<vector_type> u_next     = rcp(new vector_type(domain_map, 1));
+	RCP<vector_type> u          = rcp(new vector_type(domain_map, 1));
+	RCP<vector_type> u_prev     = rcp(new vector_type(domain_map, 1));
+	RCP<vector_type> u_tmp;
+	RCP<vector_type> f = rcp(new vector_type(domain_map, 1));
 
-	Init::fillSolution(dc, *u, efun, 0);
+	double t = 0;
+	if (f_bdf2) {
+		Init::fillSolution(dc, *u_prev, efun, 0);
+		Init::fillSolution(dc, *u, efun, dt);
+		t = dt;
+	} else {
+		Init::fillSolution(dc, *u, efun, 0);
+	}
 
 	timer.stop("Domain Initialization");
 
@@ -264,11 +280,12 @@ int main(int argc, char *argv[])
 	RCP<const map_type> matrix_map_const = matrix_map;
 
 	// Create the gamma and diff vectors
-	RCP<vector_type> gamma = rcp(new vector_type(matrix_map, 1));
-	RCP<vector_type> zeros = rcp(new vector_type(matrix_map, 1));
-	RCP<vector_type> diff  = rcp(new vector_type(matrix_map, 1));
-	RCP<vector_type> b     = rcp(new vector_type(matrix_map, 1));
-	RCP<matrix_type> A;
+	RCP<vector_type>               gamma = rcp(new vector_type(matrix_map, 1));
+	RCP<vector_type>               zeros = rcp(new vector_type(matrix_map, 1));
+	RCP<vector_type>               diff  = rcp(new vector_type(matrix_map, 1));
+	RCP<vector_type>               b     = rcp(new vector_type(matrix_map, 1));
+	RCP<matrix_type>               A;
+	RCP<const Tpetra::RowMatrix<>> rm;
 
 	// Create linear problem for the Belos solver
 	RCP<Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>> problem;
@@ -277,14 +294,6 @@ int main(int argc, char *argv[])
 
 	typedef Ifpack2::Preconditioner<scalar_type> Preconditioner;
 	RCP<Preconditioner>                          prec;
-	{
-		double fdiff = (dc.integrate(*u)) / dc.area();
-		if (my_global_rank == 0) cout << "Fdiff: " << fdiff << endl;
-
-		RCP<vector_type> diff = rcp(new vector_type(domain_map, 1));
-		diff->putScalar(fdiff);
-		u->update(1.0, *diff, 1.0);
-	}
 
 #ifdef ENABLE_AMGX
 	Teuchos::RCP<AmgxWrapper> amgxsolver;
@@ -294,7 +303,7 @@ int main(int argc, char *argv[])
 #endif
 
 	steady_clock::time_point tsolve_start;
-	if (dc.num_global_domains != 1) {
+	if ((f_schur && dc.num_global_domains != 1) || !f_schur) {
 		// do iterative solve
 
 		///////////////////
@@ -308,7 +317,13 @@ int main(int argc, char *argv[])
 		} else {
 			timer.start("Matrix Formation");
 
-			A = sch.formCRSMatrix();
+			if (f_schur) {
+				A  = sch.formCRSMatrix();
+				rm = A;
+			} else {
+				A  = mh.formCRSMatrix(lambda);
+				rm = A;
+			}
 
 			timer.stop("Matrix Formation");
 
@@ -317,9 +332,6 @@ int main(int argc, char *argv[])
 				                                                           "");
 		}
 
-		problem
-		= rcp(new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(
-		A, gamma, b));
 		if (f_amgx) {
 #ifdef ENABLE_AMGX
 			timer.start("AMGX Setup");
@@ -341,14 +353,24 @@ int main(int argc, char *argv[])
 	///////////////////
 	// solve start
 	///////////////////
+
+	// initialize vectors
 	timer.start("Complete Solve");
 
 	vector_type ones(domain_map, 1);
 	ones.putScalar(1);
-	double           t     = 0;
 	int              i     = 0;
 	RCP<vector_type> exact = rcp(new vector_type(domain_map, 1));
 	RCP<vector_type> error = rcp(new vector_type(domain_map, 1));
+	if (f_schur) {
+		problem
+		= rcp(new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(
+		A, gamma, b));
+	} else {
+		problem
+		= rcp(new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(
+		A, u_next, f));
+	}
 	for (; t < tend; t += dt) {
 		if (f_outvtk) {
 			if (t >= i * out_every) {
@@ -364,25 +386,40 @@ int main(int argc, char *argv[])
 				i++;
 			}
 		}
-		u->scale(lambda);
-		if (dc.num_global_domains != 1) {
-			timer.start("Gamma Solve");
+		if (f_bdf2) {
+			f->update(-1.0 / 3.0, *u_prev, 4.0 / 3.0, *u, 0.0);
+		} else {
+			f->update(1.0, *u, 0.0);
+		}
+		f->scale(lambda);
+		if ((f_schur && dc.num_global_domains != 1) || !f_schur) {
+			timer.start("Linear Solve");
 			// Get the b vector
-			sch.solveWithInterface(*u, *u_next, *zeros, *b);
-			b->scale(-1.0);
-
-			if (save_rhs_file != "") {
-				Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_rhs_file, b, "", "");
+			if (f_schur) {
+				sch.solveWithInterface(*f, *u_next, *zeros, *b);
+				b->scale(-1.0);
+				if (save_rhs_file != "") {
+					Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_rhs_file, b, "",
+					                                                          "");
+				}
 			}
 			// solve
 			if (false) {
 #ifdef ENABLE_AMGX
 			} else if (f_amgx) {
-				amgxsolver->solve(gamma, b);
+				if (f_schur) {
+					amgxsolver->solve(gamma, b);
+				} else {
+					amgxsolver->solve(u_next, f);
+				}
 #endif
 #ifdef ENABLE_HYPRE
 			} else if (f_hypre) {
-				hypresolver->solve(gamma, b);
+				if (f_schur) {
+					hypresolver->solve(gamma, b);
+				} else {
+					hypresolver->solve(u_next, f);
+				}
 #endif
 			} else {
 				problem->setProblem();
@@ -391,12 +428,10 @@ int main(int argc, char *argv[])
 				belosList.set("Block Size", 1);
 				belosList.set("Maximum Iterations", 5000);
 				belosList.set("Convergence Tolerance", tol);
-				belosList.set("Output Frequency", 1);
-				int verbosity = Belos::Errors + /* Belos::StatusTestDetails +*/ Belos::Warnings
-				                + Belos::TimingDetails + Belos::Debug + Belos::IterationDetails;
+				belosList.set("Output Frequency", out_every / dt);
+				// int verbosity = 0;
+				int verbosity = Belos::TimingDetails + Belos::IterationDetails;
 				belosList.set("Verbosity", verbosity);
-				// belosList.set("Orthogonalization", "ICGS");
-				//
 				belosList.set("Rel RHS Err", 0.0);
 				belosList.set("Rel Mat Err", 0.0);
 
@@ -406,20 +441,22 @@ int main(int argc, char *argv[])
 				problem, rcp(&belosList, false)));
 				solver->solve();
 			}
-			timer.stop("Gamma Solve");
+			timer.stop("Linear Solve");
 		}
 
 		// Do one last solve
-		timer.start("Patch Solve");
+		if (f_schur) {
+			timer.start("Patch Solve");
 
-		sch.solveWithInterface(*u, *u_next, *gamma, *diff);
+			sch.solveWithInterface(*f, *u_next, *gamma, *diff);
 
-		timer.stop("Patch Solve");
-		u->update(1.0, *u_next, 0.0);
-
-		double uavg = dc.integrate(*u) / dc.area();
-		// cout << "Average of computed solution: " << uavg << endl;
-		u->update(-uavg, ones, 1.0);
+			timer.stop("Patch Solve");
+		}
+		u_tmp  = u_prev;
+		u_prev = u;
+		u      = u_next;
+		u_next = u_tmp;
+		u_next->update(1.0, *u, 0.0);
 	}
 	///////////////////
 	// solve end
@@ -427,18 +464,7 @@ int main(int argc, char *argv[])
 	timer.stop("Complete Solve");
 	// error
 	Init::fillSolution(dc, *exact, efun, t);
-	error->update(-1.0, *exact, 1.0, *u_next, 0.0);
-	{
-		double uavg = dc.integrate(*u_next) / dc.area();
-		double eavg = dc.integrate(*exact) / dc.area();
-
-		if (my_global_rank == 0) {
-			cout << "Average of computed solution: " << uavg << endl;
-			cout << "Average of exact solution: " << eavg << endl;
-		}
-
-		error->update(eavg - uavg, ones, 1.0);
-	}
+	error->update(-1.0, *exact, 1.0, *u, 0.0);
 	double error_norm = error->getVector(0)->norm2();
 	double exact_norm = exact->getVector(0)->norm2();
 
@@ -462,6 +488,7 @@ int main(int argc, char *argv[])
 		VtkWriter writer(dc, ss.str());
 		writer.add(*u, "Solution");
 		writer.add(*exact, "Exact");
+		writer.add(*error, "Error");
 		writer.write();
 	}
 #endif
