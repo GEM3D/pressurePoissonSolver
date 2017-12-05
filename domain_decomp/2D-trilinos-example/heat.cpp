@@ -1,14 +1,15 @@
 #include "DomainCollection.h"
 #include "Factory.h"
-#include "MatrixHelper.h"
-#include "SchurHelper.h"
-//#include "FunctionWrapper.h"
 #include "FivePtPatchOperator.h"
+#include "FourthInterpolator.h"
+#include "FunctionWrapper.h"
 #include "Init.h"
+#include "MatrixHelper.h"
 #include "MyTypeDefs.h"
 #include "PatchSolvers/FftwPatchSolver.h"
 #include "PatchSolvers/FishpackPatchSolver.h"
 #include "QuadInterpolator.h"
+#include "SchurHelper.h"
 #include "Writers/ClawWriter.h"
 #include "Writers/MMWriter.h"
 #ifdef ENABLE_AMGX
@@ -201,7 +202,7 @@ int main(int argc, char *argv[])
 
 	double dt        = args::get(f_dt);
 	double tend      = args::get(f_tend);
-	double out_every = 0.1;
+	double out_every = 0;
 	if (f_out_every) {
 		out_every = args::get(f_out_every);
 	}
@@ -236,14 +237,14 @@ int main(int argc, char *argv[])
 	// the functions that we are using
 
 	auto efun = [=](double x, double y, double t) {
-		return exp(-8 * M_PI * M_PI * alpha * t) * sin(2 * M_PI * y) * sin(2 * M_PI * x);
+		return exp(-2 * M_PI * M_PI * alpha * t) * sin(1 * M_PI * y) * sin(1 * M_PI * x);
 	};
 	// set the patch solver
 	double lambda = -1.0 / (alpha * dt);
 	if (f_bdf2) {
 		lambda = -3.0 / (2.0 * alpha * dt);
 	}
-	RCP<PatchSolver> p_solver = rcp(new FishpackPatchSolver(lambda));
+	RCP<PatchSolver> p_solver = rcp(new FftwPatchSolver(dc, lambda));
 
 	// patch operator
 	RCP<PatchOperator> p_operator = rcp(new FivePtPatchOperator());
@@ -280,15 +281,20 @@ int main(int argc, char *argv[])
 	RCP<const map_type> matrix_map_const = matrix_map;
 
 	// Create the gamma and diff vectors
-	RCP<vector_type>               gamma = rcp(new vector_type(matrix_map, 1));
-	RCP<vector_type>               zeros = rcp(new vector_type(matrix_map, 1));
-	RCP<vector_type>               diff  = rcp(new vector_type(matrix_map, 1));
-	RCP<vector_type>               b     = rcp(new vector_type(matrix_map, 1));
-	RCP<matrix_type>               A;
-	RCP<const Tpetra::RowMatrix<>> rm;
+	RCP<vector_type>                   gamma   = rcp(new vector_type(matrix_map, 1));
+	RCP<vector_type>                   gamma_e = rcp(new vector_type(matrix_map, 1));
+	RCP<vector_type>                   zeros   = rcp(new vector_type(matrix_map, 1));
+	RCP<vector_type>                   diff    = rcp(new vector_type(matrix_map, 1));
+	RCP<vector_type>                   b       = rcp(new vector_type(matrix_map, 1));
+	RCP<matrix_type>                   A;
+	RCP<matrix_type>                   A_full;
+	RCP<const Tpetra::RowMatrix<>>     rm;
+	RCP<Tpetra::Operator<scalar_type>> op;
 
 	// Create linear problem for the Belos solver
 	RCP<Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>> problem;
+	RCP<Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>>
+	problem_resid;
 	RCP<Belos::SolverManager<scalar_type, vector_type, Tpetra::Operator<scalar_type>>> solver;
 	Teuchos::ParameterList belosList;
 
@@ -302,7 +308,9 @@ int main(int argc, char *argv[])
 	Teuchos::RCP<HypreWrapper> hypresolver;
 #endif
 
-	steady_clock::time_point tsolve_start;
+		RCP<vector_type> exact = rcp(new vector_type(domain_map, 1));
+		RCP<vector_type> error = rcp(new vector_type(domain_map, 1));
+		RCP<vector_type> resid = rcp(new vector_type(domain_map, 1));
 	if ((f_schur && dc.num_global_domains != 1) || !f_schur) {
 		// do iterative solve
 
@@ -311,39 +319,91 @@ int main(int argc, char *argv[])
 		///////////////////
 		timer.start("Linear System Setup");
 
-		if (f_wrapper) {
-			// Create a function wrapper
-			// op = rcp(new FuncWrap(b, &dc));
-		} else {
-			timer.start("Matrix Formation");
+		timer.start("Matrix Formation");
 
-			if (f_schur) {
-				A  = sch.formCRSMatrix();
-				rm = A;
-			} else {
-				A  = mh.formCRSMatrix(lambda);
-				rm = A;
+		if (f_schur) {
+			A      = sch.formCRSMatrix();
+			A_full = mh.formCRSMatrix(lambda);
+			rm     = A;
+			op     = A;
+			if (f_wrapper) {
+				// Create a function wrapper
+				op = rcp(new FuncWrap(&b, &u_next, &f, &sch));
 			}
-
-			timer.stop("Matrix Formation");
-
-			if (save_matrix_file != "")
-				Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A, "",
-				                                                           "");
+		} else {
+			A      = mh.formCRSMatrix(lambda);
+			A_full = A;
+			rm     = A;
+			op     = A;
 		}
 
+		timer.stop("Matrix Formation");
+
+		if (save_matrix_file != "")
+			Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A, "", "");
+
+		if (f_schur) {
+			problem
+			= rcp(new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(
+			op, gamma, b));
+
+			problem_resid
+			= rcp(new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(
+			op, gamma_e, b));
+			if (f_hypre&&f_wrapper) {
+					// Create the relaxation.  You could also do this using
+					// Ifpack2::Factory (the preconditioner factory) if you like.
+					RCP<precond_type> prec = rcp(new Ifpack2::Relaxation<Tpetra::RowMatrix<>>(A));
+					// Make the list of relaxation parameters.
+					Teuchos::ParameterList params;
+					// Do symmetric SOR / Gauss-Seidel.
+					params.set("relaxation: type", "Jacobi");
+					// Two sweeps (of symmetric SOR / Gauss-Seidel) per apply() call.
+					params.set("relaxation: sweeps", 1);
+					// ... Set any other parameters you want to set ...
+
+					// Set parameters.
+					prec->setParameters(params);
+					// Prepare the relaxation instance for use.
+					prec->initialize();
+					prec->compute();
+
+				problem->setLeftPrec(prec);
+
+			}
+		} else {
+			problem
+			= rcp(new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(
+			op, u_next, f));
+		}
 		if (f_amgx) {
 #ifdef ENABLE_AMGX
 			timer.start("AMGX Setup");
 			amgxsolver = rcp(new AmgxWrapper(A, dc, nx));
 			timer.stop("AMGX Setup");
 #endif
-		} else if (f_hypre) {
+		} else if (f_hypre&&!f_wrapper ) {
 #ifdef ENABLE_HYPRE
 			timer.start("Hypre Setup");
 			hypresolver = rcp(new HypreWrapper(A, dc, nx, tol, true));
 			timer.stop("Hypre Setup");
 #endif
+		} else {
+			// Set the parameters
+			belosList.set("Block Size", 1);
+			belosList.set("Maximum Iterations", 5000);
+			belosList.set("Convergence Tolerance", tol);
+			belosList.set("Output Frequency", out_every==0?1:(out_every / dt));
+			// int verbosity = 0;
+			int verbosity = Belos::TimingDetails + Belos::IterationDetails;
+			belosList.set("Verbosity", verbosity);
+			belosList.set("Rel RHS Err", 0.0);
+			belosList.set("Rel Mat Err", 0.0);
+
+			// Create solver and solve
+			solver = rcp(
+			new Belos::BlockGmresSolMgr<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(
+			problem, rcp(&belosList, false)));
 		}
 		///////////////////
 		// setup end
@@ -359,19 +419,10 @@ int main(int argc, char *argv[])
 
 	vector_type ones(domain_map, 1);
 	ones.putScalar(1);
-	int              i     = 0;
-	RCP<vector_type> exact = rcp(new vector_type(domain_map, 1));
-	RCP<vector_type> error = rcp(new vector_type(domain_map, 1));
-	if (f_schur) {
-		problem
-		= rcp(new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(
-		A, gamma, b));
-	} else {
-		problem
-		= rcp(new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(
-		A, u_next, f));
-	}
+	int i = 0;
+
 	for (; t < tend; t += dt) {
+#ifdef HAVE_VTK
 		if (f_outvtk) {
 			if (t >= i * out_every) {
 				std::ostringstream ss;
@@ -382,16 +433,21 @@ int main(int argc, char *argv[])
 				writer.add(*exact, "Exact");
 				error->update(-1.0, *exact, 1.0, *u, 0.0);
 				writer.add(*error, "Error");
+				A_full->apply(*u, *resid);
+				resid->update(-1.0, *f, 1.0);
+				writer.add(*resid, "Residual");
 				writer.write();
 				i++;
 			}
 		}
+#endif
 		if (f_bdf2) {
 			f->update(-1.0 / 3.0, *u_prev, 4.0 / 3.0, *u, 0.0);
 		} else {
 			f->update(1.0, *u, 0.0);
 		}
 		f->scale(lambda);
+
 		if ((f_schur && dc.num_global_domains != 1) || !f_schur) {
 			timer.start("Linear Solve");
 			// Get the b vector
@@ -414,7 +470,7 @@ int main(int argc, char *argv[])
 				}
 #endif
 #ifdef ENABLE_HYPRE
-			} else if (f_hypre) {
+			} else if (f_hypre&&!f_wrapper) {
 				if (f_schur) {
 					hypresolver->solve(gamma, b);
 				} else {
@@ -422,23 +478,12 @@ int main(int argc, char *argv[])
 				}
 #endif
 			} else {
-				problem->setProblem();
+                if(f_schur){
+				problem->setProblem(gamma,b);
+                }else{
+				problem->setProblem(u_next,f);
+                }
 
-				// Set the parameters
-				belosList.set("Block Size", 1);
-				belosList.set("Maximum Iterations", 5000);
-				belosList.set("Convergence Tolerance", tol);
-				belosList.set("Output Frequency", out_every / dt);
-				// int verbosity = 0;
-				int verbosity = Belos::TimingDetails + Belos::IterationDetails;
-				belosList.set("Verbosity", verbosity);
-				belosList.set("Rel RHS Err", 0.0);
-				belosList.set("Rel Mat Err", 0.0);
-
-				// Create solver and solve
-				solver = rcp(new Belos::BlockGmresSolMgr<scalar_type, vector_type,
-				                                         Tpetra::Operator<scalar_type>>(
-				problem, rcp(&belosList, false)));
 				solver->solve();
 			}
 			timer.stop("Linear Solve");
@@ -448,14 +493,29 @@ int main(int argc, char *argv[])
 		if (f_schur) {
 			timer.start("Patch Solve");
 
+			// gamma->scale(lambda);
 			sch.solveWithInterface(*f, *u_next, *gamma, *diff);
-
 			timer.stop("Patch Solve");
+			if (f_iter) {
+				A_full->apply(*u, *resid);
+				resid->update(-1.0, *f, 1.0);
+				sch.solveWithInterface(*resid, *error, *gamma_e, *b);
+				b->scale(-1);
+
+				problem_resid->setProblem();
+				solver = rcp(new Belos::BlockGmresSolMgr<scalar_type, vector_type,
+				                                         Tpetra::Operator<scalar_type>>(
+				problem_resid, rcp(&belosList, false)));
+				solver->solve();
+				sch.solveWithInterface(*resid, *error, *gamma_e, *b);
+				u_next->update(1, *error, 1);
+			}
 		}
 		u_tmp  = u_prev;
 		u_prev = u;
 		u      = u_next;
 		u_next = u_tmp;
+		// use previous solution as initial guess
 		u_next->update(1.0, *u, 0.0);
 	}
 	///////////////////
@@ -465,13 +525,22 @@ int main(int argc, char *argv[])
 	// error
 	Init::fillSolution(dc, *exact, efun, t);
 	error->update(-1.0, *exact, 1.0, *u, 0.0);
-	double error_norm = error->getVector(0)->norm2();
-	double exact_norm = exact->getVector(0)->norm2();
+	double error_norm     = error->getVector(0)->norm2();
+	double error_norm_inf = error->getVector(0)->normInf();
+	double exact_norm     = exact->getVector(0)->norm2();
+	A_full->apply(*u, *resid);
+	resid->update(-1.0, *f, 1.0);
+	double resid_norm     = resid->getVector(0)->norm2();
+	double resid_norm_inf = resid->getVector(0)->normInf();
+	double f_norm         = f->getVector(0)->norm2();
 
 	if (my_global_rank == 0) {
 		std::cout << std::scientific;
 		std::cout.precision(13);
-		std::cout << "Error: " << error_norm / exact_norm << endl;
+		std::cout << "Error    (2 norm):   " << error_norm / exact_norm << endl;
+		std::cout << "Error    (inf norm): " << error_norm_inf << endl;
+		std::cout << "Residual (2 norm):   " << resid_norm / f_norm << endl;
+		std::cout << "Residual (inf norm): " << resid_norm_inf << endl;
 		cout.unsetf(std::ios_base::floatfield);
 	}
 	if (save_gamma_file != "") {
@@ -489,6 +558,7 @@ int main(int argc, char *argv[])
 		writer.add(*u, "Solution");
 		writer.add(*exact, "Exact");
 		writer.add(*error, "Error");
+		writer.add(*resid, "Residual");
 		writer.write();
 	}
 #endif

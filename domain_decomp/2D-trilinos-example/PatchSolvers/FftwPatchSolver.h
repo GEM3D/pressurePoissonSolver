@@ -30,6 +30,7 @@ class FftwPatchSolver : public PatchSolver
 	int         n;
 	bool        initialized = false;
 	static bool compareDomains();
+    double lambda;
 	std::map<DomainK, fftw_plan> plan1;
 	std::map<DomainK, fftw_plan> plan2;
 	std::valarray<double> f_copy;
@@ -38,7 +39,7 @@ class FftwPatchSolver : public PatchSolver
 	std::map<DomainK, std::valarray<double>> denoms;
 
 	public:
-	FftwPatchSolver(DomainCollection &dsc);
+	FftwPatchSolver(DomainCollection &dsc,double lambda=0);
 	~FftwPatchSolver();
 	void solve(Domain &d, const vector_type &f, vector_type &u, const vector_type &gamma);
 	void solve(Domain &d, const vector_type &f, vector_type u, const vector_type &gamma);

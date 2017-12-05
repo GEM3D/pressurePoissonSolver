@@ -9,6 +9,8 @@ using namespace std;
 void FishpackPatchSolver::solve(Domain &d, const vector_type &f, vector_type &u,
                                 const vector_type &gamma)
 {
+	double           h_x        = d.x_length / d.n;
+	double           h_y        = d.y_length / d.n;
 	auto             gamma_view = gamma.get1dView();
 	auto             f_view     = f.get1dView();
 	auto             u_view     = u.get1dViewNonConst();
@@ -27,13 +29,7 @@ void FishpackPatchSolver::solve(Domain &d, const vector_type &f, vector_type &u,
 		mbcdnd = 1;
 	}
 	const double *bda = &zeros[0];
-	if (d.hasNbr(Side::west)) {
-		bda = &gamma_view[d.index(Side::west) * d.n];
-	}
 	const double *bdb = &zeros[0];
-	if (d.hasNbr(Side::east)) {
-		bdb = &gamma_view[d.index(Side::east) * d.n];
-	}
 
 	double c      = d.y_start;
 	double d2     = d.y_start + d.y_length;
@@ -49,13 +45,7 @@ void FishpackPatchSolver::solve(Domain &d, const vector_type &f, vector_type &u,
 		nbcdnd = 1;
 	}
 	const double *bdc = &zeros[0];
-	if (d.hasNbr(Side::south)) {
-		bdc = &gamma_view[d.index(Side::south) * d.n];
-	}
 	const double *bdd = &zeros[0];
-	if (d.hasNbr(Side::north)) {
-		bdd = &gamma_view[d.index(Side::north) * d.n];
-	}
 
 	int     start  = d.id_local * d.n * d.n;
 	double  elmbda = lambda;
@@ -63,7 +53,36 @@ void FishpackPatchSolver::solve(Domain &d, const vector_type &f, vector_type &u,
 	for (int i = 0; i < m * n; i++) {
 		f_ptr[i] = f_view[start + i];
 	}
+	if (lambda != 0) {
+		for (int i = 0; i < m * n; i++) {
+			f_ptr[i] *=lambda;
+		}
+	}
 	int              idimf  = n;
+	if (d.hasNbr(Side::north)) {
+		int idx = n * d.index(Side::north);
+		for (int i = 0; i < n; i++) {
+			f_ptr[n * (n - 1) + i] -= 2 / (h_y * h_y) * gamma_view[idx + i];
+		}
+	}
+	if (d.hasNbr(Side::east)) {
+		int idx = n * d.index(Side::east);
+		for (int i = 0; i < n; i++) {
+			f_ptr[i * n + (n - 1)] -= 2 / (h_x * h_x) * gamma_view[idx + i];
+		}
+	}
+	if (d.hasNbr(Side::south)) {
+		int idx = n * d.index(Side::south);
+		for (int i = 0; i < n; i++) {
+			f_ptr[i] -= 2 / (h_y * h_y) * gamma_view[idx + i];
+		}
+	}
+	if (d.hasNbr(Side::west)) {
+		int idx = n * d.index(Side::west);
+		for (int i = 0; i < n; i++) {
+			f_ptr[n * i] -= 2 / (h_x * h_x) * gamma_view[idx + i];
+		}
+	}
 	double           pertrb = 0;
 	int              ierror = 0;
 	valarray<double> w(13 * m + 4 * n + m * log2(n));

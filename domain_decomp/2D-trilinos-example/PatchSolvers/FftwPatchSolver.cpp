@@ -1,9 +1,10 @@
 #include "FftwPatchSolver.h"
 using namespace std;
 
-FftwPatchSolver::FftwPatchSolver(DomainCollection &dc)
+FftwPatchSolver::FftwPatchSolver(DomainCollection &dc,double lambda)
 {
 	n = dc.n;
+    this->lambda = lambda;
 	for (auto &p : dc.domains) {
 		addDomain(p.second);
 	}
@@ -108,6 +109,7 @@ void FftwPatchSolver::addDomain(Domain &d)
 				}
 			}
 		}
+        denom+=lambda;
 	}
 }
 FftwPatchSolver::~FftwPatchSolver()

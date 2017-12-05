@@ -48,10 +48,8 @@
 #include <Teuchos_oblackholestream.hpp>
 #include <Tpetra_Experimental_BlockCrsMatrix_Helpers.hpp>
 #include <Xpetra_TpetraBlockCrsMatrix.hpp>
-#include <chrono>
 #include <cmath>
 #include <iostream>
-//#include <mpi.h>
 #include <string>
 #include <unistd.h>
 #ifndef M_PIl
@@ -69,11 +67,6 @@ using namespace std;
 
 int main(int argc, char *argv[])
 {
-	//    using Belos::FuncWrap;
-	using Teuchos::RCP;
-	using Teuchos::rcp;
-	using namespace std::chrono;
-
 	Teuchos::GlobalMPISession     global(&argc, &argv, nullptr);
 	RCP<const Teuchos::Comm<int>> comm = Tpetra::DefaultPlatform::getDefaultPlatform().getComm();
 
@@ -96,6 +89,7 @@ int main(int argc, char *argv[])
 	                     {"nozerof"});
 	args::ValueFlag<double> f_t(
 	parser, "tolerance", "set the tolerance of the iterative solver (default is 1e-10)", {'t'});
+	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {"neumann"});
 
 	// mesh options
 	args::ValueFlag<string> f_mesh(parser, "file_name", "read in a mesh", {"mesh"});
@@ -119,7 +113,7 @@ int main(int argc, char *argv[])
 	                                "the file to write the residual to", {"residual"});
 	args::ValueFlag<string> f_error(parser, "error filename", "the file to write the error to",
 	                                {"error"});
-	args::ValueFlag<string> f_r(parser, "rhs filename", "the file to write the rhs vector to",
+	args::ValueFlag<string> f_rhs(parser, "rhs filename", "the file to write the rhs vector to",
 	                            {'r'});
 	args::ValueFlag<string> f_g(parser, "gamma filename", "the file to write the gamma vector to",
 	                            {'g'});
@@ -134,7 +128,7 @@ int main(int argc, char *argv[])
 	args::Flag f_precj(parser, "prec", "use jacobi preconditioner", {"precj"});
 	args::Flag f_prec(parser, "prec", "use block diagonal jacobi preconditioner", {"prec"});
 	args::Flag f_precmuelu(parser, "prec", "use MueLu AMG preconditioner", {"muelu"});
-	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {"neumann"});
+	// iterative options
 	args::Flag f_cg(parser, "gmres", "use CG for iterative solver", {"cg"});
 	args::Flag f_gmres(parser, "gmres", "use GMRES for iterative solver", {"gmres"});
 	args::Flag f_lsqr(parser, "gmres", "use least squares for iterative solver", {"lsqr"});
@@ -183,9 +177,28 @@ int main(int argc, char *argv[])
 		}
 		return 1;
 	}
+    // Set the number of discretization points in the x and y direction.
+	int nx = args::get(f_n);
+	int ny = args::get(f_n);
+
+    double tol = 1e-12;
+	if (f_t) {
+		tol = args::get(f_t);
+	}
+
+	int loop_count = 1;
+	if (f_l) {
+		loop_count = args::get(f_l);
+	}
+    /***********
+     * Input parsing done
+     **********/
 
 	bool direct_solve = (f_lu || f_superlu || f_mumps || f_basker);
 
+    ///////////////
+    // Create Mesh
+    ///////////////
 	DomainCollection dc;
 	if (f_mesh) {
 		string d = args::get(f_mesh);
@@ -205,60 +218,20 @@ int main(int argc, char *argv[])
 	if (f_neumann) {
 		dc.setNeumann();
 	}
-	// Set the number of discretization points in the x and y direction.
-	int nx = args::get(f_n);
-	int ny = args::get(f_n);
-	dc.n   = nx;
+    dc.n   = nx;
 	for (auto &p : dc.domains) {
 		p.second.n = nx;
 	}
-	int total_cells = dc.num_global_domains * nx * ny;
-	cerr << "Total cells: " << total_cells << endl;
+	int total_cells = dc.getGlobalNumCells();
+	cout << "Total cells: " << total_cells << endl;
 
 	if (dc.num_global_domains < num_procs) {
 		std::cerr << "number of domains must be greater than or equal to the number of processes\n";
 		return 1;
 	}
-	// partition domains
+	// partition domains if running in parallel
 	if (num_procs > 1) {
 		dc.zoltanBalance();
-	}
-
-	scalar_type tol = 1e-12;
-	if (f_t) {
-		tol = args::get(f_t);
-	}
-
-	int loop_count = 1;
-	if (f_l) {
-		loop_count = args::get(f_l);
-	}
-
-	string save_matrix_file = "";
-	if (f_m) {
-		save_matrix_file = args::get(f_m);
-	}
-
-	string save_solution_file = "";
-	if (f_s) {
-		save_solution_file = args::get(f_s);
-	}
-
-	string save_residual_file = "";
-	if (f_resid) {
-		save_residual_file = args::get(f_resid);
-	}
-	string save_error_file = "";
-	if (f_error) {
-		save_error_file = args::get(f_error);
-	}
-	string save_rhs_file = "";
-	if (f_r) {
-		save_rhs_file = args::get(f_r);
-	}
-	string save_gamma_file = "";
-	if (f_g) {
-		save_gamma_file = args::get(f_g);
 	}
 
 	// the functions that we are using
@@ -274,28 +247,28 @@ int main(int argc, char *argv[])
 		nfuny = [](double x, double y) { return 0; };
 	} else if (f_gauss) {
 		gfun
-		= [](double x, double y) { return exp(cos(10 * M_PIl * x)) - exp(cos(11 * M_PIl * y)); };
+		= [](double x, double y) { return exp(cos(10 * M_PI * x)) - exp(cos(11 * M_PI * y)); };
 		ffun = [](double x, double y) {
-			return 100 * M_PIl * M_PIl * (pow(sin(10 * M_PIl * x), 2) - cos(10 * M_PIl * x))
-			       * exp(cos(10 * M_PIl * x))
-			       + 121 * M_PIl * M_PIl * (cos(11 * M_PIl * y) - pow(sin(11 * M_PIl * y), 2))
-			         * exp(cos(11 * M_PIl * y));
+			return 100 * M_PI * M_PI * (pow(sin(10 * M_PI * x), 2) - cos(10 * M_PI * x))
+			       * exp(cos(10 * M_PI * x))
+			       + 121 * M_PI * M_PI * (cos(11 * M_PI * y) - pow(sin(11 * M_PI * y), 2))
+			         * exp(cos(11 * M_PI * y));
 		};
 		nfunx = [](double x, double y) {
-			return -10 * M_PIl * sin(10 * M_PIl * x) * exp(cos(10 * M_PIl * x));
+			return -10 * M_PI * sin(10 * M_PI * x) * exp(cos(10 * M_PI * x));
 		};
 
 		nfuny = [](double x, double y) {
-			return 11 * M_PIl * sin(11 * M_PIl * y) * exp(cos(11 * M_PIl * y));
+			return 11 * M_PI * sin(11 * M_PI * y) * exp(cos(11 * M_PI * y));
 		};
 	} else {
 		ffun = [](double x, double y) {
-			return -5 * M_PIl * M_PIl * sinl(M_PIl * y) * cosl(2 * M_PIl * x);
+			return -5 * M_PI * M_PI * sinl(M_PI * y) * cosl(2 * M_PI * x);
 		};
-		gfun = [](double x, double y) { return sinl(M_PIl * y) * cosl(2 * M_PIl * x); };
+		gfun = [](double x, double y) { return sinl(M_PI * y) * cosl(2 * M_PI * x); };
 		nfunx
-		= [](double x, double y) { return -2 * M_PIl * sinl(M_PIl * y) * sinl(2 * M_PIl * x); };
-		nfuny = [](double x, double y) { return M_PIl * cosl(M_PIl * y) * cosl(2 * M_PIl * x); };
+		= [](double x, double y) { return -2 * M_PI * sinl(M_PI * y) * sinl(2 * M_PI * x); };
+		nfuny = [](double x, double y) { return M_PI * cosl(M_PI * y) * cosl(2 * M_PI * x); };
 	}
 
 	// set the patch solver
@@ -371,7 +344,6 @@ int main(int argc, char *argv[])
 		Teuchos::RCP<HypreWrapper> hypresolver;
 #endif
 
-		steady_clock::time_point tsolve_start;
 		if (dc.num_global_domains != 1) {
 			// do iterative solve
 
@@ -379,8 +351,8 @@ int main(int argc, char *argv[])
 			sch.solveWithInterface(*f, *u, *gamma, *b);
 			b->scale(-1.0);
 
-			if (save_rhs_file != "") {
-				Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_rhs_file, b, "", "");
+			if (f_rhs) {
+				Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(args::get(f_rhs), b, "", "");
 			}
 
 			///////////////////
@@ -401,9 +373,10 @@ int main(int argc, char *argv[])
 				op = A;
 				rm = A;
 
-				if (save_matrix_file != "")
-					Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A,
+				if (f_m){
+					Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(args::get(f_m), A,
 					                                                           "", "");
+                }
 			}
 
 			problem
@@ -679,18 +652,20 @@ int main(int argc, char *argv[])
 			std::cout << u8"ΣAu-Σf: " << ausum - fsum << endl;
 			cout.unsetf(std::ios_base::floatfield);
 		}
+
+        //output 
 		MMWriter mmwriter(dc, f_amr);
-		if (save_solution_file != "") {
-			mmwriter.write(*u, save_solution_file);
+		if (f_s) {
+			mmwriter.write(*u, args::get(f_s));
 		}
-		if (save_residual_file != "") {
-			mmwriter.write(*resid, save_residual_file);
+		if (f_resid) {
+			mmwriter.write(*resid, args::get(f_resid));
 		}
-		if (save_error_file != "") {
-			mmwriter.write(*error, save_error_file);
+		if (f_error) {
+			mmwriter.write(*error, args::get(f_error));
 		}
-		if (save_gamma_file != "") {
-			Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_gamma_file, gamma, "",
+		if (f_g) {
+			Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(args::get(f_g), gamma, "",
 			                                                          "");
 		}
 		if (f_outclaw) {

@@ -80,6 +80,8 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 	RCP<const map_type> gamma_local_map = Tpetra::createLocalMap<int, int>(n, comm);
 	vector_type         u(local_map, 1);
 	vector_type         f(local_map, 1);
+	vector_type         r(local_map, 1);
+	vector_type         e(local_map, 1);
 	vector_type         gamma(gamma_local_map, 1);
 	vector_type         interp(gamma_local_map, 1);
 	auto                interp_view = interp.get1dView();
@@ -107,8 +109,8 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 		ds.n               = n;
 		ds.id              = 0;
 		ds.id_local        = 0;
-		ds.x_length        = n;
-		ds.y_length        = n;
+		ds.x_length        = curr_type.length;
+		ds.y_length        = curr_type.length;
 		ds.nbr_id[0]       = 1;
 		ds.neumann         = curr_type.neumann;
 		ds.zero_patch      = curr_type.zero_patch;
@@ -130,6 +132,7 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 			gamma_view[j] = 1;
 			solver->solve(ds, f, u, gamma);
 			gamma_view[j] = 0;
+
 
 			// fill the blocks
 			for (auto &p : coeffs) {

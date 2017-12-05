@@ -36,8 +36,9 @@ struct MatrixBlock {
 	std::bitset<4> neumann;
 	Side           s;
 	InterpCase     type;
+	double         length;
 	MatrixBlock(int i, int j, Side main, Side aux, std::bitset<4> neumann, bool zero_patch,
-	            InterpCase type)
+	            InterpCase type, double length)
 	{
 		this->i      = i;
 		this->j      = j;
@@ -50,10 +51,12 @@ struct MatrixBlock {
 		this->zero_patch = zero_patch;
 		this->type       = type;
 		this->s          = aux;
+		this->length     = length;
 	}
 	friend bool operator==(const MatrixBlock &l, const MatrixBlock &r)
 	{
-		return std::tie(l.neumann, l.zero_patch) == std::tie(r.neumann, r.zero_patch);
+		return std::tie(l.neumann, l.zero_patch, l.length)
+		       == std::tie(r.neumann, r.zero_patch, r.length);
 	}
 	friend bool operator<(const MatrixBlock &l, const MatrixBlock &r)
 	{
