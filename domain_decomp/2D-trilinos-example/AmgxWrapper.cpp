@@ -52,26 +52,31 @@ AmgxWrapper::AmgxWrapper(Teuchos::RCP<matrix_type> A, const DomainCollection &dc
 	/* create resources, matrix, vector and solver */
 	AMGX_config_create_from_file(&cfg, "amgx.json");
 	AMGX_SAFE_CALL(AMGX_config_add_parameters(&cfg, "exception_handling=1"));
-	MPI_Comm AMGX_MPI_Comm = MPI_COMM_WORLD;
+	AMGX_SAFE_CALL(AMGX_config_add_parameters(&cfg, "communicator=MPI"));
 	// app must know how to provide a mapping
 	// int devices[]   = {/*get_device_id_for_this_rank()*/ 0};
 	// int num_devices = 1;
-	int rank = 0; // dc.comm->getRank()%2;
-	AMGX_resources_create(&rsrc, cfg, &AMGX_MPI_Comm, 1, &rank);
-	AMGX_matrix_create(&gA, rsrc, mode);
-	AMGX_vector_create(&gx, rsrc, mode);
-	AMGX_vector_create(&gb, rsrc, mode);
-	AMGX_solver_create(&solver, rsrc, mode, cfg);
+	int rank = dc.comm->getRank()%2;
+MPI_Comm_dup(MPI_COMM_WORLD,&AMGX_MPI_COMM);
+	AMGX_resources_create(&rsrc, cfg, &AMGX_MPI_COMM, 1, &rank);
+	AMGX_matrix_create(&gA, rsrc, AMGX_mode_dDDI);
+	AMGX_vector_create(&gx, rsrc, AMGX_mode_dDDI);
+	AMGX_vector_create(&gb, rsrc, AMGX_mode_dDDI);
+	AMGX_solver_create(&solver, rsrc, AMGX_mode_dDDI, cfg);
 
 	int nrings = 0;
 	AMGX_config_get_default_number_of_rings(cfg, &nrings);
 	int n_global = A->getGlobalNumRows();
+	cerr<< "UPLOADING!!!!!!!!!!! "<<n_global<<" " <<num_rows<<endl;
 	AMGX_matrix_upload_all_global(gA, n_global, num_rows, Acrs.nnz, 1, 1, &Acrs.row_ptrs[0],
 	                              &Acrs.cols[0], (void *) &Acrs.data[0], nullptr, nrings, nrings,
 	                              nullptr);
 
+	cerr<< "UPLOADED!!!!!!!!!!!"<<endl;
+	cerr<< "BINDING!!!!!!!!!!! "<<endl;
 	AMGX_vector_bind(gx, gA);
 	AMGX_vector_bind(gb, gA);
+	cerr<< "BOUND!!!!!!!!!!! "<<endl;
 
 	AMGX_solver_setup(solver, gA);
 }

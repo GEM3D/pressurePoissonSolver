@@ -51,9 +51,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 # that was used to build Trilinos on your machine.  You do _not_ need
 # to edit this line.
 project(DomainDecomp)
-if(ENABLE_AMGX)
-    SET(CMAKE_CXX_FLAGS "-DENABLE_AMGX ${CMAKE_CXX_FLAGS}")
-endif()
 find_package(MPI REQUIRED)
 set (CMAKE_CXX_FLAGS "-Wall -g ${Trilinos_CXX_COMPILER_FLAGS} ${CMAKE_CXX_FLAGS}")
 set (CMAKE_CXX_FLAGS_DEBUG  "-g ${CMAKE_CXX_FLAGS}")
@@ -61,6 +58,10 @@ set (CMAKE_CXX_FLAGS_DEBUG  "-g ${CMAKE_CXX_FLAGS}")
   SET(CMAKE_CXX_COMPILER ${Trilinos_CXX_COMPILER})
 
 find_package(CUDA)
+find_package(AMGX)
+if(AMGX_FOUND)
+    SET(CMAKE_CXX_FLAGS "-DENABLE_AMGX ${CMAKE_CXX_FLAGS}")
+endif()
 # If you haven't already set the C compiler, use the same compiler
 # that was used to build Trilinos on your machine.  You do _not_ 
 # need to edit this line.
@@ -103,12 +104,14 @@ include_directories(SYSTEM ${VTK_INCLUDE_DIRS})
 if(CUDA_FOUND)
 include_directories(${CUDA_INCLUDE_DIRS})
 endif()
+include_directories(${AMGX_INCLUDE_DIRS})
 
 # Add to the library path Trilinos' library path, and the library
 # paths of the third-party libraries (TPLs) with which Trilinos was
 # built.  
 link_directories(${Trilinos_LIBRARY_DIRS})
 link_directories(${Trilinos_TPL_LIBRARY_DIRS})
+link_directories("${AMGX_DIR}/lib")
 
 # 
 # EDIT HERE: Change trilinosExample to the name of the executable
@@ -189,7 +192,7 @@ target_link_libraries(HypreWrapper
   ${HYPRE_LIBRARIES} 
 )
 endif()
-if(ENABLE_AMGX)
+if(AMGX_FOUND)
 add_library(AmgxWrapper AmgxWrapper.cpp)
 target_link_libraries(steady AmgxWrapper)
 target_link_libraries(heat AmgxWrapper)
@@ -197,7 +200,7 @@ target_link_libraries(steady-nodd AmgxWrapper)
 target_link_libraries(AmgxWrapper
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
-   ${CMAKE_SOURCE_DIR}/libamgxsh.so
+   ${AMGX_LIBRARIES}
 )
 endif()
 target_link_libraries(Factory

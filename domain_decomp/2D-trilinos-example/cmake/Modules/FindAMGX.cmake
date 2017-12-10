@@ -1,7 +1,7 @@
 # - Try to find AMGX
 #
 
-find_path (AMGX_DIR base/include/amgx_c.h HINTS ENV AMGX_DIR PATHS $ENV{HOME}/hypre DOC "AMGX Directory")
+find_path (AMGX_DIR base/include/amgx_c.h HINTS ENV AMGX_DIR)
 
 IF(EXISTS ${AMGX_DIR}/base/include/amgx_c.h)
   SET(AMGX_FOUND YES)
