@@ -53,12 +53,9 @@ AmgxWrapper::AmgxWrapper(Teuchos::RCP<matrix_type> A, const DomainCollection &dc
 	AMGX_config_create_from_file(&cfg, "amgx.json");
 	AMGX_SAFE_CALL(AMGX_config_add_parameters(&cfg, "exception_handling=1"));
 	AMGX_SAFE_CALL(AMGX_config_add_parameters(&cfg, "communicator=MPI"));
-	// app must know how to provide a mapping
-	// int devices[]   = {/*get_device_id_for_this_rank()*/ 0};
-	// int num_devices = 1;
-	int rank = 0;
+	int gpu_id = dc.comm->getRank()%2;
 	MPI_Comm_dup(MPI_COMM_WORLD, &AMGX_MPI_COMM);
-	AMGX_resources_create(&rsrc, cfg, &AMGX_MPI_COMM, 1, &rank);
+	AMGX_resources_create(&rsrc, cfg, &AMGX_MPI_COMM, 1, &gpu_id);
 	AMGX_matrix_create(&gA, rsrc, AMGX_mode_dDDI);
 	AMGX_vector_create(&gx, rsrc, AMGX_mode_dDDI);
 	AMGX_vector_create(&gb, rsrc, AMGX_mode_dDDI);
