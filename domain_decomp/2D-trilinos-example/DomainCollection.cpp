@@ -1015,9 +1015,9 @@ void DomainCollection::indexIfacesLocal()
 		for (auto &p : ifaces) {
 			todo.insert(p.first);
 		}
+		set<int>   enqueued;
 		while (!todo.empty()) {
 			deque<int> queue;
-			set<int>   enqueued;
 			queue.push_back(*todo.begin());
 			enqueued.insert(*todo.begin());
 			deque<int> off_proc_ifaces;
@@ -1108,9 +1108,9 @@ void DomainCollection::indexDomainsLocal()
 		for (auto &p : domains) {
 			todo.insert(p.first);
 		}
+		set<int>   enqueued;
 		while (!todo.empty()) {
 			deque<int> queue;
-			set<int>   enqueued;
 			queue.push_back(*todo.begin());
 			enqueued.insert(*todo.begin());
 			while (!queue.empty()) {
@@ -1163,9 +1163,9 @@ void DomainCollection::indexDomainIfacesLocal()
 		for (auto &p : domains) {
 			todo.insert(p.first);
 		}
+		set<int>   enqueued;
 		while (!todo.empty()) {
 			deque<int> queue;
-			set<int>   enqueued;
 			queue.push_back(*todo.begin());
 			enqueued.insert(*todo.begin());
 			deque<int> off_proc_ifaces;
