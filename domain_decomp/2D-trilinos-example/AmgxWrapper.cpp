@@ -56,8 +56,8 @@ AmgxWrapper::AmgxWrapper(Teuchos::RCP<matrix_type> A, const DomainCollection &dc
 	// app must know how to provide a mapping
 	// int devices[]   = {/*get_device_id_for_this_rank()*/ 0};
 	// int num_devices = 1;
-	int rank = dc.comm->getRank()%2;
-MPI_Comm_dup(MPI_COMM_WORLD,&AMGX_MPI_COMM);
+	int rank = 0;
+	MPI_Comm_dup(MPI_COMM_WORLD, &AMGX_MPI_COMM);
 	AMGX_resources_create(&rsrc, cfg, &AMGX_MPI_COMM, 1, &rank);
 	AMGX_matrix_create(&gA, rsrc, AMGX_mode_dDDI);
 	AMGX_vector_create(&gx, rsrc, AMGX_mode_dDDI);
@@ -66,17 +66,21 @@ MPI_Comm_dup(MPI_COMM_WORLD,&AMGX_MPI_COMM);
 
 	int nrings = 0;
 	AMGX_config_get_default_number_of_rings(cfg, &nrings);
-	int n_global = A->getGlobalNumRows();
-	cerr<< "UPLOADING!!!!!!!!!!! "<<n_global<<" " <<num_rows<<endl;
+	int         n_global = A->getGlobalNumRows();
+	vector<int> procs(n_global);
+	vector<int> inds(n_global);
+	for (int i = 0; i < n_global; i++) {
+		inds[i] = i;
+	}
+	Teuchos::ArrayView<int> inds_view(&inds[0], n_global);
+	Teuchos::ArrayView<int> procs_view(&procs[0], n_global);
+	A->getRowMap()->getRemoteIndexList(inds_view, procs_view);
 	AMGX_matrix_upload_all_global(gA, n_global, num_rows, Acrs.nnz, 1, 1, &Acrs.row_ptrs[0],
 	                              &Acrs.cols[0], (void *) &Acrs.data[0], nullptr, nrings, nrings,
-	                              nullptr);
+	                              &procs[0]);
 
-	cerr<< "UPLOADED!!!!!!!!!!!"<<endl;
-	cerr<< "BINDING!!!!!!!!!!! "<<endl;
 	AMGX_vector_bind(gx, gA);
 	AMGX_vector_bind(gb, gA);
-	cerr<< "BOUND!!!!!!!!!!! "<<endl;
 
 	AMGX_solver_setup(solver, gA);
 }
