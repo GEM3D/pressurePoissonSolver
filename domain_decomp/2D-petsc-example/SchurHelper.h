@@ -5,6 +5,7 @@
 #include "MyTypeDefs.h"
 #include "PatchOperator.h"
 #include "PatchSolvers/PatchSolver.h"
+#include <petscmat.h>
 #include <valarray>
 /**
  * @brief This class represents a collection of domains that a single processor owns.
@@ -20,6 +21,8 @@ class SchurHelper
 	private:
 	DomainCollection dc;
 
+	std::shared_ptr<Vec> local_gamma;
+	std::shared_ptr<Vec> local_interp;
 	/**
 	 * @brief The MPI communicator used.
 	 */
@@ -62,8 +65,7 @@ class SchurHelper
 	 * @param gamma the interface values to use
 	 * @param diff the resulting difference
 	 */
-	void solveWithInterface(const vector_type &f, vector_type &u, const vector_type &gamma,
-	                        vector_type &diff);
+	void solveWithInterface(const Vec f, Vec u, const Vec gamma, Vec diff);
 
 	/**
 	 * @brief Apply patch operator with a given set of interface values
@@ -72,13 +74,13 @@ class SchurHelper
 	 * @param gamma the interface values to use
 	 * @param f the resulting rhs vector
 	 */
-	void applyWithInterface(const vector_type &u, const vector_type &gamma, vector_type &f);
+	void applyWithInterface(const Vec u, const Vec gamma, Vec f);
 
 	/**
 	 * @brief Form the Schur complement matrix
 	 *
 	 * @return the formed matrix
 	 */
-	Teuchos::RCP<matrix_type> formCRSMatrix();
+	std::shared_ptr<Mat> formCRSMatrix();
 };
 #endif

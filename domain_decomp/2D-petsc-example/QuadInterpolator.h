@@ -4,8 +4,7 @@
 class QuadInterpolator : public Interpolator
 {
 	public:
-	void interpolate(Domain &d, const vector_type &u, vector_type &interp);
-	void interpolate(Domain &d, Side s, InterpCase icase, const vector_type &u,
-	                 vector_type &interp);
+	void interpolate(Domain &d, const Vec u, Vec interp);
+	void interpolate(Domain &d, Side s, InterpCase icase, const Vec u, Vec interp);
 };
 #endif

@@ -7,6 +7,8 @@
 
 # You need CMake version >= 2.8 to use this example.
 cmake_minimum_required(VERSION 2.8)
+enable_language(CXX)
+enable_language(C)
 
 # Your "do-configure" script that invokes CMake should set
 # TRILINOS_PATH to the path to your Trilinos install.
@@ -47,6 +49,7 @@ ENDIF()
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+find_package(PETSc REQUIRED)
 # If you haven't already set the C++ compiler, use the same compiler
 # that was used to build Trilinos on your machine.  You do _not_ need
 # to edit this line.
@@ -105,6 +108,7 @@ if(CUDA_FOUND)
 include_directories(${CUDA_INCLUDE_DIRS})
 endif()
 include_directories(${AMGX_INCLUDE_DIRS})
+include_directories(${PETSC_INCLUDES})
 
 # Add to the library path Trilinos' library path, and the library
 # paths of the third-party libraries (TPLs) with which Trilinos was
@@ -147,6 +151,7 @@ target_link_libraries(steady
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
   ${MPI_CXX_LIBRARIES} 
+  ${PETSC_LIBRARIES} 
 )
 target_link_libraries(heat
     SchurHelper
@@ -162,6 +167,7 @@ target_link_libraries(heat
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
   ${MPI_CXX_LIBRARIES} 
+  ${PETSC_LIBRARIES} 
 )
 if(VTK_FOUND)
     target_link_libraries(steady VtkWriter)
@@ -177,6 +183,7 @@ target_link_libraries(steady-nodd
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
   ${MPI_CXX_LIBRARIES} 
+  ${PETSC_LIBRARIES} 
 )
 if(VTK_FOUND)
     target_link_libraries(steady-nodd VtkWriter)

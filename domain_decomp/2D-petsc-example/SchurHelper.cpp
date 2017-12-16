@@ -16,38 +16,43 @@ SchurHelper::SchurHelper(DomainCollection dc, Teuchos::RCP<const Teuchos::Comm<i
 	this->solver       = solver;
 	this->op           = op;
 	this->interpolator = interpolator;
+	local_gamma        = dc.getNewSchurDistVec();
+	local_interp       = dc.getNewSchurDistVec();
 }
 
-void SchurHelper::solveWithInterface(const vector_type &f, vector_type &u, const vector_type &gamma,
-                                     vector_type &diff)
+void SchurHelper::solveWithInterface(const Vec f, Vec u, const Vec gamma, Vec diff)
 {
 	// initilize our local variables
-	Tpetra::Import<> importer(diff.getMap(), dc.getSchurDistMap());
-	vector_type      local_gamma(dc.getSchurDistMap(), 1);
-	vector_type      local_interp(dc.getSchurDistMap(), 1);
-	local_gamma.doImport(gamma, importer, Tpetra::CombineMode::INSERT);
-
+	VecScatter scatter;
+    //if(dc.num_global_domains!=1){
+	VecScatterCreate(gamma, dc.getSchurIS(), *local_gamma, dc.getSchurDistIS(), &scatter);
+	VecScatterBegin(scatter, gamma, *local_gamma, INSERT_VALUES, SCATTER_FORWARD);
+	VecScatterEnd(scatter, gamma, *local_gamma, INSERT_VALUES, SCATTER_FORWARD);
+    //}
 	// solve over domains on this proc
 	for (auto &p : dc.domains) {
 		Domain &d = p.second;
-		solver->solve(d, f, u, local_gamma);
-		interpolator->interpolate(d, u, local_interp);
+		solver->solve(d, f, u, *local_gamma);
+		interpolator->interpolate(d, u, *local_interp);
 	}
 
 	// export diff vector
-	diff.putScalar(0);
-	diff.doExport(local_interp, importer, Tpetra::CombineMode::ADD);
-	diff.update(1.0, gamma, -1.0);
+    //if(dc.num_global_domains!=1){
+	VecScale(diff, 0);
+	VecScatterBegin(scatter, *local_interp, diff, ADD_VALUES, SCATTER_REVERSE);
+	VecScatterEnd(scatter, *local_interp, diff, ADD_VALUES, SCATTER_REVERSE);
+    //}
 }
-void SchurHelper::applyWithInterface(const vector_type &u, const vector_type &gamma, vector_type &f)
+void SchurHelper::applyWithInterface(const Vec u, const Vec gamma, Vec f)
 {
-	Tpetra::Import<> importer(gamma.getMap(), dc.getSchurDistMap());
-	vector_type      local_gamma(dc.getSchurDistMap(), 1);
-	local_gamma.putScalar(0);
-	local_gamma.doImport(gamma, importer, Tpetra::CombineMode::INSERT);
+	VecScatter scatter;
+	VecScatterCreate(gamma, dc.getSchurIS(), *local_gamma, dc.getSchurDistIS(), &scatter);
+
+	VecScatterBegin(scatter, gamma, *local_gamma, INSERT_VALUES, SCATTER_FORWARD);
+	VecScatterEnd(scatter, gamma, *local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 	for (auto &p : dc.domains) {
 		Domain &d = p.second;
-		op->apply(d, u, local_gamma, f);
+		op->apply(d, u, *local_gamma, f);
 	}
 }
 
@@ -78,14 +83,16 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 	int                 num_types       = 0;
 	RCP<const map_type> local_map       = Tpetra::createLocalMap<int, int>(n * n, comm);
 	RCP<const map_type> gamma_local_map = Tpetra::createLocalMap<int, int>(n, comm);
-	vector_type         u(local_map, 1);
-	vector_type         f(local_map, 1);
-	vector_type         r(local_map, 1);
-	vector_type         e(local_map, 1);
-	vector_type         gamma(gamma_local_map, 1);
-	vector_type         interp(gamma_local_map, 1);
-	auto                interp_view = interp.get1dView();
-	auto                gamma_view  = gamma.get1dViewNonConst();
+	Vec                 u, f, r, e, gamma, interp;
+	VecCreateSeq(PETSC_COMM_SELF, n * n, &u);
+	VecCreateSeq(PETSC_COMM_SELF, n * n, &f);
+	VecCreateSeq(PETSC_COMM_SELF, n * n, &r);
+	VecCreateSeq(PETSC_COMM_SELF, n * n, &e);
+	VecCreateSeq(PETSC_COMM_SELF, n, &gamma);
+	VecCreateSeq(PETSC_COMM_SELF, n, &interp);
+	double *interp_view, *gamma_view;
+	VecGetArray(interp, &interp_view);
+	VecGetArray(gamma, &gamma_view);
 	while (!blocks.empty()) {
 		num_types++;
 		// the first in the set is the type of interface that we are going to solve for
@@ -133,12 +140,11 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 			solver->solve(ds, f, u, gamma);
 			gamma_view[j] = 0;
 
-
 			// fill the blocks
 			for (auto &p : coeffs) {
 				Side       s    = p.first.s;
 				InterpCase type = p.first.type;
-				interp.putScalar(0);
+				VecScale(interp, 0);
 				interpolator->interpolate(ds, s, type, u, interp);
 				valarray<double> &block = *p.second;
 				for (int i = 0; i < n; i++) {
@@ -166,8 +172,16 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 			insertBlock(block.i, block.j, coeffs[block], block.flip_i, block.flip_j);
 		}
 	}
+	VecRestoreArray(interp, &interp_view);
+	VecRestoreArray(gamma, &gamma_view);
+	VecDestroy(&u);
+	VecDestroy(&f);
+	VecDestroy(&r);
+	VecDestroy(&e);
+	VecDestroy(&gamma);
+	VecDestroy(&interp);
 }
-Teuchos::RCP<matrix_type> SchurHelper::formCRSMatrix()
+shared_ptr<Mat> SchurHelper::formCRSMatrix()
 {
 	int         n = dc.n;
 	vector<int> cols_array;
@@ -183,9 +197,18 @@ Teuchos::RCP<matrix_type> SchurHelper::formCRSMatrix()
 	}
 	RCP<map_type> col_map = rcp(new map_type(-1, &cols_array[0], cols_array.size(), 0, this->comm));
 
-	RCP<matrix_type> A = rcp(new matrix_type(dc.getSchurRowMap(), col_map, 5 * n));
+	shared_ptr<Mat> A(nullptr, MatDestroy);
+	MatCreate(MPI_COMM_WORLD, A.get());
+	int local_size  = dc.ifaces.size() * n;
+	int global_size = dc.num_global_interfaces * n;
+	MatSetSizes(*A, local_size, local_size, global_size, global_size);
+	MatSetType(*A, MATSEQDENSE);
+	MatSetType(*A, MATMPIAIJ);
+	// TODO MatMPIAIJSetPreallocation
 
-	set<pair<int, int>> inserted;
+	int start_i;
+	MPI_Scan(&local_size, &start_i, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+	start_i -= local_size;
 	auto insertBlock = [&](int i, int j, RCP<valarray<double>> block, bool flip_i, bool flip_j) {
 		int local_i = i * n;
 		int local_j = j * n;
@@ -205,23 +228,16 @@ Teuchos::RCP<matrix_type> SchurHelper::formCRSMatrix()
 				copy[i * n + j] = orig[block_i * n + block_j];
 			}
 		}
-		vector<int> inds(n);
-		for (int q = 0; q < n; q++) {
-			inds[q] = local_j + q;
-		}
-		if (inserted.count(make_pair(i, j)) == 0) {
-			for (int q = 0; q < n; q++) {
-				A->insertLocalValues(local_i + q, n, &copy[q * n], &inds[0]);
-			}
-		} else {
-			inserted.insert(make_pair(i, j));
-			for (int q = 0; q < n; q++) {
-				A->sumIntoLocalValues(local_i + q, n, &copy[q * n], &inds[0]);
-			}
-		}
+		vector<int> inds_i(n);
+		iota(inds_i.begin(), inds_i.end(), start_i + local_i);
+		vector<int> inds_j(n);
+		iota(inds_j.begin(), inds_j.end(), start_i + local_j);
+
+		MatSetValues(*A, n, &inds_i[0], n, &inds_j[0], &copy[0], ADD_VALUES);
 	};
 
 	assembleMatrix(insertBlock);
-	A->fillComplete(dc.getSchurRowMap(), dc.getSchurRowMap());
+	MatAssemblyBegin(*A, MAT_FINAL_ASSEMBLY);
+	MatAssemblyEnd(*A, MAT_FINAL_ASSEMBLY);
 	return A;
 }

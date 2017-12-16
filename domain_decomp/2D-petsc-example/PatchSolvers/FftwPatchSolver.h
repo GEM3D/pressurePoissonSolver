@@ -41,8 +41,7 @@ class FftwPatchSolver : public PatchSolver
 	public:
 	FftwPatchSolver(DomainCollection &dsc,double lambda=0);
 	~FftwPatchSolver();
-	void solve(Domain &d, const vector_type &f, vector_type &u, const vector_type &gamma);
-	void solve(Domain &d, const vector_type &f, vector_type u, const vector_type &gamma);
+	void solve(Domain &d, const Vec f, Vec u, const Vec gamma);
 	void addDomain(Domain &d);
 };
 #endif

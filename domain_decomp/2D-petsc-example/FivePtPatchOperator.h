@@ -4,15 +4,18 @@
 class FivePtPatchOperator : public PatchOperator
 {
 	public:
-	void apply(Domain &d, const vector_type &u, const vector_type &gamma, vector_type &f)
+	void apply(Domain &d, const Vec u, const Vec gamma, Vec f)
 	{
-		int           n              = d.n;
-		double        h_x            = d.x_length / n;
-		double        h_y            = d.y_length / n;
-		int           start          = n * n * d.id_local;
-		auto          u_ptr          = &(u.get1dView()[start]);
-		auto          f_ptr          = &(f.get1dViewNonConst()[start]);
-		auto          gamma_view     = gamma.get1dView();
+		int     n     = d.n;
+		double  h_x   = d.x_length / n;
+		double  h_y   = d.y_length / n;
+		int     start = n * n * d.id_local;
+		double *u_view, *f_view, *gamma_view;
+		VecGetArray(u, &u_view);
+		VecGetArray(f, &f_view);
+		double *f_ptr = f_view + start;
+		double *u_ptr = u_view + start;
+		VecGetArray(gamma, &gamma_view);
 		const double *boundary_north = nullptr;
 		if (d.hasNbr(Side::north)) {
 			boundary_north = &gamma_view[d.n * d.index(Side::north)];
@@ -107,6 +110,9 @@ class FivePtPatchOperator : public PatchOperator
 				f_ptr[(n - 1) * n + i] += (south - 3 * center + 2 * north) / (h_y * h_y);
 			}
 		}
+		VecRestoreArray(gamma, &gamma_view);
+		VecRestoreArray(u, &u_view);
+		VecRestoreArray(f, &f_view);
 	}
 };
 #endif

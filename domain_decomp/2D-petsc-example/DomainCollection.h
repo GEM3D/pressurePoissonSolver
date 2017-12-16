@@ -8,6 +8,8 @@
 #include <Teuchos_GlobalMPISession.hpp>
 #include <Teuchos_RCP.hpp>
 #include <map>
+#include <memory>
+#include <petscvec.h>
 #include <set>
 #include <string>
 #include <vector>
@@ -145,12 +147,20 @@ struct Iface {
 class DomainCollection
 {
 	private:
-	void enumerateIfaces();
-	void determineCoarseness();
-	void determineAmrLevel();
-	void determineXY();
-	void zoltanBalanceIfaces();
-	void zoltanBalanceDomains();
+	bool                   ises_init = false;
+	IS                     domain_is;
+	IS                     schur_is;
+	IS                     schur_dist_is;
+	ISLocalToGlobalMapping domain_is_ltg;
+	ISLocalToGlobalMapping schur_is_ltg;
+	ISLocalToGlobalMapping schur_dist_is_ltg;
+	void                   enumerateIfaces();
+	void                   determineCoarseness();
+	void                   determineAmrLevel();
+	void                   determineXY();
+	void                   zoltanBalanceIfaces();
+	void                   zoltanBalanceDomains();
+	void                   formISs();
 
 	public:
 	int                                    rank;
@@ -232,9 +242,15 @@ class DomainCollection
 	Teuchos::RCP<map_type> getSchurRowMap();
 	Teuchos::RCP<map_type> getSchurDistMap();
 	Teuchos::RCP<map_type> getDomainRowMap();
+	IS                     getSchurIS();
+	IS                     getSchurDistIS();
+	IS                     getDomainIS();
+	std::shared_ptr<Vec>   getNewSchurVec();
+	std::shared_ptr<Vec>   getNewSchurDistVec();
+	Vec   getNewDomainVec();
 
 	int    getGlobalNumCells() { return num_global_domains * n * n; }
-	double integrate(const vector_type &u);
+	double integrate(const Vec u);
 	double area();
 };
 struct IfaceZoltanHelper {

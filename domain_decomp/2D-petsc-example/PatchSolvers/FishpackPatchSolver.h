@@ -9,6 +9,6 @@ class FishpackPatchSolver : public PatchSolver
 	FishpackPatchSolver(double lambda = 0) { this->lambda = lambda; }
 	~FishpackPatchSolver() {}
 	void addDomain(Domain &d) {}
-	void solve(Domain &d, const vector_type &f, vector_type &u, const vector_type &gamma);
+	void solve(Domain &d, const Vec f, Vec u, const Vec gamma);
 };
 #endif

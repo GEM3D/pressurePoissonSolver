@@ -1,10 +1,10 @@
 #include "FftwPatchSolver.h"
 using namespace std;
 
-FftwPatchSolver::FftwPatchSolver(DomainCollection &dc,double lambda)
+FftwPatchSolver::FftwPatchSolver(DomainCollection &dc, double lambda)
 {
-	n = dc.n;
-    this->lambda = lambda;
+	n            = dc.n;
+	this->lambda = lambda;
 	for (auto &p : dc.domains) {
 		addDomain(p.second);
 	}
@@ -109,7 +109,7 @@ void FftwPatchSolver::addDomain(Domain &d)
 				}
 			}
 		}
-        denom+=lambda;
+		denom += lambda;
 	}
 }
 FftwPatchSolver::~FftwPatchSolver()
@@ -121,14 +121,14 @@ FftwPatchSolver::~FftwPatchSolver()
 		fftw_destroy_plan(p.second);
 	}
 }
-void FftwPatchSolver::solve(Domain &d, const vector_type &f, vector_type &u,
-                            const vector_type &gamma)
+void FftwPatchSolver::solve(Domain &d, const Vec f, Vec u, const Vec gamma)
 {
 	double h_x = d.x_length / n;
 	double h_y = d.y_length / n;
 
-	auto f_view     = f.get1dView();
-	auto gamma_view = gamma.get1dView();
+	double *f_view, *gamma_view;
+	VecGetArray(f, &f_view);
+	VecGetArray(gamma, &gamma_view);
 
 	int start = d.id_local * n * n;
 	for (int i = 0; i < n * n; i++) {
@@ -172,8 +172,12 @@ void FftwPatchSolver::solve(Domain &d, const vector_type &f, vector_type &u,
 
 	sol /= (4.0 * n * n);
 
-	auto u_view = u.get1dViewNonConst();
+	double *u_view;
+	VecGetArray(u, &u_view);
 	for (int i = 0; i < n * n; i++) {
 		u_view[start + i] = sol[i];
 	}
+	VecRestoreArray(u, &u_view);
+	VecRestoreArray(f, &f_view);
+	VecRestoreArray(gamma, &gamma_view);
 }

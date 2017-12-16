@@ -1015,7 +1015,7 @@ void DomainCollection::indexIfacesLocal()
 		for (auto &p : ifaces) {
 			todo.insert(p.first);
 		}
-		set<int>   enqueued;
+		set<int> enqueued;
 		while (!todo.empty()) {
 			deque<int> queue;
 			queue.push_back(*todo.begin());
@@ -1108,7 +1108,7 @@ void DomainCollection::indexDomainsLocal()
 		for (auto &p : domains) {
 			todo.insert(p.first);
 		}
-		set<int>   enqueued;
+		set<int> enqueued;
 		while (!todo.empty()) {
 			deque<int> queue;
 			queue.push_back(*todo.begin());
@@ -1163,7 +1163,7 @@ void DomainCollection::indexDomainIfacesLocal()
 		for (auto &p : domains) {
 			todo.insert(p.first);
 		}
-		set<int>   enqueued;
+		set<int> enqueued;
 		while (!todo.empty()) {
 			deque<int> queue;
 			queue.push_back(*todo.begin());
@@ -1485,10 +1485,11 @@ Teuchos::RCP<map_type> DomainCollection::getDomainRowMap()
 	}
 	return Teuchos::rcp(new map_type(-1, &domain_rows[0], domain_rows.size(), 0, this->comm));
 }
-double DomainCollection::integrate(const vector_type &u)
+double DomainCollection::integrate(const Vec u)
 {
-	double sum    = 0;
-	auto   u_view = u.get1dView();
+	double  sum = 0;
+	double *u_view;
+	VecGetArray(u, &u_view);
 
 	for (auto &p : domains) {
 		Domain &d     = p.second;
@@ -1505,6 +1506,7 @@ double DomainCollection::integrate(const vector_type &u)
 	}
 	double retval;
 	Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &sum, &retval);
+	VecRestoreArray(u, &u_view);
 	return retval;
 }
 double DomainCollection::area()
@@ -1517,4 +1519,60 @@ double DomainCollection::area()
 	double retval;
 	Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &sum, &retval);
 	return retval;
+}
+void DomainCollection::formISs()
+{
+	ises_init = true;
+	// domain index set
+	ISCreateBlock(MPI_COMM_WORLD, n * n, domain_map_vec.size(), &domain_map_vec[0],
+	              PETSC_COPY_VALUES, &domain_is);
+	// schur index set
+	ISCreateBlock(MPI_COMM_WORLD, n, iface_map_vec.size(), &iface_map_vec[0], PETSC_COPY_VALUES,
+	              &schur_is);
+	ISCreateBlock(MPI_COMM_WORLD, n, iface_dist_map_vec.size(), &iface_dist_map_vec[0],
+	              PETSC_COPY_VALUES, &schur_dist_is);
+    ISLocalToGlobalMappingCreateIS(domain_is,&domain_is_ltg);
+    ISLocalToGlobalMappingCreateIS(schur_is,&schur_is_ltg);
+    ISLocalToGlobalMappingCreateIS(schur_dist_is,&schur_dist_is_ltg);
+}
+IS DomainCollection::getSchurIS()
+{
+	if (!ises_init) formISs();
+	return schur_is;
+}
+IS DomainCollection::getSchurDistIS()
+{
+	if (!ises_init) formISs();
+	return schur_dist_is;
+}
+IS DomainCollection::getDomainIS()
+{
+	if (!ises_init) formISs();
+	return domain_is;
+}
+shared_ptr<Vec> DomainCollection::getNewSchurVec()
+{
+	if (!ises_init) formISs();
+	shared_ptr<Vec> u(new Vec, VecDestroy);
+	VecCreateMPI(MPI_COMM_WORLD,iface_map_vec.size()*n,PETSC_DETERMINE, u.get());
+	VecSetLocalToGlobalMapping(*u, schur_is_ltg);
+	return u;
+}
+shared_ptr<Vec> DomainCollection::getNewSchurDistVec()
+{
+	if (!ises_init) formISs();
+	shared_ptr<Vec> u(new Vec, VecDestroy);
+	VecCreateMPI(MPI_COMM_WORLD,iface_dist_map_vec.size()*n,PETSC_DETERMINE, u.get());
+	VecSetLocalToGlobalMapping(*u, schur_dist_is_ltg);
+	return u;
+}
+Vec DomainCollection::getNewDomainVec()
+{
+	if (!ises_init) formISs();
+	Vec u;
+	VecCreateMPI(MPI_COMM_WORLD,domains.size()*n*n,PETSC_DETERMINE, &u);
+	VecSetLocalToGlobalMapping(u, domain_is_ltg);
+    VecAssemblyBegin(u);
+    VecAssemblyEnd(u);
+	return u;
 }

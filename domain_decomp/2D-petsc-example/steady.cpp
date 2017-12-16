@@ -50,8 +50,11 @@
 #include <Xpetra_TpetraBlockCrsMatrix.hpp>
 #include <cmath>
 #include <iostream>
+#include <memory>
+#include <petscvec.h>
 #include <string>
 #include <unistd.h>
+#include <petscksp.h>
 #ifndef M_PIl
 #define M_PIl 3.141592653589793238462643383279502884L /* pi */
 #endif
@@ -67,7 +70,7 @@ using namespace std;
 
 int main(int argc, char *argv[])
 {
-	Teuchos::GlobalMPISession     global(&argc, &argv, nullptr);
+    PetscInitialize(&argc,&argv,nullptr,nullptr);
 	RCP<const Teuchos::Comm<int>> comm = Tpetra::DefaultPlatform::getDefaultPlatform().getComm();
 
 	int num_procs = comm->getSize();
@@ -114,7 +117,7 @@ int main(int argc, char *argv[])
 	args::ValueFlag<string> f_error(parser, "error filename", "the file to write the error to",
 	                                {"error"});
 	args::ValueFlag<string> f_rhs(parser, "rhs filename", "the file to write the rhs vector to",
-	                            {'r'});
+	                              {'r'});
 	args::ValueFlag<string> f_g(parser, "gamma filename", "the file to write the gamma vector to",
 	                            {'g'});
 	args::ValueFlag<string> f_read_gamma(parser, "gamma filename",
@@ -177,11 +180,11 @@ int main(int argc, char *argv[])
 		}
 		return 1;
 	}
-    // Set the number of discretization points in the x and y direction.
+	// Set the number of discretization points in the x and y direction.
 	int nx = args::get(f_n);
 	int ny = args::get(f_n);
 
-    double tol = 1e-12;
+	double tol = 1e-12;
 	if (f_t) {
 		tol = args::get(f_t);
 	}
@@ -190,15 +193,15 @@ int main(int argc, char *argv[])
 	if (f_l) {
 		loop_count = args::get(f_l);
 	}
-    /***********
-     * Input parsing done
-     **********/
+	/***********
+	 * Input parsing done
+	 **********/
 
 	bool direct_solve = (f_lu || f_superlu || f_mumps || f_basker);
 
-    ///////////////
-    // Create Mesh
-    ///////////////
+	///////////////
+	// Create Mesh
+	///////////////
 	DomainCollection dc;
 	if (f_mesh) {
 		string d = args::get(f_mesh);
@@ -218,7 +221,7 @@ int main(int argc, char *argv[])
 	if (f_neumann) {
 		dc.setNeumann();
 	}
-    dc.n   = nx;
+	dc.n = nx;
 	for (auto &p : dc.domains) {
 		p.second.n = nx;
 	}
@@ -246,8 +249,7 @@ int main(int argc, char *argv[])
 		nfunx = [](double x, double y) { return 0; };
 		nfuny = [](double x, double y) { return 0; };
 	} else if (f_gauss) {
-		gfun
-		= [](double x, double y) { return exp(cos(10 * M_PI * x)) - exp(cos(11 * M_PI * y)); };
+		gfun = [](double x, double y) { return exp(cos(10 * M_PI * x)) - exp(cos(11 * M_PI * y)); };
 		ffun = [](double x, double y) {
 			return 100 * M_PI * M_PI * (pow(sin(10 * M_PI * x), 2) - cos(10 * M_PI * x))
 			       * exp(cos(10 * M_PI * x))
@@ -262,12 +264,10 @@ int main(int argc, char *argv[])
 			return 11 * M_PI * sin(11 * M_PI * y) * exp(cos(11 * M_PI * y));
 		};
 	} else {
-		ffun = [](double x, double y) {
-			return -5 * M_PI * M_PI * sinl(M_PI * y) * cosl(2 * M_PI * x);
-		};
-		gfun = [](double x, double y) { return sinl(M_PI * y) * cosl(2 * M_PI * x); };
-		nfunx
-		= [](double x, double y) { return -2 * M_PI * sinl(M_PI * y) * sinl(2 * M_PI * x); };
+		ffun
+		= [](double x, double y) { return -5 * M_PI * M_PI * sinl(M_PI * y) * cosl(2 * M_PI * x); };
+		gfun  = [](double x, double y) { return sinl(M_PI * y) * cosl(2 * M_PI * x); };
+		nfunx = [](double x, double y) { return -2 * M_PI * sinl(M_PI * y) * sinl(2 * M_PI * x); };
 		nfuny = [](double x, double y) { return M_PI * cosl(M_PI * y) * cosl(2 * M_PI * x); };
 	}
 
@@ -291,50 +291,38 @@ int main(int argc, char *argv[])
 
 		SchurHelper sch(dc, comm, p_solver, p_operator, p_interp);
 
-		RCP<map_type>    domain_map = dc.getDomainRowMap();
-		RCP<vector_type> u          = rcp(new vector_type(domain_map, 1));
-		RCP<vector_type> exact      = rcp(new vector_type(domain_map, 1));
-		RCP<vector_type> f          = rcp(new vector_type(domain_map, 1));
+		IS              domain_is = dc.getDomainIS();
+	    Vec u         = dc.getNewDomainVec();
+	    Vec exact     = dc.getNewDomainVec();
+	    Vec f         = dc.getNewDomainVec();
 
 		if (f_neumann) {
-			double *f_ptr     = &f->get1dViewNonConst()[0];
-			double *exact_ptr = &exact->get1dViewNonConst()[0];
-			Init::initNeumann(dc, nx, f_ptr, exact_ptr, ffun, gfun, nfunx, nfuny);
+			Init::initNeumann(dc, nx, f, exact, ffun, gfun, nfunx, nfuny);
 		} else {
-			double *f_ptr     = &f->get1dViewNonConst()[0];
-			double *exact_ptr = &exact->get1dViewNonConst()[0];
-			Init::initDirichlet(dc, nx, f_ptr, exact_ptr, ffun, gfun);
+			Init::initDirichlet(dc, nx, f, exact, ffun, gfun);
 		}
 
 		timer.stop("Domain Initialization");
 
-		// Create a map that will be used in the iterative solver
-		RCP<map_type>       matrix_map       = dc.getSchurRowMap();
-		RCP<const map_type> matrix_map_const = matrix_map;
-
 		// Create the gamma and diff vectors
-		RCP<vector_type>                   gamma = rcp(new vector_type(matrix_map, 1));
-		RCP<vector_type>                   diff  = rcp(new vector_type(matrix_map, 1));
-		RCP<vector_type>                   b     = rcp(new vector_type(matrix_map, 1));
-		RCP<matrix_type>                   A;
-		RCP<Tpetra::Operator<scalar_type>> op;
-		RCP<const Tpetra::RowMatrix<>>     rm;
-		RCP<Amesos2::Solver<matrix_type, vector_type>> dsolver;
+		shared_ptr<Vec>                    gamma = dc.getNewSchurVec();
+		shared_ptr<Vec>                    diff  = dc.getNewSchurVec();
+		shared_ptr<Vec>                    b     = dc.getNewSchurVec();
+		shared_ptr<Mat>                   A;
 
 		// Create linear problem for the Belos solver
-		RCP<Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>> problem;
-		RCP<Belos::SolverManager<scalar_type, vector_type, Tpetra::Operator<scalar_type>>> solver;
-		Teuchos::ParameterList belosList;
+        shared_ptr<KSP>solver (new KSP,KSPDestroy);
+        //KSPCreate(MPI_COMM_WORLD,solver.get());
 
-		typedef Ifpack2::Preconditioner<scalar_type> Preconditioner;
-		RCP<Preconditioner>                          prec;
 		if (f_neumann && !f_nozerof) {
+            /*
 			double fdiff = (dc.integrate(*f)) / dc.area();
 			if (my_global_rank == 0) cout << "Fdiff: " << fdiff << endl;
 
 			RCP<vector_type> diff = rcp(new vector_type(domain_map, 1));
 			diff->putScalar(fdiff);
 			f->update(1.0, *diff, 1.0);
+            */
 		}
 
 #ifdef ENABLE_AMGX
@@ -348,11 +336,12 @@ int main(int argc, char *argv[])
 			// do iterative solve
 
 			// Get the b vector
-			sch.solveWithInterface(*f, *u, *gamma, *b);
-			b->scale(-1.0);
+			sch.solveWithInterface(f, u, *gamma, *b);
+            VecScale(*b,-1.0);
 
 			if (f_rhs) {
-				Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(args::get(f_rhs), b, "", "");
+		//		Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(args::get(f_rhs), b, "",
+		//		                                                          "");
 			}
 
 			///////////////////
@@ -370,132 +359,26 @@ int main(int argc, char *argv[])
 
 				timer.stop("Matrix Formation");
 
-				op = A;
-				rm = A;
-
-				if (f_m){
-					Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(args::get(f_m), A,
-					                                                           "", "");
-                }
+				if (f_m) {
+					//Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(args::get(f_m), A,
+					 //                                                          "", "");
+				}
 			}
 
-			problem
-			= rcp(new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(
-			op, gamma, b));
 			if (f_amgx) {
 #ifdef ENABLE_AMGX
 				timer.start("AMGX Setup");
-				amgxsolver = rcp(new AmgxWrapper(A, dc, nx));
+		//		amgxsolver = rcp(new AmgxWrapper(A, dc, nx));
 				timer.stop("AMGX Setup");
 #endif
 			} else if (f_hypre) {
 #ifdef ENABLE_HYPRE
 				timer.start("Hypre Setup");
-				hypresolver = rcp(new HypreWrapper(A, dc, nx, tol, true));
+		//		hypresolver = rcp(new HypreWrapper(A, dc, nx, tol, true));
 				timer.stop("Hypre Setup");
 #endif
 			} else {
-				if (f_precmuelu) {
-					timer.start("MueLu Preconditioner Formation");
-
-					Teuchos::RCP<op_type> P = Factory::getAmgPreconditioner(A);
-
-					problem->setLeftPrec(P);
-
-					timer.stop("MueLu Preconditioner Formation");
-
-				} else if (f_riluk) {
-					timer.start("RILUK Preconditioner Formation");
-
-					Teuchos::RCP<Ifpack2::RILUK<Tpetra::RowMatrix<>>> P
-					= rcp(new Ifpack2::RILUK<Tpetra::RowMatrix<>>(rm));
-					P->compute();
-
-					problem->setLeftPrec(P);
-
-					timer.stop("RILUK Preconditioner Formation");
-				} else if (f_ilu) {
-					timer.start("ILUT Preconditioner Formation");
-
-					Teuchos::RCP<Ifpack2::ILUT<Tpetra::RowMatrix<>>> P
-					= rcp(new Ifpack2::ILUT<Tpetra::RowMatrix<>>(rm));
-					Teuchos::ParameterList params;
-					params.set("fact: ilut level-of-fill", 3);
-					params.set("fact: drop tolerance", 0.0);
-					params.set("fact: absolute threshold", 0.1);
-					// P->setParameters(params);
-
-					P->compute();
-					problem->setLeftPrec(P);
-
-					timer.stop("ILUT Preconditioner Formation");
-				} else if (f_precj) {
-					timer.start("Jacobi Preconditioner Formation");
-
-					// Create the relaxation.  You could also do this using
-					// Ifpack2::Factory (the preconditioner factory) if you like.
-					RCP<precond_type> prec = rcp(new Ifpack2::Relaxation<Tpetra::RowMatrix<>>(A));
-					// Make the list of relaxation parameters.
-					Teuchos::ParameterList params;
-					// Do symmetric SOR / Gauss-Seidel.
-					params.set("relaxation: type", "Jacobi");
-					// Two sweeps (of symmetric SOR / Gauss-Seidel) per apply() call.
-					params.set("relaxation: sweeps", 1);
-					// ... Set any other parameters you want to set ...
-
-					// Set parameters.
-					prec->setParameters(params);
-					// Prepare the relaxation instance for use.
-					prec->initialize();
-					prec->compute();
-
-					timer.stop("Jacobi Preconditioner Formation");
-				} else if (f_prec) {
-					timer.start("Block Diagonal Preconditioner Formation");
-
-					// Create the relaxation.  You could also do this using
-					// Ifpack2::Factory (the preconditioner factory) if you like.
-					RCP<precond_type> prec
-					= rcp(new Ifpack2::BlockRelaxation<Tpetra::RowMatrix<>>(A));
-					// Make the list of relaxation parameters.
-					Teuchos::ParameterList params;
-					// Do symmetric SOR / Gauss-Seidel.
-					params.set("relaxation: type", "Jacobi");
-					// Two sweeps (of symmetric SOR / Gauss-Seidel) per apply() call.
-					params.set("relaxation: sweeps", 1);
-					params.set("relaxation: container", "Dense");
-					// ... Set any other parameters you want to set ...
-
-					// Set parameters.
-					prec->setParameters(params);
-					// Prepare the relaxation instance for use.
-					prec->initialize();
-					prec->compute();
-
-					timer.stop("Block Diagonal Preconditioner Formation");
-				}
-
-				if (direct_solve) {
-					timer.start("LU Factorization");
-					string name;
-					if (f_lu) {
-						name = "KLU2";
-					}
-					if (f_mumps) {
-						name = "mumps";
-					}
-					if (f_superlu) {
-						name = "superlu_dist";
-					}
-					if (f_basker) {
-						name = "Basker";
-					}
-
-					dsolver = Amesos2::create<matrix_type, vector_type>(name, A);
-
-					dsolver->symbolicFactorization().numericFactorization();
-					timer.stop("LU Factorization");
-				}
+                //preconditoners
 			}
 			///////////////////
 			// setup end
@@ -512,52 +395,17 @@ int main(int argc, char *argv[])
 			if (f_amgx) {
 // solve
 #ifdef ENABLE_AMGX
-				amgxsolver->solve(gamma, b);
+				//amgxsolver->solve(gamma, b);
 #endif
 			} else if (f_hypre) {
 #ifdef ENABLE_HYPRE
-				hypresolver->solve(gamma, b);
+				//hypresolver->solve(gamma, b);
 #endif
-			} else if (f_read_gamma) {
-				gamma = Tpetra::MatrixMarket::Reader<matrix_type>::readDenseFile(
-				args::get(f_read_gamma), comm, matrix_map_const);
-			} else if (f_lu || f_superlu || f_mumps || f_basker) {
-				dsolver->solve(&*gamma, &*b);
 			} else {
-				problem->setProblem();
 
-				// Set the parameters
-				belosList.set("Block Size", 1);
-				belosList.set("Maximum Iterations", 5000);
-				belosList.set("Convergence Tolerance", tol);
-				belosList.set("Output Frequency", 1);
-				int verbosity = Belos::Errors + /* Belos::StatusTestDetails +*/ Belos::Warnings
-				                + Belos::TimingDetails + Belos::Debug + Belos::IterationDetails;
-				belosList.set("Verbosity", verbosity);
-				// belosList.set("Orthogonalization", "ICGS");
-				//
-				belosList.set("Rel RHS Err", 0.0);
-				belosList.set("Rel Mat Err", 0.0);
-
-				// Create solver and solve
-				if (f_rgmres) {
-					solver = rcp(new Belos::GCRODRSolMgr<scalar_type, vector_type,
-					                                     Tpetra::Operator<scalar_type>>(
-					problem, rcp(&belosList, false)));
-				} else if (f_cg) {
-					solver = rcp(new Belos::BlockCGSolMgr<scalar_type, vector_type,
-					                                      Tpetra::Operator<scalar_type>>(
-					problem, rcp(&belosList, false)));
-				} else if (f_bicg) {
-					solver = rcp(new Belos::BiCGStabSolMgr<scalar_type, vector_type,
-					                                       Tpetra::Operator<scalar_type>>(
-					problem, rcp(&belosList, false)));
-				} else {
-					solver = rcp(new Belos::BlockGmresSolMgr<scalar_type, vector_type,
-					                                         Tpetra::Operator<scalar_type>>(
-					problem, rcp(&belosList, false)));
-				}
-				solver->solve();
+                KSPSetTolerances(*solver,tol,PETSC_DEFAULT,PETSC_DEFAULT,5000);
+                KSPSetOperators(*solver,*A,*A);
+                KSPSolve(*solver,*b,*gamma);
 			}
 			timer.stop("Gamma Solve");
 		}
@@ -565,50 +413,9 @@ int main(int argc, char *argv[])
 		// Do one last solve
 		timer.start("Patch Solve");
 
-		sch.solveWithInterface(*f, *u, *gamma, *diff);
+		sch.solveWithInterface(f, u, *gamma, *diff);
 
 		timer.stop("Patch Solve");
-
-		/*
-		double ausum2 = sch.integrateAU();
-		double fsum2  = sch.integrateF();
-		double bflux  = sch.integrateBoundaryFlux();
-		if (my_global_rank == 0) {
-		    std::cout << u8"Σf-Au: " << fsum2 - ausum2 << endl;
-		    std::cout << u8"Σf: " << fsum2 << endl;
-		    std::cout << u8"ΣAu: " << ausum2 << endl;
-		    if (f_neumann) {
-		        std::cout << u8"∮ du/dn: " << bflux << endl;
-		        std::cout << u8"∮ du/dn - Σf: " << bflux - fsum2 << endl;
-		        std::cout << u8"∮ du/dn - ΣAu: " << bflux - ausum2 << endl;
-		    }
-		}
-		*/
-		/*
-		if (f_iter && !direct_solve) {
-		    timer.start("Iterative Refinement Step");
-		    sch.residual();
-		    sch.swapResidSol();
-
-		    if (dc.num_global_domains != 1) {
-		        x->putScalar(0);
-		        sch.solveWithInterface(*x, *r);
-		        // op->apply(*gamma, *r);
-		        // r->update(1.0, *b, -1.0);
-
-		        solver->reset(Belos::ResetType::Problem);
-		        if (f_wrapper) {
-		            ((FuncWrap *) op.getRawPtr())->setB(r);
-		        }
-		        problem->setProblem(x, r);
-		        solver->setProblem(problem);
-		        solver->solve();
-		    }
-		    sch.solveWithInterface(*x, *d);
-		    sch.sumResidIntoSol();
-		    timer.stop("Iterative Refinement Step");
-		}
-		*/
 
 		///////////////////
 		// solve end
@@ -616,18 +423,20 @@ int main(int argc, char *argv[])
 		timer.stop("Complete Solve");
 
 		// residual
-		RCP<vector_type> resid = rcp(new vector_type(domain_map, 1));
-		RCP<vector_type> au    = rcp(new vector_type(domain_map, 1));
-		sch.applyWithInterface(*u, *gamma, *au);
-		resid->update(-1.0, *f, 1.0, *au, 0.0);
-		double residual = resid->getVector(0)->norm2();
-		double fnorm    = f->getVector(0)->norm2();
+        Vec resid = dc.getNewDomainVec();
+        Vec au = dc.getNewDomainVec();
+		sch.applyWithInterface(u, *gamma, au);
+        VecAXPBYPCZ(resid,-1.0,1.0,0.0,au,f);
+		double residual;
+        VecNorm(resid,NORM_2,&residual);
+		double fnorm;
+        VecNorm(f,NORM_2,&fnorm);
 
 		// error
-		RCP<vector_type> error = rcp(new vector_type(domain_map, 1));
-		error->update(-1.0, *exact, 1.0, *u, 0.0);
+        Vec error = dc.getNewDomainVec();
+        VecAXPBYPCZ(error,-1.0,1.0,0.0,exact,u);
 		if (f_neumann) {
-			double uavg = dc.integrate(*u) / dc.area();
+		/*	double uavg = dc.integrate(*u) / dc.area();
 			double eavg = dc.integrate(*exact) / dc.area();
 
 			if (my_global_rank == 0) {
@@ -637,13 +446,15 @@ int main(int argc, char *argv[])
 
 			vector_type ones(domain_map, 1);
 			ones.putScalar(1);
-			error->update(eavg - uavg, ones, 1.0);
+			error->update(eavg - uavg, ones, 1.0);*/
 		}
-		double error_norm = error->getVector(0)->norm2();
-		double exact_norm = exact->getVector(0)->norm2();
+		double error_norm;
+        VecNorm(error,NORM_2,&error_norm);
+		double exact_norm;
+        VecNorm(exact,NORM_2,&exact_norm);
 
-		double ausum = dc.integrate(*au);
-		double fsum  = dc.integrate(*f);
+		double ausum = dc.integrate(au);
+		double fsum  = dc.integrate(f);
 		if (my_global_rank == 0) {
 			std::cout << std::scientific;
 			std::cout.precision(13);
@@ -653,31 +464,31 @@ int main(int argc, char *argv[])
 			cout.unsetf(std::ios_base::floatfield);
 		}
 
-        //output 
+		// output
 		MMWriter mmwriter(dc, f_amr);
 		if (f_s) {
-			mmwriter.write(*u, args::get(f_s));
+			//mmwriter.write(*u, args::get(f_s));
 		}
 		if (f_resid) {
-			mmwriter.write(*resid, args::get(f_resid));
+			//mmwriter.write(*resid, args::get(f_resid));
 		}
 		if (f_error) {
-			mmwriter.write(*error, args::get(f_error));
+			//mmwriter.write(*error, args::get(f_error));
 		}
 		if (f_g) {
-			Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(args::get(f_g), gamma, "",
-			                                                          "");
+			//Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(args::get(f_g), gamma, "",
+			 //                                                         "");
 		}
 		if (f_outclaw) {
 			ClawWriter writer(dc);
-			writer.write(*u, *resid);
+			//writer.write(*u, *resid);
 		}
 #ifdef HAVE_VTK
 		if (f_outvtk) {
 			VtkWriter writer(dc, args::get(f_outvtk));
-			writer.add(*u, "Solution");
-			writer.add(*error, "Error");
-			writer.add(*resid, "Residual");
+			//writer.add(*u, "Solution");
+			//writer.add(*error, "Error");
+			//writer.add(*resid, "Residual");
 			writer.write();
 		}
 #endif

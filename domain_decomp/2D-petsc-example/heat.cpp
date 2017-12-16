@@ -23,6 +23,7 @@
 #endif
 #include "Timer.h"
 #include "args.h"
+#include <memory>
 #include <Amesos2.hpp>
 #include <Amesos2_Version.hpp>
 #include <BelosBiCGStabSolMgr.hpp>
@@ -258,6 +259,7 @@ int main(int argc, char *argv[])
 	SchurHelper  sch(dc, comm, p_solver, p_operator, p_interp);
 	MatrixHelper mh(dc, comm);
 
+	IS    domain_is = dc.getDomainIS();
 	RCP<map_type>    domain_map = dc.getDomainRowMap();
 	RCP<vector_type> u_next     = rcp(new vector_type(domain_map, 1));
 	RCP<vector_type> u          = rcp(new vector_type(domain_map, 1));

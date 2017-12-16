@@ -15,10 +15,9 @@ class Slice
 
 	const double &operator[](size_t idx) { return start[stride * idx]; }
 };
-Slice getSlice(Domain &d, int n, const vector_type &u, Side s)
+Slice getSlice(Domain &d, int n, const double *u_view, Side s)
 {
-	auto  u_view = u.get1dView();
-	int   start  = d.id_local * n * n;
+	int   start = d.id_local * n * n;
 	Slice retval;
 	switch (s) {
 		case Side::north:
@@ -36,10 +35,9 @@ Slice getSlice(Domain &d, int n, const vector_type &u, Side s)
 	}
 	return retval;
 }
-Slice getInnerSlice(Domain &d, int n, const vector_type &u, Side s)
+Slice getInnerSlice(Domain &d, int n, const double *u_view, Side s)
 {
-	auto  u_view = u.get1dView();
-	int   start  = d.id_local * n * n;
+	int   start = d.id_local * n * n;
 	Slice retval;
 	switch (s) {
 		case Side::north:
@@ -57,7 +55,7 @@ Slice getInnerSlice(Domain &d, int n, const vector_type &u, Side s)
 	}
 	return retval;
 }
-void QuadInterpolator::interpolate(Domain &d, const vector_type &u, vector_type &interp)
+void QuadInterpolator::interpolate(Domain &d, const Vec u, Vec interp)
 {
 	Side s = Side::north;
 	do {
@@ -80,23 +78,25 @@ void QuadInterpolator::interpolate(Domain &d, const vector_type &u, vector_type 
 		s++;
 	} while (s != Side::north);
 }
-void QuadInterpolator::interpolate(Domain &d, Side s, InterpCase icase, const vector_type &u,
-                                   vector_type &interp)
+void QuadInterpolator::interpolate(Domain &d, Side s, InterpCase icase, const Vec u, Vec interp)
 {
-	int  n           = d.n;
-	auto interp_view = interp.get1dViewNonConst();
-	int  right       = -1;
-	int  ctfidx      = -1;
+	int     n = d.n;
+	double *interp_view;
+	VecGetArray(interp, &interp_view);
+	double *u_view;
+	VecGetArray(u, &u_view);
+	int right  = -1;
+	int ctfidx = -1;
 	switch (icase) {
 		case InterpCase::normal: {
-			Slice sl  = getSlice(d, n, u, s);
+			Slice sl  = getSlice(d, n, u_view, s);
 			int   idx = n * d.index(s);
 			for (int i = 0; i < n; i++) {
 				interp_view[idx + i] += 0.5 * sl[i];
 			}
 		} break;
 		case InterpCase::coarse_from_coarse: {
-			Slice sl  = getSlice(d, n, u, s);
+			Slice sl  = getSlice(d, n, u_view, s);
 			int   idx = n * d.index(s);
 			// beginning case
 			interp_view[idx] += ((-sl[2] + 2 * sl[1] - 3 * sl[0]) / 30.0 + sl[0]) / 2;
@@ -113,8 +113,8 @@ void QuadInterpolator::interpolate(Domain &d, Side s, InterpCase icase, const ve
 		case InterpCase::coarse_from_fine_on_right:
 			right++;
 			{
-				Slice sl                = getSlice(d, n, u, s);
-				Slice isl               = getInnerSlice(d, n, u, s);
+				Slice sl                = getSlice(d, n, u_view, s);
+				Slice isl               = getInnerSlice(d, n, u_view, s);
 				int   idx               = n * d.indexCenter(s);
 				bool  edge_on_beginning = ((s == Side::north || s == Side::west) && !right)
 				                         || ((s == Side::east || s == Side::south) && right);
@@ -133,8 +133,8 @@ void QuadInterpolator::interpolate(Domain &d, Side s, InterpCase icase, const ve
 			break;
 		case InterpCase::fine_from_fine_on_left:
 		case InterpCase::fine_from_fine_on_right: {
-			Slice sl  = getSlice(d, n, u, s);
-			Slice isl = getInnerSlice(d, n, u, s);
+			Slice sl  = getSlice(d, n, u_view, s);
+			Slice isl = getInnerSlice(d, n, u_view, s);
 			int   idx = n * d.index(s);
 			// middle cases
 			for (int i = 0; i < n; i++) {
@@ -149,7 +149,7 @@ void QuadInterpolator::interpolate(Domain &d, Side s, InterpCase icase, const ve
 			if (ctfidx == -1) ctfidx = n * d.indexRefinedRight(s);
 			{
 				int   idx               = ctfidx;
-				Slice sl                = getSlice(d, n, u, s);
+				Slice sl                = getSlice(d, n, u_view, s);
 				bool  edge_on_beginning = ((s == Side::north || s == Side::west) && right)
 				                         || ((s == Side::east || s == Side::south) && !right);
 				if (edge_on_beginning) {
@@ -188,4 +188,7 @@ void QuadInterpolator::interpolate(Domain &d, Side s, InterpCase icase, const ve
 			}
 			break;
 	}
+
+	VecRestoreArray(interp, &interp_view);
+	VecRestoreArray(u, &u_view);
 }

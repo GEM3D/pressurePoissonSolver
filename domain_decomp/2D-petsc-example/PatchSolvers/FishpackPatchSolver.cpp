@@ -1,19 +1,20 @@
 #include "FishpackPatchSolver.h"
 #include <valarray>
+#include <iostream>
 extern "C" {
 void hstcrt_(double *a, double *b, int *m, int *mbdcnd, const double *bda, const double *bdb,
              double *c, double *d, int *n, int *nbdcnd, const double *bdc, const double *bdd,
              double *elmbda, double *f, int *idimf, double *pertrb, int *ierror, double *w);
 }
 using namespace std;
-void FishpackPatchSolver::solve(Domain &d, const vector_type &f, vector_type &u,
-                                const vector_type &gamma)
+void FishpackPatchSolver::solve(Domain &d, const Vec f, Vec u, const Vec gamma)
 {
-	double           h_x        = d.x_length / d.n;
-	double           h_y        = d.y_length / d.n;
-	auto             gamma_view = gamma.get1dView();
-	auto             f_view     = f.get1dView();
-	auto             u_view     = u.get1dViewNonConst();
+	double  h_x = d.x_length / d.n;
+	double  h_y = d.y_length / d.n;
+	double *gamma_view, *f_view, *u_view;
+	VecGetArray(gamma, &gamma_view);
+	VecGetArray(f, &f_view);
+	VecGetArray(u, &u_view);
 	valarray<double> zeros(d.n);
 	double           a      = d.x_start;
 	double           b      = d.x_start + d.x_length;
@@ -55,10 +56,10 @@ void FishpackPatchSolver::solve(Domain &d, const vector_type &f, vector_type &u,
 	}
 	if (lambda != 0) {
 		for (int i = 0; i < m * n; i++) {
-			f_ptr[i] *=lambda;
+			f_ptr[i] *= lambda;
 		}
 	}
-	int              idimf  = n;
+	int idimf = n;
 	if (d.hasNbr(Side::north)) {
 		int idx = n * d.index(Side::north);
 		for (int i = 0; i < n; i++) {
@@ -90,6 +91,9 @@ void FishpackPatchSolver::solve(Domain &d, const vector_type &f, vector_type &u,
 	hstcrt_(&a, &b, &m, &mbcdnd, bda, bdb, &c, &d2, &n, &nbcdnd, bdc, bdd, &elmbda, f_ptr, &idimf,
 	        &pertrb, &ierror, &w[0]);
 	if (ierror != 0) {
-		cerr << "IERROR: " << ierror << endl;
+		cerr << "Fishpack IERROR: " << ierror << endl;
 	}
+	VecRestoreArray(gamma, &gamma_view);
+	VecRestoreArray(f, &f_view);
+	VecRestoreArray(u, &u_view);
 }
