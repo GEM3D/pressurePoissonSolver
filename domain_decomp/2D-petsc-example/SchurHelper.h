@@ -2,9 +2,9 @@
 #define SCHURHELPER_H
 #include "DomainCollection.h"
 #include "Interpolator.h"
-#include "MyTypeDefs.h"
 #include "PatchOperator.h"
 #include "PatchSolvers/PatchSolver.h"
+#include <memory>
 #include <petscmat.h>
 #include <valarray>
 /**
@@ -23,27 +23,24 @@ class SchurHelper
 
 	std::shared_ptr<Vec> local_gamma;
 	std::shared_ptr<Vec> local_interp;
-	/**
-	 * @brief The MPI communicator used.
-	 */
-	Teuchos::RCP<const Teuchos::Comm<int>> comm;
 
 	/**
 	 * @brief Interpolates to interface values
 	 */
-	Teuchos::RCP<Interpolator> interpolator;
+	std::shared_ptr<Interpolator> interpolator;
 
 	/**
 	 * @brief The patch operator
 	 */
-	Teuchos::RCP<PatchOperator> op;
+	std::shared_ptr<PatchOperator> op;
 
 	/**
 	 * @brief The patch solver
 	 */
-	Teuchos::RCP<PatchSolver> solver;
+	std::shared_ptr<PatchSolver> solver;
 
-	typedef std::function<void(int, int, Teuchos::RCP<std::valarray<double>>, bool, bool)> inserter;
+	typedef std::function<void(int, int, std::shared_ptr<std::valarray<double>>, bool, bool)>
+	     inserter;
 	void assembleMatrix(inserter insertBlock);
 
 	public:
@@ -53,9 +50,8 @@ class SchurHelper
 	 * @param dc the DomainCollection
 	 * @param comm the teuchos communicator
 	 */
-	SchurHelper(DomainCollection dc, Teuchos::RCP<const Teuchos::Comm<int>> comm,
-	            Teuchos::RCP<PatchSolver> solver, Teuchos::RCP<PatchOperator> op,
-	            Teuchos::RCP<Interpolator> interpolator);
+	SchurHelper(DomainCollection dc, std::shared_ptr<PatchSolver> solver,
+	            std::shared_ptr<PatchOperator> op, std::shared_ptr<Interpolator> interpolator);
 
 	/**
 	 * @brief Solve with a given set of interface values

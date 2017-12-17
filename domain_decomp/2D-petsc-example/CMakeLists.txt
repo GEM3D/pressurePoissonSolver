@@ -13,52 +13,21 @@ enable_language(C)
 # Your "do-configure" script that invokes CMake should set
 # TRILINOS_PATH to the path to your Trilinos install.
 # You do _not_ need to edit this line.
-find_package(Trilinos PATHS $ENV{TRILINOS_DIR}/lib/cmake/Trilinos $ENV{TRILINOS_DIR})
-
-# If FIND_PACKAGE successfully found your Trilinos install, it will
-# set the Boolean flag Trilinos_FOUND.  The following IF statement
-# fails with a FATAL_ERROR if Trilinos was not found.  If it _was_
-# found, it prints out the values of some Trilinos configuration
-# details.  You may find them useful for building your application
-# that uses Trilinos.
-IF(Trilinos_FOUND)
-  MESSAGE("Found Trilinos!")
-     MESSAGE("   Trilinos_DIR = ${Trilinos_DIR}")
-   MESSAGE("   Trilinos_VERSION = ${Trilinos_VERSION}")
-   MESSAGE("   Trilinos_PACKAGE_LIST = ${Trilinos_PACKAGE_LIST}")
-    MESSAGE("   Trilinos_LIBRARIES = ${Trilinos_LIBRARIES}")
-   MESSAGE("   Trilinos_INCLUDE_DIRS = ${Trilinos_INCLUDE_DIRS}")
-   MESSAGE("   Trilinos_TPL_LIST = ${Trilinos_TPL_LIST}")
-   MESSAGE("   Trilinos_TPL_INCLUDE_DIRS = ${Trilinos_TPL_INCLUDE_DIRS}")
-   MESSAGE("   Trilinos_TPL_LIBRARIES = ${Trilinos_TPL_LIBRARIES}")
-   MESSAGE("   Trilinos_BUILD_SHARED_LIBS = ${Trilinos_BUILD_SHARED_LIBS}")
-   MESSAGE("   Trilinos_CXX_COMPILER = ${Trilinos_CXX_COMPILER}")
-   MESSAGE("   Trilinos_C_COMPILER = ${Trilinos_C_COMPILER}")
-   MESSAGE("   Trilinos_Fortran_COMPILER = ${Trilinos_Fortran_COMPILER}")
-   MESSAGE("   Trilinos_CXX_COMPILER_FLAGS = ${Trilinos_CXX_COMPILER_FLAGS}")
-   MESSAGE("   Trilinos_C_COMPILER_FLAGS = ${Trilinos_C_COMPILER_FLAGS}")
-   MESSAGE("   Trilinos_Fortran_COMPILER_FLAGS = ${Trilinos_Fortran_COMPILER_FLAGS}")
-   MESSAGE("   Trilinos_LINKER = ${Trilinos_LINKER}")
-   MESSAGE("   Trilinos_EXTRA_LD_FLAGS = ${Trilinos_EXTRA_LD_FLAGS}")
-   MESSAGE("   Trilinos_AR = ${Trilinos_AR}")
-   MESSAGE("End of Trilinos details\n")
-ELSE()
-    MESSAGE(FATAL_ERROR "Could not find Trilinos!\n Is TRILINOS_DIR set?")
-ENDIF()
 
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+find_package(Zoltan REQUIRED)
 find_package(PETSc REQUIRED)
 # If you haven't already set the C++ compiler, use the same compiler
 # that was used to build Trilinos on your machine.  You do _not_ need
 # to edit this line.
 project(DomainDecomp)
 find_package(MPI REQUIRED)
-set (CMAKE_CXX_FLAGS "-Wall -g ${Trilinos_CXX_COMPILER_FLAGS} ${CMAKE_CXX_FLAGS}")
-set (CMAKE_CXX_FLAGS_DEBUG  "-g ${CMAKE_CXX_FLAGS}")
+set (CMAKE_CXX_FLAGS "-Wall --std=c++11 -O3 ${CMAKE_CXX_FLAGS}")
+set (CMAKE_CXX_FLAGS_DEBUG  "-Wall --std=c++11 -g ${CMAKE_CXX_FLAGS}")
   MESSAGE("Setting CXX compiler.")
-  SET(CMAKE_CXX_COMPILER ${Trilinos_CXX_COMPILER})
+  SET(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
 
 find_package(CUDA)
 find_package(AMGX)
@@ -69,7 +38,7 @@ endif()
 # that was used to build Trilinos on your machine.  You do _not_ 
 # need to edit this line.
   MESSAGE("Setting C compiler.")
-  SET(CMAKE_C_COMPILE ${Trilinos_C_COMPILER})
+  SET(CMAKE_C_COMPILE ${MPI_C_COMPILER})
 
 
 find_program(CCACHE_FOUND ccache)
@@ -100,6 +69,7 @@ ENDIF()
 # libraries (TPLs) with which Trilinos was built.
 #
 include_directories(".")
+    include_directories(${HYPRE_INCLUDES})
 include_directories(SYSTEM ${Trilinos_TPL_INCLUDE_DIRS})
 include_directories(SYSTEM ${Trilinos_INCLUDE_DIRS})
 include_directories(${MPI_CXX_INCLUDE_PATH})
@@ -109,13 +79,13 @@ include_directories(${CUDA_INCLUDE_DIRS})
 endif()
 include_directories(${AMGX_INCLUDE_DIRS})
 include_directories(${PETSC_INCLUDES})
+    include_directories(${Zoltan_INCLUDES})
 
 # Add to the library path Trilinos' library path, and the library
 # paths of the third-party libraries (TPLs) with which Trilinos was
 # built.  
-link_directories(${Trilinos_LIBRARY_DIRS})
-link_directories(${Trilinos_TPL_LIBRARY_DIRS})
 link_directories("${AMGX_DIR}/lib")
+link_directories("${Zoltan_DIR}/lib")
 
 # 
 # EDIT HERE: Change trilinosExample to the name of the executable
@@ -146,8 +116,6 @@ target_link_libraries(steady
     Interpolators
     MMWriter
     ClawWriter
-  ${Trilinos_TPL_LIBRARIES}
-  ${Trilinos_LIBRARIES} 
   ${MPI_CXX_LIBRARIES} 
   ${PETSC_LIBRARIES} 
 )
@@ -161,8 +129,6 @@ target_link_libraries(heat
     Interpolators
     MMWriter
     ClawWriter
-  ${Trilinos_TPL_LIBRARIES}
-  ${Trilinos_LIBRARIES} 
   ${MPI_CXX_LIBRARIES} 
   ${PETSC_LIBRARIES} 
 )
@@ -176,8 +142,6 @@ target_link_libraries(steady-nodd
     Init
     MMWriter
     ClawWriter
-  ${Trilinos_TPL_LIBRARIES}
-  ${Trilinos_LIBRARIES} 
   ${MPI_CXX_LIBRARIES} 
   ${PETSC_LIBRARIES} 
 )
@@ -190,8 +154,6 @@ target_link_libraries(heat HypreWrapper)
 target_link_libraries(steady-nodd HypreWrapper)
 add_library(HypreWrapper HypreWrapper.cpp)
 target_link_libraries(HypreWrapper
-  ${Trilinos_TPL_LIBRARIES}
-  ${Trilinos_LIBRARIES} 
   ${HYPRE_LIBRARIES} 
 )
 endif()
@@ -206,21 +168,8 @@ target_link_libraries(AmgxWrapper
    ${AMGX_LIBRARIES}
 )
 endif()
-target_link_libraries(SchurHelper
-  ${Trilinos_TPL_LIBRARIES}
-  ${Trilinos_LIBRARIES} 
-  ${MPI_CXX_LIBRARIES} 
-)
-
-target_link_libraries(MatrixHelper
-  ${Trilinos_TPL_LIBRARIES}
-  ${Trilinos_LIBRARIES} 
-  ${MPI_CXX_LIBRARIES} 
-)
-
 target_link_libraries(DomainCollection
-  ${Trilinos_TPL_LIBRARIES}
-  ${Trilinos_LIBRARIES} 
+    ${Zoltan_LIBRARIES}
 )
 
 add_subdirectory(PatchSolvers)

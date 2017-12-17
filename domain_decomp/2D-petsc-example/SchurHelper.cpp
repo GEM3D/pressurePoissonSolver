@@ -1,18 +1,14 @@
 #include "SchurHelper.h"
 #include <array>
 #include <tuple>
-using Teuchos::RCP;
-using Teuchos::rcp;
 using namespace std;
 enum axis_enum { X_AXIS, Y_AXIS };
 enum bc_enum { DIRICHLET, NEUMANN, REFINED };
 
-SchurHelper::SchurHelper(DomainCollection dc, Teuchos::RCP<const Teuchos::Comm<int>> comm,
-                         Teuchos::RCP<PatchSolver> solver, Teuchos::RCP<PatchOperator> op,
-                         Teuchos::RCP<Interpolator> interpolator)
+SchurHelper::SchurHelper(DomainCollection dc, shared_ptr<PatchSolver> solver,
+                         shared_ptr<PatchOperator> op, shared_ptr<Interpolator> interpolator)
 {
 	this->dc           = dc;
-	this->comm         = comm;
 	this->solver       = solver;
 	this->op           = op;
 	this->interpolator = interpolator;
@@ -79,10 +75,8 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 		set<MatrixBlock> row_blocks = iface.getGlobalRowBlocks();
 		blocks.insert(row_blocks.begin(), row_blocks.end());
 	}
-	int                 num_types       = 0;
-	RCP<const map_type> local_map       = Tpetra::createLocalMap<int, int>(n * n, comm);
-	RCP<const map_type> gamma_local_map = Tpetra::createLocalMap<int, int>(n, comm);
-	Vec                 u, f, r, e, gamma, interp;
+	int num_types = 0;
+	Vec u, f, r, e, gamma, interp;
 	VecCreateSeq(PETSC_COMM_SELF, n * n, &u);
 	VecCreateSeq(PETSC_COMM_SELF, n * n, &f);
 	VecCreateSeq(PETSC_COMM_SELF, n * n, &r);
@@ -125,12 +119,12 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 		ds.local_i_refined = {{0, 0, 0, 0, 0, 0, 0}};
 		solver->addDomain(ds);
 
-		map<BlockKey, RCP<valarray<double>>> coeffs;
+		map<BlockKey, shared_ptr<valarray<double>>> coeffs;
 		// allocate blocks of coefficients
 		for (const MatrixBlock &b : todo) {
-			RCP<valarray<double>> ptr = coeffs[b];
-			if (ptr.is_null()) {
-				coeffs[b] = rcp(new valarray<double>(n * n));
+			shared_ptr<valarray<double>> ptr = coeffs[b];
+			if (ptr.get() == nullptr) {
+				coeffs[b] = shared_ptr<valarray<double>>(new valarray<double>(n * n));
 			}
 		}
 
@@ -202,32 +196,33 @@ shared_ptr<Mat> SchurHelper::formCRSMatrix()
 	MatSetType(*A, MATMPIAIJ);
 	MatMPIAIJSetPreallocation(*A, 19 * n, nullptr, 19 * n, nullptr);
 
-	auto insertBlock = [&](int i, int j, RCP<valarray<double>> block, bool flip_i, bool flip_j) {
-		int local_i = i * n;
-		int local_j = j * n;
+	auto insertBlock
+	= [&](int i, int j, shared_ptr<valarray<double>> block, bool flip_i, bool flip_j) {
+		  int local_i = i * n;
+		  int local_j = j * n;
 
-		valarray<double> &orig = *block;
-		valarray<double>  copy(n * n);
-		for (int i = 0; i < n; i++) {
-			int block_i = i;
-			if (flip_i) {
-				block_i = n - i - 1;
-			}
-			for (int j = 0; j < n; j++) {
-				int block_j = j;
-				if (flip_j) {
-					block_j = n - j - 1;
-				}
-				copy[i * n + j] = orig[block_i * n + block_j];
-			}
-		}
-		vector<int> inds_i(n);
-		iota(inds_i.begin(), inds_i.end(), local_i);
-		vector<int> inds_j(n);
-		iota(inds_j.begin(), inds_j.end(), local_j);
+		  valarray<double> &orig = *block;
+		  valarray<double>  copy(n * n);
+		  for (int i = 0; i < n; i++) {
+			  int block_i = i;
+			  if (flip_i) {
+				  block_i = n - i - 1;
+			  }
+			  for (int j = 0; j < n; j++) {
+				  int block_j = j;
+				  if (flip_j) {
+					  block_j = n - j - 1;
+				  }
+				  copy[i * n + j] = orig[block_i * n + block_j];
+			  }
+		  }
+		  vector<int> inds_i(n);
+		  iota(inds_i.begin(), inds_i.end(), local_i);
+		  vector<int> inds_j(n);
+		  iota(inds_j.begin(), inds_j.end(), local_j);
 
-		MatSetValues(*A, n, &inds_i[0], n, &inds_j[0], &copy[0], ADD_VALUES);
-	};
+		  MatSetValues(*A, n, &inds_i[0], n, &inds_j[0], &copy[0], ADD_VALUES);
+	  };
 
 	assembleMatrix(insertBlock);
 	MatAssemblyBegin(*A, MAT_FINAL_ASSEMBLY);

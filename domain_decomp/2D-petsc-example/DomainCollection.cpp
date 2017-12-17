@@ -1,5 +1,4 @@
 #include "DomainCollection.h"
-#include "MyTypeDefs.h"
 #include <algorithm>
 #include <deque>
 #include <fstream>
@@ -8,11 +7,7 @@
 #include <sstream>
 #include <utility>
 using namespace std;
-using Teuchos::RCP;
-using Teuchos::rcp;
-using Teuchos::ArrayRCP;
-DomainCollection::DomainCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm, string file_name,
-                                   int rank)
+DomainCollection::DomainCollection(string file_name)
 {
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	if (rank == 0) {
@@ -61,8 +56,7 @@ DomainCollection::DomainCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm, 
 	indexInterfacesBFS();
 	MPI_Bcast(&num_global_domains, 1, MPI_INT, 0, MPI_COMM_WORLD);
 }
-DomainCollection::DomainCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm, int d_x, int d_y,
-                                   int rank)
+DomainCollection::DomainCollection(int d_x, int d_y)
 {
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	num_global_domains = d_x * d_y;
@@ -164,8 +158,7 @@ void DomainCollection::enumerateIfaces()
 	indexIfacesLocal();
 	indexDomainsLocal();
 }
-DomainCollection::DomainCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm, int d_x, int d_y,
-                                   int rank, bool amr)
+DomainCollection::DomainCollection(int d_x, int d_y, bool amr)
 {
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	num_global_domains = d_x * d_y * 5;
@@ -1534,7 +1527,7 @@ double DomainCollection::integrate(const Vec u)
 		sum += patch_sum;
 	}
 	double retval;
-    MPI_Allreduce(&sum,&retval,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+	MPI_Allreduce(&sum, &retval, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 	VecRestoreArray(u, &u_view);
 	return retval;
 }
@@ -1546,7 +1539,7 @@ double DomainCollection::area()
 		sum += d.x_length * d.y_length;
 	}
 	double retval;
-    MPI_Allreduce(&sum,&retval,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+	MPI_Allreduce(&sum, &retval, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 	return retval;
 }
 void DomainCollection::formISs()

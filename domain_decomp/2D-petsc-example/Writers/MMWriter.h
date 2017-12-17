@@ -1,7 +1,6 @@
 #ifndef MMWRITER_H
 #define MMWRITER_H
 #include "DomainCollection.h"
-#include "MyTypeDefs.h"
 #include <string>
 class MMWriter
 {

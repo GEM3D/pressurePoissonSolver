@@ -1,4 +1,5 @@
 #include "Init.h"
+#include <algorithm>
 using namespace std;
 void Init::initNeumann(DomainCollection &dc, int n, Vec f, Vec exact,
                        function<double(double, double)> ffun, function<double(double, double)> efun,

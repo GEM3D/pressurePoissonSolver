@@ -3,7 +3,6 @@
 //#include "FunctionWrapper.h"
 #include "FivePtPatchOperator.h"
 #include "Init.h"
-#include "MyTypeDefs.h"
 #include "PatchSolvers/FftwPatchSolver.h"
 #include "PatchSolvers/FishpackPatchSolver.h"
 #include "QuadInterpolator.h"
@@ -20,33 +19,6 @@
 #endif
 #include "Timer.h"
 #include "args.h"
-#include <Amesos2.hpp>
-#include <Amesos2_Version.hpp>
-#include <BelosBiCGStabSolMgr.hpp>
-#include <BelosBlockCGSolMgr.hpp>
-#include <BelosBlockGmresSolMgr.hpp>
-#include <BelosConfigDefs.hpp>
-#include <BelosGCRODRSolMgr.hpp>
-#include <BelosLSQRSolMgr.hpp>
-#include <BelosLinearProblem.hpp>
-#include <BelosTpetraAdapter.hpp>
-#include <Ifpack2_BlockRelaxation_decl.hpp>
-#include <Ifpack2_BlockRelaxation_def.hpp>
-#include <Ifpack2_Factory.hpp>
-#include <Ifpack2_ILUT_decl.hpp>
-#include <Ifpack2_ILUT_def.hpp>
-#include <Ifpack2_Relaxation_decl.hpp>
-#include <Ifpack2_Relaxation_def.hpp>
-#include <MatrixMarket_Tpetra.hpp>
-#include <Teuchos_Comm.hpp>
-#include <Teuchos_GlobalMPISession.hpp>
-#include <Teuchos_ParameterList.hpp>
-#include <Teuchos_RCP.hpp>
-#include <Teuchos_Tuple.hpp>
-#include <Teuchos_VerboseObject.hpp>
-#include <Teuchos_oblackholestream.hpp>
-#include <Tpetra_Experimental_BlockCrsMatrix_Helpers.hpp>
-#include <Xpetra_TpetraBlockCrsMatrix.hpp>
 #include <cmath>
 #include <iostream>
 #include <memory>
@@ -60,9 +32,6 @@
 #define M_PIl 3.141592653589793238462643383279502884L /* pi */
 #endif
 
-using Teuchos::RCP;
-using Teuchos::rcp;
-
 // =========== //
 // main driver //
 // =========== //
@@ -72,11 +41,12 @@ using namespace std;
 int main(int argc, char *argv[])
 {
 	PetscInitialize(&argc, &argv, nullptr, nullptr);
-	RCP<const Teuchos::Comm<int>> comm = Tpetra::DefaultPlatform::getDefaultPlatform().getComm();
 
-	int num_procs = comm->getSize();
+	int num_procs;
+	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
 
-	int my_global_rank = comm->getRank();
+	int my_global_rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &my_global_rank);
 
 	// parse input
 	args::ArgumentParser parser("");
@@ -206,13 +176,13 @@ int main(int argc, char *argv[])
 	DomainCollection dc;
 	if (f_mesh) {
 		string d = args::get(f_mesh);
-		dc       = DomainCollection(comm, d, comm->getRank());
+		dc       = DomainCollection(d);
 	} else if (f_amr) {
 		int d = args::get(f_amr);
-		dc    = DomainCollection(comm, d, d, comm->getRank(), true);
+		dc    = DomainCollection(d, d, true);
 	} else {
 		int d = args::get(f_square);
-		dc    = DomainCollection(comm, d, d, comm->getRank());
+		dc    = DomainCollection(d, d);
 	}
 	if (f_div) {
 		for (int i = 0; i < args::get(f_div); i++) {
@@ -273,24 +243,24 @@ int main(int argc, char *argv[])
 	}
 
 	// set the patch solver
-	RCP<PatchSolver> p_solver;
+	shared_ptr<PatchSolver> p_solver;
 	if (f_fish) {
-		p_solver = rcp(new FishpackPatchSolver());
+		p_solver.reset(new FishpackPatchSolver());
 	} else {
-		p_solver = rcp(new FftwPatchSolver(dc));
+		p_solver.reset(new FftwPatchSolver(dc));
 	}
 
 	// patch operator
-	RCP<PatchOperator> p_operator = rcp(new FivePtPatchOperator());
+	shared_ptr<PatchOperator> p_operator(new FivePtPatchOperator());
 
 	// interface interpolator
-	RCP<Interpolator> p_interp = rcp(new QuadInterpolator());
+	shared_ptr<Interpolator> p_interp(new QuadInterpolator());
 
 	Tools::Timer timer;
 	for (int loop = 0; loop < loop_count; loop++) {
 		timer.start("Domain Initialization");
 
-		SchurHelper sch(dc, comm, p_solver, p_operator, p_interp);
+		SchurHelper sch(dc, p_solver, p_operator, p_interp);
 
 		IS  domain_is = dc.getDomainIS();
 		Vec u         = dc.getNewDomainVec();
@@ -320,17 +290,17 @@ int main(int argc, char *argv[])
 			double fdiff = (dc.integrate(*f)) / dc.area();
 			if (my_global_rank == 0) cout << "Fdiff: " << fdiff << endl;
 
-			RCP<vector_type> diff = rcp(new vector_type(domain_map, 1));
+			shared_ptr<vector_type> diff = rcp(new vector_type(domain_map, 1));
 			diff->putScalar(fdiff);
 			f->update(1.0, *diff, 1.0);
 			*/
 		}
 
 #ifdef ENABLE_AMGX
-		Teuchos::RCP<AmgxWrapper> amgxsolver;
+		shared_ptr<AmgxWrapper> amgxsolver;
 #endif
 #ifdef ENABLE_HYPRE
-		Teuchos::RCP<HypreWrapper> hypresolver;
+		shared_ptr<HypreWrapper> hypresolver;
 #endif
 
 		if (dc.num_global_domains != 1) {

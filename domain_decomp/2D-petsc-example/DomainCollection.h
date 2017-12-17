@@ -2,11 +2,7 @@
 #define DOMAINSIGNATURECOLLECTION_H
 #include "Domain.h"
 #include "InterpCase.h"
-#include "MyTypeDefs.h"
 #include "Side.h"
-#include <Teuchos_Comm.hpp>
-#include <Teuchos_GlobalMPISession.hpp>
-#include <Teuchos_RCP.hpp>
 #include <map>
 #include <memory>
 #include <petscvec.h>
@@ -164,9 +160,9 @@ class DomainCollection
 	void                   formISs();
 
 	public:
-	int                                    rank;
-	int                                    n = 4;
-	int                                    num_pins;
+	int rank;
+	int n = 4;
+	int num_pins;
 	/**
 	 * @brief Number of total domains.
 	 */
@@ -199,10 +195,9 @@ class DomainCollection
 	 * @param d_y number of domains in the y direction.
 	 * @param rank the rank of the MPI process.
 	 */
-	DomainCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm, int d_x, int d_y, int rank);
-	DomainCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm, int d_x, int d_y, int rank,
-	                 bool amr);
-	DomainCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm, std::string file_name, int rank);
+	DomainCollection(int d_x, int d_y);
+	DomainCollection(int d_x, int d_y, bool amr);
+	DomainCollection(std::string file_name);
 	/**
 	 * @brief Balance the domains over processors using Zoltan
 	 */
@@ -239,12 +234,12 @@ class DomainCollection
 			p.second.setZeroPatch();
 		}
 	}
-	IS                     getSchurIS();
-	IS                     getSchurDistIS();
-	IS                     getDomainIS();
-	std::shared_ptr<Vec>   getNewSchurVec();
-	std::shared_ptr<Vec>   getNewSchurDistVec();
-	Vec                    getNewDomainVec();
+	IS                   getSchurIS();
+	IS                   getSchurDistIS();
+	IS                   getDomainIS();
+	std::shared_ptr<Vec> getNewSchurVec();
+	std::shared_ptr<Vec> getNewSchurDistVec();
+	Vec                  getNewDomainVec();
 
 	int    getGlobalNumCells() { return num_global_domains * n * n; }
 	double integrate(const Vec u);

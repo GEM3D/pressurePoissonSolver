@@ -1,7 +1,6 @@
 #ifndef VTKWRITER_H
 #define VTKWRITER_H
 #include "DomainCollection.h"
-#include "MyTypeDefs.h"
 #include <map>
 #include <set>
 #include <string>

@@ -1,7 +1,6 @@
 #ifndef CLAWWRITER_H
 #define CLAWWRITER_H
 #include "DomainCollection.h"
-#include "MyTypeDefs.h"
 class ClawWriter
 {
 	private:
