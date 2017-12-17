@@ -51,10 +51,12 @@
 #include <cmath>
 #include <iostream>
 #include <memory>
+#include <petscksp.h>
+#include <petscsys.h>
 #include <petscvec.h>
+#include <petscviewer.h>
 #include <string>
 #include <unistd.h>
-#include <petscksp.h>
 #ifndef M_PIl
 #define M_PIl 3.141592653589793238462643383279502884L /* pi */
 #endif
@@ -70,7 +72,7 @@ using namespace std;
 
 int main(int argc, char *argv[])
 {
-    PetscInitialize(&argc,&argv,nullptr,nullptr);
+	PetscInitialize(&argc, &argv, nullptr, nullptr);
 	RCP<const Teuchos::Comm<int>> comm = Tpetra::DefaultPlatform::getDefaultPlatform().getComm();
 
 	int num_procs = comm->getSize();
@@ -291,10 +293,10 @@ int main(int argc, char *argv[])
 
 		SchurHelper sch(dc, comm, p_solver, p_operator, p_interp);
 
-		IS              domain_is = dc.getDomainIS();
-	    Vec u         = dc.getNewDomainVec();
-	    Vec exact     = dc.getNewDomainVec();
-	    Vec f         = dc.getNewDomainVec();
+		IS  domain_is = dc.getDomainIS();
+		Vec u         = dc.getNewDomainVec();
+		Vec exact     = dc.getNewDomainVec();
+		Vec f         = dc.getNewDomainVec();
 
 		if (f_neumann) {
 			Init::initNeumann(dc, nx, f, exact, ffun, gfun, nfunx, nfuny);
@@ -305,24 +307,24 @@ int main(int argc, char *argv[])
 		timer.stop("Domain Initialization");
 
 		// Create the gamma and diff vectors
-		shared_ptr<Vec>                    gamma = dc.getNewSchurVec();
-		shared_ptr<Vec>                    diff  = dc.getNewSchurVec();
-		shared_ptr<Vec>                    b     = dc.getNewSchurVec();
-		shared_ptr<Mat>                   A;
+		shared_ptr<Vec> gamma = dc.getNewSchurVec();
+		shared_ptr<Vec> diff  = dc.getNewSchurVec();
+		shared_ptr<Vec> b     = dc.getNewSchurVec();
+		shared_ptr<Mat> A;
 
 		// Create linear problem for the Belos solver
-        shared_ptr<KSP>solver (new KSP,KSPDestroy);
-        //KSPCreate(MPI_COMM_WORLD,solver.get());
+		shared_ptr<KSP> solver(new KSP, KSPDestroy);
+		KSPCreate(MPI_COMM_WORLD, solver.get());
 
 		if (f_neumann && !f_nozerof) {
-            /*
+			/*
 			double fdiff = (dc.integrate(*f)) / dc.area();
 			if (my_global_rank == 0) cout << "Fdiff: " << fdiff << endl;
 
 			RCP<vector_type> diff = rcp(new vector_type(domain_map, 1));
 			diff->putScalar(fdiff);
 			f->update(1.0, *diff, 1.0);
-            */
+			*/
 		}
 
 #ifdef ENABLE_AMGX
@@ -336,12 +338,16 @@ int main(int argc, char *argv[])
 			// do iterative solve
 
 			// Get the b vector
+			VecScale(*gamma, 0);
 			sch.solveWithInterface(f, u, *gamma, *b);
-            VecScale(*b,-1.0);
+			VecScale(*b, -1.0);
 
 			if (f_rhs) {
-		//		Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(args::get(f_rhs), b, "",
-		//		                                                          "");
+				PetscViewer viewer;
+				PetscViewerBinaryOpen(PETSC_COMM_WORLD, args::get(f_rhs).c_str(), FILE_MODE_WRITE,
+				                      &viewer);
+				VecView(*b, viewer);
+				PetscViewerDestroy(&viewer);
 			}
 
 			///////////////////
@@ -360,25 +366,28 @@ int main(int argc, char *argv[])
 				timer.stop("Matrix Formation");
 
 				if (f_m) {
-					//Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(args::get(f_m), A,
-					 //                                                          "", "");
+					PetscViewer viewer;
+					PetscViewerBinaryOpen(PETSC_COMM_WORLD, args::get(f_m).c_str(), FILE_MODE_WRITE,
+					                      &viewer);
+					MatView(*A, viewer);
+					PetscViewerDestroy(&viewer);
 				}
 			}
 
 			if (f_amgx) {
 #ifdef ENABLE_AMGX
 				timer.start("AMGX Setup");
-		//		amgxsolver = rcp(new AmgxWrapper(A, dc, nx));
+				//		amgxsolver = rcp(new AmgxWrapper(A, dc, nx));
 				timer.stop("AMGX Setup");
 #endif
 			} else if (f_hypre) {
 #ifdef ENABLE_HYPRE
 				timer.start("Hypre Setup");
-		//		hypresolver = rcp(new HypreWrapper(A, dc, nx, tol, true));
+				//		hypresolver = rcp(new HypreWrapper(A, dc, nx, tol, true));
 				timer.stop("Hypre Setup");
 #endif
 			} else {
-                //preconditoners
+				// preconditoners
 			}
 			///////////////////
 			// setup end
@@ -395,17 +404,19 @@ int main(int argc, char *argv[])
 			if (f_amgx) {
 // solve
 #ifdef ENABLE_AMGX
-				//amgxsolver->solve(gamma, b);
+// amgxsolver->solve(gamma, b);
 #endif
 			} else if (f_hypre) {
 #ifdef ENABLE_HYPRE
-				//hypresolver->solve(gamma, b);
+// hypresolver->solve(gamma, b);
 #endif
 			} else {
-
-                KSPSetTolerances(*solver,tol,PETSC_DEFAULT,PETSC_DEFAULT,5000);
-                KSPSetOperators(*solver,*A,*A);
-                KSPSolve(*solver,*b,*gamma);
+				KSPSetTolerances(*solver, tol, PETSC_DEFAULT, PETSC_DEFAULT, 5000);
+				KSPSetOperators(*solver, *A, *A);
+				KSPSolve(*solver, *b, *gamma);
+				int its;
+				KSPGetIterationNumber(*solver, &its);
+				cout << "Iterations: " << its << endl;
 			}
 			timer.stop("Gamma Solve");
 		}
@@ -423,35 +434,35 @@ int main(int argc, char *argv[])
 		timer.stop("Complete Solve");
 
 		// residual
-        Vec resid = dc.getNewDomainVec();
-        Vec au = dc.getNewDomainVec();
+		Vec resid = dc.getNewDomainVec();
+		Vec au    = dc.getNewDomainVec();
 		sch.applyWithInterface(u, *gamma, au);
-        VecAXPBYPCZ(resid,-1.0,1.0,0.0,au,f);
+		VecAXPBYPCZ(resid, -1.0, 1.0, 0.0, au, f);
 		double residual;
-        VecNorm(resid,NORM_2,&residual);
+		VecNorm(resid, NORM_2, &residual);
 		double fnorm;
-        VecNorm(f,NORM_2,&fnorm);
+		VecNorm(f, NORM_2, &fnorm);
 
 		// error
-        Vec error = dc.getNewDomainVec();
-        VecAXPBYPCZ(error,-1.0,1.0,0.0,exact,u);
+		Vec error = dc.getNewDomainVec();
+		VecAXPBYPCZ(error, -1.0, 1.0, 0.0, exact, u);
 		if (f_neumann) {
-		/*	double uavg = dc.integrate(*u) / dc.area();
-			double eavg = dc.integrate(*exact) / dc.area();
+			/*	double uavg = dc.integrate(*u) / dc.area();
+			    double eavg = dc.integrate(*exact) / dc.area();
 
-			if (my_global_rank == 0) {
-				cout << "Average of computed solution: " << uavg << endl;
-				cout << "Average of exact solution: " << eavg << endl;
-			}
+			    if (my_global_rank == 0) {
+			        cout << "Average of computed solution: " << uavg << endl;
+			        cout << "Average of exact solution: " << eavg << endl;
+			    }
 
-			vector_type ones(domain_map, 1);
-			ones.putScalar(1);
-			error->update(eavg - uavg, ones, 1.0);*/
+			    vector_type ones(domain_map, 1);
+			    ones.putScalar(1);
+			    error->update(eavg - uavg, ones, 1.0);*/
 		}
 		double error_norm;
-        VecNorm(error,NORM_2,&error_norm);
+		VecNorm(error, NORM_2, &error_norm);
 		double exact_norm;
-        VecNorm(exact,NORM_2,&exact_norm);
+		VecNorm(exact, NORM_2, &exact_norm);
 
 		double ausum = dc.integrate(au);
 		double fsum  = dc.integrate(f);
@@ -467,28 +478,29 @@ int main(int argc, char *argv[])
 		// output
 		MMWriter mmwriter(dc, f_amr);
 		if (f_s) {
-			//mmwriter.write(*u, args::get(f_s));
+			// mmwriter.write(*u, args::get(f_s));
 		}
 		if (f_resid) {
-			//mmwriter.write(*resid, args::get(f_resid));
+			// mmwriter.write(*resid, args::get(f_resid));
 		}
 		if (f_error) {
-			//mmwriter.write(*error, args::get(f_error));
+			// mmwriter.write(*error, args::get(f_error));
 		}
 		if (f_g) {
-			//Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(args::get(f_g), gamma, "",
-			 //                                                         "");
+			PetscViewer viewer;
+			PetscViewerASCIIOpen(PETSC_COMM_WORLD, args::get(f_g).c_str(), &viewer);
+			VecView(*gamma, viewer);
 		}
 		if (f_outclaw) {
 			ClawWriter writer(dc);
-			//writer.write(*u, *resid);
+			// writer.write(*u, *resid);
 		}
 #ifdef HAVE_VTK
 		if (f_outvtk) {
 			VtkWriter writer(dc, args::get(f_outvtk));
-			//writer.add(*u, "Solution");
-			//writer.add(*error, "Error");
-			//writer.add(*resid, "Residual");
+			// writer.add(*u, "Solution");
+			// writer.add(*error, "Error");
+			// writer.add(*resid, "Residual");
 			writer.write();
 		}
 #endif
@@ -498,5 +510,6 @@ int main(int argc, char *argv[])
 	if (my_global_rank == 0) {
 		cout << timer;
 	}
+	PetscFinalize();
 	return 0;
 }

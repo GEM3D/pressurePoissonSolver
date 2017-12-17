@@ -119,6 +119,7 @@ struct Iface {
 	}
 	void setGlobalIndexes(std::map<int, int> &rev_map)
 	{
+		id_global = rev_map.at(id_local);
 		left.setGlobalIndexes(rev_map);
 		right.setGlobalIndexes(rev_map);
 		extra.setGlobalIndexes(rev_map);
@@ -247,7 +248,7 @@ class DomainCollection
 	IS                     getDomainIS();
 	std::shared_ptr<Vec>   getNewSchurVec();
 	std::shared_ptr<Vec>   getNewSchurDistVec();
-	Vec   getNewDomainVec();
+	Vec                    getNewDomainVec();
 
 	int    getGlobalNumCells() { return num_global_domains * n * n; }
 	double integrate(const Vec u);

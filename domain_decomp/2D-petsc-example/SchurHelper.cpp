@@ -24,11 +24,10 @@ void SchurHelper::solveWithInterface(const Vec f, Vec u, const Vec gamma, Vec di
 {
 	// initilize our local variables
 	VecScatter scatter;
-    //if(dc.num_global_domains!=1){
-	VecScatterCreate(gamma, dc.getSchurIS(), *local_gamma, dc.getSchurDistIS(), &scatter);
+	VecScatterCreate(gamma, dc.getSchurDistIS(), *local_gamma, dc.getSchurIS(), &scatter);
 	VecScatterBegin(scatter, gamma, *local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(scatter, gamma, *local_gamma, INSERT_VALUES, SCATTER_FORWARD);
-    //}
+
 	// solve over domains on this proc
 	for (auto &p : dc.domains) {
 		Domain &d = p.second;
@@ -37,19 +36,19 @@ void SchurHelper::solveWithInterface(const Vec f, Vec u, const Vec gamma, Vec di
 	}
 
 	// export diff vector
-    //if(dc.num_global_domains!=1){
 	VecScale(diff, 0);
 	VecScatterBegin(scatter, *local_interp, diff, ADD_VALUES, SCATTER_REVERSE);
 	VecScatterEnd(scatter, *local_interp, diff, ADD_VALUES, SCATTER_REVERSE);
-    //}
+	VecAXPBY(diff, 1.0, -1.0, gamma);
+	VecScatterDestroy(&scatter);
 }
 void SchurHelper::applyWithInterface(const Vec u, const Vec gamma, Vec f)
 {
 	VecScatter scatter;
-	VecScatterCreate(gamma, dc.getSchurIS(), *local_gamma, dc.getSchurDistIS(), &scatter);
-
+	VecScatterCreate(gamma, dc.getSchurDistIS(), *local_gamma, dc.getSchurIS(), &scatter);
 	VecScatterBegin(scatter, gamma, *local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(scatter, gamma, *local_gamma, INSERT_VALUES, SCATTER_FORWARD);
+	VecScatterDestroy(&scatter);
 	for (auto &p : dc.domains) {
 		Domain &d = p.second;
 		op->apply(d, u, *local_gamma, f);
@@ -77,7 +76,7 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 	set<MatrixBlock> blocks;
 	for (auto p : dc.ifaces) {
 		Iface &          iface      = p.second;
-		set<MatrixBlock> row_blocks = iface.getRowBlocks();
+		set<MatrixBlock> row_blocks = iface.getGlobalRowBlocks();
 		blocks.insert(row_blocks.begin(), row_blocks.end());
 	}
 	int                 num_types       = 0;
@@ -195,20 +194,14 @@ shared_ptr<Mat> SchurHelper::formCRSMatrix()
 			cols_array.push_back(i * n + j);
 		}
 	}
-	RCP<map_type> col_map = rcp(new map_type(-1, &cols_array[0], cols_array.size(), 0, this->comm));
-
-	shared_ptr<Mat> A(nullptr, MatDestroy);
+	shared_ptr<Mat> A(new Mat, MatDestroy);
 	MatCreate(MPI_COMM_WORLD, A.get());
 	int local_size  = dc.ifaces.size() * n;
 	int global_size = dc.num_global_interfaces * n;
 	MatSetSizes(*A, local_size, local_size, global_size, global_size);
-	MatSetType(*A, MATSEQDENSE);
 	MatSetType(*A, MATMPIAIJ);
-	// TODO MatMPIAIJSetPreallocation
+	MatMPIAIJSetPreallocation(*A, 19 * n, nullptr, 19 * n, nullptr);
 
-	int start_i;
-	MPI_Scan(&local_size, &start_i, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-	start_i -= local_size;
 	auto insertBlock = [&](int i, int j, RCP<valarray<double>> block, bool flip_i, bool flip_j) {
 		int local_i = i * n;
 		int local_j = j * n;
@@ -229,9 +222,9 @@ shared_ptr<Mat> SchurHelper::formCRSMatrix()
 			}
 		}
 		vector<int> inds_i(n);
-		iota(inds_i.begin(), inds_i.end(), start_i + local_i);
+		iota(inds_i.begin(), inds_i.end(), local_i);
 		vector<int> inds_j(n);
-		iota(inds_j.begin(), inds_j.end(), start_i + local_j);
+		iota(inds_j.begin(), inds_j.end(), local_j);
 
 		MatSetValues(*A, n, &inds_i[0], n, &inds_j[0], &copy[0], ADD_VALUES);
 	};

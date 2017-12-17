@@ -6,10 +6,10 @@ void Init::initNeumann(DomainCollection &dc, int n, Vec f, Vec exact,
                        function<double(double, double)> nfuny)
 {
 	n = dc.n;
-    vector<int>inds(dc.domains.size()*n*n);
-    iota(inds.begin(),inds.end(),0);
-    vector<double>f_vals(dc.domains.size()*n*n);
-    vector<double>exact_vals(dc.domains.size()*n*n);
+	vector<int> inds(dc.domains.size() * n * n);
+	iota(inds.begin(), inds.end(), 0);
+	vector<double> f_vals(dc.domains.size() * n * n);
+	vector<double> exact_vals(dc.domains.size() * n * n);
 	for (auto &p : dc.domains) {
 		Domain &d = p.second;
 
@@ -18,8 +18,8 @@ void Init::initNeumann(DomainCollection &dc, int n, Vec f, Vec exact,
 		double h_y = d.y_length / n;
 		for (int yi = 0; yi < n; yi++) {
 			for (int xi = 0; xi < n; xi++) {
-				double x           = d.x_start + h_x / 2.0 + d.x_length * xi / n;
-				double y           = d.y_start + h_y / 2.0 + d.y_length * yi / n;
+				double x                = d.x_start + h_x / 2.0 + d.x_length * xi / n;
+				double y                = d.y_start + h_y / 2.0 + d.y_length * yi / n;
 				f_vals[yi * n + xi]     = ffun(x, y);
 				exact_vals[yi * n + xi] = efun(x, y);
 			}
@@ -54,32 +54,34 @@ void Init::initNeumann(DomainCollection &dc, int n, Vec f, Vec exact,
 			}
 		}
 	}
-    VecSetValuesLocal(f,inds.size(),&inds[0],&f_vals[0],INSERT_VALUES);
-    VecSetValuesLocal(exact,inds.size(),&inds[0],&exact_vals[0],INSERT_VALUES);
-    VecAssemblyBegin(f);
-    VecAssemblyBegin(exact);
-    VecAssemblyEnd(f);
-    VecAssemblyEnd(exact);
+	VecSetValuesLocal(f, inds.size(), &inds[0], &f_vals[0], INSERT_VALUES);
+	VecSetValuesLocal(exact, inds.size(), &inds[0], &exact_vals[0], INSERT_VALUES);
+	VecAssemblyBegin(f);
+	VecAssemblyBegin(exact);
+	VecAssemblyEnd(f);
+	VecAssemblyEnd(exact);
 }
 void Init::initDirichlet(DomainCollection &dc, int n, Vec f, Vec exact,
                          function<double(double, double)> ffun,
                          function<double(double, double)> efun)
 {
 	n = dc.n;
-    double *f_vals;
-    VecGetArray(f,&f_vals);
-    double *exact_vals;
-    VecGetArray(exact,&exact_vals);
+	double *f_ptr;
+	VecGetArray(f, &f_ptr);
+	double *exact_ptr;
+	VecGetArray(exact, &exact_ptr);
 	for (auto &p : dc.domains) {
 		Domain &d = p.second;
 
+		double *f_vals     = f_ptr + d.id_local * n * n;
+		double *exact_vals = exact_ptr + d.id_local * n * n;
 		// Generate RHS vector
 		double h_x = d.x_length / n;
 		double h_y = d.y_length / n;
 		for (int yi = 0; yi < n; yi++) {
 			for (int xi = 0; xi < n; xi++) {
-				double x           = d.x_start + h_x / 2.0 + d.x_length * xi / n;
-				double y           = d.y_start + h_y / 2.0 + d.y_length * yi / n;
+				double x                = d.x_start + h_x / 2.0 + d.x_length * xi / n;
+				double y                = d.y_start + h_y / 2.0 + d.y_length * yi / n;
 				f_vals[yi * n + xi]     = ffun(x, y);
 				exact_vals[yi * n + xi] = efun(x, y);
 			}
@@ -114,14 +116,14 @@ void Init::initDirichlet(DomainCollection &dc, int n, Vec f, Vec exact,
 			}
 		}
 	}
-    VecRestoreArray(f,&f_vals);
-    VecRestoreArray(exact,&exact_vals);
+	VecRestoreArray(f, &f_ptr);
+	VecRestoreArray(exact, &exact_ptr);
 }
-void Init::fillSolution(DomainCollection &dc, vector_type& u,
+void Init::fillSolution(DomainCollection &dc, vector_type &u,
                         function<double(double, double, double)> fun, double time)
 {
-	double *vec                  = &u.get1dViewNonConst()[0];
-	int n = dc.n;
+	double *vec = &u.get1dViewNonConst()[0];
+	int     n   = dc.n;
 	for (auto &p : dc.domains) {
 		Domain &d = p.second;
 

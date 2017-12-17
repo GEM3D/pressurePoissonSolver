@@ -1527,13 +1527,12 @@ void DomainCollection::formISs()
 	ISCreateBlock(MPI_COMM_WORLD, n * n, domain_map_vec.size(), &domain_map_vec[0],
 	              PETSC_COPY_VALUES, &domain_is);
 	// schur index set
-	ISCreateBlock(MPI_COMM_WORLD, n, iface_map_vec.size(), &iface_map_vec[0], PETSC_COPY_VALUES,
-	              &schur_is);
+	ISCreateStride(MPI_COMM_WORLD, iface_dist_map_vec.size() * n, 0, 1, &schur_is);
 	ISCreateBlock(MPI_COMM_WORLD, n, iface_dist_map_vec.size(), &iface_dist_map_vec[0],
 	              PETSC_COPY_VALUES, &schur_dist_is);
-    ISLocalToGlobalMappingCreateIS(domain_is,&domain_is_ltg);
-    ISLocalToGlobalMappingCreateIS(schur_is,&schur_is_ltg);
-    ISLocalToGlobalMappingCreateIS(schur_dist_is,&schur_dist_is_ltg);
+	ISLocalToGlobalMappingCreateIS(domain_is, &domain_is_ltg);
+	ISLocalToGlobalMappingCreateIS(schur_is, &schur_is_ltg);
+	ISLocalToGlobalMappingCreateIS(schur_dist_is, &schur_dist_is_ltg);
 }
 IS DomainCollection::getSchurIS()
 {
@@ -1552,27 +1551,21 @@ IS DomainCollection::getDomainIS()
 }
 shared_ptr<Vec> DomainCollection::getNewSchurVec()
 {
-	if (!ises_init) formISs();
 	shared_ptr<Vec> u(new Vec, VecDestroy);
-	VecCreateMPI(MPI_COMM_WORLD,iface_map_vec.size()*n,PETSC_DETERMINE, u.get());
-	VecSetLocalToGlobalMapping(*u, schur_is_ltg);
+	VecCreateMPI(MPI_COMM_WORLD, iface_map_vec.size() * n, PETSC_DETERMINE, u.get());
 	return u;
 }
 shared_ptr<Vec> DomainCollection::getNewSchurDistVec()
 {
-	if (!ises_init) formISs();
 	shared_ptr<Vec> u(new Vec, VecDestroy);
-	VecCreateMPI(MPI_COMM_WORLD,iface_dist_map_vec.size()*n,PETSC_DETERMINE, u.get());
-	VecSetLocalToGlobalMapping(*u, schur_dist_is_ltg);
+	VecCreateSeq(PETSC_COMM_SELF, iface_dist_map_vec.size() * n, u.get());
 	return u;
 }
 Vec DomainCollection::getNewDomainVec()
 {
-	if (!ises_init) formISs();
 	Vec u;
-	VecCreateMPI(MPI_COMM_WORLD,domains.size()*n*n,PETSC_DETERMINE, &u);
-	VecSetLocalToGlobalMapping(u, domain_is_ltg);
-    VecAssemblyBegin(u);
-    VecAssemblyEnd(u);
+	VecCreateMPI(MPI_COMM_WORLD, domains.size() * n * n, PETSC_DETERMINE, &u);
+	VecAssemblyBegin(u);
+	VecAssemblyEnd(u);
 	return u;
 }
