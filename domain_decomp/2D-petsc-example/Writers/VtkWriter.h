@@ -2,9 +2,9 @@
 #define VTKWRITER_H
 #include "DomainCollection.h"
 #include "MyTypeDefs.h"
-#include <string>
-#include <set>
 #include <map>
+#include <set>
+#include <string>
 #include <vtkCellData.h>
 #include <vtkDoubleArray.h>
 #include <vtkImageData.h>
@@ -17,18 +17,18 @@
 class VtkWriter
 {
 	private:
-	DomainCollection dc;
-    std::string file_name;
-    static vtkSmartPointer<vtkMultiProcessController> controller;
-    std::map<int,vtkSmartPointer<vtkImageData>>   images;
-    std::set<vtkSmartPointer<vtkDoubleArray>> arrays;
+	DomainCollection                                  dc;
+	std::string                                       file_name;
+	static vtkSmartPointer<vtkMultiProcessController> controller;
+	std::map<int, vtkSmartPointer<vtkImageData>> images;
+	std::set<vtkSmartPointer<vtkDoubleArray>>    arrays;
 	vtkSmartPointer<vtkXMLPMultiBlockDataWriter> writer;
-	vtkSmartPointer<vtkMultiBlockDataSet> block;
-	vtkSmartPointer<vtkMultiPieceDataSet> data;
+	vtkSmartPointer<vtkMultiBlockDataSet>        block;
+	vtkSmartPointer<vtkMultiPieceDataSet>        data;
 
 	public:
-	VtkWriter(DomainCollection &dc,std::string file_name);
-    void add(vector_type &u, std::string name);
+	VtkWriter(DomainCollection &dc, std::string file_name);
+	void add(Vec u, std::string name);
 	void write();
 };
 #endif

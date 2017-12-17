@@ -29,11 +29,12 @@ VtkWriter::VtkWriter(DomainCollection &dc, string file_name)
 		writer->SetWriteMetaFile(1);
 	}
 }
-void VtkWriter::add(vector_type &u, string name)
+void VtkWriter::add(Vec u, string name)
 {
 	// create MultiPieceDataSet and fill with patch information
 
-	auto u_view = u.get1dView();
+	double *u_view;
+	VecGetArray(u, &u_view);
 
 	for (auto &p : dc.domains) {
 		Domain &d     = p.second;
@@ -45,7 +46,7 @@ void VtkWriter::add(vector_type &u, string name)
 		// create image object
 		vtkSmartPointer<vtkImageData> image = images[d.id];
 		if (image == nullptr) {
-            image  = vtkSmartPointer<vtkImageData>::New();
+			image        = vtkSmartPointer<vtkImageData>::New();
 			images[d.id] = image;
 			image->SetOrigin(d.x_start, d.y_start, 0);
 			image->SetSpacing(h_x, h_y, 0);
@@ -67,6 +68,8 @@ void VtkWriter::add(vector_type &u, string name)
 		}
 		image->GetCellData()->AddArray(solution);
 	}
+
+	VecRestoreArray(u, &u_view);
 }
 void VtkWriter::write()
 {

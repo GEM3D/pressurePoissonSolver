@@ -119,11 +119,12 @@ void Init::initDirichlet(DomainCollection &dc, int n, Vec f, Vec exact,
 	VecRestoreArray(f, &f_ptr);
 	VecRestoreArray(exact, &exact_ptr);
 }
-void Init::fillSolution(DomainCollection &dc, vector_type &u,
-                        function<double(double, double, double)> fun, double time)
+void Init::fillSolution(DomainCollection &dc, Vec u, function<double(double, double, double)> fun,
+                        double time)
 {
-	double *vec = &u.get1dViewNonConst()[0];
-	int     n   = dc.n;
+	double *vec;
+	VecGetArray(u, &vec);
+	int n = dc.n;
 	for (auto &p : dc.domains) {
 		Domain &d = p.second;
 
@@ -139,4 +140,5 @@ void Init::fillSolution(DomainCollection &dc, vector_type &u,
 			}
 		}
 	}
+	VecRestoreArray(u, &vec);
 }

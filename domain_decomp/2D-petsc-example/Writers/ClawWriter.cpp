@@ -2,7 +2,7 @@
 #include <fstream>
 using namespace std;
 ClawWriter::ClawWriter(DomainCollection &dc) { this->dc = dc; }
-void ClawWriter::write(vector_type &u, vector_type &resid)
+void ClawWriter::write(Vec u, Vec resid)
 {
 	ofstream     t_file("fort.t0000");
 	const string tab = "\t";
@@ -14,15 +14,20 @@ void ClawWriter::write(vector_type &u, vector_type &resid)
 	t_file.close();
 	ofstream q_file("fort.q0000");
 
+	double *u_view, *resid_view;
+	VecGetArray(u, &u_view);
+	VecGetArray(resid, &resid_view);
 	q_file.precision(10);
 	q_file << scientific;
 	for (auto &p : dc.domains) {
 		Domain &d = p.second;
-		writePatch(d, q_file, u, resid);
+		writePatch(d, q_file, u_view, resid_view);
 	}
+	VecRestoreArray(u, &u_view);
+	VecRestoreArray(resid, &resid_view);
 	q_file.close();
 }
-void ClawWriter::writePatch(Domain &d, std::ostream &os, vector_type &u, vector_type &resid)
+void ClawWriter::writePatch(Domain &d, std::ostream &os, double *u_view, double *resid_view)
 {
 	const string tab = "\t";
 	os << d.id << tab << "grid_number" << endl;
@@ -39,9 +44,7 @@ void ClawWriter::writePatch(Domain &d, std::ostream &os, vector_type &u, vector_
 	os << h_x << tab << "dx" << endl;
 	os << h_y << tab << "dy" << endl;
 	os << endl;
-	int  start      = d.id * n * n;
-	auto u_view     = u.get1dView();
-	auto resid_view = resid.get1dView();
+	int start = d.id * n * n;
 	for (int i = 0; i < n; i++) {
 		for (int j = 0; j < n; j++) {
 			int loc = j + i * n;

@@ -1,5 +1,4 @@
 #include "DomainCollection.h"
-#include "Factory.h"
 #include "SchurHelper.h"
 //#include "FunctionWrapper.h"
 #include "FivePtPatchOperator.h"
@@ -478,13 +477,13 @@ int main(int argc, char *argv[])
 		// output
 		MMWriter mmwriter(dc, f_amr);
 		if (f_s) {
-			// mmwriter.write(*u, args::get(f_s));
+			mmwriter.write(u, args::get(f_s));
 		}
 		if (f_resid) {
-			// mmwriter.write(*resid, args::get(f_resid));
+			mmwriter.write(resid, args::get(f_resid));
 		}
 		if (f_error) {
-			// mmwriter.write(*error, args::get(f_error));
+			mmwriter.write(error, args::get(f_error));
 		}
 		if (f_g) {
 			PetscViewer viewer;
@@ -493,14 +492,14 @@ int main(int argc, char *argv[])
 		}
 		if (f_outclaw) {
 			ClawWriter writer(dc);
-			// writer.write(*u, *resid);
+			writer.write(u, resid);
 		}
 #ifdef HAVE_VTK
 		if (f_outvtk) {
 			VtkWriter writer(dc, args::get(f_outvtk));
-			// writer.add(*u, "Solution");
-			// writer.add(*error, "Error");
-			// writer.add(*resid, "Residual");
+			writer.add(u, "Solution");
+			writer.add(error, "Error");
+			writer.add(resid, "Residual");
 			writer.write();
 		}
 #endif

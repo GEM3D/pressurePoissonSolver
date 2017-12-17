@@ -11,6 +11,6 @@ class MMWriter
 
 	public:
 	MMWriter(DomainCollection &dc, bool amr);
-	void write(const vector_type &u, std::string filename);
+	void write(const Vec u, std::string filename);
 };
 #endif

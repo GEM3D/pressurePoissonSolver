@@ -128,7 +128,6 @@ add_executable(steady-nodd steady-nodd.cpp)
 add_library(SchurHelper SchurHelper.cpp)
 add_library(MatrixHelper MatrixHelper.cpp)
 add_library(DomainCollection DomainCollection.cpp)
-add_library(Factory Factory.cpp)
 add_library(Interpolators QuadInterpolator.cpp FourthInterpolator.cpp)
 add_library(Init Init.cpp)
 
@@ -141,7 +140,6 @@ add_library(Init Init.cpp)
 target_link_libraries(steady
     SchurHelper
     DomainCollection
-    Factory
     Init
     FftwPatchSolver
     FishpackPatchSolver
@@ -157,7 +155,6 @@ target_link_libraries(heat
     SchurHelper
     MatrixHelper
     DomainCollection
-    Factory
     Init
     FftwPatchSolver
     FishpackPatchSolver
@@ -176,7 +173,6 @@ endif(VTK_FOUND)
 target_link_libraries(steady-nodd
     MatrixHelper
     DomainCollection
-    Factory
     Init
     MMWriter
     ClawWriter
@@ -210,10 +206,6 @@ target_link_libraries(AmgxWrapper
    ${AMGX_LIBRARIES}
 )
 endif()
-target_link_libraries(Factory
-  ${Trilinos_TPL_LIBRARIES}
-  ${Trilinos_LIBRARIES} 
-)
 target_link_libraries(SchurHelper
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 

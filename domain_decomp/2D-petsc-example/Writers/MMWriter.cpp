@@ -6,7 +6,7 @@ MMWriter::MMWriter(DomainCollection &dc, bool amr)
 	this->amr = amr;
 	this->dc  = dc;
 }
-void MMWriter::write(const vector_type &u, string filename)
+void MMWriter::write(const Vec u, string filename)
 {
 	int      n = dc.n;
 	ofstream os(filename);
@@ -23,7 +23,8 @@ void MMWriter::write(const vector_type &u, string filename)
 	os << "%%MatrixMarket matrix array real general\n";
 	os << num_i << ' ' << num_j << '\n';
 	os.precision(15);
-	auto u_view = u.get1dView();
+	double *u_view;
+	VecGetArray(u, &u_view);
 	for (int j = 0; j < num_j; j++) {
 		int domain_j   = j / n;
 		int internal_j = j % n;
@@ -57,4 +58,5 @@ void MMWriter::write(const vector_type &u, string filename)
 		}
 		os.close();
 	}
+	VecRestoreArray(u, &u_view);
 }
