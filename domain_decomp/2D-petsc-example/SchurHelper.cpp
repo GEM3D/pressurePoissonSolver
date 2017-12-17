@@ -24,7 +24,7 @@ void SchurHelper::solveWithInterface(const Vec f, Vec u, const Vec gamma, Vec di
 {
 	// initilize our local variables
 	VecScatter scatter;
-	VecScatterCreate(gamma, dc.getSchurDistIS(), *local_gamma, dc.getSchurIS(), &scatter);
+	VecScatterCreate(gamma, dc.getSchurDistIS(), *local_gamma, nullptr, &scatter);
 	VecScatterBegin(scatter, gamma, *local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(scatter, gamma, *local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 

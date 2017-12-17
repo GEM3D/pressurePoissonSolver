@@ -14,8 +14,7 @@ using Teuchos::ArrayRCP;
 DomainCollection::DomainCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm, string file_name,
                                    int rank)
 {
-	this->comm = comm;
-	this->rank = rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	if (rank == 0) {
 		num_global_interfaces = 0;
 		ifstream mesh(file_name);
@@ -65,8 +64,7 @@ DomainCollection::DomainCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm, 
 DomainCollection::DomainCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm, int d_x, int d_y,
                                    int rank)
 {
-	this->comm         = comm;
-	this->rank         = rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	num_global_domains = d_x * d_y;
 	if (rank == 0) {
 		for (int domain_y = 0; domain_y < d_y; domain_y++) {
@@ -169,8 +167,7 @@ void DomainCollection::enumerateIfaces()
 DomainCollection::DomainCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm, int d_x, int d_y,
                                    int rank, bool amr)
 {
-	this->comm         = comm;
-	this->rank         = rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	num_global_domains = d_x * d_y * 5;
 	if (rank == 0) {
 		for (int domain_y = 0; domain_y < d_y; domain_y++) {
@@ -949,29 +946,57 @@ void DomainCollection::zoltanBalanceDomains()
 
 void DomainCollection::indexIfacesGlobal()
 {
-	RCP<const map_type> global_map = Tpetra::createContigMap<int, int>(-1, ifaces.size(), comm);
-	RCP<map_type> gid_map = rcp(new map_type(-1, &iface_map_vec[0], iface_map_vec.size(), 0, comm));
+	// create map for gids
+	ISLocalToGlobalMapping gid_map;
+	ISLocalToGlobalMappingCreate(MPI_COMM_WORLD, 1, iface_map_vec.size(), &iface_map_vec[0],
+	                             PETSC_COPY_VALUES, &gid_map);
 
-	int_vector_type source(gid_map, 1);
-	auto            vec            = source.get1dViewNonConst();
-	auto            global_map_vec = global_map->getMyGlobalIndices();
-	for (int i = 0; i < vec.size(); i++) {
-		vec[i] = global_map_vec[i];
+	// create source vector
+	Vec source;
+	VecCreateMPI(MPI_COMM_WORLD, iface_map_vec.size(), PETSC_DETERMINE, &source);
+	VecSetLocalToGlobalMapping(source, gid_map);
+
+	// global indices are going to be sequentially increasing with rank
+	int local_size = ifaces.size();
+	int start_i;
+	MPI_Scan(&local_size, &start_i, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+	start_i -= local_size;
+
+	// fill source vector with new global indices
+	double *source_array;
+	VecGetArray(source, &source_array);
+	for (int i = 0; i < local_size; i++) {
+		source_array[i] = start_i + i;
 	}
+	VecRestoreArray(source, &source_array);
 
+	// get indices for schur matrix
 	{
+		// create dest vector
+		Vec dest;
+		int dest_size = iface_map_vec.size() + iface_off_proc_map_vec.size();
+		VecCreateSeq(PETSC_COMM_SELF, dest_size, &dest);
+
+		// get global indices that we want to recieve for dest vector
 		vector<int> iface_map_vec_dist = iface_map_vec;
 		for (int i : iface_off_proc_map_vec) {
 			iface_map_vec_dist.push_back(i);
 		}
-		RCP<map_type> gid_map_dist
-		= rcp(new map_type(-1, &iface_map_vec_dist[0], iface_map_vec_dist.size(), 0, comm));
-		int_vector_type  dest(gid_map_dist, 1);
-		Tpetra::Import<> importer(gid_map, gid_map_dist);
-		dest.doImport(source, importer, Tpetra::CombineMode::INSERT);
-		auto local_vec = dest.get1dViewNonConst();
+		IS gid_dist;
+		ISCreateGeneral(MPI_COMM_WORLD, iface_map_vec_dist.size(), &iface_map_vec_dist[0],
+		                PETSC_COPY_VALUES, &gid_dist);
+
+		// scatter new global index values
+		VecScatter scatter;
+		VecScatterCreate(source, gid_dist, dest, nullptr, &scatter);
+		VecScatterBegin(scatter, source, dest, INSERT_VALUES, SCATTER_FORWARD);
+		VecScatterEnd(scatter, source, dest, INSERT_VALUES, SCATTER_FORWARD);
+
+		// set new global indices in iface objects
+		double *local_vec;
+		VecGetArray(dest, &local_vec);
 		map<int, int> rev_map;
-		for (int i = 0; i < local_vec.size(); i++) {
+		for (int i = 0; i < dest_size; i++) {
 			rev_map[i] = local_vec[i];
 		}
 		for (auto &p : ifaces) {
@@ -984,15 +1009,29 @@ void DomainCollection::indexIfacesGlobal()
 			iface_off_proc_map_vec[i] = local_vec[iface_map_vec.size() + i];
 		}
 	}
+	// get indices for local ifaces
 	{
-		RCP<map_type> gid_map_dist
-		= rcp(new map_type(-1, &iface_dist_map_vec[0], iface_dist_map_vec.size(), 0, comm));
-		int_vector_type  dest(gid_map_dist, 1);
-		Tpetra::Import<> importer(gid_map, gid_map_dist);
-		dest.doImport(source, importer, Tpetra::CombineMode::INSERT);
-		auto local_vec = dest.get1dViewNonConst();
+		// create dest vector
+		Vec dest;
+		int dest_size = iface_dist_map_vec.size();
+		VecCreateSeq(PETSC_COMM_SELF, dest_size, &dest);
+
+		// get global indices that we want to recieve for dest vector
+		IS gid_dist;
+		ISCreateGeneral(MPI_COMM_WORLD, iface_dist_map_vec.size(), &iface_dist_map_vec[0],
+		                PETSC_COPY_VALUES, &gid_dist);
+
+		// scatter new global index values
+		VecScatter scatter;
+		VecScatterCreate(source, gid_dist, dest, nullptr, &scatter);
+		VecScatterBegin(scatter, source, dest, INSERT_VALUES, SCATTER_FORWARD);
+		VecScatterEnd(scatter, source, dest, INSERT_VALUES, SCATTER_FORWARD);
+
+		// set new global indices in domain objects
+		double *local_vec;
+		VecGetArray(dest, &local_vec);
 		map<int, int> rev_map;
-		for (int i = 0; i < local_vec.size(); i++) {
+		for (int i = 0; i < dest_size; i++) {
 			rev_map[i] = local_vec[i];
 		}
 		for (auto &p : domains) {
@@ -1061,29 +1100,52 @@ void DomainCollection::indexIfacesLocal()
 }
 void DomainCollection::indexDomainsGlobal()
 {
-	RCP<const map_type> global_map = Tpetra::createContigMap<int, int>(-1, domains.size(), comm);
-	RCP<map_type>       gid_map
-	= rcp(new map_type(-1, &domain_map_vec[0], domain_map_vec.size(), 0, comm));
+	// create map for gids
+	ISLocalToGlobalMapping gid_map;
+	ISLocalToGlobalMappingCreate(MPI_COMM_WORLD, 1, domain_map_vec.size(), &domain_map_vec[0],
+	                             PETSC_COPY_VALUES, &gid_map);
 
-	int_vector_type source(gid_map, 1);
-	auto            vec            = source.get1dViewNonConst();
-	auto            global_map_vec = global_map->getMyGlobalIndices();
-	for (int i = 0; i < vec.size(); i++) {
-		vec[i] = global_map_vec[i];
+	// create vectors
+	Vec source, dest;
+	VecCreateMPI(MPI_COMM_WORLD, domains.size(), PETSC_DETERMINE, &source);
+	VecSetLocalToGlobalMapping(source, gid_map);
+	int dest_size = domain_map_vec.size() + domain_off_proc_map_vec.size();
+	VecCreateSeq(PETSC_COMM_SELF, dest_size, &dest);
+
+	// global indices are going to be sequentially increasing with rank
+	int local_size = domains.size();
+	int start_i;
+	MPI_Scan(&local_size, &start_i, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+	start_i -= local_size;
+
+	// fill source vector with new global indices
+	double *source_array;
+	VecGetArray(source, &source_array);
+	for (int i = 0; i < local_size; i++) {
+		source_array[i] = start_i + i;
 	}
+	VecRestoreArray(source, &source_array);
 
+	// get global indices that we want to recieve for dest vector
 	vector<int> domain_map_vec_dist = domain_map_vec;
 	for (int i : domain_off_proc_map_vec) {
 		domain_map_vec_dist.push_back(i);
 	}
-	RCP<map_type> gid_map_dist
-	= rcp(new map_type(-1, &domain_map_vec_dist[0], domain_map_vec_dist.size(), 0, comm));
-	int_vector_type  dest(gid_map_dist, 1);
-	Tpetra::Import<> importer(gid_map, gid_map_dist);
-	dest.doImport(source, importer, Tpetra::CombineMode::INSERT);
-	auto local_vec = dest.get1dViewNonConst();
+	IS gid_dist;
+	ISCreateGeneral(MPI_COMM_WORLD, domain_map_vec_dist.size(), &domain_map_vec_dist[0],
+	                PETSC_COPY_VALUES, &gid_dist);
+
+	// scatter new global index values
+	VecScatter scatter;
+	VecScatterCreate(source, gid_dist, dest, nullptr, &scatter);
+	VecScatterBegin(scatter, source, dest, INSERT_VALUES, SCATTER_FORWARD);
+	VecScatterEnd(scatter, source, dest, INSERT_VALUES, SCATTER_FORWARD);
+
+	// set new global indices in domian objects
+	double *local_vec;
+	VecGetArray(dest, &local_vec);
 	map<int, int> rev_map;
-	for (int i = 0; i < local_vec.size(); i++) {
+	for (int i = 0; i < dest_size; i++) {
 		rev_map[i] = local_vec[i];
 	}
 	for (auto &p : domains) {
@@ -1095,6 +1157,14 @@ void DomainCollection::indexDomainsGlobal()
 	for (size_t i = 0; i < domain_off_proc_map_vec.size(); i++) {
 		domain_off_proc_map_vec[i] = local_vec[domain_map_vec.size() + i];
 	}
+	VecRestoreArray(dest, &local_vec);
+
+	// free petsc stuff
+	ISLocalToGlobalMappingDestroy(&gid_map);
+	VecDestroy(&source);
+	VecDestroy(&dest);
+	VecScatterDestroy(&scatter);
+	ISDestroy(&gid_dist);
 }
 void DomainCollection::indexDomainsLocal()
 {
@@ -1444,47 +1514,6 @@ set<int>              Iface::getPins()
 	}
 	return pins;
 }
-
-Teuchos::RCP<map_type> DomainCollection::getSchurRowMap()
-{
-	vector<int> schur_rows;
-	for (int i : iface_map_vec) {
-		for (int j = 0; j < n; j++) {
-			schur_rows.push_back(i * n + j);
-		}
-	}
-	if (num_global_domains == 1) {
-		// this is a special case for when there is only one domain
-		return Teuchos::rcp(new map_type(1, 0, comm));
-	} else {
-		return Teuchos::rcp(new map_type(-1, &schur_rows[0], schur_rows.size(), 0, this->comm));
-	}
-}
-Teuchos::RCP<map_type> DomainCollection::getSchurDistMap()
-{
-	vector<int> schur_rows;
-	for (int i : iface_dist_map_vec) {
-		for (int j = 0; j < n; j++) {
-			schur_rows.push_back(i * n + j);
-		}
-	}
-	if (num_global_domains == 1) {
-		// this is a special case for when there is only one domain
-		return Teuchos::rcp(new map_type(1, 0, comm));
-	} else {
-		return Teuchos::rcp(new map_type(-1, &schur_rows[0], schur_rows.size(), 0, this->comm));
-	}
-}
-Teuchos::RCP<map_type> DomainCollection::getDomainRowMap()
-{
-	vector<int> domain_rows;
-	for (int i : domain_map_vec) {
-		for (int j = 0; j < n * n; j++) {
-			domain_rows.push_back(i * n * n + j);
-		}
-	}
-	return Teuchos::rcp(new map_type(-1, &domain_rows[0], domain_rows.size(), 0, this->comm));
-}
 double DomainCollection::integrate(const Vec u)
 {
 	double  sum = 0;
@@ -1505,7 +1534,7 @@ double DomainCollection::integrate(const Vec u)
 		sum += patch_sum;
 	}
 	double retval;
-	Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &sum, &retval);
+    MPI_Allreduce(&sum,&retval,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 	VecRestoreArray(u, &u_view);
 	return retval;
 }
@@ -1517,7 +1546,7 @@ double DomainCollection::area()
 		sum += d.x_length * d.y_length;
 	}
 	double retval;
-	Teuchos::reduceAll<int, double>(*comm, Teuchos::REDUCE_SUM, 1, &sum, &retval);
+    MPI_Allreduce(&sum,&retval,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 	return retval;
 }
 void DomainCollection::formISs()

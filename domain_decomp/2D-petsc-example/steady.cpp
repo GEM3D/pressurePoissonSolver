@@ -388,6 +388,7 @@ int main(int argc, char *argv[])
 #endif
 			} else {
 				// preconditoners
+				KSPSetOperators(*solver, *A, *A);
 			}
 			///////////////////
 			// setup end
@@ -412,7 +413,6 @@ int main(int argc, char *argv[])
 #endif
 			} else {
 				KSPSetTolerances(*solver, tol, PETSC_DEFAULT, PETSC_DEFAULT, 5000);
-				KSPSetOperators(*solver, *A, *A);
 				KSPSolve(*solver, *b, *gamma);
 				int its;
 				KSPGetIterationNumber(*solver, &its);

@@ -166,7 +166,6 @@ class DomainCollection
 	public:
 	int                                    rank;
 	int                                    n = 4;
-	Teuchos::RCP<const Teuchos::Comm<int>> comm;
 	int                                    num_pins;
 	/**
 	 * @brief Number of total domains.
@@ -240,9 +239,6 @@ class DomainCollection
 			p.second.setZeroPatch();
 		}
 	}
-	Teuchos::RCP<map_type> getSchurRowMap();
-	Teuchos::RCP<map_type> getSchurDistMap();
-	Teuchos::RCP<map_type> getDomainRowMap();
 	IS                     getSchurIS();
 	IS                     getSchurDistIS();
 	IS                     getDomainIS();
