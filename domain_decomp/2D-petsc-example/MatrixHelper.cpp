@@ -1,26 +1,18 @@
 #include "MatrixHelper.h"
 #include "StencilHelper.h"
-#include <vector>
+#include <iostream>
 using namespace std;
-MatrixHelper::MatrixHelper(DomainCollection dc, Teuchos::RCP<const Teuchos::Comm<int>> comm)
+MatrixHelper::MatrixHelper(DomainCollection dc) { this->dc = dc; }
+PW_explicit<Mat> MatrixHelper::formCRSMatrix(double lambda)
 {
-	this->dc   = dc;
-	this->comm = comm;
-}
-Teuchos::RCP<matrix_type> MatrixHelper::getIdentity()
-{
-	auto                      row_map = dc.getDomainRowMap();
-	Teuchos::RCP<matrix_type> A       = Teuchos::rcp(new matrix_type(row_map, 1));
-	double                    one     = 1;
-	for (int row = row_map->getMinGlobalIndex(); row <= row_map->getMaxGlobalIndex(); row++) {
-		A->insertGlobalValues(row, 1, &one, &row);
-	}
-	A->fillComplete();
-	return A;
-}
-Teuchos::RCP<matrix_type> MatrixHelper::formCRSMatrix(double lambda)
-{
-	Teuchos::RCP<matrix_type> A = Teuchos::rcp(new matrix_type(dc.getDomainRowMap(), 10));
+	PW<Mat> A;
+	MatCreate(MPI_COMM_WORLD, &A);
+	int     local_size  = dc.domains.size() * dc.n*dc.n;
+	int     global_size = dc.num_global_domains * dc.n*dc.n;
+	MatSetSizes(A, local_size, local_size, global_size, global_size);
+	MatSetType(A, MATMPIAIJ);
+	MatMPIAIJSetPreallocation(A, 19, nullptr, 19, nullptr);
+
 	for (auto &p : dc.domains) {
 		Domain &d     = p.second;
 		int     n     = d.n;
@@ -29,11 +21,11 @@ Teuchos::RCP<matrix_type> MatrixHelper::formCRSMatrix(double lambda)
 		int     start = n * n * d.id_global;
 
 		// center coeffs
-		double coeff = -2.0 / (h_x * h_x) - 2.0 / (h_y * h_y)+lambda;
+		double coeff = -2.0 / (h_x * h_x) - 2.0 / (h_y * h_y) + lambda;
 		for (int y_i = 0; y_i < n; y_i++) {
 			for (int x_i = 0; x_i < n; x_i++) {
 				int row = start + x_i + n * y_i;
-				A->insertGlobalValues(row, 1, &coeff, &row);
+				MatSetValues(A, 1, &row, 1, &row, &coeff, ADD_VALUES);
 			}
 		}
 		// north coeffs
@@ -42,7 +34,7 @@ Teuchos::RCP<matrix_type> MatrixHelper::formCRSMatrix(double lambda)
 			for (int x_i = 0; x_i < n; x_i++) {
 				int row = start + x_i + n * y_i;
 				int col = start + x_i + n * (y_i + 1);
-				A->insertGlobalValues(row, 1, &coeff, &col);
+				MatSetValues(A, 1, &row, 1, &col, &coeff, ADD_VALUES);
 			}
 		}
 		// south coeffs
@@ -50,7 +42,7 @@ Teuchos::RCP<matrix_type> MatrixHelper::formCRSMatrix(double lambda)
 			for (int x_i = 0; x_i < n; x_i++) {
 				int row = start + x_i + n * y_i;
 				int col = start + x_i + n * (y_i - 1);
-				A->insertGlobalValues(row, 1, &coeff, &col);
+				MatSetValues(A, 1, &row, 1, &col, &coeff, ADD_VALUES);
 			}
 		}
 		coeff = 1.0 / (h_x * h_x);
@@ -59,7 +51,7 @@ Teuchos::RCP<matrix_type> MatrixHelper::formCRSMatrix(double lambda)
 			for (int x_i = 0; x_i < n - 1; x_i++) {
 				int row = start + x_i + n * y_i;
 				int col = start + x_i + 1 + n * y_i;
-				A->insertGlobalValues(row, 1, &coeff, &col);
+				MatSetValues(A, 1, &row, 1, &col, &coeff, ADD_VALUES);
 			}
 		}
 		// west coeffs
@@ -67,7 +59,7 @@ Teuchos::RCP<matrix_type> MatrixHelper::formCRSMatrix(double lambda)
 			for (int x_i = 1; x_i < n; x_i++) {
 				int row = start + x_i + n * y_i;
 				int col = start + x_i - 1 + n * y_i;
-				A->insertGlobalValues(row, 1, &coeff, &col);
+				MatSetValues(A, 1, &row, 1, &col, &coeff, ADD_VALUES);
 			}
 		}
 		// boundaries
@@ -79,12 +71,13 @@ Teuchos::RCP<matrix_type> MatrixHelper::formCRSMatrix(double lambda)
 				int     size   = sh->size(i);
 				double *coeffs = sh->coeffs(i);
 				int *   cols   = sh->cols(i);
-				A->insertGlobalValues(row, size, coeffs, cols);
+				MatSetValues(A, 1, &row, size, cols, coeffs, ADD_VALUES);
 			}
 			delete sh;
 			s++;
 		} while (s != Side::north);
 	}
-	A->fillComplete();
+	MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
+	MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
 	return A;
 }

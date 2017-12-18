@@ -3,6 +3,7 @@
 #include <deque>
 #include <fstream>
 #include <iostream>
+#include <petscao.h>
 #include <set>
 #include <sstream>
 #include <utility>
@@ -939,99 +940,62 @@ void DomainCollection::zoltanBalanceDomains()
 
 void DomainCollection::indexIfacesGlobal()
 {
-	// create map for gids
-	PW<ISLocalToGlobalMapping> gid_map;
-	ISLocalToGlobalMappingCreate(MPI_COMM_WORLD, 1, iface_map_vec.size(), &iface_map_vec[0],
-	                             PETSC_COPY_VALUES, &gid_map);
-
-	// create source vector
-	PW<Vec> source;
-	VecCreateMPI(MPI_COMM_WORLD, iface_map_vec.size(), PETSC_DETERMINE, &source);
-	VecSetLocalToGlobalMapping(source, gid_map);
-
 	// global indices are going to be sequentially increasing with rank
 	int local_size = ifaces.size();
 	int start_i;
 	MPI_Scan(&local_size, &start_i, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 	start_i -= local_size;
+	vector<int> new_global(local_size);
+	iota(new_global.begin(), new_global.end(), start_i);
 
-	// fill source vector with new global indices
-	double *source_array;
-	VecGetArray(source, &source_array);
-	for (int i = 0; i < local_size; i++) {
-		source_array[i] = start_i + i;
-	}
-	VecRestoreArray(source, &source_array);
+	// create map for gids
+	PW<AO> ao;
+	AOCreateMapping(MPI_COMM_WORLD, local_size, &iface_map_vec[0], &new_global[0], &ao);
 
 	// get indices for schur matrix
 	{
-		// create dest vector
-		PW<Vec> dest;
-		int     dest_size = iface_map_vec.size() + iface_off_proc_map_vec.size();
-		VecCreateSeq(PETSC_COMM_SELF, dest_size, &dest);
-
 		// get global indices that we want to recieve for dest vector
-		vector<int> iface_map_vec_dist = iface_map_vec;
+		vector<int> inds = iface_map_vec;
 		for (int i : iface_off_proc_map_vec) {
-			iface_map_vec_dist.push_back(i);
+			inds.push_back(i);
 		}
-		PW<IS> gid_dist;
-		ISCreateGeneral(MPI_COMM_WORLD, iface_map_vec_dist.size(), &iface_map_vec_dist[0],
-		                PETSC_COPY_VALUES, &gid_dist);
 
-		// scatter new global index values
-		PW<VecScatter> scatter;
-		VecScatterCreate(source, gid_dist, dest, nullptr, &scatter);
-		VecScatterBegin(scatter, source, dest, INSERT_VALUES, SCATTER_FORWARD);
-		VecScatterEnd(scatter, source, dest, INSERT_VALUES, SCATTER_FORWARD);
+		// get new global indices
+		AOApplicationToPetsc(ao, inds.size(), &inds[0]);
+		map<int, int> rev_map;
+		for (size_t i = 0; i < inds.size(); i++) {
+			rev_map[i] = inds[i];
+		}
 
 		// set new global indices in iface objects
-		double *local_vec;
-		VecGetArray(dest, &local_vec);
-		map<int, int> rev_map;
-		for (int i = 0; i < dest_size; i++) {
-			rev_map[i] = local_vec[i];
-		}
 		for (auto &p : ifaces) {
 			p.second.setGlobalIndexes(rev_map);
 		}
 		for (size_t i = 0; i < iface_map_vec.size(); i++) {
-			iface_map_vec[i] = local_vec[i];
+			iface_map_vec[i] = inds[i];
 		}
 		for (size_t i = 0; i < iface_off_proc_map_vec.size(); i++) {
-			iface_off_proc_map_vec[i] = local_vec[iface_map_vec.size() + i];
+			iface_off_proc_map_vec[i] = inds[iface_map_vec.size() + i];
 		}
 	}
 	// get indices for local ifaces
 	{
-		// create dest vector
-		PW<Vec> dest;
-		int     dest_size = iface_dist_map_vec.size();
-		VecCreateSeq(PETSC_COMM_SELF, dest_size, &dest);
-
 		// get global indices that we want to recieve for dest vector
-		PW<IS> gid_dist;
-		ISCreateGeneral(MPI_COMM_WORLD, iface_dist_map_vec.size(), &iface_dist_map_vec[0],
-		                PETSC_COPY_VALUES, &gid_dist);
+		vector<int> inds = iface_dist_map_vec;
 
-		// scatter new global index values
-		PW<VecScatter> scatter;
-		VecScatterCreate(source, gid_dist, dest, nullptr, &scatter);
-		VecScatterBegin(scatter, source, dest, INSERT_VALUES, SCATTER_FORWARD);
-		VecScatterEnd(scatter, source, dest, INSERT_VALUES, SCATTER_FORWARD);
+		// get new global indices
+		AOApplicationToPetsc(ao, inds.size(), &inds[0]);
+		map<int, int> rev_map;
+		for (size_t i = 0; i < inds.size(); i++) {
+			rev_map[i] = inds[i];
+		}
 
 		// set new global indices in domain objects
-		double *local_vec;
-		VecGetArray(dest, &local_vec);
-		map<int, int> rev_map;
-		for (int i = 0; i < dest_size; i++) {
-			rev_map[i] = local_vec[i];
-		}
 		for (auto &p : domains) {
 			p.second.setGlobalIndexes(rev_map);
 		}
 		for (size_t i = 0; i < iface_dist_map_vec.size(); i++) {
-			iface_dist_map_vec[i] = local_vec[i];
+			iface_dist_map_vec[i] = inds[i];
 		}
 	}
 }
@@ -1093,64 +1057,40 @@ void DomainCollection::indexIfacesLocal()
 }
 void DomainCollection::indexDomainsGlobal()
 {
-	// create map for gids
-	PW<ISLocalToGlobalMapping> gid_map;
-	ISLocalToGlobalMappingCreate(MPI_COMM_WORLD, 1, domain_map_vec.size(), &domain_map_vec[0],
-	                             PETSC_COPY_VALUES, &gid_map);
-
-	// create vectors
-	PW<Vec> source, dest;
-	VecCreateMPI(MPI_COMM_WORLD, domains.size(), PETSC_DETERMINE, &source);
-	VecSetLocalToGlobalMapping(source, gid_map);
-	int dest_size = domain_map_vec.size() + domain_off_proc_map_vec.size();
-	VecCreateSeq(PETSC_COMM_SELF, dest_size, &dest);
-
 	// global indices are going to be sequentially increasing with rank
 	int local_size = domains.size();
 	int start_i;
 	MPI_Scan(&local_size, &start_i, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 	start_i -= local_size;
+	vector<int> new_global(local_size);
+	iota(new_global.begin(), new_global.end(), start_i);
 
-	// fill source vector with new global indices
-	double *source_array;
-	VecGetArray(source, &source_array);
-	for (int i = 0; i < local_size; i++) {
-		source_array[i] = start_i + i;
-	}
-	VecRestoreArray(source, &source_array);
+	// create map for gids
+	PW<AO> ao;
+	AOCreateMapping(MPI_COMM_WORLD, local_size, &domain_map_vec[0], &new_global[0], &ao);
 
 	// get global indices that we want to recieve for dest vector
-	vector<int> domain_map_vec_dist = domain_map_vec;
+	vector<int> inds = domain_map_vec;
 	for (int i : domain_off_proc_map_vec) {
-		domain_map_vec_dist.push_back(i);
+		inds.push_back(i);
 	}
-	PW<IS> gid_dist;
-	ISCreateGeneral(MPI_COMM_WORLD, domain_map_vec_dist.size(), &domain_map_vec_dist[0],
-	                PETSC_COPY_VALUES, &gid_dist);
 
-	// scatter new global index values
-	PW<VecScatter> scatter;
-	VecScatterCreate(source, gid_dist, dest, nullptr, &scatter);
-	VecScatterBegin(scatter, source, dest, INSERT_VALUES, SCATTER_FORWARD);
-	VecScatterEnd(scatter, source, dest, INSERT_VALUES, SCATTER_FORWARD);
-
-	// set new global indices in domian objects
-	double *local_vec;
-	VecGetArray(dest, &local_vec);
+	// get new global indices
+	AOApplicationToPetsc(ao, inds.size(), &inds[0]);
 	map<int, int> rev_map;
-	for (int i = 0; i < dest_size; i++) {
-		rev_map[i] = local_vec[i];
+	for (size_t i = 0; i < inds.size(); i++) {
+		rev_map[i] = inds[i];
 	}
+
 	for (auto &p : domains) {
 		p.second.setGlobalNeighborIndexes(rev_map);
 	}
 	for (size_t i = 0; i < domain_map_vec.size(); i++) {
-		domain_map_vec[i] = local_vec[i];
+		domain_map_vec[i] = inds[i];
 	}
 	for (size_t i = 0; i < domain_off_proc_map_vec.size(); i++) {
-		domain_off_proc_map_vec[i] = local_vec[domain_map_vec.size() + i];
+		domain_off_proc_map_vec[i] = inds[domain_map_vec.size() + i];
 	}
-	VecRestoreArray(dest, &local_vec);
 }
 void DomainCollection::indexDomainsLocal()
 {

@@ -87,7 +87,6 @@ link_directories("${Zoltan_DIR}/lib")
 #
 add_executable(steady steady.cpp)
 add_executable(heat heat.cpp)
-add_executable(steady-nodd steady-nodd.cpp)
 add_library(SchurHelper SchurHelper.cpp)
 add_library(MatrixHelper MatrixHelper.cpp)
 add_library(DomainCollection DomainCollection.cpp)
@@ -104,6 +103,7 @@ target_link_libraries(steady
     SchurHelper
     DomainCollection
     Init
+    MatrixHelper
     FftwPatchSolver
     FishpackPatchSolver
     Interpolators
@@ -129,23 +129,10 @@ if(VTK_FOUND)
     target_link_libraries(steady VtkWriter)
     target_link_libraries(heat VtkWriter)
 endif(VTK_FOUND)
-target_link_libraries(steady-nodd
-    MatrixHelper
-    DomainCollection
-    Init
-    MMWriter
-    ClawWriter
-  ${MPI_CXX_LIBRARIES} 
-  ${PETSC_LIBRARIES} 
-)
-if(VTK_FOUND)
-    target_link_libraries(steady-nodd VtkWriter)
-endif(VTK_FOUND)
 if(AMGX_FOUND)
 add_library(AmgxWrapper AmgxWrapper.cpp)
 target_link_libraries(steady AmgxWrapper)
 target_link_libraries(heat AmgxWrapper)
-target_link_libraries(steady-nodd AmgxWrapper)
 target_link_libraries(AmgxWrapper
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 

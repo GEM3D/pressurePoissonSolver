@@ -1,15 +1,10 @@
 #ifndef MATRIXHELPER_H
 #define MATRIXHELPER_H
 #include "DomainCollection.h"
-#include "MyTypeDefs.h"
+#include <petscmat.h>
 class MatrixHelper
 {
 	private:
-	/**
-	 * @brief The MPI communicator used.
-	 */
-	Teuchos::RCP<const Teuchos::Comm<int>> comm;
-
 	DomainCollection dc;
 
 	public:
@@ -22,15 +17,13 @@ class MatrixHelper
 	 * @param h_y the y spacing
 	 * @param comm the teuchos communicator
 	 */
-	MatrixHelper(DomainCollection dc, Teuchos::RCP<const Teuchos::Comm<int>> comm);
-
-	Teuchos::RCP<matrix_type> getIdentity();
+	MatrixHelper(DomainCollection dc);
 
 	/**
 	 * @brief Form the matrix
 	 *
 	 * @return the formed matrix
 	 */
-	Teuchos::RCP<matrix_type> formCRSMatrix(double lambda=0);
+	PW_explicit<Mat> formCRSMatrix(double lambda = 0);
 };
 #endif

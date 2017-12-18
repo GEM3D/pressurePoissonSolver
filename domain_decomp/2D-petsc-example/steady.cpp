@@ -3,6 +3,7 @@
 //#include "FunctionWrapper.h"
 #include "FivePtPatchOperator.h"
 #include "Init.h"
+#include "MatrixHelper.h"
 #include "PatchSolvers/FftwPatchSolver.h"
 #include "PatchSolvers/FishpackPatchSolver.h"
 #include "QuadInterpolator.h"
@@ -40,14 +41,6 @@ using namespace std;
 
 int main(int argc, char *argv[])
 {
-	PetscInitialize(&argc, &argv, nullptr, nullptr);
-
-	int num_procs;
-	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
-
-	int my_global_rank;
-	MPI_Comm_rank(MPI_COMM_WORLD, &my_global_rank);
-
 	// parse input
 	args::ArgumentParser parser("");
 
@@ -63,7 +56,10 @@ int main(int argc, char *argv[])
 	                     {"nozerof"});
 	args::ValueFlag<double> f_t(
 	parser, "tolerance", "set the tolerance of the iterative solver (default is 1e-10)", {'t'});
-	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {"neumann"});
+	args::Flag              f_neumann(parser, "", "use neumann boundary conditions", {"neumann"});
+	args::Flag              f_noschur(parser, "", "don't use schur compliment method", {"noschur"});
+	args::ValueFlag<string> f_petsc(parser, "petsc flags",
+	                                "list of petsc command line flags in quotes", {"petsc"});
 
 	// mesh options
 	args::ValueFlag<string> f_mesh(parser, "file_name", "read in a mesh", {"mesh"});
@@ -98,27 +94,6 @@ int main(int argc, char *argv[])
 	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
 	args::Flag f_zero(parser, "zero", "solve zero function", {"zero"});
 
-	// preconditioners
-	args::Flag f_precj(parser, "prec", "use jacobi preconditioner", {"precj"});
-	args::Flag f_prec(parser, "prec", "use block diagonal jacobi preconditioner", {"prec"});
-	args::Flag f_precmuelu(parser, "prec", "use MueLu AMG preconditioner", {"muelu"});
-	// iterative options
-	args::Flag f_cg(parser, "gmres", "use CG for iterative solver", {"cg"});
-	args::Flag f_gmres(parser, "gmres", "use GMRES for iterative solver", {"gmres"});
-	args::Flag f_lsqr(parser, "gmres", "use least squares for iterative solver", {"lsqr"});
-	args::Flag f_rgmres(parser, "rgmres", "use GCRO-DR (Recycling GMRES) for iterative solver",
-	                    {"rgmres"});
-	args::Flag f_bicg(parser, "gmres", "use BiCGStab for iterative solver", {"bicg"});
-
-	// direct solvers
-	args::Flag f_lu(parser, "lu", "use KLU solver", {"klu"});
-	args::Flag f_mumps(parser, "lu", "use MUMPS solver", {"mumps"});
-	args::Flag f_basker(parser, "lu", "use Basker solver", {"basker"});
-	args::Flag f_superlu(parser, "lu", "use SUPERLU solver", {"superlu"});
-	args::Flag f_ilu(parser, "ilu", "use incomplete LU preconditioner", {"ilu"});
-	args::Flag f_riluk(parser, "ilu", "use RILUK preconditioner", {"riluk"});
-	args::Flag f_iter(parser, "iterative", "use iterative method", {"iterative"});
-
 	// patch solvers
 	args::Flag f_fish(parser, "fishpack", "use fishpack as the patch solver", {"fishpack"});
 #ifdef __NVCC__
@@ -127,7 +102,14 @@ int main(int argc, char *argv[])
 
 	// third-party preconditioners
 	args::Flag f_amgx(parser, "amgx", "solve schur compliment system with amgx", {"amgx"});
-	args::Flag f_hypre(parser, "hypre", "solve schur compliment system with hypre", {"hypre"});
+
+	PetscInitialize(&argc, &argv, nullptr, nullptr);
+
+	int num_procs;
+	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+
+	int my_global_rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &my_global_rank);
 
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;
@@ -152,8 +134,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	// Set the number of discretization points in the x and y direction.
-	int nx = args::get(f_n);
-	int ny = args::get(f_n);
+	int n = args::get(f_n);
 
 	double tol = 1e-12;
 	if (f_t) {
@@ -167,8 +148,6 @@ int main(int argc, char *argv[])
 	/***********
 	 * Input parsing done
 	 **********/
-
-	bool direct_solve = (f_lu || f_superlu || f_mumps || f_basker);
 
 	///////////////
 	// Create Mesh
@@ -192,9 +171,9 @@ int main(int argc, char *argv[])
 	if (f_neumann) {
 		dc.setNeumann();
 	}
-	dc.n = nx;
+	dc.n = n;
 	for (auto &p : dc.domains) {
-		p.second.n = nx;
+		p.second.n = n;
 	}
 	int total_cells = dc.getGlobalNumCells();
 	cout << "Total cells: " << total_cells << endl;
@@ -211,13 +190,13 @@ int main(int argc, char *argv[])
 	// the functions that we are using
 	function<double(double, double)> ffun;
 	function<double(double, double)> gfun;
-	function<double(double, double)> nfunx;
+	function<double(double, double)> nfun;
 	function<double(double, double)> nfuny;
 
 	if (f_zero) {
 		ffun  = [](double x, double y) { return 0; };
 		gfun  = [](double x, double y) { return 0; };
-		nfunx = [](double x, double y) { return 0; };
+		nfun  = [](double x, double y) { return 0; };
 		nfuny = [](double x, double y) { return 0; };
 	} else if (f_gauss) {
 		gfun = [](double x, double y) { return exp(cos(10 * M_PI * x)) - exp(cos(11 * M_PI * y)); };
@@ -227,7 +206,7 @@ int main(int argc, char *argv[])
 			       + 121 * M_PI * M_PI * (cos(11 * M_PI * y) - pow(sin(11 * M_PI * y), 2))
 			         * exp(cos(11 * M_PI * y));
 		};
-		nfunx = [](double x, double y) {
+		nfun = [](double x, double y) {
 			return -10 * M_PI * sin(10 * M_PI * x) * exp(cos(10 * M_PI * x));
 		};
 
@@ -238,7 +217,7 @@ int main(int argc, char *argv[])
 		ffun
 		= [](double x, double y) { return -5 * M_PI * M_PI * sinl(M_PI * y) * cosl(2 * M_PI * x); };
 		gfun  = [](double x, double y) { return sinl(M_PI * y) * cosl(2 * M_PI * x); };
-		nfunx = [](double x, double y) { return -2 * M_PI * sinl(M_PI * y) * sinl(2 * M_PI * x); };
+		nfun  = [](double x, double y) { return -2 * M_PI * sinl(M_PI * y) * sinl(2 * M_PI * x); };
 		nfuny = [](double x, double y) { return M_PI * cosl(M_PI * y) * cosl(2 * M_PI * x); };
 	}
 
@@ -260,16 +239,17 @@ int main(int argc, char *argv[])
 	for (int loop = 0; loop < loop_count; loop++) {
 		timer.start("Domain Initialization");
 
-		SchurHelper sch(dc, p_solver, p_operator, p_interp);
+		SchurHelper  sch(dc, p_solver, p_operator, p_interp);
+		MatrixHelper mh(dc);
 
 		PW<Vec> u     = dc.getNewDomainVec();
 		PW<Vec> exact = dc.getNewDomainVec();
 		PW<Vec> f     = dc.getNewDomainVec();
 
 		if (f_neumann) {
-			Init::initNeumann(dc, nx, f, exact, ffun, gfun, nfunx, nfuny);
+			Init::initNeumann(dc, n, f, exact, ffun, gfun, nfun, nfuny);
 		} else {
-			Init::initDirichlet(dc, nx, f, exact, ffun, gfun);
+			Init::initDirichlet(dc, n, f, exact, ffun, gfun);
 		}
 
 		timer.stop("Domain Initialization");
@@ -298,24 +278,23 @@ int main(int argc, char *argv[])
 #ifdef ENABLE_AMGX
 		shared_ptr<AmgxWrapper> amgxsolver;
 #endif
-#ifdef ENABLE_HYPRE
-		shared_ptr<HypreWrapper> hypresolver;
-#endif
 
-		if (dc.num_global_domains != 1) {
+		if (f_noschur || dc.num_global_domains != 1) {
 			// do iterative solve
 
-			// Get the b vector
-			VecScale(gamma, 0);
-			sch.solveWithInterface(f, u, gamma, b);
-			VecScale(b, -1.0);
+			if (!f_noschur) {
+				// Get the b vector
+				VecScale(gamma, 0);
+				sch.solveWithInterface(f, u, gamma, b);
+				VecScale(b, -1.0);
 
-			if (f_rhs) {
-				PetscViewer viewer;
-				PetscViewerBinaryOpen(PETSC_COMM_WORLD, args::get(f_rhs).c_str(), FILE_MODE_WRITE,
-				                      &viewer);
-				VecView(b, viewer);
-				PetscViewerDestroy(&viewer);
+				if (f_rhs) {
+					PetscViewer viewer;
+					PetscViewerBinaryOpen(PETSC_COMM_WORLD, args::get(f_rhs).c_str(),
+					                      FILE_MODE_WRITE, &viewer);
+					VecView(b, viewer);
+					PetscViewerDestroy(&viewer);
+				}
 			}
 
 			///////////////////
@@ -329,7 +308,11 @@ int main(int argc, char *argv[])
 			} else {
 				timer.start("Matrix Formation");
 
-				A = sch.formCRSMatrix();
+				if (f_noschur) {
+					A = mh.formCRSMatrix();
+				} else {
+					A = sch.formCRSMatrix();
+				}
 
 				timer.stop("Matrix Formation");
 
@@ -345,14 +328,8 @@ int main(int argc, char *argv[])
 			if (f_amgx) {
 #ifdef ENABLE_AMGX
 				timer.start("AMGX Setup");
-				//		amgxsolver = rcp(new AmgxWrapper(A, dc, nx));
+				//		amgxsolver = rcp(new AmgxWrapper(A, dc, n));
 				timer.stop("AMGX Setup");
-#endif
-			} else if (f_hypre) {
-#ifdef ENABLE_HYPRE
-				timer.start("Hypre Setup");
-				//		hypresolver = rcp(new HypreWrapper(A, dc, nx, tol, true));
-				timer.stop("Hypre Setup");
 #endif
 			} else {
 				// preconditoners
@@ -368,33 +345,35 @@ int main(int argc, char *argv[])
 		///////////////////
 		timer.start("Complete Solve");
 
-		if (dc.num_global_domains != 1) {
-			timer.start("Gamma Solve");
+		if (f_noschur || dc.num_global_domains != 1) {
+			timer.start("Linear Solve");
 			if (f_amgx) {
 // solve
 #ifdef ENABLE_AMGX
 // amgxsolver->solve(gamma, b);
 #endif
-			} else if (f_hypre) {
-#ifdef ENABLE_HYPRE
-// hypresolver->solve(gamma, b);
-#endif
 			} else {
 				KSPSetTolerances(solver, tol, PETSC_DEFAULT, PETSC_DEFAULT, 5000);
-				KSPSolve(solver, b, gamma);
+				if (f_noschur) {
+					KSPSolve(solver, f, u);
+				} else {
+					KSPSolve(solver, b, gamma);
+				}
 				int its;
 				KSPGetIterationNumber(solver, &its);
 				cout << "Iterations: " << its << endl;
 			}
-			timer.stop("Gamma Solve");
+			timer.stop("Linear Solve");
 		}
 
-		// Do one last solve
-		timer.start("Patch Solve");
+		if (!f_noschur) {
+			// Do one last solve
+			timer.start("Patch Solve");
 
-		sch.solveWithInterface(f, u, gamma, diff);
+			sch.solveWithInterface(f, u, gamma, diff);
 
-		timer.stop("Patch Solve");
+			timer.stop("Patch Solve");
+		}
 
 		///////////////////
 		// solve end
@@ -404,7 +383,11 @@ int main(int argc, char *argv[])
 		// residual
 		PW<Vec> resid = dc.getNewDomainVec();
 		PW<Vec> au    = dc.getNewDomainVec();
-		sch.applyWithInterface(u, gamma, au);
+		if (f_noschur) {
+			MatMult(A, u, au);
+		} else {
+			sch.applyWithInterface(u, gamma, au);
+		}
 		VecAXPBYPCZ(resid, -1.0, 1.0, 0.0, au, f);
 		double residual;
 		VecNorm(resid, NORM_2, &residual);
