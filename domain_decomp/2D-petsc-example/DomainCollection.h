@@ -2,6 +2,7 @@
 #define DOMAINSIGNATURECOLLECTION_H
 #include "Domain.h"
 #include "InterpCase.h"
+#include "PW.h"
 #include "Side.h"
 #include <map>
 #include <memory>
@@ -144,20 +145,12 @@ struct Iface {
 class DomainCollection
 {
 	private:
-	bool                   ises_init = false;
-	IS                     domain_is;
-	IS                     schur_is;
-	IS                     schur_dist_is;
-	ISLocalToGlobalMapping domain_is_ltg;
-	ISLocalToGlobalMapping schur_is_ltg;
-	ISLocalToGlobalMapping schur_dist_is_ltg;
-	void                   enumerateIfaces();
-	void                   determineCoarseness();
-	void                   determineAmrLevel();
-	void                   determineXY();
-	void                   zoltanBalanceIfaces();
-	void                   zoltanBalanceDomains();
-	void                   formISs();
+	void enumerateIfaces();
+	void determineCoarseness();
+	void determineAmrLevel();
+	void determineXY();
+	void zoltanBalanceIfaces();
+	void zoltanBalanceDomains();
 
 	public:
 	int rank;
@@ -234,12 +227,9 @@ class DomainCollection
 			p.second.setZeroPatch();
 		}
 	}
-	IS                   getSchurIS();
-	IS                   getSchurDistIS();
-	IS                   getDomainIS();
-	std::shared_ptr<Vec> getNewSchurVec();
-	std::shared_ptr<Vec> getNewSchurDistVec();
-	Vec                  getNewDomainVec();
+	PW_explicit<Vec> getNewSchurVec();
+	PW_explicit<Vec> getNewSchurDistVec();
+	PW_explicit<Vec> getNewDomainVec();
 
 	int    getGlobalNumCells() { return num_global_domains * n * n; }
 	double integrate(const Vec u);

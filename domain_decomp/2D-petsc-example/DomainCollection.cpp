@@ -940,12 +940,12 @@ void DomainCollection::zoltanBalanceDomains()
 void DomainCollection::indexIfacesGlobal()
 {
 	// create map for gids
-	ISLocalToGlobalMapping gid_map;
+	PW<ISLocalToGlobalMapping> gid_map;
 	ISLocalToGlobalMappingCreate(MPI_COMM_WORLD, 1, iface_map_vec.size(), &iface_map_vec[0],
 	                             PETSC_COPY_VALUES, &gid_map);
 
 	// create source vector
-	Vec source;
+	PW<Vec> source;
 	VecCreateMPI(MPI_COMM_WORLD, iface_map_vec.size(), PETSC_DETERMINE, &source);
 	VecSetLocalToGlobalMapping(source, gid_map);
 
@@ -966,8 +966,8 @@ void DomainCollection::indexIfacesGlobal()
 	// get indices for schur matrix
 	{
 		// create dest vector
-		Vec dest;
-		int dest_size = iface_map_vec.size() + iface_off_proc_map_vec.size();
+		PW<Vec> dest;
+		int     dest_size = iface_map_vec.size() + iface_off_proc_map_vec.size();
 		VecCreateSeq(PETSC_COMM_SELF, dest_size, &dest);
 
 		// get global indices that we want to recieve for dest vector
@@ -975,12 +975,12 @@ void DomainCollection::indexIfacesGlobal()
 		for (int i : iface_off_proc_map_vec) {
 			iface_map_vec_dist.push_back(i);
 		}
-		IS gid_dist;
+		PW<IS> gid_dist;
 		ISCreateGeneral(MPI_COMM_WORLD, iface_map_vec_dist.size(), &iface_map_vec_dist[0],
 		                PETSC_COPY_VALUES, &gid_dist);
 
 		// scatter new global index values
-		VecScatter scatter;
+		PW<VecScatter> scatter;
 		VecScatterCreate(source, gid_dist, dest, nullptr, &scatter);
 		VecScatterBegin(scatter, source, dest, INSERT_VALUES, SCATTER_FORWARD);
 		VecScatterEnd(scatter, source, dest, INSERT_VALUES, SCATTER_FORWARD);
@@ -1005,17 +1005,17 @@ void DomainCollection::indexIfacesGlobal()
 	// get indices for local ifaces
 	{
 		// create dest vector
-		Vec dest;
-		int dest_size = iface_dist_map_vec.size();
+		PW<Vec> dest;
+		int     dest_size = iface_dist_map_vec.size();
 		VecCreateSeq(PETSC_COMM_SELF, dest_size, &dest);
 
 		// get global indices that we want to recieve for dest vector
-		IS gid_dist;
+		PW<IS> gid_dist;
 		ISCreateGeneral(MPI_COMM_WORLD, iface_dist_map_vec.size(), &iface_dist_map_vec[0],
 		                PETSC_COPY_VALUES, &gid_dist);
 
 		// scatter new global index values
-		VecScatter scatter;
+		PW<VecScatter> scatter;
 		VecScatterCreate(source, gid_dist, dest, nullptr, &scatter);
 		VecScatterBegin(scatter, source, dest, INSERT_VALUES, SCATTER_FORWARD);
 		VecScatterEnd(scatter, source, dest, INSERT_VALUES, SCATTER_FORWARD);
@@ -1094,12 +1094,12 @@ void DomainCollection::indexIfacesLocal()
 void DomainCollection::indexDomainsGlobal()
 {
 	// create map for gids
-	ISLocalToGlobalMapping gid_map;
+	PW<ISLocalToGlobalMapping> gid_map;
 	ISLocalToGlobalMappingCreate(MPI_COMM_WORLD, 1, domain_map_vec.size(), &domain_map_vec[0],
 	                             PETSC_COPY_VALUES, &gid_map);
 
 	// create vectors
-	Vec source, dest;
+	PW<Vec> source, dest;
 	VecCreateMPI(MPI_COMM_WORLD, domains.size(), PETSC_DETERMINE, &source);
 	VecSetLocalToGlobalMapping(source, gid_map);
 	int dest_size = domain_map_vec.size() + domain_off_proc_map_vec.size();
@@ -1124,12 +1124,12 @@ void DomainCollection::indexDomainsGlobal()
 	for (int i : domain_off_proc_map_vec) {
 		domain_map_vec_dist.push_back(i);
 	}
-	IS gid_dist;
+	PW<IS> gid_dist;
 	ISCreateGeneral(MPI_COMM_WORLD, domain_map_vec_dist.size(), &domain_map_vec_dist[0],
 	                PETSC_COPY_VALUES, &gid_dist);
 
 	// scatter new global index values
-	VecScatter scatter;
+	PW<VecScatter> scatter;
 	VecScatterCreate(source, gid_dist, dest, nullptr, &scatter);
 	VecScatterBegin(scatter, source, dest, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(scatter, source, dest, INSERT_VALUES, SCATTER_FORWARD);
@@ -1151,13 +1151,6 @@ void DomainCollection::indexDomainsGlobal()
 		domain_off_proc_map_vec[i] = local_vec[domain_map_vec.size() + i];
 	}
 	VecRestoreArray(dest, &local_vec);
-
-	// free petsc stuff
-	ISLocalToGlobalMappingDestroy(&gid_map);
-	VecDestroy(&source);
-	VecDestroy(&dest);
-	VecScatterDestroy(&scatter);
-	ISDestroy(&gid_dist);
 }
 void DomainCollection::indexDomainsLocal()
 {
@@ -1542,52 +1535,21 @@ double DomainCollection::area()
 	MPI_Allreduce(&sum, &retval, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 	return retval;
 }
-void DomainCollection::formISs()
+PW_explicit<Vec> DomainCollection::getNewSchurVec()
 {
-	ises_init = true;
-	// domain index set
-	ISCreateBlock(MPI_COMM_WORLD, n * n, domain_map_vec.size(), &domain_map_vec[0],
-	              PETSC_COPY_VALUES, &domain_is);
-	// schur index set
-	ISCreateStride(MPI_COMM_WORLD, iface_dist_map_vec.size() * n, 0, 1, &schur_is);
-	ISCreateBlock(MPI_COMM_WORLD, n, iface_dist_map_vec.size(), &iface_dist_map_vec[0],
-	              PETSC_COPY_VALUES, &schur_dist_is);
-	ISLocalToGlobalMappingCreateIS(domain_is, &domain_is_ltg);
-	ISLocalToGlobalMappingCreateIS(schur_is, &schur_is_ltg);
-	ISLocalToGlobalMappingCreateIS(schur_dist_is, &schur_dist_is_ltg);
-}
-IS DomainCollection::getSchurIS()
-{
-	if (!ises_init) formISs();
-	return schur_is;
-}
-IS DomainCollection::getSchurDistIS()
-{
-	if (!ises_init) formISs();
-	return schur_dist_is;
-}
-IS DomainCollection::getDomainIS()
-{
-	if (!ises_init) formISs();
-	return domain_is;
-}
-shared_ptr<Vec> DomainCollection::getNewSchurVec()
-{
-	shared_ptr<Vec> u(new Vec, VecDestroy);
-	VecCreateMPI(MPI_COMM_WORLD, iface_map_vec.size() * n, PETSC_DETERMINE, u.get());
+	PW<Vec> u;
+	VecCreateMPI(MPI_COMM_WORLD, iface_map_vec.size() * n, PETSC_DETERMINE, &u);
 	return u;
 }
-shared_ptr<Vec> DomainCollection::getNewSchurDistVec()
+PW_explicit<Vec> DomainCollection::getNewSchurDistVec()
 {
-	shared_ptr<Vec> u(new Vec, VecDestroy);
-	VecCreateSeq(PETSC_COMM_SELF, iface_dist_map_vec.size() * n, u.get());
+	PW<Vec> u;
+	VecCreateSeq(PETSC_COMM_SELF, iface_dist_map_vec.size() * n, &u);
 	return u;
 }
-Vec DomainCollection::getNewDomainVec()
+PW_explicit<Vec> DomainCollection::getNewDomainVec()
 {
-	Vec u;
+	PW<Vec> u;
 	VecCreateMPI(MPI_COMM_WORLD, domains.size() * n * n, PETSC_DETERMINE, &u);
-	VecAssemblyBegin(u);
-	VecAssemblyEnd(u);
 	return u;
 }

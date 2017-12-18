@@ -262,10 +262,9 @@ int main(int argc, char *argv[])
 
 		SchurHelper sch(dc, p_solver, p_operator, p_interp);
 
-		IS  domain_is = dc.getDomainIS();
-		Vec u         = dc.getNewDomainVec();
-		Vec exact     = dc.getNewDomainVec();
-		Vec f         = dc.getNewDomainVec();
+		PW<Vec> u     = dc.getNewDomainVec();
+		PW<Vec> exact = dc.getNewDomainVec();
+		PW<Vec> f     = dc.getNewDomainVec();
 
 		if (f_neumann) {
 			Init::initNeumann(dc, nx, f, exact, ffun, gfun, nfunx, nfuny);
@@ -276,14 +275,14 @@ int main(int argc, char *argv[])
 		timer.stop("Domain Initialization");
 
 		// Create the gamma and diff vectors
-		shared_ptr<Vec> gamma = dc.getNewSchurVec();
-		shared_ptr<Vec> diff  = dc.getNewSchurVec();
-		shared_ptr<Vec> b     = dc.getNewSchurVec();
-		shared_ptr<Mat> A;
+		PW<Vec> gamma = dc.getNewSchurVec();
+		PW<Vec> diff  = dc.getNewSchurVec();
+		PW<Vec> b     = dc.getNewSchurVec();
+		PW<Mat> A;
 
 		// Create linear problem for the Belos solver
-		shared_ptr<KSP> solver(new KSP, KSPDestroy);
-		KSPCreate(MPI_COMM_WORLD, solver.get());
+		PW<KSP> solver;
+		KSPCreate(MPI_COMM_WORLD, &solver);
 
 		if (f_neumann && !f_nozerof) {
 			/*
@@ -307,15 +306,15 @@ int main(int argc, char *argv[])
 			// do iterative solve
 
 			// Get the b vector
-			VecScale(*gamma, 0);
-			sch.solveWithInterface(f, u, *gamma, *b);
-			VecScale(*b, -1.0);
+			VecScale(gamma, 0);
+			sch.solveWithInterface(f, u, gamma, b);
+			VecScale(b, -1.0);
 
 			if (f_rhs) {
 				PetscViewer viewer;
 				PetscViewerBinaryOpen(PETSC_COMM_WORLD, args::get(f_rhs).c_str(), FILE_MODE_WRITE,
 				                      &viewer);
-				VecView(*b, viewer);
+				VecView(b, viewer);
 				PetscViewerDestroy(&viewer);
 			}
 
@@ -338,7 +337,7 @@ int main(int argc, char *argv[])
 					PetscViewer viewer;
 					PetscViewerBinaryOpen(PETSC_COMM_WORLD, args::get(f_m).c_str(), FILE_MODE_WRITE,
 					                      &viewer);
-					MatView(*A, viewer);
+					MatView(A, viewer);
 					PetscViewerDestroy(&viewer);
 				}
 			}
@@ -357,7 +356,7 @@ int main(int argc, char *argv[])
 #endif
 			} else {
 				// preconditoners
-				KSPSetOperators(*solver, *A, *A);
+				KSPSetOperators(solver, A, A);
 			}
 			///////////////////
 			// setup end
@@ -381,10 +380,10 @@ int main(int argc, char *argv[])
 // hypresolver->solve(gamma, b);
 #endif
 			} else {
-				KSPSetTolerances(*solver, tol, PETSC_DEFAULT, PETSC_DEFAULT, 5000);
-				KSPSolve(*solver, *b, *gamma);
+				KSPSetTolerances(solver, tol, PETSC_DEFAULT, PETSC_DEFAULT, 5000);
+				KSPSolve(solver, b, gamma);
 				int its;
-				KSPGetIterationNumber(*solver, &its);
+				KSPGetIterationNumber(solver, &its);
 				cout << "Iterations: " << its << endl;
 			}
 			timer.stop("Gamma Solve");
@@ -393,7 +392,7 @@ int main(int argc, char *argv[])
 		// Do one last solve
 		timer.start("Patch Solve");
 
-		sch.solveWithInterface(f, u, *gamma, *diff);
+		sch.solveWithInterface(f, u, gamma, diff);
 
 		timer.stop("Patch Solve");
 
@@ -403,9 +402,9 @@ int main(int argc, char *argv[])
 		timer.stop("Complete Solve");
 
 		// residual
-		Vec resid = dc.getNewDomainVec();
-		Vec au    = dc.getNewDomainVec();
-		sch.applyWithInterface(u, *gamma, au);
+		PW<Vec> resid = dc.getNewDomainVec();
+		PW<Vec> au    = dc.getNewDomainVec();
+		sch.applyWithInterface(u, gamma, au);
 		VecAXPBYPCZ(resid, -1.0, 1.0, 0.0, au, f);
 		double residual;
 		VecNorm(resid, NORM_2, &residual);
@@ -413,7 +412,7 @@ int main(int argc, char *argv[])
 		VecNorm(f, NORM_2, &fnorm);
 
 		// error
-		Vec error = dc.getNewDomainVec();
+		PW<Vec> error = dc.getNewDomainVec();
 		VecAXPBYPCZ(error, -1.0, 1.0, 0.0, exact, u);
 		if (f_neumann) {
 			/*	double uavg = dc.integrate(*u) / dc.area();
@@ -458,7 +457,7 @@ int main(int argc, char *argv[])
 		if (f_g) {
 			PetscViewer viewer;
 			PetscViewerASCIIOpen(PETSC_COMM_WORLD, args::get(f_g).c_str(), &viewer);
-			VecView(*gamma, viewer);
+			VecView(gamma, viewer);
 		}
 		if (f_outclaw) {
 			ClawWriter writer(dc);

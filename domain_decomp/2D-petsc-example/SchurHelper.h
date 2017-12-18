@@ -21,8 +21,10 @@ class SchurHelper
 	private:
 	DomainCollection dc;
 
-	std::shared_ptr<Vec> local_gamma;
-	std::shared_ptr<Vec> local_interp;
+	PW<Vec>        local_gamma;
+	PW<Vec>        gamma;
+	PW<Vec>        local_interp;
+	PW<VecScatter> scatter;
 
 	/**
 	 * @brief Interpolates to interface values
@@ -77,6 +79,6 @@ class SchurHelper
 	 *
 	 * @return the formed matrix
 	 */
-	std::shared_ptr<Mat> formCRSMatrix();
+	PW_explicit<Mat> formCRSMatrix();
 };
 #endif
