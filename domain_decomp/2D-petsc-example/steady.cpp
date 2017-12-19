@@ -29,9 +29,6 @@
 #include <petscviewer.h>
 #include <string>
 #include <unistd.h>
-#ifndef M_PIl
-#define M_PIl 3.141592653589793238462643383279502884L /* pi */
-#endif
 
 // =========== //
 // main driver //
@@ -41,6 +38,23 @@ using namespace std;
 
 int main(int argc, char *argv[])
 {
+	int     petsc_argc;
+	int *   petsc_argc_ptr = nullptr;
+	char ** petsc_argv;
+	char ***petsc_argv_ptr = nullptr;
+	string  delim          = "::";
+	for (int i = 0; i < argc; i++) {
+		if (argv[i] == delim) {
+			int tmp        = argc;
+			argc           = i;
+			petsc_argc     = tmp - i;
+			petsc_argc_ptr = &petsc_argc;
+			petsc_argv     = &argv[i];
+			petsc_argv_ptr = &petsc_argv;
+		}
+	}
+	// use :: to delimit petsc options at end
+	PetscInitialize(petsc_argc_ptr, petsc_argv_ptr, nullptr, nullptr);
 	// parse input
 	args::ArgumentParser parser("");
 
@@ -56,10 +70,8 @@ int main(int argc, char *argv[])
 	                     {"nozerof"});
 	args::ValueFlag<double> f_t(
 	parser, "tolerance", "set the tolerance of the iterative solver (default is 1e-10)", {'t'});
-	args::Flag              f_neumann(parser, "", "use neumann boundary conditions", {"neumann"});
-	args::Flag              f_noschur(parser, "", "don't use schur compliment method", {"noschur"});
-	args::ValueFlag<string> f_petsc(parser, "petsc flags",
-	                                "list of petsc command line flags in quotes", {"petsc"});
+	args::Flag f_neumann(parser, "", "use neumann boundary conditions", {"neumann"});
+	args::Flag f_noschur(parser, "", "don't use schur compliment method", {"noschur"});
 
 	// mesh options
 	args::ValueFlag<string> f_mesh(parser, "file_name", "read in a mesh", {"mesh"});
@@ -102,8 +114,6 @@ int main(int argc, char *argv[])
 
 	// third-party preconditioners
 	args::Flag f_amgx(parser, "amgx", "solve schur compliment system with amgx", {"amgx"});
-
-	PetscInitialize(&argc, &argv, nullptr, nullptr);
 
 	int num_procs;
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
@@ -263,16 +273,12 @@ int main(int argc, char *argv[])
 		// Create linear problem for the Belos solver
 		PW<KSP> solver;
 		KSPCreate(MPI_COMM_WORLD, &solver);
+		KSPSetFromOptions(solver);
 
 		if (f_neumann && !f_nozerof) {
-			/*
-			double fdiff = (dc.integrate(*f)) / dc.area();
+			double fdiff = (dc.integrate(f)) / dc.area();
 			if (my_global_rank == 0) cout << "Fdiff: " << fdiff << endl;
-
-			shared_ptr<vector_type> diff = rcp(new vector_type(domain_map, 1));
-			diff->putScalar(fdiff);
-			f->update(1.0, *diff, 1.0);
-			*/
+			VecShift(f, fdiff);
 		}
 
 #ifdef ENABLE_AMGX
@@ -328,12 +334,15 @@ int main(int argc, char *argv[])
 			if (f_amgx) {
 #ifdef ENABLE_AMGX
 				timer.start("AMGX Setup");
-				//		amgxsolver = rcp(new AmgxWrapper(A, dc, n));
+				amgxsolver.reset(new AmgxWrapper(A, dc));
 				timer.stop("AMGX Setup");
 #endif
 			} else {
 				// preconditoners
+				timer.start("Petsc Setup");
 				KSPSetOperators(solver, A, A);
+				KSPSetUp(solver);
+				timer.stop("Petsc Setup");
 			}
 			///////////////////
 			// setup end
@@ -348,9 +357,9 @@ int main(int argc, char *argv[])
 		if (f_noschur || dc.num_global_domains != 1) {
 			timer.start("Linear Solve");
 			if (f_amgx) {
-// solve
 #ifdef ENABLE_AMGX
-// amgxsolver->solve(gamma, b);
+				// solve
+				amgxsolver->solve(gamma, b);
 #endif
 			} else {
 				KSPSetTolerances(solver, tol, PETSC_DEFAULT, PETSC_DEFAULT, 5000);
@@ -398,17 +407,15 @@ int main(int argc, char *argv[])
 		PW<Vec> error = dc.getNewDomainVec();
 		VecAXPBYPCZ(error, -1.0, 1.0, 0.0, exact, u);
 		if (f_neumann) {
-			/*	double uavg = dc.integrate(*u) / dc.area();
-			    double eavg = dc.integrate(*exact) / dc.area();
+			double uavg = dc.integrate(u) / dc.area();
+			double eavg = dc.integrate(exact) / dc.area();
 
-			    if (my_global_rank == 0) {
-			        cout << "Average of computed solution: " << uavg << endl;
-			        cout << "Average of exact solution: " << eavg << endl;
-			    }
+			if (my_global_rank == 0) {
+				cout << "Average of computed solution: " << uavg << endl;
+				cout << "Average of exact solution: " << eavg << endl;
+			}
 
-			    vector_type ones(domain_map, 1);
-			    ones.putScalar(1);
-			    error->update(eavg - uavg, ones, 1.0);*/
+			VecShift(error, eavg - uavg);
 		}
 		double error_norm;
 		VecNorm(error, NORM_2, &error_norm);

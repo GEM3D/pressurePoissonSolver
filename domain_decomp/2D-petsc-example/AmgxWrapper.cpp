@@ -3,45 +3,21 @@
 #include <set>
 #include <vector>
 using namespace std;
-struct AmgxCrs {
-	int                  n_global;
-	int                  n;
-	int                  nnz;
-	int                  block_dimx = 1;
-	int                  block_dimy = 1;
-	std::vector<int>     row_ptrs;
-	std::vector<int64_t> cols;
-	std::vector<double>  data;
-	double *             diag_data = nullptr;
-};
-
-AmgxWrapper::AmgxWrapper(Teuchos::RCP<matrix_type> A, const DomainCollection &dc, int n)
+AmgxWrapper::AmgxWrapper(Mat A, const DomainCollection &dc)
 {
-	AmgxCrs Acrs;
-	Acrs.nnz = A->getNodeNumEntries();
-	num_rows = A->getNodeNumRows();
-	num_cols = A->getNodeNumCols();
-	Acrs.row_ptrs.resize(num_rows + 1);
-	Acrs.data.resize(Acrs.nnz);
-	Acrs.cols.resize(Acrs.nnz);
-	int curr_pos     = 0;
-	Acrs.row_ptrs[0] = curr_pos;
-	for (int i = 0; i < num_rows; i++) {
-		size_t n;
-		n                              = A->getNumEntriesInLocalRow(i);
-		int                        row = A->getRowMap()->getGlobalElement(i);
-		vector<int>                cols(n);
-		vector<double>             data(n);
-		Teuchos::ArrayView<int>    inds_view(&cols[0], n);
-		Teuchos::ArrayView<double> vals_view(&data[0], n);
-		A->getGlobalRowCopy(row, inds_view, vals_view, n);
-		for (size_t j = 0; j < n; j++) {
-			Acrs.data[curr_pos] = data[j];
-			Acrs.cols[curr_pos] = cols[j];
-			curr_pos++;
-		}
-		Acrs.row_ptrs[i + 1] = curr_pos;
-	}
+	int rank, size;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+	PW<Mat> localA;
+	MatMPIAIJGetLocalMat(A, MAT_INITIAL_MATRIX, &localA);
+	const int *ia;
+	const int *ja;
+	PetscBool  done;
+	int        nr;
+	MatGetRowIJ(localA, 0, PETSC_FALSE, PETSC_FALSE, &nr, &ia, &ja, &done);
+	num_rows = nr;
+	int nnz  = ia[num_rows];
 
 	/* init */
 	AMGX_SAFE_CALL(AMGX_initialize());
@@ -53,7 +29,7 @@ AmgxWrapper::AmgxWrapper(Teuchos::RCP<matrix_type> A, const DomainCollection &dc
 	AMGX_config_create_from_file(&cfg, "amgx.json");
 	AMGX_SAFE_CALL(AMGX_config_add_parameters(&cfg, "exception_handling=1"));
 	AMGX_SAFE_CALL(AMGX_config_add_parameters(&cfg, "communicator=MPI"));
-	int gpu_id = dc.comm->getRank()%2;
+	int gpu_id = rank % 1;
 	MPI_Comm_dup(MPI_COMM_WORLD, &AMGX_MPI_COMM);
 	AMGX_resources_create(&rsrc, cfg, &AMGX_MPI_COMM, 1, &gpu_id);
 	AMGX_matrix_create(&gA, rsrc, AMGX_mode_dDDI);
@@ -63,18 +39,39 @@ AmgxWrapper::AmgxWrapper(Teuchos::RCP<matrix_type> A, const DomainCollection &dc
 
 	int nrings = 0;
 	AMGX_config_get_default_number_of_rings(cfg, &nrings);
-	int         n_global = A->getGlobalNumRows();
-	vector<int> procs(n_global);
-	vector<int> inds(n_global);
-	for (int i = 0; i < n_global; i++) {
-		inds[i] = i;
+
+	int m, n;
+	MatGetSize(A, &m, &n);
+
+	const int *ranges;
+	MatGetOwnershipRanges(A, &ranges);
+	vector<int> procs;
+	for (int p = 0; p < size; p++) {
+		for (int i = ranges[n]; i < ranges[n+ 1]; i++) {
+			procs.push_back(p);
+		}
 	}
-	Teuchos::ArrayView<int> inds_view(&inds[0], n_global);
-	Teuchos::ArrayView<int> procs_view(&procs[0], n_global);
-	A->getRowMap()->getRemoteIndexList(inds_view, procs_view);
-	AMGX_matrix_upload_all_global(gA, n_global, num_rows, Acrs.nnz, 1, 1, &Acrs.row_ptrs[0],
-	                              &Acrs.cols[0], (void *) &Acrs.data[0], nullptr, nrings, nrings,
-	                              &procs[0]);
+
+	vector<double>  data(nnz);
+	vector<int64_t> cols(nnz);
+	vector<int>     rows(num_rows + 1);
+	int             q = 0;
+	for (int i = 0; i < num_rows; i++) {
+		rows[i] = q;
+		int           ncols;
+		const int *   c;
+		const double *vals;
+		MatGetRow(localA, i, &ncols, &c, &vals);
+		for (int j = 0; j < ncols; j++) {
+			data[q] = vals[j];
+			cols[q] = c[j];
+			q++;
+		}
+	}
+	rows[num_rows] = q;
+	MatRestoreRowIJ(localA, 0, PETSC_FALSE, PETSC_FALSE, &nr, &ia, &ja, &done);
+	AMGX_matrix_upload_all_global(gA, n, num_rows, nnz, 1, 1, &rows[0], &cols[0], (void *) &data[0],
+	                              nullptr, nrings, nrings, &procs[0]);
 
 	AMGX_vector_bind(gx, gA);
 	AMGX_vector_bind(gb, gA);
@@ -89,13 +86,19 @@ AmgxWrapper::~AmgxWrapper()
 	AMGX_vector_destroy(gb);
 	AMGX_resources_destroy(rsrc);
 	AMGX_config_destroy(cfg);
+	AMGX_reset_signal_handler();
 	AMGX_finalize_plugins();
 	AMGX_finalize();
 }
-void AmgxWrapper::solve(Teuchos::RCP<vector_type> x, Teuchos::RCP<vector_type> b)
+void AmgxWrapper::solve(Vec x, Vec b)
 {
-	AMGX_vector_upload(gb, num_rows, 1, (void *) b->get1dViewNonConst().get());
-	AMGX_vector_upload(gx, num_rows, 1, (void *) x->get1dViewNonConst().get());
+	double *x_ptr, *b_ptr;
+	VecGetArray(x, &x_ptr);
+	VecGetArray(b, &b_ptr);
+	AMGX_vector_upload(gb, num_rows, 1, (void *) b_ptr);
+	AMGX_vector_upload(gx, num_rows, 1, (void *) x_ptr);
 	AMGX_solver_solve(solver, gb, gx);
-	AMGX_vector_download(gx, (void *) x->get1dViewNonConst().get());
+	AMGX_vector_download(gx, (void *) x_ptr);
+	VecRestoreArray(x, &x_ptr);
+	VecRestoreArray(b, &b_ptr);
 }

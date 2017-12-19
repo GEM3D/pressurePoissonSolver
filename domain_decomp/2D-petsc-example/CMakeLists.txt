@@ -25,7 +25,7 @@ find_package(PETSc REQUIRED)
 project(DomainDecomp)
 find_package(MPI REQUIRED)
 set (CMAKE_CXX_FLAGS "-Wall --std=c++11 -O3 ${CMAKE_CXX_FLAGS}")
-set (CMAKE_CXX_FLAGS_DEBUG  "-Wall --std=c++11 -g ${CMAKE_CXX_FLAGS}")
+set (CMAKE_CXX_FLAGS_DEBUG  "-Wall --std=c++11 -g -O0 ")
   MESSAGE("Setting CXX compiler.")
   SET(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
 

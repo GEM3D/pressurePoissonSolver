@@ -118,21 +118,6 @@ int main(int argc, char *argv[])
 	args::ValueFlag<string> f_g(parser, "gamma filename", "the file to write the gamma vector to",
 	                            {'g'});
 
-	// preconditioners
-	args::Flag f_precj(parser, "prec", "use jacobi preconditioner", {"precj"});
-	args::Flag f_prec(parser, "prec", "use block diagonal jacobi preconditioner", {"prec"});
-	args::Flag f_precmuelu(parser, "prec", "use MueLu AMG preconditioner", {"muelu"});
-	args::Flag f_neumann(parser, "neumann", "use neumann boundary conditions", {"neumann"});
-	args::Flag f_cg(parser, "gmres", "use CG for iterative solver", {"cg"});
-	args::Flag f_gmres(parser, "gmres", "use GMRES for iterative solver", {"gmres"});
-	args::Flag f_lsqr(parser, "gmres", "use least squares for iterative solver", {"lsqr"});
-	args::Flag f_rgmres(parser, "rgmres", "use GCRO-DR (Recycling GMRES) for iterative solver",
-	                    {"rgmres"});
-	args::Flag f_bicg(parser, "gmres", "use BiCGStab for iterative solver", {"bicg"});
-
-	// direct solvers
-	args::Flag f_iter(parser, "iterative", "use iterative method", {"iterative"});
-
 	// patch solvers
 	args::Flag f_fish(parser, "fishpack", "use fishpack as the patch solver", {"fishpack"});
 #ifdef __NVCC__
@@ -141,7 +126,6 @@ int main(int argc, char *argv[])
 
 	// third-party preconditioners
 	args::Flag f_amgx(parser, "amgx", "solve schur compliment system with amgx", {"amgx"});
-	args::Flag f_hypre(parser, "hypre", "solve schur compliment system with hypre", {"hypre"});
 
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;

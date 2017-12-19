@@ -1,8 +1,9 @@
 #ifndef AMGXWRAPPER_H
 #define AMGXWRAPPER_H
 #include "DomainCollection.h"
-#include "MyTypeDefs.h"
 #include "amgx_c.h"
+#include <petscmat.h>
+#include <iostream>
 class AmgxWrapper
 {
 	private:
@@ -26,8 +27,8 @@ class AmgxWrapper
 	int               num_cols;
 
 	public:
-	AmgxWrapper(Teuchos::RCP<matrix_type> A, const DomainCollection &dc, int n);
+	AmgxWrapper(Mat A, const DomainCollection &dc);
 	~AmgxWrapper();
-	void solve(Teuchos::RCP<vector_type> x, Teuchos::RCP<vector_type> b);
+	void solve(Vec x, Vec b);
 };
 #endif
