@@ -15,6 +15,9 @@
 #ifdef ENABLE_MUELU
 #include "MueLuWrapper.h"
 #endif
+#ifdef ENABLE_MUELU_CUDA
+#include "MueLuCudaWrapper.h"
+#endif
 #ifdef HAVE_VTK
 #include "Writers/VtkWriter.h"
 #endif
@@ -117,7 +120,10 @@ int main(int argc, char *argv[])
 	args::Flag f_amgx(parser, "", "solve schur compliment system with amgx", {"amgx"});
 #endif 
 #ifdef ENABLE_MUELU
-	args::Flag f_meulu(parser, "", "solve schur compliment system with muelu", {"meulu"});
+	args::Flag f_meulu(parser, "", "solve schur compliment system with muelu", {"muelu"});
+#endif 
+#ifdef ENABLE_MUELU_CUDA
+	args::Flag f_meulucuda(parser, "", "solve schur compliment system with muelu", {"muelucuda"});
 #endif 
 
 	int num_procs;
@@ -290,7 +296,10 @@ int main(int argc, char *argv[])
 		shared_ptr<AmgxWrapper> amgxsolver;
 #endif
 #ifdef ENABLE_MUELU
-		shared_ptr<MueLuWrapper> meulusolver;
+		MueLuWrapper* meulusolver=nullptr;
+#endif
+#ifdef ENABLE_MUELU_CUDA
+		MueLuCudaWrapper* meulucudasolver=nullptr;
 #endif
 
 		if (f_noschur || dc.num_global_domains != 1) {
@@ -343,7 +352,13 @@ int main(int argc, char *argv[])
 #ifdef ENABLE_MUELU
 			} else if (f_meulu) {
 				timer.start("MeuLu Setup");
-				meulusolver.reset(new MueLuWrapper(A, tol, "mueluOptions.xml"));
+				meulusolver = new MueLuWrapper(A, tol, "mueluOptions.xml");
+				timer.stop("MeuLu Setup");
+#endif
+#ifdef ENABLE_MUELU_CUDA
+			} else if (f_meulucuda) {
+				timer.start("MeuLu Setup");
+				meulucudasolver =new MueLuCudaWrapper(A, tol, "mueluOptions.xml");
 				timer.stop("MeuLu Setup");
 #endif
 #ifdef ENABLE_AMGX
@@ -376,6 +391,11 @@ int main(int argc, char *argv[])
 			} else if (f_meulu) {
 				// solve
 				meulusolver->solve(gamma, b);
+#endif
+#ifdef ENABLE_MUELU_CUDA
+			} else if (f_meulucuda) {
+				// solve
+				meulucudasolver->solve(gamma, b);
 #endif
 #ifdef ENABLE_AMGX
 			} else if (f_amgx) {
@@ -484,6 +504,16 @@ int main(int argc, char *argv[])
 		}
 #endif
 		cout.unsetf(std::ios_base::floatfield);
+#ifdef ENABLE_MUELU
+        if(meulusolver!=nullptr){
+            delete meulusolver;
+        }
+#endif
+#ifdef ENABLE_MUELU_CUDA
+        if(meulucudasolver!=nullptr){
+            delete meulucudasolver;
+        }
+#endif
 	}
 
 	if (my_global_rank == 0) {

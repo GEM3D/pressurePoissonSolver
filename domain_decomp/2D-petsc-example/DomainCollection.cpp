@@ -1,4 +1,5 @@
 #include "DomainCollection.h"
+#include "ZoltanHelpers.h"
 #include <algorithm>
 #include <deque>
 #include <fstream>
@@ -7,6 +8,7 @@
 #include <set>
 #include <sstream>
 #include <utility>
+#include <zoltan.h>
 using namespace std;
 DomainCollection::DomainCollection(string file_name)
 {
@@ -788,26 +790,26 @@ void DomainCollection::zoltanBalance()
 
 void DomainCollection::zoltanBalanceIfaces()
 {
-	Zoltan *zz = new Zoltan(MPI_COMM_WORLD);
+	struct Zoltan_Struct *zz = Zoltan_Create(MPI_COMM_WORLD);
 
 	// parameters
-	zz->Set_Param("LB_METHOD", "HYPERGRAPH");
-	zz->Set_Param("LB_APPROACH", "PARTITION");
-	zz->Set_Param("NUM_GID_ENTRIES", "1");
-	zz->Set_Param("NUM_LID_ENTRIES", "1");
-	zz->Set_Param("OBJ_WEIGHT_DIM", "1");
-	zz->Set_Param("AUTO_MIGRATE", "TRUE");
-	zz->Set_Param("PHG_EDGE_SIZE_THRESHOLD", "1.0");
-	zz->Set_Param("IMBALANCE_TOL[0]", "1.0");
+	Zoltan_Set_Param(zz, "LB_METHOD", "HYPERGRAPH");
+	Zoltan_Set_Param(zz, "LB_APPROACH", "PARTITION");
+	Zoltan_Set_Param(zz, "NUM_GID_ENTRIES", "1");
+	Zoltan_Set_Param(zz, "NUM_LID_ENTRIES", "1");
+	Zoltan_Set_Param(zz, "OBJ_WEIGHT_DIM", "1");
+	Zoltan_Set_Param(zz, "AUTO_MIGRATE", "TRUE");
+	Zoltan_Set_Param(zz, "PHG_EDGE_SIZE_THRESHOLD", "1.0");
+	Zoltan_Set_Param(zz, "IMBALANCE_TOL[0]", "1.0");
 
 	// Query functions
-	zz->Set_Num_Obj_Fn(IfaceZoltanHelper::get_number_of_objects, this);
-	zz->Set_Obj_List_Fn(IfaceZoltanHelper::get_object_list, this);
-	zz->Set_Pack_Obj_Multi_Fn(IfaceZoltanHelper::pack_objects, this);
-	zz->Set_Unpack_Obj_Multi_Fn(IfaceZoltanHelper::unpack_objects, this);
-	zz->Set_Obj_Size_Multi_Fn(IfaceZoltanHelper::object_sizes, this);
-	zz->Set_HG_Size_CS_Fn(IfaceZoltanHelper::ZOLTAN_HG_SIZE_CS_FN, this);
-	zz->Set_HG_CS_Fn(IfaceZoltanHelper::ZOLTAN_HG_CS_FN, this);
+	Zoltan_Set_Num_Obj_Fn(zz, IfaceZoltanHelper::get_number_of_objects, this);
+	Zoltan_Set_Obj_List_Fn(zz, IfaceZoltanHelper::get_object_list, this);
+	Zoltan_Set_Pack_Obj_Multi_Fn(zz, IfaceZoltanHelper::pack_objects, this);
+	Zoltan_Set_Unpack_Obj_Multi_Fn(zz, IfaceZoltanHelper::unpack_objects, this);
+	Zoltan_Set_Obj_Size_Multi_Fn(zz, IfaceZoltanHelper::object_sizes, this);
+	Zoltan_Set_HG_Size_CS_Fn(zz, IfaceZoltanHelper::ZOLTAN_HG_SIZE_CS_FN, this);
+	Zoltan_Set_HG_CS_Fn(zz, IfaceZoltanHelper::ZOLTAN_HG_CS_FN, this);
 	// zz->Set_Geom_Fn(DomainCollection::coord, this);
 	// zz->Set_Num_Geom_Fn(DomainCollection::dimensions, this);
 
@@ -832,16 +834,17 @@ void DomainCollection::zoltanBalanceIfaces()
 	int *         exportProcs;
 	int *         exportToPart;
 
-	int rc = zz->LB_Partition(changes, numGidEntries, numLidEntries, numImport, importGlobalIds,
-	                          importLocalIds, importProcs, importToPart, numExport, exportGlobalIds,
-	                          exportLocalIds, exportProcs, exportToPart);
+	int rc = Zoltan_LB_Partition(zz, &changes, &numGidEntries, &numLidEntries, &numImport,
+	                             &importGlobalIds, &importLocalIds, &importProcs, &importToPart,
+	                             &numExport, &exportGlobalIds, &exportLocalIds, &exportProcs,
+	                             &exportToPart);
 
 	if (rc != ZOLTAN_OK) {
 		cerr << "zoltan error\n";
-		delete zz;
+		Zoltan_Destroy(&zz);
 		exit(0);
 	}
-	delete zz;
+	Zoltan_Destroy(&zz);
 	ostringstream oss;
 	oss << "I have " << ifaces.size() << " ifaces: ";
 
@@ -866,24 +869,24 @@ void DomainCollection::zoltanBalanceIfaces()
 }
 void DomainCollection::zoltanBalanceDomains()
 {
-	Zoltan *zz = new Zoltan(MPI_COMM_WORLD);
+	struct Zoltan_Struct *zz = Zoltan_Create(MPI_COMM_WORLD);
 
 	// parameters
-	zz->Set_Param("LB_METHOD", "GRAPH");       /* Zoltan method: "BLOCK" */
-	zz->Set_Param("LB_APPROACH", "PARTITION"); /* Zoltan method: "BLOCK" */
-	zz->Set_Param("NUM_GID_ENTRIES", "1");     /* global ID is 1 integer */
-	zz->Set_Param("NUM_LID_ENTRIES", "1");     /* local ID is 1 integer */
-	zz->Set_Param("OBJ_WEIGHT_DIM", "0");      /* we omit object weights */
-	zz->Set_Param("AUTO_MIGRATE", "TRUE");     /* we omit object weights */
+	Zoltan_Set_Param(zz, "LB_METHOD", "GRAPH");       /* Zoltan method: "BLOCK" */
+	Zoltan_Set_Param(zz, "LB_APPROACH", "PARTITION"); /* Zoltan method: "BLOCK" */
+	Zoltan_Set_Param(zz, "NUM_GID_ENTRIES", "1");     /* global ID is 1 integer */
+	Zoltan_Set_Param(zz, "NUM_LID_ENTRIES", "1");     /* local ID is 1 integer */
+	Zoltan_Set_Param(zz, "OBJ_WEIGHT_DIM", "0");      /* we omit object weights */
+	Zoltan_Set_Param(zz, "AUTO_MIGRATE", "TRUE");     /* we omit object weights */
 
 	// Query functions
-	zz->Set_Num_Obj_Fn(DomainZoltanHelper::get_number_of_objects, this);
-	zz->Set_Obj_List_Fn(DomainZoltanHelper::get_object_list, this);
-	zz->Set_Pack_Obj_Multi_Fn(DomainZoltanHelper::pack_objects, this);
-	zz->Set_Unpack_Obj_Multi_Fn(DomainZoltanHelper::unpack_objects, this);
-	zz->Set_Obj_Size_Multi_Fn(DomainZoltanHelper::object_sizes, this);
-	zz->Set_Num_Edges_Fn(DomainZoltanHelper::numInterfaces, this);
-	zz->Set_Edge_List_Fn(DomainZoltanHelper::interfaceList, this);
+	Zoltan_Set_Num_Obj_Fn(zz, DomainZoltanHelper::get_number_of_objects, this);
+	Zoltan_Set_Obj_List_Fn(zz, DomainZoltanHelper::get_object_list, this);
+	Zoltan_Set_Pack_Obj_Multi_Fn(zz, DomainZoltanHelper::pack_objects, this);
+	Zoltan_Set_Unpack_Obj_Multi_Fn(zz, DomainZoltanHelper::unpack_objects, this);
+	Zoltan_Set_Obj_Size_Multi_Fn(zz, DomainZoltanHelper::object_sizes, this);
+	Zoltan_Set_Num_Edges_Fn(zz, DomainZoltanHelper::numInterfaces, this);
+	Zoltan_Set_Edge_List_Fn(zz, DomainZoltanHelper::interfaceList, this);
 	// zz->Set_Geom_Fn(DomainCollection::coord, this);
 	// zz->Set_Num_Geom_Fn(DomainCollection::dimensions, this);
 
@@ -908,15 +911,17 @@ void DomainCollection::zoltanBalanceDomains()
 	int *         exportProcs;
 	int *         exportToPart;
 
-	int rc = zz->LB_Partition(changes, numGidEntries, numLidEntries, numImport, importGlobalIds,
-	                          importLocalIds, importProcs, importToPart, numExport, exportGlobalIds,
-	                          exportLocalIds, exportProcs, exportToPart);
+	int rc = Zoltan_LB_Partition(zz, &changes, &numGidEntries, &numLidEntries, &numImport,
+	                             &importGlobalIds, &importLocalIds, &importProcs, &importToPart,
+	                             &numExport, &exportGlobalIds, &exportLocalIds, &exportProcs,
+	                             &exportToPart);
 
 	if (rc != ZOLTAN_OK) {
 		cerr << "zoltan error\n";
-		delete zz;
+	Zoltan_Destroy(&zz);
 		exit(0);
 	}
+	Zoltan_Destroy(&zz);
 	cout << "I have " << domains.size() << " domains: ";
 
 #if DD_DEBUG
