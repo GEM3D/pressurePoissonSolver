@@ -12,8 +12,8 @@
 #ifdef ENABLE_AMGX
 #include "AmgxWrapper.h"
 #endif
-#ifdef ENABLE_HYPRE
-#include "HypreWrapper.h"
+#ifdef ENABLE_MUELU
+#include "MueLuWrapper.h"
 #endif
 #ifdef HAVE_VTK
 #include "Writers/VtkWriter.h"
@@ -113,7 +113,12 @@ int main(int argc, char *argv[])
 #endif
 
 	// third-party preconditioners
-	args::Flag f_amgx(parser, "amgx", "solve schur compliment system with amgx", {"amgx"});
+#ifdef ENABLE_AMGX
+	args::Flag f_amgx(parser, "", "solve schur compliment system with amgx", {"amgx"});
+#endif 
+#ifdef ENABLE_MUELU
+	args::Flag f_meulu(parser, "", "solve schur compliment system with muelu", {"meulu"});
+#endif 
 
 	int num_procs;
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
@@ -284,6 +289,9 @@ int main(int argc, char *argv[])
 #ifdef ENABLE_AMGX
 		shared_ptr<AmgxWrapper> amgxsolver;
 #endif
+#ifdef ENABLE_MUELU
+		shared_ptr<MueLuWrapper> meulusolver;
+#endif
 
 		if (f_noschur || dc.num_global_domains != 1) {
 			// do iterative solve
@@ -331,8 +339,15 @@ int main(int argc, char *argv[])
 				}
 			}
 
-			if (f_amgx) {
+			if (false) {
+#ifdef ENABLE_MUELU
+			} else if (f_meulu) {
+				timer.start("MeuLu Setup");
+				meulusolver.reset(new MueLuWrapper(A, tol, "mueluOptions.xml"));
+				timer.stop("MeuLu Setup");
+#endif
 #ifdef ENABLE_AMGX
+			} else if (f_amgx) {
 				timer.start("AMGX Setup");
 				amgxsolver.reset(new AmgxWrapper(A, dc));
 				timer.stop("AMGX Setup");
@@ -356,8 +371,14 @@ int main(int argc, char *argv[])
 
 		if (f_noschur || dc.num_global_domains != 1) {
 			timer.start("Linear Solve");
-			if (f_amgx) {
+			if (false) {
+#ifdef ENABLE_MUELU
+			} else if (f_meulu) {
+				// solve
+				meulusolver->solve(gamma, b);
+#endif
 #ifdef ENABLE_AMGX
+			} else if (f_amgx) {
 				// solve
 				amgxsolver->solve(gamma, b);
 #endif

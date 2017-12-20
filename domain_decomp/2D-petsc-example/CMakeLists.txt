@@ -112,6 +112,15 @@ target_link_libraries(steady
   ${MPI_CXX_LIBRARIES} 
   ${PETSC_LIBRARIES} 
 )
+if(ENABLE_MUELU)
+    link_directories("./muelu/")
+    include_directories("./muelu/")
+    target_link_libraries(steady
+        -Lmuelu/
+        MueLuWrapper
+    )
+    SET(CMAKE_CXX_FLAGS "-DENABLE_MUELU ${CMAKE_CXX_FLAGS}")
+endif()
 target_link_libraries(heat
     SchurHelper
     MatrixHelper
