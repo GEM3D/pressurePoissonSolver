@@ -1,5 +1,5 @@
 #include "MueLuWrapper.h"
-#include "MyTypeDefs.h"
+#include "MyTypeDefsSerial.h"
 #include "PW.h"
 #include <BelosBlockGmresSolMgr.hpp>
 #include <BelosLinearProblem.hpp>

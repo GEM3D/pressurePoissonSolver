@@ -9,9 +9,13 @@
 #include <MueLu_TpetraOperator.hpp>
 #include <MueLu_TpetraOperator_def.hpp>
 #include <Teuchos_DefaultMpiComm.hpp>
+#include <Kokkos_Cuda.hpp>
 #include <map>
 #include <set>
 #include <vector>
+#ifndef NUM_GPU
+#define NUM_GPU 1
+#endif
 using namespace std;
 using Teuchos::RCP;
 using Teuchos::rcp;
@@ -32,6 +36,7 @@ MueLuCudaWrapper::MueLuCudaWrapper(Mat A, double tol, string config)
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 
+	Kokkos::Cuda::initialize(Kokkos::Cuda::SelectDevice(rank % NUM_GPU));
 	PW<Mat> localA;
 	MatMPIAIJGetLocalMat(A, MAT_INITIAL_MATRIX, &localA);
 
@@ -94,7 +99,11 @@ MueLuCudaWrapper::MueLuCudaWrapper(Mat A, double tol, string config)
 	= rcp(new Belos::BlockGmresSolMgr<scalar_type, vec_type, Tpetra::Operator<scalar_type>>(
 	vars->problem, rcp(&belosList, false)));
 }
-MueLuCudaWrapper::~MueLuCudaWrapper() { delete vars; }
+MueLuCudaWrapper::~MueLuCudaWrapper()
+{
+	delete vars;
+	Kokkos::Cuda::finalize();
+}
 void MueLuCudaWrapper::solve(Vec x, Vec b)
 {
 	double *x_ptr, *b_ptr;

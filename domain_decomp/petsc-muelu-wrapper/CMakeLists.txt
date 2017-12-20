@@ -53,7 +53,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 project(DomainDecomp)
 find_package(MPI REQUIRED)
 find_package(PETSc REQUIRED)
-set (CMAKE_CXX_FLAGS "-Wall ${Trilinos_CXX_COMPILER_FLAGS} ${CMAKE_CXX_FLAGS}")
+set (CMAKE_CXX_FLAGS "-Wall -fPIC ${Trilinos_CXX_COMPILER_FLAGS} ${CMAKE_CXX_FLAGS}")
 set (CMAKE_CXX_FLAGS_DEBUG  "-g ${CMAKE_CXX_FLAGS}")
   MESSAGE("Setting CXX compiler.")
   SET(CMAKE_CXX_COMPILER ${Trilinos_CXX_COMPILER})
@@ -95,7 +95,7 @@ link_directories(${Trilinos_TPL_LIBRARY_DIRS})
 # file that you want to build.  This line tells CMake which source
 # file(s) to use to build the executable.
 #
-add_library(MueLuWrapper STATIC MueLuWrapper.cpp )
+add_library(MueLuWrapper SHARED MueLuWrapper.cpp )
 
 #
 # EDIT HERE: Change trilinosExample to the name of the executable
@@ -104,6 +104,7 @@ add_library(MueLuWrapper STATIC MueLuWrapper.cpp )
 # (TPLs) with which Trilinos was built.
 #
 target_link_libraries(MueLuWrapper
+    LINK_PRIVATE
   ${MPI_CXX_LIBRARIES} 
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES}
