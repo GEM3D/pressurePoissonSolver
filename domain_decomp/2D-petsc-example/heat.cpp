@@ -1,11 +1,10 @@
 #include "DomainCollection.h"
-#include "Factory.h"
 #include "FivePtPatchOperator.h"
 #include "FourthInterpolator.h"
-#include "FunctionWrapper.h"
+//#include "FunctionWrapper.h"
 #include "Init.h"
 #include "MatrixHelper.h"
-#include "MyTypeDefs.h"
+#include "PW.h"
 #include "PatchSolvers/FftwPatchSolver.h"
 #include "PatchSolvers/FishpackPatchSolver.h"
 #include "QuadInterpolator.h"
@@ -15,45 +14,24 @@
 #ifdef ENABLE_AMGX
 #include "AmgxWrapper.h"
 #endif
-#ifdef ENABLE_HYPRE
-#include "HypreWrapper.h"
-#endif
 #ifdef HAVE_VTK
 #include "Writers/VtkWriter.h"
 #endif
 #include "Timer.h"
 #include "args.h"
-#include <memory>
-#include <Amesos2.hpp>
-#include <Amesos2_Version.hpp>
-#include <BelosBiCGStabSolMgr.hpp>
-#include <BelosBlockCGSolMgr.hpp>
-#include <BelosBlockGmresSolMgr.hpp>
-#include <BelosConfigDefs.hpp>
-#include <BelosGCRODRSolMgr.hpp>
-#include <BelosLSQRSolMgr.hpp>
-#include <BelosLinearProblem.hpp>
-#include <BelosTpetraAdapter.hpp>
-#include <MatrixMarket_Tpetra.hpp>
-#include <Teuchos_Comm.hpp>
-#include <Teuchos_GlobalMPISession.hpp>
-#include <Teuchos_ParameterList.hpp>
-#include <Teuchos_RCP.hpp>
-#include <Teuchos_Tuple.hpp>
-#include <Teuchos_VerboseObject.hpp>
-#include <Teuchos_oblackholestream.hpp>
-#include <Tpetra_Experimental_BlockCrsMatrix_Helpers.hpp>
-#include <Xpetra_TpetraBlockCrsMatrix.hpp>
 #include <chrono>
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <memory>
+#include <memory>
+#include <petscksp.h>
+#include <petscsys.h>
+#include <petscvec.h>
+#include <petscviewer.h>
 #include <sstream>
 #include <string>
-#include <unistd.h>
-
-using Teuchos::RCP;
-using Teuchos::rcp;
+#include <string>
 
 // =========== //
 // main driver //
@@ -63,17 +41,24 @@ using namespace std;
 
 int main(int argc, char *argv[])
 {
-	//    using Belos::FuncWrap;
-	using Teuchos::RCP;
-	using Teuchos::rcp;
-	using namespace std::chrono;
+	int     petsc_argc;
+	int *   petsc_argc_ptr = nullptr;
+	char ** petsc_argv;
+	char ***petsc_argv_ptr = nullptr;
+	string  delim          = "::";
+	for (int i = 0; i < argc; i++) {
+		if (argv[i] == delim) {
+			int tmp        = argc;
+			argc           = i;
+			petsc_argc     = tmp - i;
+			petsc_argc_ptr = &petsc_argc;
+			petsc_argv     = &argv[i];
+			petsc_argv_ptr = &petsc_argv;
+		}
+	}
 
-	Teuchos::GlobalMPISession     global(&argc, &argv, nullptr);
-	RCP<const Teuchos::Comm<int>> comm = Tpetra::DefaultPlatform::getDefaultPlatform().getComm();
-
-	int num_procs = comm->getSize();
-
-	int my_global_rank = comm->getRank();
+	// use :: to delimit petsc options at end
+	PetscInitialize(petsc_argc_ptr, petsc_argv_ptr, nullptr, nullptr);
 
 	// parse input
 	args::ArgumentParser parser("");
@@ -127,6 +112,12 @@ int main(int argc, char *argv[])
 	// third-party preconditioners
 	args::Flag f_amgx(parser, "amgx", "solve schur compliment system with amgx", {"amgx"});
 
+	int num_procs;
+	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+
+	int my_global_rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &my_global_rank);
+
 	if (argc < 5) {
 		if (my_global_rank == 0) std::cout << parser;
 		return 0;
@@ -153,13 +144,13 @@ int main(int argc, char *argv[])
 	DomainCollection dc;
 	if (f_mesh) {
 		string d = args::get(f_mesh);
-		dc       = DomainCollection(comm, d, comm->getRank());
+		dc       = DomainCollection(d);
 	} else if (f_amr) {
 		int d = args::get(f_amr);
-		dc    = DomainCollection(comm, d, d, comm->getRank(), true);
+		dc    = DomainCollection(d, d, true);
 	} else {
 		int d = args::get(f_square);
-		dc    = DomainCollection(comm, d, d, comm->getRank());
+		dc    = DomainCollection(d, d);
 	}
 	if (f_div) {
 		for (int i = 0; i < args::get(f_div); i++) {
@@ -191,7 +182,7 @@ int main(int argc, char *argv[])
 	if (f_out_every) {
 		out_every = args::get(f_out_every);
 	}
-	scalar_type tol = 1e-12;
+	double tol = 1e-12;
 	if (f_t) {
 		tol = args::get(f_t);
 	}
@@ -229,74 +220,53 @@ int main(int argc, char *argv[])
 	if (f_bdf2) {
 		lambda = -3.0 / (2.0 * alpha * dt);
 	}
-	RCP<PatchSolver> p_solver = rcp(new FftwPatchSolver(dc, lambda));
+	shared_ptr<PatchSolver> p_solver(new FftwPatchSolver(dc, lambda));
 
 	// patch operator
-	RCP<PatchOperator> p_operator = rcp(new FivePtPatchOperator());
+	shared_ptr<PatchOperator> p_operator(new FivePtPatchOperator());
 
 	// interface interpolator
-	RCP<Interpolator> p_interp = rcp(new QuadInterpolator());
+	shared_ptr<Interpolator> p_interp(new QuadInterpolator());
 
 	Tools::Timer timer;
 	timer.start("Domain Initialization");
 
-	SchurHelper  sch(dc, comm, p_solver, p_operator, p_interp);
-	MatrixHelper mh(dc, comm);
+	SchurHelper  sch(dc, p_solver, p_operator, p_interp);
+	MatrixHelper mh(dc);
 
-	IS    domain_is = dc.getDomainIS();
-	RCP<map_type>    domain_map = dc.getDomainRowMap();
-	RCP<vector_type> u_next     = rcp(new vector_type(domain_map, 1));
-	RCP<vector_type> u          = rcp(new vector_type(domain_map, 1));
-	RCP<vector_type> u_prev     = rcp(new vector_type(domain_map, 1));
-	RCP<vector_type> u_tmp;
-	RCP<vector_type> f = rcp(new vector_type(domain_map, 1));
+	PW<Vec> u_next = dc.getNewDomainVec();
+	PW<Vec> u      = dc.getNewDomainVec();
+	PW<Vec> u_prev = dc.getNewDomainVec();
+	PW<Vec> u_tmp;
+	PW<Vec> f = dc.getNewDomainVec();
 
 	double t = 0;
 	if (f_bdf2) {
-		Init::fillSolution(dc, *u_prev, efun, 0);
-		Init::fillSolution(dc, *u, efun, dt);
+		Init::fillSolution(dc, u_prev, efun, 0);
+		Init::fillSolution(dc, u, efun, dt);
 		t = dt;
 	} else {
-		Init::fillSolution(dc, *u, efun, 0);
+		Init::fillSolution(dc, u, efun, 0);
 	}
 
 	timer.stop("Domain Initialization");
 
-	// Create a map that will be used in the iterative solver
-	RCP<map_type>       matrix_map       = dc.getSchurRowMap();
-	RCP<const map_type> matrix_map_const = matrix_map;
-
 	// Create the gamma and diff vectors
-	RCP<vector_type>                   gamma   = rcp(new vector_type(matrix_map, 1));
-	RCP<vector_type>                   gamma_e = rcp(new vector_type(matrix_map, 1));
-	RCP<vector_type>                   zeros   = rcp(new vector_type(matrix_map, 1));
-	RCP<vector_type>                   diff    = rcp(new vector_type(matrix_map, 1));
-	RCP<vector_type>                   b       = rcp(new vector_type(matrix_map, 1));
-	RCP<matrix_type>                   A;
-	RCP<matrix_type>                   A_full;
-	RCP<const Tpetra::RowMatrix<>>     rm;
-	RCP<Tpetra::Operator<scalar_type>> op;
+	PW<Vec> gamma   = dc.getNewSchurVec();
+	PW<Vec> gamma_e = dc.getNewSchurVec();
+	PW<Vec> zeros   = dc.getNewSchurVec();
+	PW<Vec> diff    = dc.getNewSchurVec();
+	PW<Vec> b       = dc.getNewSchurVec();
+	PW<Mat> A;
 
-	// Create linear problem for the Belos solver
-	RCP<Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>> problem;
-	RCP<Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>>
-	problem_resid;
-	RCP<Belos::SolverManager<scalar_type, vector_type, Tpetra::Operator<scalar_type>>> solver;
-	Teuchos::ParameterList belosList;
+	// Create linear solver
+	PW<KSP> solver;
+	KSPCreate(MPI_COMM_WORLD, &solver);
+	KSPSetFromOptions(solver);
 
-	typedef Ifpack2::Preconditioner<scalar_type> Preconditioner;
-	RCP<Preconditioner>                          prec;
-
-#ifdef ENABLE_AMGX
-	Teuchos::RCP<AmgxWrapper> amgxsolver;
-#endif
-#ifdef ENABLE_HYPRE
-	Teuchos::RCP<HypreWrapper> hypresolver;
-#endif
-
-		RCP<vector_type> exact = rcp(new vector_type(domain_map, 1));
-		RCP<vector_type> error = rcp(new vector_type(domain_map, 1));
-		RCP<vector_type> resid = rcp(new vector_type(domain_map, 1));
+	PW<Vec> exact = dc.getNewDomainVec();
+	PW<Vec> error = dc.getNewDomainVec();
+	PW<Vec> resid = dc.getNewDomainVec();
 	if ((f_schur && dc.num_global_domains != 1) || !f_schur) {
 		// do iterative solve
 
@@ -308,89 +278,27 @@ int main(int argc, char *argv[])
 		timer.start("Matrix Formation");
 
 		if (f_schur) {
-			A      = sch.formCRSMatrix();
-			A_full = mh.formCRSMatrix(lambda);
-			rm     = A;
-			op     = A;
+			A = sch.formCRSMatrix();
 			if (f_wrapper) {
 				// Create a function wrapper
-				op = rcp(new FuncWrap(&b, &u_next, &f, &sch));
+				// op = rcp(new FuncWrap(&b, &u_next, &f, &sch));
 			}
 		} else {
-			A      = mh.formCRSMatrix(lambda);
-			A_full = A;
-			rm     = A;
-			op     = A;
+			A = mh.formCRSMatrix(lambda);
 		}
 
 		timer.stop("Matrix Formation");
-
-		if (save_matrix_file != "")
-			Tpetra::MatrixMarket::Writer<matrix_type>::writeSparseFile(save_matrix_file, A, "", "");
-
-		if (f_schur) {
-			problem
-			= rcp(new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(
-			op, gamma, b));
-
-			problem_resid
-			= rcp(new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(
-			op, gamma_e, b));
-			if (f_hypre&&f_wrapper) {
-					// Create the relaxation.  You could also do this using
-					// Ifpack2::Factory (the preconditioner factory) if you like.
-					RCP<precond_type> prec = rcp(new Ifpack2::Relaxation<Tpetra::RowMatrix<>>(A));
-					// Make the list of relaxation parameters.
-					Teuchos::ParameterList params;
-					// Do symmetric SOR / Gauss-Seidel.
-					params.set("relaxation: type", "Jacobi");
-					// Two sweeps (of symmetric SOR / Gauss-Seidel) per apply() call.
-					params.set("relaxation: sweeps", 1);
-					// ... Set any other parameters you want to set ...
-
-					// Set parameters.
-					prec->setParameters(params);
-					// Prepare the relaxation instance for use.
-					prec->initialize();
-					prec->compute();
-
-				problem->setLeftPrec(prec);
-
-			}
-		} else {
-			problem
-			= rcp(new Belos::LinearProblem<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(
-			op, u_next, f));
+		if (f_m) {
+			PetscViewer viewer;
+			PetscViewerBinaryOpen(PETSC_COMM_WORLD, args::get(f_m).c_str(), FILE_MODE_WRITE,
+			                      &viewer);
+			MatView(A, viewer);
+			PetscViewerDestroy(&viewer);
 		}
-		if (f_amgx) {
-#ifdef ENABLE_AMGX
-			timer.start("AMGX Setup");
-			amgxsolver = rcp(new AmgxWrapper(A, dc, nx));
-			timer.stop("AMGX Setup");
-#endif
-		} else if (f_hypre&&!f_wrapper ) {
-#ifdef ENABLE_HYPRE
-			timer.start("Hypre Setup");
-			hypresolver = rcp(new HypreWrapper(A, dc, nx, tol, true));
-			timer.stop("Hypre Setup");
-#endif
-		} else {
-			// Set the parameters
-			belosList.set("Block Size", 1);
-			belosList.set("Maximum Iterations", 5000);
-			belosList.set("Convergence Tolerance", tol);
-			belosList.set("Output Frequency", out_every==0?1:(out_every / dt));
-			// int verbosity = 0;
-			int verbosity = Belos::TimingDetails + Belos::IterationDetails;
-			belosList.set("Verbosity", verbosity);
-			belosList.set("Rel RHS Err", 0.0);
-			belosList.set("Rel Mat Err", 0.0);
 
-			// Create solver and solve
-			solver = rcp(
-			new Belos::BlockGmresSolMgr<scalar_type, vector_type, Tpetra::Operator<scalar_type>>(
-			problem, rcp(&belosList, false)));
-		}
+		KSPSetTolerances(solver, tol, PETSC_DEFAULT, PETSC_DEFAULT, 5000);
+		KSPSetOperators(solver, A, A);
+		KSPSetUp(solver);
 		///////////////////
 		// setup end
 		///////////////////
@@ -403,8 +311,6 @@ int main(int argc, char *argv[])
 	// initialize vectors
 	timer.start("Complete Solve");
 
-	vector_type ones(domain_map, 1);
-	ones.putScalar(1);
 	int i = 0;
 
 	for (; t < tend; t += dt) {
@@ -414,63 +320,50 @@ int main(int argc, char *argv[])
 				std::ostringstream ss;
 				ss << args::get(f_outvtk) << setfill('0') << setw(5) << i;
 				VtkWriter writer(dc, ss.str());
-				writer.add(*u, "Solution");
-				Init::fillSolution(dc, *exact, efun, t - dt);
-				writer.add(*exact, "Exact");
-				error->update(-1.0, *exact, 1.0, *u, 0.0);
-				writer.add(*error, "Error");
-				A_full->apply(*u, *resid);
-				resid->update(-1.0, *f, 1.0);
-				writer.add(*resid, "Residual");
+				writer.add(u, "Solution");
+				Init::fillSolution(dc, exact, efun, t - dt);
+				writer.add(exact, "Exact");
+				VecAXPBYPCZ(error, -1.0, 1.0, 0.0, exact, u);
+				writer.add(error, "Error");
+				if (f_schur) {
+					sch.applyWithInterface(u, gamma, resid);
+				} else {
+					MatMult(A, u, resid);
+				}
+				VecAYPX(resid, -1.0, f);
+				writer.add(resid, "Residual");
 				writer.write();
 				i++;
 			}
 		}
 #endif
 		if (f_bdf2) {
-			f->update(-1.0 / 3.0, *u_prev, 4.0 / 3.0, *u, 0.0);
+			VecAXPBYPCZ(f, -1.0 / 3.0, 4.0 / 3.0, 0.0, u_prev, u);
 		} else {
-			f->update(1.0, *u, 0.0);
+			VecScale(f, 0);
+			VecAXPY(f, 1.0, u);
 		}
-		f->scale(lambda);
+		VecScale(f, lambda);
 
 		if ((f_schur && dc.num_global_domains != 1) || !f_schur) {
 			timer.start("Linear Solve");
 			// Get the b vector
 			if (f_schur) {
-				sch.solveWithInterface(*f, *u_next, *zeros, *b);
-				b->scale(-1.0);
-				if (save_rhs_file != "") {
-					Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_rhs_file, b, "",
-					                                                          "");
+				sch.solveWithInterface(f, u_next, zeros, b);
+				VecScale(b, -1.0);
+				if (f_r) {
+					PetscViewer viewer;
+					PetscViewerBinaryOpen(PETSC_COMM_WORLD, args::get(f_r).c_str(), FILE_MODE_WRITE,
+					                      &viewer);
+					VecView(b, viewer);
+					PetscViewerDestroy(&viewer);
 				}
 			}
 			// solve
-			if (false) {
-#ifdef ENABLE_AMGX
-			} else if (f_amgx) {
-				if (f_schur) {
-					amgxsolver->solve(gamma, b);
-				} else {
-					amgxsolver->solve(u_next, f);
-				}
-#endif
-#ifdef ENABLE_HYPRE
-			} else if (f_hypre&&!f_wrapper) {
-				if (f_schur) {
-					hypresolver->solve(gamma, b);
-				} else {
-					hypresolver->solve(u_next, f);
-				}
-#endif
+			if (f_schur) {
+				KSPSolve(solver, b, gamma);
 			} else {
-                if(f_schur){
-				problem->setProblem(gamma,b);
-                }else{
-				problem->setProblem(u_next,f);
-                }
-
-				solver->solve();
+				KSPSolve(solver, f, u_next);
 			}
 			timer.stop("Linear Solve");
 		}
@@ -480,45 +373,40 @@ int main(int argc, char *argv[])
 			timer.start("Patch Solve");
 
 			// gamma->scale(lambda);
-			sch.solveWithInterface(*f, *u_next, *gamma, *diff);
+			sch.solveWithInterface(f, u_next, gamma, diff);
 			timer.stop("Patch Solve");
-			if (f_iter) {
-				A_full->apply(*u, *resid);
-				resid->update(-1.0, *f, 1.0);
-				sch.solveWithInterface(*resid, *error, *gamma_e, *b);
-				b->scale(-1);
-
-				problem_resid->setProblem();
-				solver = rcp(new Belos::BlockGmresSolMgr<scalar_type, vector_type,
-				                                         Tpetra::Operator<scalar_type>>(
-				problem_resid, rcp(&belosList, false)));
-				solver->solve();
-				sch.solveWithInterface(*resid, *error, *gamma_e, *b);
-				u_next->update(1, *error, 1);
-			}
 		}
 		u_tmp  = u_prev;
 		u_prev = u;
 		u      = u_next;
 		u_next = u_tmp;
 		// use previous solution as initial guess
-		u_next->update(1.0, *u, 0.0);
+		VecAXPY(u_next, 1.0, u);
 	}
 	///////////////////
 	// solve end
 	///////////////////
 	timer.stop("Complete Solve");
 	// error
-	Init::fillSolution(dc, *exact, efun, t);
-	error->update(-1.0, *exact, 1.0, *u, 0.0);
-	double error_norm     = error->getVector(0)->norm2();
-	double error_norm_inf = error->getVector(0)->normInf();
-	double exact_norm     = exact->getVector(0)->norm2();
-	A_full->apply(*u, *resid);
-	resid->update(-1.0, *f, 1.0);
-	double resid_norm     = resid->getVector(0)->norm2();
-	double resid_norm_inf = resid->getVector(0)->normInf();
-	double f_norm         = f->getVector(0)->norm2();
+	Init::fillSolution(dc, exact, efun, t);
+	VecAXPBYPCZ(error, -1.0, 1.0, 0.0, exact, u);
+
+	double error_norm, error_norm_inf, exact_norm;
+	VecNorm(error, NORM_2, &error_norm);
+	VecNorm(error, NORM_INFINITY, &error_norm_inf);
+	VecNorm(exact, NORM_2, &exact_norm);
+
+	if (f_schur) {
+		sch.applyWithInterface(u, gamma, resid);
+	} else {
+		MatMult(A, u, resid);
+	}
+	VecAYPX(resid, -1.0, f);
+
+	double resid_norm, resid_norm_inf, f_norm;
+	VecNorm(resid, NORM_2, &resid_norm);
+	VecNorm(resid, NORM_INFINITY, &resid_norm_inf);
+	VecNorm(f, NORM_2, &f_norm);
 
 	if (my_global_rank == 0) {
 		std::cout << std::scientific;
@@ -529,22 +417,24 @@ int main(int argc, char *argv[])
 		std::cout << "Residual (inf norm): " << resid_norm_inf << endl;
 		cout.unsetf(std::ios_base::floatfield);
 	}
-	if (save_gamma_file != "") {
-		Tpetra::MatrixMarket::Writer<matrix_type>::writeDenseFile(save_gamma_file, gamma, "", "");
+	if (f_g) {
+		PetscViewer viewer;
+		PetscViewerASCIIOpen(PETSC_COMM_WORLD, args::get(f_g).c_str(), &viewer);
+		VecView(gamma, viewer);
 	}
 	if (f_outclaw) {
 		ClawWriter writer(dc);
-		writer.write(*u, *u);
+		writer.write(u, u);
 	}
 #ifdef HAVE_VTK
 	if (f_outvtk) {
 		std::ostringstream ss;
 		ss << args::get(f_outvtk) << setfill('0') << setw(5) << i;
 		VtkWriter writer(dc, ss.str());
-		writer.add(*u, "Solution");
-		writer.add(*exact, "Exact");
-		writer.add(*error, "Error");
-		writer.add(*resid, "Residual");
+		writer.add(u, "Solution");
+		writer.add(exact, "Exact");
+		writer.add(error, "Error");
+		writer.add(resid, "Residual");
 		writer.write();
 	}
 #endif

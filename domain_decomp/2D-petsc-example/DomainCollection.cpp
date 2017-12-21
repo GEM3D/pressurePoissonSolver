@@ -918,7 +918,7 @@ void DomainCollection::zoltanBalanceDomains()
 
 	if (rc != ZOLTAN_OK) {
 		cerr << "zoltan error\n";
-	Zoltan_Destroy(&zz);
+		Zoltan_Destroy(&zz);
 		exit(0);
 	}
 	Zoltan_Destroy(&zz);
