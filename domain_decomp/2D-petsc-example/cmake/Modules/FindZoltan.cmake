@@ -1,17 +1,17 @@
 # - Try to find Zoltan
 #
 
-find_path (Zoltan_DIR include/zoltan_cpp.h HINTS ENV Zoltan_DIR)
+find_path (ZOLTAN_DIR include/zoltan.h HINTS ENV ZOLTAN_DIR)
 
-IF(EXISTS ${Zoltan_DIR}/include/zoltan_cpp.h)
+IF(EXISTS ${ZOLTAN_DIR}/include/zoltan.h)
   SET(Zoltan_FOUND YES)
-  SET(Zoltan_INCLUDES ${Zoltan_DIR})
-  find_path (Zoltan_INCLUDE_DIR zoltan_cpp.h HINTS "${Zoltan_DIR}/include" PATH_SUFFIXES include NO_DEFAULT_PATH)
+  SET(Zoltan_INCLUDES ${ZOLTAN_DIR})
+  find_path (Zoltan_INCLUDE_DIR zoltan.h HINTS "${ZOLTAN_DIR}/include" PATH_SUFFIXES include NO_DEFAULT_PATH)
   list(APPEND Zoltan_INCLUDES ${Zoltan_INCLUDE_DIR})
-  find_library(Zoltan_LIBRARIES zoltan PATHS "${Zoltan_DIR}/lib" ${Zoltan_DIR})
-ELSE(EXISTS ${Zoltan_DIR}/include/zoltan_cpp.h)
+  find_library(Zoltan_LIBRARIES zoltan PATHS "${ZOLTAN_DIR}/lib" ${ZOLTAN_DIR})
+ELSE(EXISTS ${ZOLTAN_DIR}/include/zoltan.h)
   SET(Zoltan_FOUND NO)
-ENDIF(EXISTS ${Zoltan_DIR}/include/zoltan_cpp.h)
+ENDIF(EXISTS ${ZOLTAN_DIR}/include/zoltan.h)
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(Zoltan DEFAULT_MSG Zoltan_LIBRARIES Zoltan_INCLUDES)

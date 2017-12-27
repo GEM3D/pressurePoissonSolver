@@ -4,6 +4,7 @@
 #include "amgx_c.h"
 #include <petscmat.h>
 #include <iostream>
+#include <string>
 class AmgxWrapper
 {
 	private:
@@ -14,20 +15,19 @@ class AmgxWrapper
 		if (rank == 0) std::cout << msg;
 	}
 	// library handles
-	AMGX_Mode             mode = AMGX_mode_dDDI;
 	MPI_Comm              AMGX_MPI_COMM;
 	AMGX_config_handle    cfg;
 	AMGX_resources_handle rsrc;
 	AMGX_matrix_handle    gA;
-	AMGX_vector_handle    gb, gx;
+	AMGX_vector_handle    gb;
+	AMGX_vector_handle    gx;
 	AMGX_solver_handle    solver;
-	// status handling
-	AMGX_SOLVE_STATUS status;
 	int               num_rows;
-	int               num_cols;
+        int nrings = 0;
 
 	public:
-	AmgxWrapper(Mat A, const DomainCollection &dc);
+	AmgxWrapper(std::string filename);
+	void setMatrix(Mat A);
 	~AmgxWrapper();
 	void solve(Vec x, Vec b);
 };

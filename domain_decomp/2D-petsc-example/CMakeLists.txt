@@ -25,6 +25,9 @@ find_package(PETSc REQUIRED)
 project(DomainDecomp)
 find_package(MPI REQUIRED)
 set (CMAKE_CXX_FLAGS "-Wall --std=c++11 -O3 ${CMAKE_CXX_FLAGS}")
+if(NUM_GPU)
+    set (CMAKE_CXX_FLAGS "-DNUM_GPU=${NUM_GPU} ${CMAKE_CXX_FLAGS}")
+endif()
 set (CMAKE_CXX_FLAGS_DEBUG  "-Wall --std=c++11 -g -O0 ")
   MESSAGE("Setting CXX compiler.")
   SET(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
@@ -47,13 +50,13 @@ if(CCACHE_FOUND)
    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
 endif(CCACHE_FOUND)
-find_package(VTK NO_MODULE)
 IF(VTK_FOUND)
     SET(CMAKE_CXX_FLAGS "-DHAVE_VTK ${CMAKE_CXX_FLAGS}")
     MESSAGE("VTK found, enabling vtk output")
 ELSE()
     MESSAGE("VTK not found, disabling vtk output")
 ENDIF()
+
 
 # 
 # EDIT HERE:
@@ -113,10 +116,10 @@ target_link_libraries(steady
   ${PETSC_LIBRARIES} 
 )
 if(ENABLE_MUELU)
+    find_library(MUELU_LIB MueLuWrapper)
     include_directories("./lib/")
     target_link_libraries(steady
-        -Llib
-        MueLuWrapper
+        ${MUELU_LIB}
     )
     SET(CMAKE_CXX_FLAGS "-DENABLE_MUELU ${CMAKE_CXX_FLAGS}")
 endif()
@@ -150,13 +153,12 @@ add_library(AmgxWrapper AmgxWrapper.cpp)
 target_link_libraries(steady AmgxWrapper)
 target_link_libraries(heat AmgxWrapper)
 target_link_libraries(AmgxWrapper
-  ${Trilinos_TPL_LIBRARIES}
-  ${Trilinos_LIBRARIES} 
    ${AMGX_LIBRARIES}
 )
 endif()
 target_link_libraries(DomainCollection
     ${Zoltan_LIBRARIES}
+    "-L/cm/shared/apps/parmetis/4.0.3/lib/ -lparmetis -lmetis  -lm" 
 )
 
 add_subdirectory(PatchSolvers)

@@ -4,6 +4,7 @@
     <Parameter name="verbosity" type="string" value="low"/>
     <Parameter name="max levels" type="int" value="1000"/>
     <Parameter name="coarse: max size" type="int" value="1000"/>
+    <Parameter name="coarse: type" type="string" value="RELAXATION"/>
     <Parameter name="multigrid algorithm" type="string" value="sa"/>
     <Parameter name="sa: use filtered matrix" type="bool" value="true"/>
     <!-- Damped Jacobi smoothing -->
