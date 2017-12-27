@@ -28,6 +28,11 @@ struct Vars {
 	RCP<Belos::LinearProblem<scalar_type, vec_type, Tpetra::Operator<scalar_type>>> problem;
 	RCP<Belos::SolverManager<scalar_type, vec_type, Tpetra::Operator<scalar_type>>> solver;
 };
+void MueLuCudaWrapper::initialize(){
+	int rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	Kokkos::Cuda::initialize(Kokkos::Cuda::SelectDevice(rank % NUM_GPU));
+}
 MueLuCudaWrapper::MueLuCudaWrapper(Mat A, double tol, string config)
 {
 	vars       = new Vars;
@@ -36,7 +41,6 @@ MueLuCudaWrapper::MueLuCudaWrapper(Mat A, double tol, string config)
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-	Kokkos::Cuda::initialize(Kokkos::Cuda::SelectDevice(rank % NUM_GPU));
 	PW<Mat> localA;
 	MatMPIAIJGetLocalMat(A, MAT_INITIAL_MATRIX, &localA);
 
@@ -102,6 +106,8 @@ MueLuCudaWrapper::MueLuCudaWrapper(Mat A, double tol, string config)
 MueLuCudaWrapper::~MueLuCudaWrapper()
 {
 	delete vars;
+}
+void MueLuCudaWrapper::finalize(){
 	Kokkos::Cuda::finalize();
 }
 void MueLuCudaWrapper::solve(Vec x, Vec b)

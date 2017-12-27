@@ -288,10 +288,16 @@ int main(int argc, char *argv[]) {
     shared_ptr<Interpolator> p_interp(new QuadInterpolator());
 
 #ifdef ENABLE_AMGX
-        AmgxWrapper* amgxsolver;
+        AmgxWrapper* amgxsolver=nullptr;
     if (f_amgx) {
         amgxsolver= new AmgxWrapper(args::get(f_amgx));
     }
+#endif
+
+#ifdef ENABLE_MUELU_CUDA
+           if (f_meulucuda) {
+                     MueLuCudaWrapper::initialize();
+           }
 #endif
     Tools::Timer timer;
     for (int loop = 0; loop < loop_count; loop++) {
@@ -409,6 +415,9 @@ int main(int argc, char *argv[]) {
                 timer.start("Petsc Setup");
                 KSPSetOperators(solver, A, A);
                 KSPSetUp(solver);
+                PC pc;
+                KSPGetPC(solver,&pc);
+                PCSetUp(pc);
                 timer.stop("Petsc Setup");
             }
             ///////////////////
@@ -574,6 +583,11 @@ int main(int argc, char *argv[]) {
         if (amgxsolver != nullptr) {
             delete amgxsolver;
         }
+#endif
+#ifdef ENABLE_MUELU_CUDA
+           if (f_meulucuda) {
+                     MueLuCudaWrapper::finalize();
+           }
 #endif
     if (my_global_rank == 0) {
         cout << timer;
