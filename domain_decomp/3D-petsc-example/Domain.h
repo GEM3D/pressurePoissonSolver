@@ -44,6 +44,7 @@ struct Domain {
 	 * @brief The lower left y coordinate of domain
 	 */
 	double y_start = 0;
+	double z_start = 0;
 	/**
 	 * @brief length of domain in x direction
 	 */
@@ -52,6 +53,7 @@ struct Domain {
 	 * @brief length of odmain in y direction
 	 */
 	double y_length = 1;
+	double z_length = 1;
 
 	friend bool operator<(const Domain &l, const Domain &r) { return l.id < r.id; }
 	int &gid(Side s) { return g_id[static_cast<int>(s)]; }
