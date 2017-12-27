@@ -71,16 +71,20 @@ include_directories(SYSTEM ${Trilinos_INCLUDE_DIRS})
 include_directories(${MPI_CXX_INCLUDE_PATH})
 include_directories(SYSTEM ${VTK_INCLUDE_DIRS})
 if(CUDA_FOUND)
-include_directories(${CUDA_INCLUDE_DIRS})
+    include_directories(${CUDA_INCLUDE_DIRS})
 endif()
-include_directories(${AMGX_INCLUDE_DIRS})
+if(AMGX_FOUND)
+    include_directories(${AMGX_INCLUDE_DIRS})
+endif()
 include_directories(${PETSC_INCLUDES})
-    include_directories(${Zoltan_INCLUDES})
+include_directories(${Zoltan_INCLUDES})
 
 # Add to the library path Trilinos' library path, and the library
 # paths of the third-party libraries (TPLs) with which Trilinos was
 # built.  
+if(AMGX_FOUND)
 link_directories("${AMGX_DIR}/lib")
+endif()
 link_directories("${Zoltan_DIR}/lib")
 
 # 
@@ -89,7 +93,6 @@ link_directories("${Zoltan_DIR}/lib")
 # file(s) to use to build the executable.
 #
 add_executable(steady steady.cpp)
-add_executable(heat heat.cpp)
 add_library(SchurHelper SchurHelper.cpp)
 add_library(MatrixHelper MatrixHelper.cpp)
 add_library(DomainCollection DomainCollection.cpp)
@@ -130,26 +133,12 @@ if(ENABLE_MUELU_CUDA)
     SET(CMAKE_CXX_FLAGS "-DENABLE_MUELU_CUDA ${CMAKE_CXX_FLAGS}")
 endif()
 
-target_link_libraries(heat
-    SchurHelper
-    MatrixHelper
-    DomainCollection
-    Init
-    FftwPatchSolver
-    Interpolators
-    MMWriter
-    ClawWriter
-  ${MPI_CXX_LIBRARIES} 
-  ${PETSC_LIBRARIES} 
-)
 if(VTK_FOUND)
     target_link_libraries(steady VtkWriter)
-    target_link_libraries(heat VtkWriter)
 endif(VTK_FOUND)
 if(AMGX_FOUND)
 add_library(AmgxWrapper AmgxWrapper.cpp)
 target_link_libraries(steady AmgxWrapper)
-target_link_libraries(heat AmgxWrapper)
 target_link_libraries(AmgxWrapper
    ${AMGX_LIBRARIES}
 )
