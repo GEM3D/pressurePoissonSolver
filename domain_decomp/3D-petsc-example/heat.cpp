@@ -6,7 +6,6 @@
 #include "MatrixHelper.h"
 #include "PW.h"
 #include "PatchSolvers/FftwPatchSolver.h"
-#include "PatchSolvers/FishpackPatchSolver.h"
 #include "QuadInterpolator.h"
 #include "SchurHelper.h"
 #include "Writers/ClawWriter.h"
@@ -104,7 +103,6 @@ int main(int argc, char *argv[])
 	                            {'g'});
 
 	// patch solvers
-	args::Flag f_fish(parser, "fishpack", "use fishpack as the patch solver", {"fishpack"});
 #ifdef __NVCC__
 	args::Flag f_cufft(parser, "cufft", "use CuFFT as the patch solver", {"cufft"});
 #endif

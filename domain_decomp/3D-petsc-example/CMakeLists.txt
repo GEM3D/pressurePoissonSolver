@@ -108,7 +108,6 @@ target_link_libraries(steady
     Init
     MatrixHelper
     FftwPatchSolver
-    FishpackPatchSolver
     Interpolators
     MMWriter
     ClawWriter
@@ -137,7 +136,6 @@ target_link_libraries(heat
     DomainCollection
     Init
     FftwPatchSolver
-    FishpackPatchSolver
     Interpolators
     MMWriter
     ClawWriter
