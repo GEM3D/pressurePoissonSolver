@@ -16,16 +16,16 @@ SchurHelper::SchurHelper(DomainCollection dc, shared_ptr<PatchSolver> solver,
 	local_interp       = dc.getNewSchurDistVec();
 	gamma              = dc.getNewSchurVec();
 	PW<IS> dist_is;
-	ISCreateBlock(MPI_COMM_WORLD, dc.n, dc.iface_dist_map_vec.size(), &dc.iface_dist_map_vec[0],
-	              PETSC_COPY_VALUES, &dist_is);
-	VecScatterCreate(gamma, dist_is, local_gamma, nullptr, &scatter);
+	//ISCreateBlock(MPI_COMM_WORLD, dc.n, dc.iface_dist_map_vec.size(), &dc.iface_dist_map_vec[0],
+	 //             PETSC_COPY_VALUES, &dist_is);
+	//VecScatterCreate(gamma, dist_is, local_gamma, nullptr, &scatter);
 }
 
 void SchurHelper::solveWithInterface(const Vec f, Vec u, const Vec gamma, Vec diff)
 {
 	// initilize our local variables
-	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
-	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
+	//VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
+	//VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 
 	// solve over domains on this proc
 	for (auto &p : dc.domains) {
@@ -35,38 +35,24 @@ void SchurHelper::solveWithInterface(const Vec f, Vec u, const Vec gamma, Vec di
 	}
 
 	// export diff vector
-	VecScale(diff, 0);
-	VecScatterBegin(scatter, local_interp, diff, ADD_VALUES, SCATTER_REVERSE);
-	VecScatterEnd(scatter, local_interp, diff, ADD_VALUES, SCATTER_REVERSE);
-	VecAXPBY(diff, 1.0, -1.0, gamma);
+	//VecScale(diff, 0);
+	//VecScatterBegin(scatter, local_interp, diff, ADD_VALUES, SCATTER_REVERSE);
+	//VecScatterEnd(scatter, local_interp, diff, ADD_VALUES, SCATTER_REVERSE);
+	//VecAXPBY(diff, 1.0, -1.0, gamma);
 }
 void SchurHelper::applyWithInterface(const Vec u, const Vec gamma, Vec f)
 {
-	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
-	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
+	//VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
+	//VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 	for (auto &p : dc.domains) {
 		Domain &d = p.second;
 		op->apply(d, u, local_gamma, f);
 	}
 }
 
-struct BlockKey {
-	InterpCase type;
-	Side       s;
-
-	BlockKey() {}
-	BlockKey(const MatrixBlock &b)
-	{
-		s    = b.s;
-		type = b.type;
-	}
-	friend bool operator<(const BlockKey &l, const BlockKey &r)
-	{
-		return std::tie(l.s, l.type) < std::tie(r.s, r.type);
-	}
-};
 void SchurHelper::assembleMatrix(inserter insertBlock)
 {
+    /*
 	int              n = dc.n;
 	set<MatrixBlock> blocks;
 	for (auto p : dc.ifaces) {
@@ -172,22 +158,13 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 	VecDestroy(&e);
 	VecDestroy(&gamma);
 	VecDestroy(&interp);
+    */
 }
 PW_explicit<Mat> SchurHelper::formCRSMatrix()
 {
 	int         n = dc.n;
-	vector<int> cols_array;
-	for (int i : dc.iface_map_vec) {
-		for (int j = 0; j < n; j++) {
-			cols_array.push_back(i * n + j);
-		}
-	}
-	for (int i : dc.iface_off_proc_map_vec) {
-		for (int j = 0; j < n; j++) {
-			cols_array.push_back(i * n + j);
-		}
-	}
 	PW<Mat> A;
+    /*
 	MatCreate(MPI_COMM_WORLD, &A);
 	int local_size  = dc.ifaces.size() * n;
 	int global_size = dc.num_global_interfaces * n;
@@ -226,5 +203,6 @@ PW_explicit<Mat> SchurHelper::formCRSMatrix()
 	assembleMatrix(insertBlock);
 	MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
 	MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
+    */
 	return A;
 }

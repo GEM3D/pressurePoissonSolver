@@ -176,13 +176,13 @@ int main(int argc, char *argv[])
 	DomainCollection dc;
 	if (f_mesh) {
 		string d = args::get(f_mesh);
-		dc       = DomainCollection(d);
+	//	dc       = DomainCollection(d);
 	} else if (f_amr) {
 		int d = args::get(f_amr);
-		dc    = DomainCollection(d, d, true);
+	//	dc    = DomainCollection(d, d, true);
 	} else {
 		int d = args::get(f_square);
-		dc    = DomainCollection(d, d);
+		dc    = DomainCollection(d, d,d);
 	}
 	if (f_div) {
 		for (int i = 0; i < args::get(f_div); i++) {
@@ -240,9 +240,9 @@ int main(int argc, char *argv[])
 		nfunz = [](double x, double y, double z) { return 0; };
 	} else {
 		ffun = [](double x, double y, double z) {
-			return -5 * M_PI * M_PI * sin(M_PI * y) * cos(2 * M_PI * x);
+			return -9 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y)*sin(2*M_PI*z);
 		};
-		gfun  = [](double x, double y, double z) { return sin(M_PI * y) * cos(2 * M_PI * x); };
+		gfun  = [](double x, double y, double z) { return sin(M_PI * x) * cos(2 * M_PI * y)*sin(2*M_PI*z); };
 		nfunx = [](double x, double y, double z) {
 			return -2 * M_PI * sin(M_PI * y) * sin(2 * M_PI * x);
 		};

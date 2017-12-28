@@ -145,8 +145,8 @@ void Init::initDirichlet(DomainCollection &dc, int n, Vec f, Vec exact,
 	for (auto &p : dc.domains) {
 		Domain &d = p.second;
 
-		double *f_vals     = f_ptr + d.id_local * n * n;
-		double *exact_vals = exact_ptr + d.id_local * n * n;
+		double *f_vals     = f_ptr + d.id_local * n * n*n;
+		double *exact_vals = exact_ptr + d.id_local * n * n*n;
 		// Generate RHS vector
 		double h_x = d.x_length / n;
 		double h_y = d.y_length / n;
@@ -171,7 +171,7 @@ void Init::initDirichlet(DomainCollection &dc, int n, Vec f, Vec exact,
 				for (int yi = 0; yi < n; yi++) {
 					double x, y, z;
 					getXYZ(d, -1, yi, zi, x, y, z);
-					f_vals[index(d, 0, yi, zi)] -= efun(x, y, z) / h_x;
+					f_vals[index(d, 0, yi, zi)] -= 2*efun(x, y, z) / h_x;
 				}
 			}
 		}
@@ -181,7 +181,7 @@ void Init::initDirichlet(DomainCollection &dc, int n, Vec f, Vec exact,
 				for (int yi = 0; yi < n; yi++) {
 					double x, y, z;
 					getXYZ(d, n, yi, zi, x, y, z);
-					f_vals[index(d, n - 1, yi, zi)] -= efun(x, y, z) / h_x;
+					f_vals[index(d, n - 1, yi, zi)] -= 2*efun(x, y, z) / h_x;
 				}
 			}
 		}
@@ -191,7 +191,7 @@ void Init::initDirichlet(DomainCollection &dc, int n, Vec f, Vec exact,
 				for (int xi = 0; xi < n; xi++) {
 					double x, y, z;
 					getXYZ(d, xi, -1, zi, x, y, z);
-					f_vals[index(d, xi, 0, zi)] -= efun(x, y, z) / h_y;
+					f_vals[index(d, xi, 0, zi)] -= 2*efun(x, y, z) / h_y;
 				}
 			}
 		}
@@ -201,7 +201,7 @@ void Init::initDirichlet(DomainCollection &dc, int n, Vec f, Vec exact,
 				for (int xi = 0; xi < n; xi++) {
 					double x, y, z;
 					getXYZ(d, xi, n, zi, x, y, z);
-					f_vals[index(d, xi, n - 1, zi)] -= efun(x, y, z) / h_y;
+					f_vals[index(d, xi, n - 1, zi)] -= 2*efun(x, y, z) / h_y;
 				}
 			}
 		}
@@ -211,7 +211,7 @@ void Init::initDirichlet(DomainCollection &dc, int n, Vec f, Vec exact,
 				for (int xi = 0; xi < n; xi++) {
 					double x, y, z;
 					getXYZ(d, xi, yi, -1, x, y, z);
-					f_vals[index(d, xi, yi, 0)] -= efun(x, y, z) / h_z;
+					f_vals[index(d, xi, yi, 0)] -= 2*efun(x, y, z) / h_z;
 				}
 			}
 		}
@@ -221,7 +221,7 @@ void Init::initDirichlet(DomainCollection &dc, int n, Vec f, Vec exact,
 				for (int xi = 0; xi < n; xi++) {
 					double x, y, z;
 					getXYZ(d, xi, yi, n, x, y, z);
-					f_vals[index(d, xi, yi, n - 1)] -= efun(x, y, z) / h_z;
+					f_vals[index(d, xi, yi, n - 1)] -= 2*efun(x, y, z) / h_z;
 				}
 			}
 		}

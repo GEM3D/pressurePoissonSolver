@@ -41,19 +41,20 @@ void VtkWriter::add(Vec u, string name)
 		int     n     = d.n;
 		double  h_x   = d.x_length / n;
 		double  h_y   = d.y_length / n;
-		int     start = d.id_local * n * n;
+		double  h_z   = d.z_length / n;
+		int     start = d.id_local * n * n*n;
 
 		// create image object
 		vtkSmartPointer<vtkImageData> image = images[d.id];
 		if (image == nullptr) {
 			image        = vtkSmartPointer<vtkImageData>::New();
 			images[d.id] = image;
-			image->SetOrigin(d.x_start, d.y_start, 0);
-			image->SetSpacing(h_x, h_y, 0);
+			image->SetOrigin(d.x_start, d.y_start, d.z_start);
+			image->SetSpacing(h_x, h_y, h_z);
 			image->SetExtent(d.x_start, d.x_start + d.x_length, d.y_start, d.y_start + d.y_length,
-			                 0, 0);
+			                 d.z_start, d.z_start+d.z_length);
 			image->PrepareForNewData();
-			image->SetDimensions(n + 1, n + 1, 1);
+			image->SetDimensions(n + 1, n + 1, n+1);
 			// add image to dataset
 			data->SetPiece(d.id_global, image);
 		}
@@ -61,9 +62,9 @@ void VtkWriter::add(Vec u, string name)
 		// create solution vector
 		vtkSmartPointer<vtkDoubleArray> solution = vtkSmartPointer<vtkDoubleArray>::New();
 		solution->SetNumberOfComponents(1);
-		solution->SetNumberOfValues(n * n);
+		solution->SetNumberOfValues(n * n*n);
 		solution->SetName(name.c_str());
-		for (int i = 0; i < n * n; i++) {
+		for (int i = 0; i < n * n*n; i++) {
 			solution->SetValue(i, u_view[start + i]);
 		}
 		image->GetCellData()->AddArray(solution);

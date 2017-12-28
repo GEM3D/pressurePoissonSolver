@@ -1,6 +1,7 @@
 #ifndef ZOLTANHELPERS_H
 #define ZOLTANHELPERS_H
 #include <zoltan.h>
+/*
 struct IfaceZoltanHelper {
 	// query functions that respond to requests from Zoltan
 	static int get_number_of_objects(void *data, int *ierr)
@@ -91,7 +92,7 @@ struct IfaceZoltanHelper {
 		}
 	}
 };
-
+*/
 struct DomainZoltanHelper {
 	// query functions that respond to requests from Zoltan
 	static int get_number_of_objects(void *data, int *ierr)
@@ -125,26 +126,9 @@ struct DomainZoltanHelper {
 	                         ZOLTAN_ID_PTR global_ids, ZOLTAN_ID_PTR local_ids, int *sizes,
 	                         int *ierr)
 	{
-		DomainCollection *dc = (DomainCollection *) data;
 		*ierr                = ZOLTAN_OK;
 		for (int i = 0; i < num_ids; i++) {
-			auto ds         = dc->domains[global_ids[i]];
-			int  num_ifaces = 0;
-			if (ds.hasCoarseNbr(Side::north)) {
-				num_ifaces += 2;
-			} else if (ds.hasFineNbr(Side::north)) {
-				num_ifaces += 3;
-			} else if (ds.hasNbr(Side::north)) {
-				num_ifaces += 1;
-			}
-			if (ds.hasCoarseNbr(Side::east)) {
-				num_ifaces += 2;
-			} else if (ds.hasFineNbr(Side::east)) {
-				num_ifaces += 3;
-			} else if (ds.hasNbr(Side::east)) {
-				num_ifaces += 1;
-			}
-			sizes[i] = sizeof(int) + sizeof(Domain) + num_ifaces * sizeof(Iface);
+			sizes[i] = sizeof(int) + sizeof(Domain);
 		}
 	}
 	static void pack_objects(void *data, int num_gid_entries, int num_lid_entries, int num_ids,

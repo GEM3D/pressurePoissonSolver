@@ -1,4 +1,5 @@
 #include "QuadInterpolator.h"
+/*
 class Slice
 {
 	private:
@@ -55,8 +56,10 @@ Slice getInnerSlice(Domain &d, int n, const double *u_view, Side s)
 	}
 	return retval;
 }
+*/
 void QuadInterpolator::interpolate(Domain &d, const Vec u, Vec interp)
 {
+    /*
 	Side s = Side::north;
 	do {
 		if (d.hasFineNbr(s)) {
@@ -77,9 +80,11 @@ void QuadInterpolator::interpolate(Domain &d, const Vec u, Vec interp)
 		}
 		s++;
 	} while (s != Side::north);
+    */
 }
 void QuadInterpolator::interpolate(Domain &d, Side s, InterpCase icase, const Vec u, Vec interp)
 {
+    /*
 	int     n = d.n;
 	double *interp_view;
 	VecGetArray(interp, &interp_view);
@@ -191,4 +196,5 @@ void QuadInterpolator::interpolate(Domain &d, Side s, InterpCase icase, const Ve
 
 	VecRestoreArray(interp, &interp_view);
 	VecRestoreArray(u, &u_view);
+    */
 }
