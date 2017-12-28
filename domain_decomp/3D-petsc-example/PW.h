@@ -11,7 +11,9 @@ template <typename X> class PW
 		if (ref_count != nullptr) {
 			--(*ref_count);
 			if (*ref_count == 0) {
-				PetscObjectDestroy((PetscObject *) &obj);
+				if (obj != nullptr) {
+					PetscObjectDestroy((PetscObject *) &obj);
+				}
 				delete ref_count;
 			}
 		}

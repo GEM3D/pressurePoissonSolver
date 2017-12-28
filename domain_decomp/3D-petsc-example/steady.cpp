@@ -1,7 +1,7 @@
 #include "DomainCollection.h"
 #include "SchurHelper.h"
 //#include "FunctionWrapper.h"
-#include "FivePtPatchOperator.h"
+#include "SevenPtPatchOperator.h"
 #include "Init.h"
 #include "MatrixHelper.h"
 #include "PatchSolvers/FftwPatchSolver.h"
@@ -256,7 +256,7 @@ int main(int argc, char *argv[])
 	p_solver.reset(new FftwPatchSolver(dc));
 
 	// patch operator
-	shared_ptr<PatchOperator> p_operator(new FivePtPatchOperator());
+	shared_ptr<PatchOperator> p_operator(new SevenPtPatchOperator());
 
 	// interface interpolator
 	shared_ptr<Interpolator> p_interp(new QuadInterpolator());
