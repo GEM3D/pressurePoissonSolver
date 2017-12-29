@@ -4,6 +4,7 @@
 #include "InterpCase.h"
 #include "PW.h"
 #include "Side.h"
+#include "Iface.h"
 #include <map>
 #include <memory>
 #include <petscvec.h>
@@ -44,8 +45,12 @@ class DomainCollection
 	 */
 	std::map<int, Domain> domains;
 
+    std::map<int,IfaceSet> ifaces;
 	std::vector<int> domain_map_vec;
 	std::vector<int> domain_off_proc_map_vec;
+	std::vector<int> iface_dist_map_vec;
+	std::vector<int> iface_map_vec;
+	std::vector<int> iface_off_proc_map_vec;
 
 	/**
 	 * @brief Default empty constructor.
@@ -65,16 +70,14 @@ class DomainCollection
 	 */
 	void zoltanBalance();
 	void divide();
-	/**
-	 * @brief Index the interfaces using a Breadth First Search.
-	 */
-	void indexInterfacesBFS();
 
 	void indexIfacesLocal();
 	void indexIfacesGlobal();
 
 	void indexDomainsLocal();
 	void indexDomainsGlobal();
+
+	void reIndex();
 
 	void indexDomainIfacesLocal();
 

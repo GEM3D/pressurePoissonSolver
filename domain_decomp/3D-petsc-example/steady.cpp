@@ -1,11 +1,11 @@
 #include "DomainCollection.h"
-#include "SchurHelper.h"
-//#include "FunctionWrapper.h"
-#include "SevenPtPatchOperator.h"
+#include "FunctionWrapper.h"
 #include "Init.h"
 #include "MatrixHelper.h"
 #include "PatchSolvers/FftwPatchSolver.h"
-#include "QuadInterpolator.h"
+#include "SchurHelper.h"
+#include "SevenPtPatchOperator.h"
+#include "TriLinInterp.h"
 #include "Writers/ClawWriter.h"
 #include "Writers/MMWriter.h"
 #ifdef ENABLE_AMGX
@@ -176,13 +176,13 @@ int main(int argc, char *argv[])
 	DomainCollection dc;
 	if (f_mesh) {
 		string d = args::get(f_mesh);
-	//	dc       = DomainCollection(d);
+		//	dc       = DomainCollection(d);
 	} else if (f_amr) {
 		int d = args::get(f_amr);
-	//	dc    = DomainCollection(d, d, true);
+		//	dc    = DomainCollection(d, d, true);
 	} else {
 		int d = args::get(f_square);
-		dc    = DomainCollection(d, d,d);
+		dc    = DomainCollection(d, d, d);
 	}
 	if (f_div) {
 		for (int i = 0; i < args::get(f_div); i++) {
@@ -240,9 +240,11 @@ int main(int argc, char *argv[])
 		nfunz = [](double x, double y, double z) { return 0; };
 	} else {
 		ffun = [](double x, double y, double z) {
-			return -9 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y)*sin(2*M_PI*z);
+			return -9 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
 		};
-		gfun  = [](double x, double y, double z) { return sin(M_PI * x) * cos(2 * M_PI * y)*sin(2*M_PI*z); };
+		gfun = [](double x, double y, double z) {
+			return sin(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
+		};
 		nfunx = [](double x, double y, double z) {
 			return -2 * M_PI * sin(M_PI * y) * sin(2 * M_PI * x);
 		};
@@ -259,7 +261,7 @@ int main(int argc, char *argv[])
 	shared_ptr<PatchOperator> p_operator(new SevenPtPatchOperator());
 
 	// interface interpolator
-	shared_ptr<Interpolator> p_interp(new QuadInterpolator());
+	shared_ptr<Interpolator> p_interp(new TriLinInterp());
 
 #ifdef ENABLE_AMGX
 	AmgxWrapper *amgxsolver = nullptr;
@@ -285,7 +287,7 @@ int main(int argc, char *argv[])
 		PW<Vec> f     = dc.getNewDomainVec();
 
 		if (f_neumann) {
-			Init::initNeumann(dc, n, f, exact, ffun, gfun, nfunx, nfuny,nfunz);
+			Init::initNeumann(dc, n, f, exact, ffun, gfun, nfunx, nfuny, nfunz);
 		} else {
 			Init::initDirichlet(dc, n, f, exact, ffun, gfun);
 		}
@@ -293,10 +295,11 @@ int main(int argc, char *argv[])
 		timer.stop("Domain Initialization");
 
 		// Create the gamma and diff vectors
-		PW<Vec> gamma = dc.getNewSchurVec();
-		PW<Vec> diff  = dc.getNewSchurVec();
-		PW<Vec> b     = dc.getNewSchurVec();
-		PW<Mat> A;
+		PW<Vec>              gamma = dc.getNewSchurVec();
+		PW<Vec>              diff  = dc.getNewSchurVec();
+		PW<Vec>              b     = dc.getNewSchurVec();
+		PW<Mat>              A;
+		shared_ptr<FuncWrap> w;
 
 		// Create linear problem for the Belos solver
 		PW<KSP> solver;
@@ -340,8 +343,8 @@ int main(int argc, char *argv[])
 			timer.start("Linear System Setup");
 
 			if (f_wrapper) {
-				// Create a function wrapper
-				// op = rcp(new FuncWrap(b, &dc));
+				w.reset(new FuncWrap(&sch, &dc));
+				A = w->getMatrix();
 			} else {
 				timer.start("Matrix Formation");
 

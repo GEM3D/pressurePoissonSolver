@@ -97,7 +97,7 @@ add_executable(steady steady.cpp)
 add_library(SchurHelper SchurHelper.cpp)
 add_library(MatrixHelper MatrixHelper.cpp)
 add_library(DomainCollection DomainCollection.cpp)
-add_library(Interpolators QuadInterpolator.cpp FourthInterpolator.cpp)
+add_library(Interpolators TriLinInterp.cpp)
 add_library(Init Init.cpp)
 
 #

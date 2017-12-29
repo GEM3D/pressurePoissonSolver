@@ -19,7 +19,6 @@
 class SchurHelper
 {
 	private:
-	DomainCollection dc;
 
 	PW<Vec>        local_gamma;
 	PW<Vec>        gamma;
@@ -46,6 +45,7 @@ class SchurHelper
 	void assembleMatrix(inserter insertBlock);
 
 	public:
+	DomainCollection dc;
 	/**
 	 * @brief Create a SchurHelper from a given DomainCollection
 	 *
