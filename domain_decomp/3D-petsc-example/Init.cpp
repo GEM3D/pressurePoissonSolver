@@ -59,7 +59,6 @@ void Init::initNeumann(DomainCollection &dc, int n, Vec f, Vec exact,
 				for (int xi = 0; xi < n; xi++) {
 					double x, y, z;
 					getXYZ(d, xi, yi, zi, x, y, z);
-
 					f_vals[index(d, xi, yi, zi)]     = ffun(x, y, z);
 					exact_vals[index(d, xi, yi, zi)] = efun(x, y, z);
 				}

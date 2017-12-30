@@ -6,10 +6,10 @@ class StencilHelper
 {
 	public:
 	virtual ~StencilHelper() {}
-	virtual int row(int i)        = 0;
-	virtual int size(int i)       = 0;
-	virtual double *coeffs(int i) = 0;
-	virtual int *cols(int i)      = 0;
+	virtual int row(int xi, int yi)        = 0;
+	virtual int size(int xi, int yi)       = 0;
+	virtual double *coeffs(int xi, int yi) = 0;
+	virtual int *cols(int xi, int yi)      = 0;
 };
 class DirichletSH : public StencilHelper
 {
@@ -17,45 +17,60 @@ class DirichletSH : public StencilHelper
 	double coeff;
 	int    col;
 	int    start;
-	int    stride;
+	int    stridex;
+	int    stridey;
 
 	public:
 	DirichletSH(Domain &d, Side s)
 	{
 		double h   = 0;
-		int    idx = d.id_global * d.n * d.n;
+		int    idx = d.id_global * d.n * d.n * d.n;
 		switch (s) {
-			case Side::north:
-				h      = d.x_length / d.n;
-				start  = idx + (d.n - 1) * d.n;
-				stride = 1;
+			case Side::west:
+				h       = d.x_length / d.n;
+				start   = idx;
+				stridex = d.n;
+				stridey = d.n * d.n;
 				break;
 			case Side::east:
-				h      = d.y_length / d.n;
-				start  = idx + (d.n - 1);
-				stride = d.n;
+				h       = d.x_length / d.n;
+				start   = idx + (d.n - 1);
+				stridex = d.n;
+				stridey = d.n * d.n;
 				break;
 			case Side::south:
-				h      = d.x_length / d.n;
-				start  = idx;
-				stride = 1;
+				h       = d.y_length / d.n;
+				start   = idx;
+				stridex = 1;
+				stridey = d.n * d.n;
 				break;
-			case Side::west:
-				h      = d.y_length / d.n;
-				start  = idx;
-				stride = d.n;
+			case Side::north:
+				h       = d.y_length / d.n;
+				start   = idx + (d.n - 1) * d.n;
+				stridex = 1;
+				stridey = d.n * d.n;
 				break;
-            default:
-                break;
+			case Side::bottom:
+				h       = d.z_length / d.n;
+				start   = idx;
+				stridex = 1;
+				stridey = d.n;
+				break;
+			case Side::top:
+				h       = d.z_length / d.n;
+				start   = idx + (d.n - 1) * d.n * d.n;
+				stridex = 1;
+				stridey = d.n;
+				break;
 		}
 		coeff = -1.0 / (h * h);
 	}
-	int row(int i) { return start + stride * i; }
-	int size(int i) { return 1; }
-	double *coeffs(int i) { return &coeff; }
-	int *cols(int i)
+	int row(int xi, int yi) { return start + stridex * xi + stridey * yi; }
+	int size(int xi, int yi) { return 1; }
+	double *coeffs(int xi, int yi) { return &coeff; }
+	int *cols(int xi, int yi)
 	{
-		col = start + stride * i;
+		col = start + stridex * xi + stridey * yi;
 		return &col;
 	}
 };
@@ -65,45 +80,60 @@ class NeumannSH : public StencilHelper
 	double coeff;
 	int    col;
 	int    start;
-	int    stride;
+	int    stridex;
+	int    stridey;
 
 	public:
 	NeumannSH(Domain &d, Side s)
 	{
 		double h   = 0;
-		int    idx = d.id_global * d.n * d.n;
+		int    idx = d.id_global * d.n * d.n * d.n;
 		switch (s) {
-			case Side::north:
-				h      = d.x_length / d.n;
-				start  = idx + (d.n - 1) * d.n;
-				stride = 1;
+			case Side::west:
+				h       = d.x_length / d.n;
+				start   = idx;
+				stridex = d.n;
+				stridey = d.n * d.n;
 				break;
 			case Side::east:
-				h      = d.y_length / d.n;
-				start  = idx + (d.n - 1);
-				stride = d.n;
+				h       = d.x_length / d.n;
+				start   = idx + (d.n - 1);
+				stridex = d.n;
+				stridey = d.n * d.n;
 				break;
 			case Side::south:
-				h      = d.x_length / d.n;
-				start  = idx;
-				stride = 1;
+				h       = d.y_length / d.n;
+				start   = idx;
+				stridex = 1;
+				stridey = d.n * d.n;
 				break;
-			case Side::west:
-				h      = d.y_length / d.n;
-				start  = idx;
-				stride = d.n;
+			case Side::north:
+				h       = d.y_length / d.n;
+				start   = idx + (d.n - 1) * d.n;
+				stridex = 1;
+				stridey = d.n * d.n;
 				break;
-            default:
-                break;
+			case Side::bottom:
+				h       = d.z_length / d.n;
+				start   = idx;
+				stridex = 1;
+				stridey = d.n;
+				break;
+			case Side::top:
+				h       = d.z_length / d.n;
+				start   = idx + (d.n - 1) * d.n * d.n;
+				stridex = 1;
+				stridey = d.n;
+				break;
 		}
 		coeff = 1.0 / (h * h);
 	}
-	int row(int i) { return start + stride * i; }
-	int size(int i) { return 1; }
-	double *coeffs(int i) { return &coeff; }
-	int *cols(int i)
+	int row(int xi, int yi) { return start + stridex * xi + stridey * yi; }
+	int size(int xi, int yi) { return 1; }
+	double *coeffs(int xi, int yi) { return &coeff; }
+	int *cols(int xi, int yi)
 	{
-		col = start + stride * i;
+		col = start + stridex * xi + stridey * yi;
 		return &col;
 	}
 };
@@ -114,62 +144,78 @@ class NormalSH : public StencilHelper
 	int    col;
 	int    start;
 	int    nbr_start;
-	int    stride;
+	int    stridex;
+	int    stridey;
 
 	public:
 	NormalSH(Domain &d, Side s)
 	{
 		double h       = 0;
-		int    idx     = d.id_global * d.n * d.n;
-		int    nbr_idx = d.globalNbr(s) * d.n * d.n;
+		int    idx     = d.id_global * d.n * d.n * d.n;
+		int    nbr_idx = d.globalNbr(s) * d.n * d.n * d.n;
 		switch (s) {
-			case Side::north:
+			case Side::west:
 				h         = d.x_length / d.n;
-				start     = idx + (d.n - 1) * d.n;
-				nbr_start = nbr_idx;
-				stride    = 1;
+				start     = idx;
+				nbr_start = nbr_idx + (d.n - 1);
+				stridex   = d.n;
+				stridey   = d.n * d.n;
 				break;
 			case Side::east:
-				h         = d.y_length / d.n;
+				h         = d.x_length / d.n;
 				start     = idx + (d.n - 1);
 				nbr_start = nbr_idx;
-				stride    = d.n;
+				stridex   = d.n;
+				stridey   = d.n * d.n;
 				break;
 			case Side::south:
-				h         = d.x_length / d.n;
-				start     = idx;
-				nbr_start = nbr_idx + (d.n - 1) * d.n;
-				stride    = 1;
-				break;
-			case Side::west:
 				h         = d.y_length / d.n;
 				start     = idx;
-				nbr_start = nbr_idx + d.n - 1;
-				stride    = d.n;
+				nbr_start = nbr_idx + (d.n - 1) * d.n;
+				stridex   = 1;
+				stridey   = d.n * d.n;
 				break;
-            default:
-                break;
+			case Side::north:
+				h         = d.y_length / d.n;
+				start     = idx + (d.n - 1) * d.n;
+				nbr_start = nbr_idx;
+				stridex   = 1;
+				stridey   = d.n * d.n;
+				break;
+			case Side::bottom:
+				h         = d.z_length / d.n;
+				start     = idx;
+				nbr_start = nbr_idx + (d.n - 1) * d.n * d.n;
+				stridex   = 1;
+				stridey   = d.n;
+				break;
+			case Side::top:
+				h         = d.z_length / d.n;
+				start     = idx + (d.n - 1) * d.n * d.n;
+				nbr_start = nbr_idx;
+				stridex   = 1;
+				stridey   = d.n;
+				break;
 		}
 		coeff = 1.0 / (h * h);
 	}
-	int row(int i) { return start + stride * i; }
-	int size(int i) { return 1; }
-	double *coeffs(int i) { return &coeff; }
-	int *cols(int i)
+	int row(int xi, int yi) { return start + stridex * xi + stridey * yi; }
+	int size(int xi, int yi) { return 1; }
+	double *coeffs(int xi, int yi) { return &coeff; }
+	int *cols(int xi, int yi)
 	{
-		col = nbr_start + stride * i;
+		col = nbr_start + stridex * xi + stridey * yi;
 		return &col;
 	}
 };
-
 StencilHelper *getStencilHelper(Domain &d, Side s)
 {
 	StencilHelper *retval = nullptr;
 	if (d.hasNbr(s)) {
-			retval = new NormalSH(d, s);
+		retval = new NormalSH(d, s);
 	} else {
 		if (d.isNeumann(s)) {
-			retval = new NeumannSH(d, s);
+						retval = new NeumannSH(d, s);
 		} else {
 			retval = new DirichletSH(d, s);
 		}

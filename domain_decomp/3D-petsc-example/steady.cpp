@@ -77,8 +77,8 @@ int main(int argc, char *argv[])
 
 	// mesh options
 	args::ValueFlag<string> f_mesh(parser, "file_name", "read in a mesh", {"mesh"});
-	args::ValueFlag<int>    f_square(parser, "num_domains",
-	                              "create a num_domains x num_domains square of grids", {"square"});
+	args::ValueFlag<int>    f_cube(parser, "num_domains",
+	                              "create a num_domains^3 cube of grids", {"cube"});
 	args::ValueFlag<int> f_amr(parser, "num_domains", "create a num_domains x num_domains square "
 	                                                  "of grids, and a num_domains*2 x "
 	                                                  "num_domains*2 refined square next to it",
@@ -181,7 +181,7 @@ int main(int argc, char *argv[])
 		int d = args::get(f_amr);
 		//	dc    = DomainCollection(d, d, true);
 	} else {
-		int d = args::get(f_square);
+		int d = args::get(f_cube);
 		dc    = DomainCollection(d, d, d);
 	}
 	if (f_div) {
@@ -246,11 +246,14 @@ int main(int argc, char *argv[])
 			return sin(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
 		};
 		nfunx = [](double x, double y, double z) {
-			return -2 * M_PI * sin(M_PI * y) * sin(2 * M_PI * x);
+			return M_PI * cos(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
 		};
-		nfuny
-		= [](double x, double y, double z) { return M_PI * cos(M_PI * y) * cos(2 * M_PI * x); };
-		nfunz = [](double x, double y, double z) { return 0; };
+		nfuny = [](double x, double y, double z) {
+			return -2 * M_PI * sin(M_PI * x) * sin(2 * M_PI * y) * sin(2 * M_PI * z);
+		};
+		nfunz = [](double x, double y, double z) {
+			return 2 * M_PI * sin(M_PI * x) * cos(2 * M_PI * y) * cos(2 * M_PI * z);
+		};
 	}
 
 	// set the patch solver
@@ -307,7 +310,7 @@ int main(int argc, char *argv[])
 		KSPSetFromOptions(solver);
 
 		if (f_neumann && !f_nozerof) {
-			double fdiff = dc.integrate(f) / dc.area();
+			double fdiff = dc.integrate(f) / dc.volume();
 			if (my_global_rank == 0) cout << "Fdiff: " << fdiff << endl;
 			VecShift(f, -fdiff);
 		}
@@ -482,8 +485,8 @@ int main(int argc, char *argv[])
 		PW<Vec> error = dc.getNewDomainVec();
 		VecAXPBYPCZ(error, -1.0, 1.0, 0.0, exact, u);
 		if (f_neumann) {
-			double uavg = dc.integrate(u) / dc.area();
-			double eavg = dc.integrate(exact) / dc.area();
+			double uavg = dc.integrate(u) / dc.volume();
+			double eavg = dc.integrate(exact) / dc.volume();
 
 			if (my_global_rank == 0) {
 				cout << "Average of computed solution: " << uavg << endl;
@@ -536,6 +539,7 @@ int main(int argc, char *argv[])
 			writer.add(u, "Solution");
 			writer.add(error, "Error");
 			writer.add(resid, "Residual");
+			writer.add(f, "RHS");
 			writer.write();
 		}
 #endif

@@ -63,7 +63,7 @@ struct Domain {
 	int &globalIndex(Side s) { return global_i[static_cast<int>(s)]; }
 	int &index(Side s) { return local_i[static_cast<int>(s)]; }
 	inline int &nbr(Side s) { return nbr_id[static_cast<int>(s)]; }
-	inline int &globalNbr(Side s) { return nbr_id_global[2 * static_cast<int>(s)]; }
+	inline int &globalNbr(Side s) { return nbr_id_global[static_cast<int>(s)]; }
 	inline bool hasNbr(Side s) const { return nbr_id[static_cast<int>(s)] != -1; }
 	inline bool isNeumann(Side s) const { return neumann[static_cast<int>(s)]; }
 	void setLocalIndexes(std::map<int, int> &rev_map)
@@ -106,7 +106,7 @@ struct Domain {
 	void setNeumann()
 	{
 		for (int q = 0; q < 6; q++) {
-			neumann[q] = (global_i[q] == -1);
+			neumann[q] = !hasNbr(static_cast<Side>(q));
 		}
 	}
 	std::bitset<4> neumannRelative(Side s)

@@ -443,7 +443,7 @@ double DomainCollection::integrate(const Vec u)
 
 	for (auto &p : domains) {
 		Domain &d     = p.second;
-		int     start = d.n * d.n * d.id_local;
+		int     start = d.n * d.n * d.n * d.id_local;
 
 		double patch_sum = 0;
 		for (int i = 0; i < d.n * d.n; i++) {
@@ -459,7 +459,7 @@ double DomainCollection::integrate(const Vec u)
 	VecRestoreArray(u, &u_view);
 	return retval;
 }
-double DomainCollection::area()
+double DomainCollection::volume()
 {
 	double sum = 0;
 	for (auto &p : domains) {
