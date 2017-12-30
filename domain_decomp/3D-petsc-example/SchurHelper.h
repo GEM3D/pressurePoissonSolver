@@ -16,6 +16,7 @@
  *   - Provide member functions for calculating error, residual, etc.
  *   - Provide member functions that generate the Schur complement matrix.
  */
+class Block;
 class SchurHelper
 {
 	private:
@@ -40,7 +41,7 @@ class SchurHelper
 	 */
 	std::shared_ptr<PatchSolver> solver;
 
-	typedef std::function<void(int, int, std::shared_ptr<std::valarray<double>>, bool, bool)>
+	typedef std::function<void(Block*, std::shared_ptr<std::valarray<double>>)>
 	     inserter;
 	void assembleMatrix(inserter insertBlock);
 

@@ -1,5 +1,6 @@
 #include "SchurHelper.h"
 #include <array>
+#include <iostream>
 #include <tuple>
 using namespace std;
 enum axis_enum { X_AXIS, Y_AXIS };
@@ -50,106 +51,202 @@ void SchurHelper::applyWithInterface(const Vec u, const Vec gamma, Vec f)
 		op->apply(d, u, local_gamma, f);
 	}
 }
+enum class Rotation : char { x_cw, x_ccw, y_cw, y_ccw, z_cw, z_ccw };
+constexpr bool sideIsLeft(const Side s)
+{
+	return (s == Side::north || s == Side::west || s == Side::bottom);
+}
+struct Block {
+	static const Side             side_table[6][6];
+	static const char             rots_table[6][6];
+	static const vector<Rotation> main_rot_plan[6];
+	char                          data = 0;
+	Side                          main;
+	Side                          aux;
+	int                           j;
+	int                           i;
+	Block(Side main, int j, Side aux, int i)
+	{
+		this->main = main;
+		this->j    = j;
+		this->aux  = aux;
+		this->i    = i;
+		data       = 0;
+		bool left  = sideIsLeft(main);
+		data |= left << 7;
+		left = sideIsLeft(aux);
+		data |= left << 3;
+		rotate();
+	}
+	Block &operator*=(const Rotation &rot)
+	{
+		char r;
+		// main rotation
+		r = (data & ~(~0 << 2) << 4) >> 4;
+		r = (r + rots_table[static_cast<int>(rot)][static_cast<int>(main)]) & 0b11;
+		data &= ~(~(~0 << 2) << 4);
+		data |= r << 4;
+		// aux rotation
+		r = data & ~(~0 << 2);
+		r = (r + rots_table[static_cast<int>(rot)][static_cast<int>(aux)]) & 0b11;
+		data &= ~0 << 2;
+		data |= r;
+		main = side_table[static_cast<int>(rot)][static_cast<int>(main)];
+		aux  = side_table[static_cast<int>(rot)][static_cast<int>(aux)];
+		return *this;
+	}
+	void rotate()
+	{
+		for (Rotation rot : main_rot_plan[static_cast<int>(main)]) {
+			(*this) *= rot;
+		}
+	}
+	bool operator<(const Block &b) const
+	{
+		return std::tie(i, j, data) < std::tie(b.i, b.j, b.data);
+	}
+	bool operator==(const Block &b) const { return true; }
+	//
+	bool mainLeft() { return sideIsLeft(main); }
+	bool mainFlipped()
+	{
+		bool left      = sideIsLeft(main);
+		bool orig_left = (data >> 7) & 0b1;
+		return left != orig_left;
+	}
+	int  mainRot() { return (data >> 4) & 0b11; }
+	bool auxLeft() { return sideIsLeft(aux); }
+	bool auxFlipped()
+	{
+		bool left      = sideIsLeft(aux);
+		bool orig_left = (data >> 3) & 0b1;
+		return left != orig_left;
+	}
+	int auxRot() { return data & 0b11; }
+};
+struct BlockKey {
+	Side s;
 
+	BlockKey() {}
+	BlockKey(const Block &b) { s = b.aux; }
+	friend bool operator<(const BlockKey &l, const BlockKey &r) { return l.s < r.s; }
+};
+
+const Side Block::side_table[6][6]
+= {{Side::west, Side::east, Side::top, Side::bottom, Side::south, Side::north},
+   {Side::west, Side::east, Side::bottom, Side::top, Side::north, Side::south},
+   {Side::bottom, Side::top, Side::south, Side::north, Side::east, Side::west},
+   {Side::top, Side::bottom, Side::south, Side::north, Side::west, Side::east},
+   {Side::north, Side::south, Side::west, Side::east, Side::bottom, Side::top},
+   {Side::south, Side::north, Side::east, Side::west, Side::bottom, Side::top}};
+const char Block::rots_table[6][6] = {{3, 1, 0, 0, 2, 2}, {1, 3, 2, 2, 0, 0}, {1, 3, 3, 1, 1, 3},
+                                      {1, 3, 1, 3, 3, 1}, {0, 0, 0, 0, 3, 1}, {0, 0, 0, 0, 1, 3}};
+const vector<Rotation> Block::main_rot_plan[6] = {{},
+                                                  {Rotation::z_cw, Rotation::z_cw},
+                                                  {Rotation::z_cw},
+                                                  {Rotation::z_ccw},
+                                                  {Rotation::y_ccw},
+                                                  {Rotation::y_cw}};
 void SchurHelper::assembleMatrix(inserter insertBlock)
 {
-	/*
-	int              n = dc.n;
-	set<MatrixBlock> blocks;
-	for (auto p : dc.ifaces) {
-	    Iface &          iface      = p.second;
-	    set<MatrixBlock> row_blocks = iface.getGlobalRowBlocks();
-	    blocks.insert(row_blocks.begin(), row_blocks.end());
+	int        n = dc.n;
+	set<Block> blocks;
+	for (auto &p : dc.ifaces) {
+		IfaceSet &ifs = p.second;
+		int       i   = ifs.id_global;
+		for (const Iface &iface : ifs.ifaces) {
+			Side aux = iface.s;
+			for (int s = 0; s < 6; s++) {
+				int j = iface.global_id[s];
+				if (j != -1) {
+					Side main = static_cast<Side>(s);
+					blocks.insert(Block(main, j, aux, i));
+				}
+			}
+		}
 	}
 	int num_types = 0;
 	Vec u, f, r, e, gamma, interp;
-	VecCreateSeq(PETSC_COMM_SELF, n * n, &u);
-	VecCreateSeq(PETSC_COMM_SELF, n * n, &f);
-	VecCreateSeq(PETSC_COMM_SELF, n * n, &r);
-	VecCreateSeq(PETSC_COMM_SELF, n * n, &e);
-	VecCreateSeq(PETSC_COMM_SELF, n, &gamma);
-	VecCreateSeq(PETSC_COMM_SELF, n, &interp);
+	VecCreateSeq(PETSC_COMM_SELF, n * n * n, &u);
+	VecCreateSeq(PETSC_COMM_SELF, n * n * n, &f);
+	VecCreateSeq(PETSC_COMM_SELF, n * n * n, &r);
+	VecCreateSeq(PETSC_COMM_SELF, n * n * n, &e);
+	VecCreateSeq(PETSC_COMM_SELF, n * n, &gamma);
+	VecCreateSeq(PETSC_COMM_SELF, n * n, &interp);
 	double *interp_view, *gamma_view;
 	VecGetArray(interp, &interp_view);
 	VecGetArray(gamma, &gamma_view);
 	while (!blocks.empty()) {
-	    num_types++;
-	    // the first in the set is the type of interface that we are going to solve for
-	    set<MatrixBlock> todo;
-	    MatrixBlock      curr_type = *blocks.begin();
-	    blocks.erase(blocks.begin());
-	    todo.insert(curr_type);
-	    set<MatrixBlock> to_be_deleted;
-	    for (auto iter = blocks.begin(); iter != blocks.end(); iter++) {
-	        if (*iter == curr_type) {
-	            todo.insert(*iter);
-	            to_be_deleted.insert(*iter);
-	        }
-	    }
-	    for (MatrixBlock i : to_be_deleted) {
-	        blocks.erase(i);
-	    }
+		num_types++;
+		// the first in the set is the type of interface that we are going to solve for
+		set<Block> todo;
+		Block      curr_type = *blocks.begin();
+		blocks.erase(blocks.begin());
+		todo.insert(curr_type);
+		set<Block> to_be_deleted;
+		for (auto iter = blocks.begin(); iter != blocks.end(); iter++) {
+			if (*iter == curr_type) {
+				todo.insert(*iter);
+				to_be_deleted.insert(*iter);
+			}
+		}
+		for (Block i : to_be_deleted) {
+			blocks.erase(i);
+		}
 
-	    // create domain representing curr_type
-	    Domain ds;
-	    ds.n               = n;
-	    ds.id              = 0;
-	    ds.id_local        = 0;
-	    ds.x_length        = curr_type.length;
-	    ds.y_length        = curr_type.length;
-	    ds.nbr_id[0]       = 1;
-	    ds.neumann         = curr_type.neumann;
-	    ds.zero_patch      = curr_type.zero_patch;
-	    ds.local_i         = {{0, 0, 0, 0}};
-	    ds.local_i_center  = {{0, 0, 0, 0}};
-	    ds.local_i_refined = {{0, 0, 0, 0, 0, 0, 0}};
-	    solver->addDomain(ds);
+		// create domain representing curr_type
+		Domain ds;
+		ds.n         = n;
+		ds.id        = 0;
+		ds.id_local  = 0;
+		ds.x_length  = 1;
+		ds.y_length  = 1;
+		ds.z_length  = 1;
+		ds.nbr_id[0] = 1;
+		// ds.neumann    = curr_type.neumann;
+		ds.local_i = {0, 0, 0, 0, 0, 0};
+		solver->addDomain(ds);
 
-	    map<BlockKey, shared_ptr<valarray<double>>> coeffs;
-	    // allocate blocks of coefficients
-	    for (const MatrixBlock &b : todo) {
-	        shared_ptr<valarray<double>> ptr = coeffs[b];
-	        if (ptr.get() == nullptr) {
-	            coeffs[b] = shared_ptr<valarray<double>>(new valarray<double>(n * n));
-	        }
-	    }
+		map<BlockKey, shared_ptr<valarray<double>>> coeffs;
+		// allocate blocks of coefficients
+		for (const Block &b : todo) {
+			shared_ptr<valarray<double>> ptr = coeffs[b];
+			if (ptr.get() == nullptr) {
+				coeffs[b] = shared_ptr<valarray<double>>(new valarray<double>(n * n * n * n));
+			}
+		}
 
-	    for (int j = 0; j < n; j++) {
-	        gamma_view[j] = 1;
-	        solver->solve(ds, f, u, gamma);
-	        gamma_view[j] = 0;
+		for (int j = 0; j < n * n; j++) {
+			gamma_view[j] = 1;
+			solver->solve(ds, f, u, gamma);
+			gamma_view[j] = 0;
 
-	        // fill the blocks
-	        for (auto &p : coeffs) {
-	            Side       s    = p.first.s;
-	            InterpCase type = p.first.type;
-	            VecScale(interp, 0);
-	            interpolator->interpolate(ds, s, type, u, interp);
-	            valarray<double> &block = *p.second;
-	            for (int i = 0; i < n; i++) {
-	                block[i * n + j] = -interp_view[i];
-	            }
-	            if (s == Side::north) {
-	                switch (type) {
-	                    case InterpCase::normal:
-	                        block[n * j + j] += 0.5;
-	                        break;
-	                    case InterpCase::coarse_from_coarse:
-	                    case InterpCase::fine_from_fine_on_left:
-	                    case InterpCase::fine_from_fine_on_right:
-	                        block[n * j + j] += 1;
-	                        break;
-	                    default:
-	                        break;
-	                }
-	            }
-	        }
-	    }
+			// fill the blocks
+			for (auto &p : coeffs) {
+				Side      s    = p.first.s;
+				IfaceType type = IfaceType::normal;
+				VecScale(interp, 0);
+				interpolator->interpolate(ds, s, type, u, interp);
+				valarray<double> &block = *p.second;
+				for (int i = 0; i < n * n; i++) {
+					block[i * n * n + j] = -interp_view[i];
+				}
+				if (s == Side::west) {
+					switch (type) {
+						case IfaceType::normal:
+							block[n * n * j + j] += 0.5;
+							break;
+						default:
+							break;
+					}
+				}
+			}
+		}
 
-	    // now insert these results into the matrix for each interface
-	    for (MatrixBlock block : todo) {
-	        insertBlock(block.i, block.j, coeffs[block], block.flip_i, block.flip_j);
-	    }
+		// now insert these results into the matrix for each interface
+		for (Block block : todo) {
+			insertBlock(&block, coeffs[block]);
+		}
 	}
 	VecRestoreArray(interp, &interp_view);
 	VecRestoreArray(gamma, &gamma_view);
@@ -159,51 +256,122 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 	VecDestroy(&e);
 	VecDestroy(&gamma);
 	VecDestroy(&interp);
-	*/
 }
 PW_explicit<Mat> SchurHelper::formCRSMatrix()
 {
 	int     n = dc.n;
 	PW<Mat> A;
-	/*
 	MatCreate(MPI_COMM_WORLD, &A);
-	int local_size  = dc.ifaces.size() * n;
-	int global_size = dc.num_global_interfaces * n;
+	int local_size  = dc.ifaces.size() * n * n;
+	int global_size = dc.num_global_interfaces * n * n;
 	MatSetSizes(A, local_size, local_size, global_size, global_size);
 	MatSetType(A, MATMPIAIJ);
-	MatMPIAIJSetPreallocation(A, 19 * n, nullptr, 19 * n, nullptr);
+	MatMPIAIJSetPreallocation(A, 19 * n * n, nullptr, 19 * n * n, nullptr);
 
-	auto insertBlock
-	= [&](int i, int j, shared_ptr<valarray<double>> block, bool flip_i, bool flip_j) {
-	      int local_i = i * n;
-	      int local_j = j * n;
+	auto insertBlock = [&](Block *b, shared_ptr<valarray<double>> coeffs) {
+		int global_i = b->i * n * n;
+		int global_j = b->j * n * n;
 
-	      valarray<double> &orig = *block;
-	      valarray<double>  copy(n * n);
-	      for (int i = 0; i < n; i++) {
-	          int block_i = i;
-	          if (flip_i) {
-	              block_i = n - i - 1;
-	          }
-	          for (int j = 0; j < n; j++) {
-	              int block_j = j;
-	              if (flip_j) {
-	                  block_j = n - j - 1;
-	              }
-	              copy[i * n + j] = orig[block_i * n + block_j];
-	          }
-	      }
-	      vector<int> inds_i(n);
-	      iota(inds_i.begin(), inds_i.end(), local_i);
-	      vector<int> inds_j(n);
-	      iota(inds_j.begin(), inds_j.end(), local_j);
+		valarray<double> &orig = *coeffs;
+		const function<int(int, int)> transforms_left[4]
+		= {[&](int xi, int yi) { return xi + yi * n; },
+		   [&](int xi, int yi) { return n - yi - 1 + xi * n; },
+		   [&](int xi, int yi) { return n - xi - 1 + (n - yi - 1) * n; },
+		   [&](int xi, int yi) { return yi + (n - xi - 1) * n; }};
 
-	      MatSetValues(A, n, &inds_i[0], n, &inds_j[0], &copy[0], ADD_VALUES);
-	  };
+		const function<int(int, int)> transforms_right[4]
+		= {[&](int xi, int yi) { return xi + yi * n; },
+		   [&](int xi, int yi) { return yi + (n - xi - 1) * n; },
+		   [&](int xi, int yi) { return n - xi - 1 + (n - yi - 1) * n; },
+		   [&](int xi, int yi) { return n - yi - 1 + xi * n; }};
+
+		const function<int(int, int)> transforms_left_inv[4]
+		= {[&](int xi, int yi) {
+			   xi = n - xi - 1;
+			   return xi + yi * n;
+		   },
+		   [&](int xi, int yi) {
+			   xi = n - xi - 1;
+			   return n - yi - 1 + xi * n;
+		   },
+		   [&](int xi, int yi) {
+			   xi = n - xi - 1;
+			   return n - xi - 1 + (n - yi - 1) * n;
+		   },
+		   [&](int xi, int yi) {
+			   xi = n - xi - 1;
+			   return yi + (n - xi - 1) * n;
+		   }};
+		const function<int(int, int)> transforms_right_inv[4]
+		= {[&](int xi, int yi) {
+			   xi = n - xi - 1;
+			   return xi + yi * n;
+		   },
+		   [&](int xi, int yi) {
+			   xi = n - xi - 1;
+			   return yi + (n - xi - 1) * n;
+		   },
+		   [&](int xi, int yi) {
+			   xi = n - xi - 1;
+			   return n - xi - 1 + (n - yi - 1) * n;
+		   },
+		   [&](int xi, int yi) {
+			   xi = n - xi - 1;
+			   return n - yi - 1 + xi * n;
+		   }};
+
+		valarray<double> copy(n * n * n * n);
+		function<int(int, int)> col_trans, row_trans;
+		if (b->mainLeft()) {
+			if (b->mainFlipped()) {
+				col_trans = transforms_left_inv[b->mainRot()];
+			} else {
+				col_trans = transforms_left[b->mainRot()];
+			}
+		} else {
+			if (b->mainFlipped()) {
+				col_trans = transforms_right_inv[b->mainRot()];
+			} else {
+				col_trans = transforms_right[b->mainRot()];
+			}
+		}
+		if (b->auxLeft()) {
+			if (b->auxFlipped()) {
+				row_trans = transforms_left_inv[b->auxRot()];
+			} else {
+				row_trans = transforms_left[b->auxRot()];
+			}
+		} else {
+			if (b->auxFlipped()) {
+				row_trans = transforms_right_inv[b->auxRot()];
+			} else {
+				row_trans = transforms_right[b->auxRot()];
+			}
+		}
+		for (int row_yi = 0; row_yi < n; row_yi++) {
+			for (int row_xi = 0; row_xi < n; row_xi++) {
+				int i_dest = row_xi + row_yi * n;
+				int i_orig = row_trans(row_xi, row_yi);
+				for (int col_yi = 0; col_yi < n; col_yi++) {
+					for (int col_xi = 0; col_xi < n; col_xi++) {
+						int j_dest = col_xi + col_yi * n;
+						int j_orig = col_trans(col_xi, col_yi);
+
+						copy[i_dest * n * n + j_dest] = orig[i_orig * n * n + j_orig];
+					}
+				}
+			}
+		}
+		vector<int> inds_i(n * n);
+		iota(inds_i.begin(), inds_i.end(), global_i);
+		vector<int> inds_j(n * n);
+		iota(inds_j.begin(), inds_j.end(), global_j);
+
+		MatSetValues(A, n * n, &inds_i[0], n * n, &inds_j[0], &copy[0], ADD_VALUES);
+	};
 
 	assembleMatrix(insertBlock);
 	MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
 	MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
-	*/
 	return A;
 }
