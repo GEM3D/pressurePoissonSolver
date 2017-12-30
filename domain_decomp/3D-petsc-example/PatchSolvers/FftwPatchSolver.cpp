@@ -81,27 +81,20 @@ void FftwPatchSolver::addDomain(Domain &d)
 		denom.resize(n * n * n);
 		// create denom vector
 		// z direction
-		if (d.neumann.none()) {
+		if (d.isNeumann(Side::bottom) && d.isNeumann(Side::top)) {
+			for (int zi = 0; zi < n; zi++) {
+				denom[slice(zi * n * n, n * n, 1)]
+				= -4 / (h_z * h_z) * pow(sin(zi * M_PI / (2 * n)), 2);
+			}
+		} else if (d.isNeumann(Side::bottom) || d.isNeumann(Side::top)) {
+			for (int zi = 0; zi < n; zi++) {
+				denom[slice(zi * n * n, n * n, 1)]
+				= -4 / (h_z * h_z) * pow(sin((zi + 0.5) * M_PI / (2 * n)), 2);
+			}
+		} else {
 			for (int zi = 0; zi < n; zi++) {
 				denom[slice(zi * n * n, n * n, 1)]
 				= -4 / (h_z * h_z) * pow(sin((zi + 1) * M_PI / (2 * n)), 2);
-			}
-		} else {
-			if (d.isNeumann(Side::north) && d.isNeumann(Side::south)) {
-				for (int zi = 0; zi < n; zi++) {
-					denom[slice(zi * n * n, n * n, 1)]
-					= -4 / (h_z * h_z) * pow(sin(zi * M_PI / (2 * n)), 2);
-				}
-			} else if (d.isNeumann(Side::south) || d.isNeumann(Side::north)) {
-				for (int zi = 0; zi < n; zi++) {
-					denom[slice(zi * n * n, n * n, 1)]
-					= -4 / (h_z * h_z) * pow(sin((zi + 0.5) * M_PI / (2 * n)), 2);
-				}
-			} else {
-				for (int zi = 0; zi < n; zi++) {
-					denom[slice(zi * n * n, n * n, 1)]
-					= -4 / (h_z * h_z) * pow(sin((zi + 1) * M_PI / (2 * n)), 2);
-				}
 			}
 		}
 
@@ -113,54 +106,40 @@ void FftwPatchSolver::addDomain(Domain &d)
 		valarray<size_t> strides(2);
 		strides[0] = n * n;
 		strides[1] = 1;
-		if (d.neumann.none()) {
+		if (d.isNeumann(Side::south) && d.isNeumann(Side::north)) {
+			for (int yi = 0; yi < n; yi++) {
+				denom[gslice(yi * n, sizes, strides)]
+				-= 4 / (h_y * h_y) * pow(sin(yi * M_PI / (2 * n)), 2) * ones;
+			}
+		} else if (d.isNeumann(Side::south) || d.isNeumann(Side::north)) {
+			for (int yi = 0; yi < n; yi++) {
+				denom[gslice(yi * n, sizes, strides)]
+				-= 4 / (h_y * h_y) * pow(sin((yi + 0.5) * M_PI / (2 * n)), 2) * ones;
+			}
+		} else {
 			for (int yi = 0; yi < n; yi++) {
 				denom[gslice(yi * n, sizes, strides)]
 				-= 4 / (h_y * h_y) * pow(sin((yi + 1) * M_PI / (2 * n)), 2) * ones;
-			}
-		} else {
-			if (d.isNeumann(Side::north) && d.isNeumann(Side::south)) {
-				for (int yi = 0; yi < n; yi++) {
-					denom[slice(yi * n, n, 1)]
-					= -4 / (h_y * h_y) * pow(sin(yi * M_PI / (2 * n)), 2);
-				}
-			} else if (d.isNeumann(Side::south) || d.isNeumann(Side::north)) {
-				for (int yi = 0; yi < n; yi++) {
-					denom[slice(yi * n, n, 1)]
-					= -4 / (h_y * h_y) * pow(sin((yi + 0.5) * M_PI / (2 * n)), 2);
-				}
-			} else {
-				for (int yi = 0; yi < n; yi++) {
-					denom[slice(yi * n, n, 1)]
-					= -4 / (h_y * h_y) * pow(sin((yi + 1) * M_PI / (2 * n)), 2);
-				}
 			}
 		}
 
 		// x direction
 		strides[0] = n * n;
 		strides[1] = n;
-		if (d.neumann.none()) {
+		if (d.isNeumann(Side::west) && d.isNeumann(Side::east)) {
+			for (int xi = 0; xi < n; xi++) {
+				denom[gslice(xi, sizes, strides)]
+				-= 4 / (h_x * h_x) * pow(sin(xi * M_PI / (2 * n)), 2) * ones;
+			}
+		} else if (d.isNeumann(Side::west) || d.isNeumann(Side::east)) {
+			for (int xi = 0; xi < n; xi++) {
+				denom[gslice(xi, sizes, strides)]
+				-= 4 / (h_x * h_x) * pow(sin((xi + 0.5) * M_PI / (2 * n)), 2) * ones;
+			}
+		} else {
 			for (int xi = 0; xi < n; xi++) {
 				denom[gslice(xi, sizes, strides)]
 				-= 4 / (h_x * h_x) * pow(sin((xi + 1) * M_PI / (2 * n)), 2) * ones;
-			}
-		} else {
-			if (d.isNeumann(Side::east) && d.isNeumann(Side::west)) {
-				for (int xi = 0; xi < n; xi++) {
-					denom[slice(xi, n, n)]
-					-= 4 / (h_x * h_x) * pow(sin(xi * M_PI / (2 * n)), 2) * ones;
-				}
-			} else if (d.isNeumann(Side::west) || d.isNeumann(Side::east)) {
-				for (int xi = 0; xi < n; xi++) {
-					denom[slice(xi, n, n)]
-					-= 4 / (h_x * h_x) * pow(sin((xi + 0.5) * M_PI / (2 * n)), 2) * ones;
-				}
-			} else {
-				for (int xi = 0; xi < n; xi++) {
-					denom[slice(xi, n, n)]
-					-= 4 / (h_x * h_x) * pow(sin((xi + 1) * M_PI / (2 * n)), 2) * ones;
-				}
 			}
 		}
 		denom += lambda;
@@ -177,26 +156,26 @@ FftwPatchSolver::~FftwPatchSolver()
 }
 void FftwPatchSolver::solve(Domain &d, const Vec f, Vec u, const Vec gamma)
 {
-	double h_x = d.x_length / n;
-	double h_y = d.x_length / n;
-	double h_z = d.x_length / n;
-    auto getSpacing = [=](Side s){
-        double retval=0;
-        switch(s){
-            case Side::east:
-            case Side::west:
-                retval=h_x;
-                break;
-            case Side::south:
-            case Side::north:
-                retval=h_y;
-                break;
-            case Side::bottom:
-            case Side::top:
-                retval=h_z;
-        }
-        return retval;
-    };
+	double h_x      = d.x_length / n;
+	double h_y      = d.x_length / n;
+	double h_z      = d.x_length / n;
+	auto getSpacing = [=](Side s) {
+		double retval = 0;
+		switch (s) {
+			case Side::east:
+			case Side::west:
+				retval = h_x;
+				break;
+			case Side::south:
+			case Side::north:
+				retval = h_y;
+				break;
+			case Side::bottom:
+			case Side::top:
+				retval = h_z;
+		}
+		return retval;
+	};
 
 	double *f_view, *gamma_view;
 	VecGetArray(f, &f_view);
@@ -210,9 +189,9 @@ void FftwPatchSolver::solve(Domain &d, const Vec f, Vec u, const Vec gamma)
 	Side s = Side::west;
 	do {
 		if (d.hasNbr(s)) {
-			int   idx = n * n * d.index(s);
-			Slice sl  = getSlice(&f_copy[0],n, s);
-            double h2 = pow(getSpacing(s),2);
+			int    idx = n * n * d.index(s);
+			Slice  sl  = getSlice(&f_copy[0], n, s);
+			double h2  = pow(getSpacing(s), 2);
 			for (int yi = 0; yi < n; yi++) {
 				for (int xi = 0; xi < n; xi++) {
 					sl(xi, yi) -= 2.0 / h2 * gamma_view[idx + xi + yi * n];
