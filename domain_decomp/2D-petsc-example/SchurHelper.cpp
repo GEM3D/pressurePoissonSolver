@@ -27,6 +27,7 @@ void SchurHelper::solveWithInterface(const Vec f, Vec u, const Vec gamma, Vec di
 	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 
+    VecScale(local_interp,0);
 	// solve over domains on this proc
 	for (auto &p : dc.domains) {
 		Domain &d = p.second;
