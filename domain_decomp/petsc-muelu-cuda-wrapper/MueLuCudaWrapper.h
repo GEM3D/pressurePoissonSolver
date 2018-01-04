@@ -14,5 +14,7 @@ class MueLuCudaWrapper
 	~MueLuCudaWrapper();
 
 	void solve(Vec x, Vec b);
+    static void initialize();
+    static void finalize();
 };
 #endif

@@ -1,12 +1,11 @@
 #include "DomainCollection.h"
-#include "FivePtPatchOperator.h"
 #include "FunctionWrapper.h"
 #include "Init.h"
 #include "MatrixHelper.h"
 #include "PatchSolvers/FftwPatchSolver.h"
-#include "PatchSolvers/FishpackPatchSolver.h"
-#include "QuadInterpolator.h"
 #include "SchurHelper.h"
+#include "SevenPtPatchOperator.h"
+#include "TriLinInterp.h"
 #include "Writers/ClawWriter.h"
 #include "Writers/MMWriter.h"
 #ifdef ENABLE_AMGX
@@ -78,8 +77,8 @@ int main(int argc, char *argv[])
 
 	// mesh options
 	args::ValueFlag<string> f_mesh(parser, "file_name", "read in a mesh", {"mesh"});
-	args::ValueFlag<int>    f_square(parser, "num_domains",
-	                              "create a num_domains x num_domains square of grids", {"square"});
+	args::ValueFlag<int>    f_cube(parser, "num_domains",
+	                              "create a num_domains^3 cube of grids", {"cube"});
 	args::ValueFlag<int> f_amr(parser, "num_domains", "create a num_domains x num_domains square "
 	                                                  "of grids, and a num_domains*2 x "
 	                                                  "num_domains*2 refined square next to it",
@@ -109,8 +108,7 @@ int main(int argc, char *argv[])
 	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
 	args::Flag f_zero(parser, "zero", "solve zero function", {"zero"});
 
-	// patch solvers
-	args::Flag f_fish(parser, "fishpack", "use fishpack as the patch solver", {"fishpack"});
+// patch solvers
 #ifdef __NVCC__
 	args::Flag f_cufft(parser, "cufft", "use CuFFT as the patch solver", {"cufft"});
 #endif
@@ -178,13 +176,13 @@ int main(int argc, char *argv[])
 	DomainCollection dc;
 	if (f_mesh) {
 		string d = args::get(f_mesh);
-		dc       = DomainCollection(d);
+		//	dc       = DomainCollection(d);
 	} else if (f_amr) {
 		int d = args::get(f_amr);
-		dc    = DomainCollection(d, d, true);
+		//	dc    = DomainCollection(d, d, true);
 	} else {
-		int d = args::get(f_square);
-		dc    = DomainCollection(d, d);
+		int d = args::get(f_cube);
+		dc    = DomainCollection(d, d, d);
 	}
 	if (f_div) {
 		for (int i = 0; i < args::get(f_div); i++) {
@@ -210,52 +208,63 @@ int main(int argc, char *argv[])
 	}
 
 	// the functions that we are using
-	function<double(double, double)> ffun;
-	function<double(double, double)> gfun;
-	function<double(double, double)> nfun;
-	function<double(double, double)> nfuny;
+	function<double(double, double, double)> ffun;
+	function<double(double, double, double)> gfun;
+	function<double(double, double, double)> nfunx;
+	function<double(double, double, double)> nfuny;
+	function<double(double, double, double)> nfunz;
 
 	if (f_zero) {
-		ffun  = [](double x, double y) { return 0; };
-		gfun  = [](double x, double y) { return 0; };
-		nfun  = [](double x, double y) { return 0; };
-		nfuny = [](double x, double y) { return 0; };
+		ffun  = [](double x, double y, double z) { return 0; };
+		gfun  = [](double x, double y, double z) { return 0; };
+		nfunx = [](double x, double y, double z) { return 0; };
+		nfuny = [](double x, double y, double z) { return 0; };
+		nfunz = [](double x, double y, double z) { return 0; };
 	} else if (f_gauss) {
-		gfun = [](double x, double y) { return exp(cos(10 * M_PI * x)) - exp(cos(11 * M_PI * y)); };
-		ffun = [](double x, double y) {
+		gfun = [](double x, double y, double z) {
+			return exp(cos(10 * M_PI * x)) - exp(cos(11 * M_PI * y));
+		};
+		ffun = [](double x, double y, double z) {
 			return 100 * M_PI * M_PI * (pow(sin(10 * M_PI * x), 2) - cos(10 * M_PI * x))
 			       * exp(cos(10 * M_PI * x))
 			       + 121 * M_PI * M_PI * (cos(11 * M_PI * y) - pow(sin(11 * M_PI * y), 2))
 			         * exp(cos(11 * M_PI * y));
 		};
-		nfun = [](double x, double y) {
+		nfunx = [](double x, double y, double z) {
 			return -10 * M_PI * sin(10 * M_PI * x) * exp(cos(10 * M_PI * x));
 		};
 
-		nfuny = [](double x, double y) {
+		nfuny = [](double x, double y, double z) {
 			return 11 * M_PI * sin(11 * M_PI * y) * exp(cos(11 * M_PI * y));
 		};
+		nfunz = [](double x, double y, double z) { return 0; };
 	} else {
-		ffun
-		= [](double x, double y) { return -5 * M_PI * M_PI * sinl(M_PI * y) * cosl(2 * M_PI * x); };
-		gfun  = [](double x, double y) { return sinl(M_PI * y) * cosl(2 * M_PI * x); };
-		nfun  = [](double x, double y) { return -2 * M_PI * sinl(M_PI * y) * sinl(2 * M_PI * x); };
-		nfuny = [](double x, double y) { return M_PI * cosl(M_PI * y) * cosl(2 * M_PI * x); };
+		ffun = [](double x, double y, double z) {
+			return -9 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
+		};
+		gfun = [](double x, double y, double z) {
+			return sin(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
+		};
+		nfunx = [](double x, double y, double z) {
+			return M_PI * cos(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
+		};
+		nfuny = [](double x, double y, double z) {
+			return -2 * M_PI * sin(M_PI * x) * sin(2 * M_PI * y) * sin(2 * M_PI * z);
+		};
+		nfunz = [](double x, double y, double z) {
+			return 2 * M_PI * sin(M_PI * x) * cos(2 * M_PI * y) * cos(2 * M_PI * z);
+		};
 	}
 
 	// set the patch solver
 	shared_ptr<PatchSolver> p_solver;
-	if (f_fish) {
-		p_solver.reset(new FishpackPatchSolver());
-	} else {
-		p_solver.reset(new FftwPatchSolver(dc));
-	}
+	p_solver.reset(new FftwPatchSolver(dc));
 
 	// patch operator
-	shared_ptr<PatchOperator> p_operator(new FivePtPatchOperator());
+	shared_ptr<PatchOperator> p_operator(new SevenPtPatchOperator());
 
 	// interface interpolator
-	shared_ptr<Interpolator> p_interp(new QuadInterpolator());
+	shared_ptr<Interpolator> p_interp(new TriLinInterp());
 
 #ifdef ENABLE_AMGX
 	AmgxWrapper *amgxsolver = nullptr;
@@ -281,7 +290,7 @@ int main(int argc, char *argv[])
 		PW<Vec> f     = dc.getNewDomainVec();
 
 		if (f_neumann) {
-			Init::initNeumann(dc, n, f, exact, ffun, gfun, nfun, nfuny);
+			Init::initNeumann(dc, n, f, exact, ffun, gfun, nfunx, nfuny, nfunz);
 		} else {
 			Init::initDirichlet(dc, n, f, exact, ffun, gfun);
 		}
@@ -301,7 +310,7 @@ int main(int argc, char *argv[])
 		KSPSetFromOptions(solver);
 
 		if (f_neumann && !f_nozerof) {
-			double fdiff = dc.integrate(f) / dc.area();
+			double fdiff = dc.integrate(f) / dc.volume();
 			if (my_global_rank == 0) cout << "Fdiff: " << fdiff << endl;
 			VecShift(f, -fdiff);
 		}
@@ -337,7 +346,6 @@ int main(int argc, char *argv[])
 			timer.start("Linear System Setup");
 
 			if (f_wrapper) {
-				// Create a function wrapper
 				w.reset(new FuncWrap(&sch, &dc));
 				A = w->getMatrix();
 			} else {
@@ -477,8 +485,8 @@ int main(int argc, char *argv[])
 		PW<Vec> error = dc.getNewDomainVec();
 		VecAXPBYPCZ(error, -1.0, 1.0, 0.0, exact, u);
 		if (f_neumann) {
-			double uavg = dc.integrate(u) / dc.area();
-			double eavg = dc.integrate(exact) / dc.area();
+			double uavg = dc.integrate(u) / dc.volume();
+			double eavg = dc.integrate(exact) / dc.volume();
 
 			if (my_global_rank == 0) {
 				cout << "Average of computed solution: " << uavg << endl;
@@ -531,6 +539,7 @@ int main(int argc, char *argv[])
 			writer.add(u, "Solution");
 			writer.add(error, "Error");
 			writer.add(resid, "Residual");
+			writer.add(f, "RHS");
 			writer.write();
 		}
 #endif
