@@ -75,7 +75,7 @@ include_directories(${CUDA_INCLUDE_DIRS})
 endif()
 include_directories(${AMGX_INCLUDE_DIRS})
 include_directories(${PETSC_INCLUDES})
-    include_directories(${Zoltan_INCLUDES})
+include_directories(${Zoltan_INCLUDES})
 
 # Add to the library path Trilinos' library path, and the library
 # paths of the third-party libraries (TPLs) with which Trilinos was

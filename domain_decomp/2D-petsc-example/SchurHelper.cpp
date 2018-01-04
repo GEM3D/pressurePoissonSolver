@@ -1,6 +1,7 @@
 #include "SchurHelper.h"
 #include <array>
 #include <tuple>
+#include <numeric>
 using namespace std;
 enum axis_enum { X_AXIS, Y_AXIS };
 enum bc_enum { DIRICHLET, NEUMANN, REFINED };
