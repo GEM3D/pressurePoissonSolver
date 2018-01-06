@@ -8,6 +8,7 @@
 #include <set>
 #include <sstream>
 #include <utility>
+#include <numeric>
 #include <zoltan.h>
 using namespace std;
 DomainCollection::DomainCollection(string file_name)

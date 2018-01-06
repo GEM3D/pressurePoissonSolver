@@ -7,7 +7,7 @@
 #include <map>
 #include <valarray>
 struct DomainK {
-	ulong  neumann = 0;
+	unsigned long  neumann = 0;
 	double h_x     = 0;
 	double h_y     = 0;
 
