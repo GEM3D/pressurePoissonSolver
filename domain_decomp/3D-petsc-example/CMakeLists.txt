@@ -28,7 +28,7 @@ set (CMAKE_CXX_FLAGS "-Wall --std=c++11 -O3 ${CMAKE_CXX_FLAGS}")
 if(NUM_GPU)
     set (CMAKE_CXX_FLAGS "-DNUM_GPU=${NUM_GPU} ${CMAKE_CXX_FLAGS}")
 endif()
-set (CMAKE_CXX_FLAGS_DEBUG  "-Wall --std=c++11 -g -O0 ")
+set (CMAKE_CXX_FLAGS_DEBUG  "-Wall --std=c++11 -g -O3 ")
   MESSAGE("Setting CXX compiler.")
   SET(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
 
@@ -96,7 +96,7 @@ link_directories("${Zoltan_DIR}/lib")
 add_executable(steady steady.cpp)
 add_library(SchurHelper SchurHelper.cpp)
 add_library(MatrixHelper MatrixHelper.cpp)
-add_library(DomainCollection DomainCollection.cpp)
+add_library(DomainCollection DomainCollection.cpp OctTree.cpp)
 add_library(Interpolators TriLinInterp.cpp)
 add_library(Init Init.cpp)
 
@@ -144,7 +144,7 @@ target_link_libraries(AmgxWrapper
    ${AMGX_LIBRARIES}
 )
 endif()
-target_link_libraries(DomainCollection
+target_link_libraries(DomainCollection 
     ${Zoltan_LIBRARIES}
     "-L/cm/shared/apps/parmetis/4.0.3/lib/ -lparmetis -lmetis  -lm" 
 )

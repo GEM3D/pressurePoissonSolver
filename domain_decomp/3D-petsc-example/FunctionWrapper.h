@@ -2,6 +2,7 @@
 #define FUNCTIONWRAPPER_H
 #include "SchurHelper.h"
 #include <iostream>
+#include <petscpc.h>
 class FuncWrap
 {
 	public:
@@ -34,4 +35,30 @@ class FuncWrap
 		return A;
 	}
 };
+class SchwarzPrec
+{
+	public:
+	SchurHelper *     sh = nullptr;
+	DomainCollection *dc = nullptr;
+	SchwarzPrec()        = default;
+	SchwarzPrec(SchurHelper *sh, DomainCollection *dc)
+	{
+		this->sh = sh;
+		this->dc = dc;
+	}
+	static int multiply(PC A, Vec f, Vec u)
+	{
+		SchwarzPrec *w = nullptr;
+		PCShellGetContext(A,(void**) &w);
+		w->sh->solveWithSolution(f, u);
+		return 0;
+	}
+	void getPrec(PC P)
+	{
+        PCSetType(P,PCSHELL);
+		PCShellSetContext(P, this);
+		PCShellSetApply(P,  multiply);
+	}
+};
+
 #endif

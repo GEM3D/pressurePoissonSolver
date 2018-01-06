@@ -18,13 +18,19 @@ struct Domain {
 
 	int refine_level = 1;
 
-	std::array<int, 6> nbr_id        = {{-1, -1, -1, -1, -1, -1}};
-	std::array<int, 6> nbr_id_local  = {{-1, -1, -1, -1, -1, -1}};
-	std::array<int, 6> nbr_id_global = {{-1, -1, -1, -1, -1, -1}};
-	std::array<int, 6> proc          = {{-1, -1, -1, -1, -1, -1}};
-	std::array<int, 6> global_i      = {{-1, -1, -1, -1, -1, -1}};
-	std::array<int, 6> local_i       = {{-1, -1, -1, -1, -1, -1}};
+	std::array<int, 24> nbr_id = {{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	                               -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1}};
+	std::array<int, 24> nbr_id_local = {{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	                                     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1}};
+	std::array<int, 24> nbr_id_global = {{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	                                      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1}};
+	std::array<int, 6> proc     = {{-1}};
+	std::array<int, 6> global_i = {{-1}};
+	std::array<int, 6> local_i  = {{-1}};
 	std::bitset<6> neumann;
+	std::bitset<6> coarse_nbr;
+	std::bitset<6> fine_nbr;
+	std::array<int, 6> coarse_quad = {{-1,-1,-1,-1,-1,-1}};
 	bool           zero_patch = false;
 	/**
 	 * @brief The lower left x coordinate of domain
@@ -48,24 +54,31 @@ struct Domain {
 	friend bool operator<(const Domain &l, const Domain &r) { return l.id < r.id; }
 	inline int gid(Side s)
 	{
-		int retval=-1;
-        if(hasNbr(s)){
-		if (s % 2 == 0) {
-            //lower side
-			retval = nbr(s) ^ ~s;
-		} else {
-            //upper side
-			retval = id ^ s;
-		}
+		int retval = -1;
+		if (hasNbr(s)) {
+			if (s % 2 == 0) {
+				// lower side
+				retval = nbr(s) ^ ~s;
+			} else {
+				// upper side
+				retval = id ^ s;
+			}
 		}
 		return retval;
 	}
 	int &globalIndex(Side s) { return global_i[static_cast<int>(s)]; }
 	int &index(Side s) { return local_i[static_cast<int>(s)]; }
-	inline int &nbr(Side s) { return nbr_id[static_cast<int>(s)]; }
-	inline int &globalNbr(Side s) { return nbr_id_global[static_cast<int>(s)]; }
-	inline bool hasNbr(Side s) const { return nbr_id[static_cast<int>(s)] != -1; }
+	inline int &nbr(Side s) { return nbr_id[static_cast<int>(s) * 4]; }
+	inline int &nbr(Side s,int quad) { return nbr_id[static_cast<int>(s) * 4+quad]; }
+	inline int &globalNbr(Side s) { return nbr_id_global[static_cast<int>(s) * 4]; }
+	inline int &globalNbr(Side s,int quad) { return nbr_id_global[static_cast<int>(s) * 4+quad]; }
+	inline bool hasNbr(Side s) const { return nbr_id[static_cast<int>(s) * 4] != -1; }
 	inline bool isNeumann(Side s) const { return neumann[static_cast<int>(s)]; }
+	inline void setHasCoarseNbr(Side s)  { coarse_nbr[static_cast<int>(s)]=true; }
+	inline bool hasCoarseNbr(Side s) const { return coarse_nbr[static_cast<int>(s)]; }
+	inline void setHasFineNbr(Side s)  { fine_nbr[static_cast<int>(s)]=true; }
+	inline bool hasFineNbr(Side s) const { return fine_nbr[static_cast<int>(s)]; }
+	inline int &quadOnCoarse(Side s) { return coarse_quad[static_cast<int>(s)]; }
 	void setLocalIndexes(std::map<int, int> &rev_map)
 	{
 		for (int i = 0; i < 6; i++) {
@@ -78,7 +91,7 @@ struct Domain {
 	void setLocalNeighborIndexes(std::map<int, int> &rev_map)
 	{
 		id_local = rev_map.at(id);
-		for (int i = 0; i < 6; i++) {
+		for (int i = 0; i < 24; i++) {
 			if (nbr_id[i] != -1) {
 				nbr_id_local[i] = rev_map.at(nbr_id[i]);
 			}
@@ -97,7 +110,7 @@ struct Domain {
 	void setGlobalNeighborIndexes(std::map<int, int> &rev_map)
 	{
 		id_global = rev_map.at(id_local);
-		for (int i = 0; i < 6; i++) {
+		for (int i = 0; i < 24; i++) {
 			if (nbr_id_local[i] != -1) {
 				nbr_id_global[i] = rev_map.at(nbr_id_local[i]);
 			}
@@ -107,20 +120,6 @@ struct Domain {
 	{
 		for (int q = 0; q < 6; q++) {
 			neumann[q] = !hasNbr(static_cast<Side>(q));
-		}
-	}
-	std::bitset<4> neumannRelative(Side s)
-	{
-		std::bitset<4> ret;
-		for (int q = 0; q < 4; q++) {
-			ret[q] = neumann[(static_cast<int>(s) + q) % 4];
-		}
-		return ret;
-	}
-	void setZeroPatch()
-	{
-		if (id == 0) {
-			zero_patch = true;
 		}
 	}
 	std::array<int, 6> g_id()
@@ -134,7 +133,7 @@ struct Domain {
 				retval[i] = -1;
 			}
 		}
-        return retval;
+		return retval;
 	}
 };
 #endif

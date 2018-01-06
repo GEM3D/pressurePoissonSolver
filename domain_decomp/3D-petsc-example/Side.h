@@ -1,7 +1,34 @@
 #ifndef SIDEENUM_H
 #define SIDEENUM_H
+#include <array>
 #include <iostream>
 enum class Side : char { west, east, south, north, bottom, top };
+enum class Oct : char { bsw, bse, bnw, bne, tsw, tse, tnw, tne };
+inline std::array<Oct, 6> getOctsOnSide(Side s)
+{
+	std::array<Oct, 6> retval;
+	switch (s) {
+		case Side::west:
+			retval = {{Oct::bsw, Oct::bnw, Oct::tsw, Oct::tnw}};
+			break;
+		case Side::east:
+			retval = {{Oct::bse, Oct::bne, Oct::tse, Oct::tne}};
+			break;
+		case Side::south:
+			retval = {{Oct::bsw, Oct::bse, Oct::tsw, Oct::tse}};
+			break;
+		case Side::north:
+			retval = {{Oct::bnw, Oct::bne, Oct::tnw, Oct::tne}};
+			break;
+		case Side::bottom:
+			retval = {{Oct::bsw, Oct::bse, Oct::bnw, Oct::bne}};
+			break;
+		case Side::top:
+			retval = {{Oct::tsw, Oct::tse, Oct::tnw, Oct::tne}};
+			break;
+	}
+	return retval;
+}
 inline Side operator++(Side &s, int i)
 {
 	s = static_cast<Side>((static_cast<char>(s) + 1) % 6);

@@ -10,6 +10,77 @@
 #include <utility>
 #include <zoltan.h>
 using namespace std;
+DomainCollection::DomainCollection(OctTree t)
+{
+	OctNode root  = t.nodes[t.root];
+	OctNode child = root;
+	while (child.hasChildren()) {
+		child = t.nodes[child.child_id[0]];
+	}
+	deque<int> q;
+	set<int>   qed;
+	q.push_back(child.id);
+	qed.insert(child.id);
+
+	while (!q.empty()) {
+		Domain  d;
+		OctNode n = t.nodes[q.front()];
+		q.pop_front();
+
+		d.id   = n.id;
+		d.x_length = n.x_length;
+		d.y_length = n.y_length;
+		d.z_length = n.z_length;
+		d.x_start  = n.x_start;
+		d.y_start  = n.y_start;
+		d.z_start  = n.z_start;
+
+		Side s = Side::west;
+		// set and enqueue nbrs
+		do {
+			if (n.nbr(s) == -1 && n.parent != -1 && t.nodes[n.parent].nbr(s) != -1) {
+				d.setHasCoarseNbr(s);
+				d.nbr(s)       = n.nbr(s);
+				OctNode parent = t.nodes[n.parent];
+				OctNode nbr    = t.nodes[parent.nbr(s)];
+				auto    octs   = getOctsOnSide(s);
+				int     quad   = 0;
+				while (parent.child(octs[quad]) != n.id) {
+					quad++;
+				}
+				d.quadOnCoarse(s) = quad;
+				if (!qed.count(nbr.id)) {
+					q.push_back(nbr.id);
+					qed.insert(nbr.id);
+				}
+			} else if (n.nbr(s) != -1 && t.nodes[n.nbr(s)].hasChildren()) {
+				d.setHasFineNbr(s);
+				OctNode nbr       = t.nodes[n.nbr(s)];
+				auto octs = getOctsOnSide(~s);
+				for (int i = 0; i < 4; i++) {
+					int id = nbr.child(octs[i]);
+					d.nbr(s, i) = id;
+					if (!qed.count(id)) {
+						q.push_back(id);
+						qed.insert(id);
+					}
+				}
+			} else if (n.nbr(s) != -1) {
+				d.nbr(s) = n.nbr(s);
+				int id   = n.nbr(s);
+				if (!qed.count(id)) {
+					q.push_back(id);
+					qed.insert(id);
+				}
+			}
+            s++;
+		} while (s != Side::west);
+		domains[d.id] = d;
+	}
+	num_global_domains = domains.size();
+	enumerateIfaces();
+	reIndex();
+}
 DomainCollection::DomainCollection(int d_x, int d_y, int d_z)
 {
 	auto getID = [&](int x, int y, int z) { return x + y * d_y + z * d_z * d_z; };

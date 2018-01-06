@@ -2,6 +2,7 @@
 #include "FunctionWrapper.h"
 #include "Init.h"
 #include "MatrixHelper.h"
+#include "OctTree.h"
 #include "PatchSolvers/FftwPatchSolver.h"
 #include "SchurHelper.h"
 #include "SevenPtPatchOperator.h"
@@ -77,8 +78,8 @@ int main(int argc, char *argv[])
 
 	// mesh options
 	args::ValueFlag<string> f_mesh(parser, "file_name", "read in a mesh", {"mesh"});
-	args::ValueFlag<int>    f_cube(parser, "num_domains",
-	                              "create a num_domains^3 cube of grids", {"cube"});
+	args::ValueFlag<int>    f_cube(parser, "num_domains", "create a num_domains^3 cube of grids",
+	                            {"cube"});
 	args::ValueFlag<int> f_amr(parser, "num_domains", "create a num_domains x num_domains square "
 	                                                  "of grids, and a num_domains*2 x "
 	                                                  "num_domains*2 refined square next to it",
@@ -125,6 +126,7 @@ int main(int argc, char *argv[])
 	args::ValueFlag<string> f_meulucuda(parser, "", "solve schur compliment system with muelu",
 	                                    {"muelucuda"});
 #endif
+	args::Flag f_scharz(parser, "", "use schwarz preconditioner", {"scwharz"});
 
 	int num_procs;
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
@@ -175,8 +177,9 @@ int main(int argc, char *argv[])
 	///////////////
 	DomainCollection dc;
 	if (f_mesh) {
-		string d = args::get(f_mesh);
-		//	dc       = DomainCollection(d);
+		string  d = args::get(f_mesh);
+		OctTree t(d);
+		dc = DomainCollection(t);
 	} else if (f_amr) {
 		int d = args::get(f_amr);
 		//	dc    = DomainCollection(d, d, true);
@@ -302,7 +305,9 @@ int main(int argc, char *argv[])
 		PW<Vec>              diff  = dc.getNewSchurVec();
 		PW<Vec>              b     = dc.getNewSchurVec();
 		PW<Mat>              A;
+		PW<PC>              P;
 		shared_ptr<FuncWrap> w;
+		shared_ptr<SchwarzPrec> sp;
 
 		// Create linear problem for the Belos solver
 		PW<KSP> solver;
@@ -394,6 +399,10 @@ int main(int argc, char *argv[])
 				KSPSetUp(solver);
 				PC pc;
 				KSPGetPC(solver, &pc);
+                if(f_scharz){
+				    sp.reset(new SchwarzPrec(&sch, &dc));
+                    sp->getPrec(pc);
+                }
 				PCSetUp(pc);
 				timer.stop("Petsc Setup");
 			}
@@ -438,7 +447,7 @@ int main(int argc, char *argv[])
 				}
 #endif
 			} else {
-				KSPSetTolerances(solver, 0.0, tol, PETSC_DEFAULT, 5000);
+				KSPSetTolerances(solver, tol, PETSC_DEFAULT, PETSC_DEFAULT, 5000);
 				if (f_noschur) {
 					KSPSolve(solver, f, u);
 				} else {
@@ -497,6 +506,8 @@ int main(int argc, char *argv[])
 		}
 		double error_norm;
 		VecNorm(error, NORM_2, &error_norm);
+		double error_norm_inf;
+		VecNorm(error, NORM_INFINITY, &error_norm_inf);
 		double exact_norm;
 		VecNorm(exact, NORM_2, &exact_norm);
 
@@ -505,7 +516,8 @@ int main(int argc, char *argv[])
 		if (my_global_rank == 0) {
 			std::cout << std::scientific;
 			std::cout.precision(13);
-			std::cout << "Error: " << error_norm / exact_norm << endl;
+			std::cout << "Error (2-norm):   " << error_norm / exact_norm << endl;
+			std::cout << "Error (inf-norm): " << error_norm_inf <<endl;
 			std::cout << "Residual: " << residual / fnorm << endl;
 			std::cout << u8"ΣAu-Σf: " << ausum - fsum << endl;
 			cout.unsetf(std::ios_base::floatfield);

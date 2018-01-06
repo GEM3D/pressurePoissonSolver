@@ -177,9 +177,9 @@ void FftwPatchSolver::solve(Domain &d, const Vec f, Vec u, const Vec gamma)
 		return retval;
 	};
 
-	double *f_view, *gamma_view;
-	VecGetArray(f, &f_view);
-	VecGetArray(gamma, &gamma_view);
+	const double *f_view, *gamma_view;
+	VecGetArrayRead(f, &f_view);
+	VecGetArrayRead(gamma, &gamma_view);
 
 	int start = d.id_local * n * n * n;
 	for (int i = 0; i < n * n * n; i++) {
@@ -219,6 +219,6 @@ void FftwPatchSolver::solve(Domain &d, const Vec f, Vec u, const Vec gamma)
 		u_view[start + i] = sol[i];
 	}
 	VecRestoreArray(u, &u_view);
-	VecRestoreArray(f, &f_view);
-	VecRestoreArray(gamma, &gamma_view);
+	VecRestoreArrayRead(f, &f_view);
+	VecRestoreArrayRead(gamma, &gamma_view);
 }

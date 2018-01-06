@@ -3,6 +3,7 @@
 #include "Domain.h"
 #include "Iface.h"
 #include "InterpCase.h"
+#include "OctTree.h"
 #include "PW.h"
 #include "Side.h"
 #include <map>
@@ -57,6 +58,7 @@ class DomainCollection
 	 */
 	DomainCollection() = default;
 
+	DomainCollection(OctTree t);
 	/**
 	 * @brief Generate a grid of domains.
 	 *
