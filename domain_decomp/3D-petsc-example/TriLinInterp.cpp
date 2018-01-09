@@ -28,6 +28,8 @@ void TriLinInterp::interpolate(Domain &d, Side s, IfaceType itype, const Vec u, 
 				}
 			}
 		} break;
+        case IfaceType::coarse_from_coarse:
+        case IfaceType::coarse_from_fine_0:
 		default:
 			break;
 	}

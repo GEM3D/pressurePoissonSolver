@@ -47,6 +47,7 @@ class SchurHelper
 
 	public:
 	DomainCollection dc;
+    SchurHelper()=default;
 	/**
 	 * @brief Create a SchurHelper from a given DomainCollection
 	 *

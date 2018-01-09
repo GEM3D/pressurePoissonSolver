@@ -99,6 +99,7 @@ add_library(MatrixHelper MatrixHelper.cpp)
 add_library(DomainCollection DomainCollection.cpp OctTree.cpp)
 add_library(Interpolators TriLinInterp.cpp)
 add_library(Init Init.cpp)
+add_library(GMGHelper GMGHelper.cpp)
 
 #
 # EDIT HERE: Change trilinosExample to the name of the executable
@@ -111,6 +112,7 @@ target_link_libraries(steady
     DomainCollection
     Init
     MatrixHelper
+    GMGHelper
     FftwPatchSolver
     Interpolators
     MMWriter
@@ -151,3 +153,10 @@ target_link_libraries(DomainCollection
 
 add_subdirectory(PatchSolvers)
 add_subdirectory(Writers)
+SET( CMAKE_EXPORT_COMPILE_COMMANDS ON )
+IF( EXISTS "${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json" )
+  EXECUTE_PROCESS( COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
+    ${CMAKE_CURRENT_SOURCE_DIR}/compile_commands.json
+  )
+ENDIF()

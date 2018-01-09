@@ -6,12 +6,13 @@ template <typename X> class PW
 	protected:
 	X       obj       = nullptr;
 	size_t *ref_count = nullptr;
+    bool owns = true;
 	void    decrement()
 	{
 		if (ref_count != nullptr) {
 			--(*ref_count);
 			if (*ref_count == 0) {
-				if (obj != nullptr) {
+				if (obj != nullptr&&owns) {
 					PetscObjectDestroy((PetscObject *) &obj);
 				}
 				delete ref_count;
@@ -38,6 +39,15 @@ template <typename X> class PW
 		ref_count = other.ref_count;
 		obj       = other.obj;
 		++(*ref_count);
+		return *this;
+	}
+    PW &operator=(const X &other)
+	{
+		decrement();
+		ref_count = new size_t;
+		obj       = other;
+        owns = false;
+		(*ref_count)=1;
 		return *this;
 	}
 	operator X() { return obj; }

@@ -18,6 +18,9 @@ struct Domain {
 
 	int refine_level = 1;
 
+	int parent_id = -1;
+	std::array<int, 8> child_id = {{-1, -1, -1, -1, -1, -1, -1, -1}};
+
 	std::array<int, 24> nbr_id = {{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 	                               -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1}};
 	std::array<int, 24> nbr_id_local = {{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -30,8 +33,8 @@ struct Domain {
 	std::bitset<6> neumann;
 	std::bitset<6> coarse_nbr;
 	std::bitset<6> fine_nbr;
-	std::array<int, 6> coarse_quad = {{-1,-1,-1,-1,-1,-1}};
-	bool           zero_patch = false;
+	std::array<int, 6> coarse_quad = {{-1, -1, -1, -1, -1, -1}};
+	bool zero_patch = false;
 	/**
 	 * @brief The lower left x coordinate of domain
 	 */
@@ -69,14 +72,17 @@ struct Domain {
 	int &globalIndex(Side s) { return global_i[static_cast<int>(s)]; }
 	int &index(Side s) { return local_i[static_cast<int>(s)]; }
 	inline int &nbr(Side s) { return nbr_id[static_cast<int>(s) * 4]; }
-	inline int &nbr(Side s,int quad) { return nbr_id[static_cast<int>(s) * 4+quad]; }
+	inline int &nbr(Side s, int quad) { return nbr_id[static_cast<int>(s) * 4 + quad]; }
 	inline int &globalNbr(Side s) { return nbr_id_global[static_cast<int>(s) * 4]; }
-	inline int &globalNbr(Side s,int quad) { return nbr_id_global[static_cast<int>(s) * 4+quad]; }
+	inline int &globalNbr(Side s, int quad)
+	{
+		return nbr_id_global[static_cast<int>(s) * 4 + quad];
+	}
 	inline bool hasNbr(Side s) const { return nbr_id[static_cast<int>(s) * 4] != -1; }
 	inline bool isNeumann(Side s) const { return neumann[static_cast<int>(s)]; }
-	inline void setHasCoarseNbr(Side s)  { coarse_nbr[static_cast<int>(s)]=true; }
+	inline void setHasCoarseNbr(Side s) { coarse_nbr[static_cast<int>(s)] = true; }
 	inline bool hasCoarseNbr(Side s) const { return coarse_nbr[static_cast<int>(s)]; }
-	inline void setHasFineNbr(Side s)  { fine_nbr[static_cast<int>(s)]=true; }
+	inline void setHasFineNbr(Side s) { fine_nbr[static_cast<int>(s)] = true; }
 	inline bool hasFineNbr(Side s) const { return fine_nbr[static_cast<int>(s)]; }
 	inline int &quadOnCoarse(Side s) { return coarse_quad[static_cast<int>(s)]; }
 	void setLocalIndexes(std::map<int, int> &rev_map)

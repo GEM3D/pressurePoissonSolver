@@ -6,6 +6,8 @@
 struct OctTree {
 	std::map<int, OctNode> nodes;
 	int root;
+    int num_levels=1;
+    OctTree()=default;
 	OctTree(std::string file_name);
 };
 #endif

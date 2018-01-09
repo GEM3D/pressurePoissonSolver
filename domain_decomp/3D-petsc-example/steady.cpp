@@ -6,9 +6,12 @@
 #include "PatchSolvers/FftwPatchSolver.h"
 #include "SchurHelper.h"
 #include "SevenPtPatchOperator.h"
+#include "Timer.h"
 #include "TriLinInterp.h"
 #include "Writers/ClawWriter.h"
 #include "Writers/MMWriter.h"
+#include "args.h"
+#include "GMGHelper.h"
 #ifdef ENABLE_AMGX
 #include "AmgxWrapper.h"
 #endif
@@ -21,8 +24,6 @@
 #ifdef HAVE_VTK
 #include "Writers/VtkWriter.h"
 #endif
-#include "Timer.h"
-#include "args.h"
 #include <cmath>
 #include <iostream>
 #include <memory>
@@ -87,9 +88,11 @@ int main(int argc, char *argv[])
 
 	// output options
 	args::Flag f_outclaw(parser, "outclaw", "output amrclaw ascii file", {"outclaw"});
+
 #ifdef HAVE_VTK
 	args::ValueFlag<string> f_outvtk(parser, "", "output to vtk format", {"outvtk"});
 #endif
+
 	args::ValueFlag<string> f_m(parser, "matrix filename", "the file to write the matrix to",
 	                            {'m'});
 	args::ValueFlag<string> f_s(parser, "solution filename", "the file to write the solution to",
@@ -126,7 +129,8 @@ int main(int argc, char *argv[])
 	args::ValueFlag<string> f_meulucuda(parser, "", "solve schur compliment system with muelu",
 	                                    {"muelucuda"});
 #endif
-	args::Flag f_scharz(parser, "", "use schwarz preconditioner", {"scwharz"});
+	args::Flag f_scharz(parser, "", "use schwarz preconditioner", {"schwarz"});
+	args::Flag f_gmg(parser, "", "use GMG preconditioner", {"gmg"});
 
 	int num_procs;
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
@@ -176,9 +180,10 @@ int main(int argc, char *argv[])
 	// Create Mesh
 	///////////////
 	DomainCollection dc;
+    OctTree t;
 	if (f_mesh) {
 		string  d = args::get(f_mesh);
-		OctTree t(d);
+		t = OctTree(d);
 		dc = DomainCollection(t);
 	} else if (f_amr) {
 		int d = args::get(f_amr);
@@ -301,13 +306,14 @@ int main(int argc, char *argv[])
 		timer.stop("Domain Initialization");
 
 		// Create the gamma and diff vectors
-		PW<Vec>              gamma = dc.getNewSchurVec();
-		PW<Vec>              diff  = dc.getNewSchurVec();
-		PW<Vec>              b     = dc.getNewSchurVec();
-		PW<Mat>              A;
-		PW<PC>              P;
-		shared_ptr<FuncWrap> w;
+		PW<Vec>                 gamma = dc.getNewSchurVec();
+		PW<Vec>                 diff  = dc.getNewSchurVec();
+		PW<Vec>                 b     = dc.getNewSchurVec();
+		PW<Mat>                 A;
+		PW<PC>                  P;
+		shared_ptr<FuncWrap>    w;
 		shared_ptr<SchwarzPrec> sp;
+		shared_ptr<GMGHelper> gh;
 
 		// Create linear problem for the Belos solver
 		PW<KSP> solver;
@@ -399,10 +405,14 @@ int main(int argc, char *argv[])
 				KSPSetUp(solver);
 				PC pc;
 				KSPGetPC(solver, &pc);
-                if(f_scharz){
-				    sp.reset(new SchwarzPrec(&sch, &dc));
-                    sp->getPrec(pc);
-                }
+				if (f_scharz) {
+					sp.reset(new SchwarzPrec(&sch, &dc));
+					sp->getPrec(pc);
+				}
+				if (f_gmg) {
+					gh.reset(new GMGHelper(n,t, p_solver, p_operator, p_interp));
+					gh->getPrec(pc);
+				}
 				PCSetUp(pc);
 				timer.stop("Petsc Setup");
 			}
@@ -517,7 +527,7 @@ int main(int argc, char *argv[])
 			std::cout << std::scientific;
 			std::cout.precision(13);
 			std::cout << "Error (2-norm):   " << error_norm / exact_norm << endl;
-			std::cout << "Error (inf-norm): " << error_norm_inf <<endl;
+			std::cout << "Error (inf-norm): " << error_norm_inf << endl;
 			std::cout << "Residual: " << residual / fnorm << endl;
 			std::cout << u8"ΣAu-Σf: " << ausum - fsum << endl;
 			cout.unsetf(std::ios_base::floatfield);

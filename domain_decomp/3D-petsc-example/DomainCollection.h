@@ -59,6 +59,7 @@ class DomainCollection
 	DomainCollection() = default;
 
 	DomainCollection(OctTree t);
+	DomainCollection(OctTree t, int level);
 	/**
 	 * @brief Generate a grid of domains.
 	 *

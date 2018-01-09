@@ -46,18 +46,20 @@ class SchwarzPrec
 		this->sh = sh;
 		this->dc = dc;
 	}
+	void apply(Vec f, Vec u) { sh->solveWithSolution(f, u); }
 	static int multiply(PC A, Vec f, Vec u)
 	{
 		SchwarzPrec *w = nullptr;
-		PCShellGetContext(A,(void**) &w);
-		w->sh->solveWithSolution(f, u);
+		PCShellGetContext(A, (void **) &w);
+		VecScale(u, 0);
+		w->apply(f, u);
 		return 0;
 	}
 	void getPrec(PC P)
 	{
-        PCSetType(P,PCSHELL);
+		PCSetType(P, PCSHELL);
 		PCShellSetContext(P, this);
-		PCShellSetApply(P,  multiply);
+		PCShellSetApply(P, multiply);
 	}
 };
 

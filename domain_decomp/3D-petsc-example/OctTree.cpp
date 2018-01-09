@@ -19,9 +19,13 @@ OctTree::OctTree(string file_name)
 		input.read((char *) &n.nbr_id[0], 6 * 4);
 		input.read((char *) &n.child_id[0], 8 * 4);
 
-		if (i == 1) {
+		if (i == 0) {
 			root = n.id;
 		}
 		nodes[n.id] = n;
+
+		if (n.level > num_levels) {
+			num_levels = n.level;
+		}
 	}
 }

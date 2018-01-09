@@ -50,9 +50,9 @@ void SchurHelper::solveWithSolution(const Vec f, Vec u)
 		Domain &d = p.second;
 		interpolator->interpolate(d, u, local_interp);
 	}
+	VecScale(gamma, 0);
 	VecScatterBegin(scatter, local_interp, gamma, ADD_VALUES, SCATTER_REVERSE);
 	VecScatterEnd(scatter, local_interp, gamma, ADD_VALUES, SCATTER_REVERSE);
-	VecScale(gamma, 0);
 	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 
@@ -224,7 +224,7 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 		ds.z_length  = 1;
 		ds.nbr_id[0] = 1;
 		// ds.neumann    = curr_type.neumann;
-		ds.local_i = {0, 0, 0, 0, 0, 0};
+		ds.local_i = {{0, 0, 0, 0, 0, 0}};
 		solver->addDomain(ds);
 
 		map<BlockKey, shared_ptr<valarray<double>>> coeffs;
