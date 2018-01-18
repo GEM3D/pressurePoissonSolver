@@ -1,7 +1,9 @@
 #include "SchurHelper.h"
+#include "PBMatrix.h"
 #include <array>
 #include <iostream>
 #include <tuple>
+#include <numeric>
 using namespace std;
 enum axis_enum { X_AXIS, Y_AXIS };
 enum bc_enum { DIRICHLET, NEUMANN, REFINED };
@@ -71,6 +73,24 @@ void SchurHelper::applyWithInterface(const Vec u, const Vec gamma, Vec f)
 		op->apply(d, u, local_gamma, f);
 	}
 }
+void SchurHelper::apply(const Vec u, Vec f)
+{
+    VecScale(local_interp, 0);
+	for (auto &p : dc.domains) {
+		Domain &d = p.second;
+		interpolator->interpolate(d, u, local_interp);
+	}
+	VecScale(gamma, 0);
+	VecScatterBegin(scatter, local_interp, gamma, ADD_VALUES, SCATTER_REVERSE);
+	VecScatterEnd(scatter, local_interp, gamma, ADD_VALUES, SCATTER_REVERSE);
+	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
+	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
+
+	for (auto &p : dc.domains) {
+		Domain &d = p.second;
+		op->apply(d, u, local_gamma, f);
+	}
+}
 enum class Rotation : char { x_cw, x_ccw, y_cw, y_ccw, z_cw, z_ccw };
 constexpr bool sideIsLeft(const Side s)
 {
@@ -102,14 +122,14 @@ struct Block {
 	{
 		char r;
 		// main rotation
-		r = (data & ~(~0 << 2) << 4) >> 4;
+		r = (data & ~(~0u << 2) << 4) >> 4;
 		r = (r + rots_table[static_cast<int>(rot)][static_cast<int>(main)]) & 0b11;
-		data &= ~(~(~0 << 2) << 4);
+		data &= ~(~(~0u << 2) << 4);
 		data |= r << 4;
 		// aux rotation
-		r = data & ~(~0 << 2);
+		r = data & ~(~0u << 2);
 		r = (r + rots_table[static_cast<int>(rot)][static_cast<int>(aux)]) & 0b11;
-		data &= ~0 << 2;
+		data &= ~0u << 2;
 		data |= r;
 		main = side_table[static_cast<int>(rot)][static_cast<int>(main)];
 		aux  = side_table[static_cast<int>(rot)][static_cast<int>(aux)];
@@ -394,4 +414,97 @@ PW_explicit<Mat> SchurHelper::formCRSMatrix()
 	MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
 	MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
 	return A;
+}
+PW_explicit<Mat> SchurHelper::formPBMatrix()
+{
+	int     n = dc.n;
+	int local_size  = dc.ifaces.size() * n * n;
+	int global_size = dc.num_global_interfaces * n * n;
+
+    PBMatrix* APB = new PBMatrix(n,local_size,global_size);
+	auto insertBlock = [&](Block *b, shared_ptr<valarray<double>> coeffs) {
+		int global_i = b->i;
+		int global_j = b->j;
+
+		const function<int(int,int, int)> transforms_left[4]
+		= {[](int n,int xi, int yi) { return xi + yi * n; },
+		   [](int n,int xi, int yi) { return n - yi - 1 + xi * n; },
+		   [](int n,int xi, int yi) { return n - xi - 1 + (n - yi - 1) * n; },
+		   [](int n,int xi, int yi) { return yi + (n - xi - 1) * n; }};
+
+		const function<int(int,int, int)> transforms_right[4]
+		= {[](int n,int xi, int yi) { return xi + yi * n; },
+		   [](int n,int xi, int yi) { return yi + (n - xi - 1) * n; },
+		   [](int n,int xi, int yi) { return n - xi - 1 + (n - yi - 1) * n; },
+		   [](int n,int xi, int yi) { return n - yi - 1 + xi * n; }};
+
+		const function<int(int,int, int)> transforms_left_inv[4]
+		= {[](int n,int xi, int yi) {
+			   xi = n - xi - 1;
+			   return xi + yi * n;
+		   },
+		   [](int n,int xi, int yi) {
+			   xi = n - xi - 1;
+			   return n - yi - 1 + xi * n;
+		   },
+		   [](int n,int xi, int yi) {
+			   xi = n - xi - 1;
+			   return n - xi - 1 + (n - yi - 1) * n;
+		   },
+		   [](int n,int xi, int yi) {
+			   xi = n - xi - 1;
+			   return yi + (n - xi - 1) * n;
+		   }};
+		const function<int(int,int, int)> transforms_right_inv[4]
+		= {[](int n,int xi, int yi) {
+			   xi = n - xi - 1;
+			   return xi + yi * n;
+		   },
+		   [](int n,int xi, int yi) {
+			   xi = n - xi - 1;
+			   return yi + (n - xi - 1) * n;
+		   },
+		   [](int n,int xi, int yi) {
+			   xi = n - xi - 1;
+			   return n - xi - 1 + (n - yi - 1) * n;
+		   },
+		   [](int n,int xi, int yi) {
+			   xi = n - xi - 1;
+			   return n - yi - 1 + xi * n;
+		   }};
+
+		function<int(int,int, int)> col_trans, row_trans;
+		if (b->mainLeft()) {
+			if (b->mainFlipped()) {
+				col_trans = transforms_left_inv[b->mainRot()];
+			} else {
+				col_trans = transforms_left[b->mainRot()];
+			}
+		} else {
+			if (b->mainFlipped()) {
+				col_trans = transforms_right_inv[b->mainRot()];
+			} else {
+				col_trans = transforms_right[b->mainRot()];
+			}
+		}
+		if (b->auxLeft()) {
+			if (b->auxFlipped()) {
+				row_trans = transforms_left_inv[b->auxRot()];
+			} else {
+				row_trans = transforms_left[b->auxRot()];
+			}
+		} else {
+			if (b->auxFlipped()) {
+				row_trans = transforms_right_inv[b->auxRot()];
+			} else {
+				row_trans = transforms_right[b->auxRot()];
+			}
+		}
+        APB->insertBlock(global_i,global_j,coeffs,col_trans,row_trans);
+	};
+
+	assembleMatrix(insertBlock);
+    APB->finalize();
+
+	return APB->getMatrix();
 }

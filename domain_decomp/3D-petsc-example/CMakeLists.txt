@@ -68,7 +68,14 @@ include_directories(${FFTW_INCLUDES})
 # include directory, and the include directories of the third-party
 # libraries (TPLs) with which Trilinos was built.
 #
+find_package(FFTW REQUIRED)
 include_directories(".")
+<<<<<<< Updated upstream
+=======
+include_directories(${FFTW_INCLUDES})
+include_directories(SYSTEM ${Trilinos_TPL_INCLUDE_DIRS})
+include_directories(SYSTEM ${Trilinos_INCLUDE_DIRS})
+>>>>>>> Stashed changes
 include_directories(${MPI_CXX_INCLUDE_PATH})
 if(VTK_FOUND)
 include_directories(SYSTEM ${VTK_INCLUDE_DIRS})
@@ -102,6 +109,8 @@ add_library(DomainCollection DomainCollection.cpp OctTree.cpp)
 add_library(Interpolators TriLinInterp.cpp)
 add_library(Init Init.cpp)
 add_library(GMGHelper GMGHelper.cpp)
+add_library(ContigFftwSolver ContigFftwSolver.cpp)
+add_library(PBMatrix PBMatrix.cpp)
 
 #
 # EDIT HERE: Change trilinosExample to the name of the executable
@@ -119,6 +128,8 @@ target_link_libraries(steady
     Interpolators
     MMWriter
     ClawWriter
+    ContigFftwSolver
+    PBMatrix
   ${MPI_CXX_LIBRARIES} 
   ${PETSC_LIBRARIES} 
 )

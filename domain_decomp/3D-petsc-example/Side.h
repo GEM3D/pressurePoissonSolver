@@ -2,6 +2,7 @@
 #define SIDEENUM_H
 #include <array>
 #include <iostream>
+#include <vector>
 enum class Side : char { west, east, south, north, bottom, top };
 enum class Oct : char { bsw, bse, bnw, bne, tsw, tse, tnw, tne };
 inline std::array<Oct, 6> getOctsOnSide(Side s)

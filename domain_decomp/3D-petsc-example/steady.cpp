@@ -12,6 +12,7 @@
 #include "Writers/MMWriter.h"
 #include "args.h"
 #include "GMGHelper.h"
+#include "ContigFftwSolver.h"
 #ifdef ENABLE_AMGX
 #include "AmgxWrapper.h"
 #endif
@@ -131,6 +132,8 @@ int main(int argc, char *argv[])
 #endif
 	args::Flag f_scharz(parser, "", "use schwarz preconditioner", {"schwarz"});
 	args::Flag f_gmg(parser, "", "use GMG preconditioner", {"gmg"});
+	args::Flag f_cfft(parser, "", "use GMG preconditioner", {"cfft"});
+	args::Flag f_pbm(parser, "", "use GMG preconditioner", {"pbm"});
 
 	int num_procs;
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
@@ -185,9 +188,6 @@ int main(int argc, char *argv[])
 		string  d = args::get(f_mesh);
 		t = OctTree(d);
 		dc = DomainCollection(t);
-	} else if (f_amr) {
-		int d = args::get(f_amr);
-		//	dc    = DomainCollection(d, d, true);
 	} else {
 		int d = args::get(f_cube);
 		dc    = DomainCollection(d, d, d);
@@ -248,11 +248,19 @@ int main(int argc, char *argv[])
 		nfunz = [](double x, double y, double z) { return 0; };
 	} else {
 		ffun = [](double x, double y, double z) {
+			return -3 * M_PI * M_PI * sin(M_PI * x) * sin(M_PI * y) * sin(M_PI * z);
+		};
+		gfun = [](double x, double y, double z) {
+			return  sin(M_PI * x) * sin(M_PI * y) * sin(M_PI * z);
+		};
+        /*
+		ffun = [](double x, double y, double z) {
 			return -9 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
 		};
 		gfun = [](double x, double y, double z) {
 			return sin(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
 		};
+        */
 		nfunx = [](double x, double y, double z) {
 			return M_PI * cos(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
 		};
@@ -332,8 +340,13 @@ int main(int argc, char *argv[])
 #ifdef ENABLE_MUELU_CUDA
 		MueLuCudaWrapper *meulucudasolver = nullptr;
 #endif
+        ContigFftwSolver cfftsolver;
+        if(f_cfft){
+			timer.start("FFT Setup");
+            cfftsolver=ContigFftwSolver(dc);
+			timer.stop("FFT Setup");
 
-		if (f_noschur || dc.num_global_domains != 1) {
+        }else if (f_noschur || dc.num_global_domains != 1) {
 			// do iterative solve
 
 			if (!f_noschur) {
@@ -365,7 +378,11 @@ int main(int argc, char *argv[])
 				if (f_noschur) {
 					A = mh.formCRSMatrix();
 				} else {
+                    if(f_pbm){
+					A = sch.formPBMatrix();
+                    }else{
 					A = sch.formCRSMatrix();
+                    }
 				}
 
 				timer.stop("Matrix Formation");
@@ -426,7 +443,7 @@ int main(int argc, char *argv[])
 		///////////////////
 		timer.start("Complete Solve");
 
-		if (f_noschur || dc.num_global_domains != 1) {
+		if ((f_noschur || dc.num_global_domains != 1)&&!f_cfft) {
 			timer.start("Linear Solve");
 			if (false) {
 #ifdef ENABLE_MUELU
@@ -472,7 +489,11 @@ int main(int argc, char *argv[])
 			timer.stop("Linear Solve");
 		}
 
-		if (!f_noschur) {
+        if(f_cfft){
+			timer.start("FFT Solve");
+            cfftsolver.solve(f,u);
+			timer.stop("FFT Solve");
+        }else if (!f_noschur) {
 			// Do one last solve
 			timer.start("Patch Solve");
 
@@ -560,6 +581,7 @@ int main(int argc, char *argv[])
 			VtkWriter writer(dc, args::get(f_outvtk));
 			writer.add(u, "Solution");
 			writer.add(error, "Error");
+			writer.add(exact, "Exact");
 			writer.add(resid, "Residual");
 			writer.add(f, "RHS");
 			writer.write();

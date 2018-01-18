@@ -76,6 +76,7 @@ class SchurHelper
 	 * @param f the resulting rhs vector
 	 */
 	void applyWithInterface(const Vec u, const Vec gamma, Vec f);
+	void apply(const Vec u, Vec f);
 
 	/**
 	 * @brief Form the Schur complement matrix
@@ -83,5 +84,6 @@ class SchurHelper
 	 * @return the formed matrix
 	 */
 	PW_explicit<Mat> formCRSMatrix();
+	PW_explicit<Mat> formPBMatrix();
 };
 #endif

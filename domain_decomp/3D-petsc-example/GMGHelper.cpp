@@ -7,7 +7,6 @@ GMGHelper::GMGHelper(int n, OctTree t, std::shared_ptr<PatchSolver> solver,
 	levels.resize(num_levels);
 	smoothers.resize(num_levels);
 	shs.resize(num_levels);
-	matrices.resize(num_levels);
 	u_vectors.resize(num_levels);
 	f_vectors.resize(num_levels);
 	r_vectors.resize(num_levels);
@@ -23,8 +22,6 @@ GMGHelper::GMGHelper(int n, OctTree t, std::shared_ptr<PatchSolver> solver,
 		f_vectors[i] = levels[i].getNewDomainVec();
 		u_vectors[i] = levels[i].getNewDomainVec();
 		r_vectors[i] = levels[i].getNewDomainVec();
-		MatrixHelper mh(levels[i]);
-		matrices[i] = mh.formCRSMatrix();
 	}
 }
 void GMGHelper::restrictForLevel(int level)
@@ -139,13 +136,15 @@ void GMGHelper::apply(Vec f, Vec u)
 
 	// finest level
 	smoothers[num_levels - 1].apply(f, u);
-	MatResidual(matrices[num_levels - 1], f, u, r_vectors[num_levels - 1]);
+	shs[num_levels - 1].apply(u_vectors[num_levels - 1], r_vectors[num_levels - 1]);
+	VecAYPX(r_vectors[num_levels - 1], -1, f_vectors[num_levels - 1]);
 	// down-cycle
 	for (int i = num_levels - 2; i > 0; i--) {
 		restrictForLevel(i);
 		VecScale(u_vectors[i], 0);
 		smoothers[i].apply(f_vectors[i], u_vectors[i]);
-		MatResidual(matrices[i], f_vectors[i], u_vectors[i], r_vectors[i]);
+		shs[i].apply(u_vectors[i], r_vectors[i]);
+		VecAYPX(r_vectors[i], -1, f_vectors[i]);
 	}
 	// coarse level
 	restrictForLevel(0);

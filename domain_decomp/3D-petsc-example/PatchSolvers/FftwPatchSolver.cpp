@@ -67,10 +67,10 @@ void FftwPatchSolver::addDomain(Domain &d)
 		}
 
 		plan1[d] = fftw_plan_r2r_3d(n, n, n, &f_copy[0], &tmp[0], z_transform, y_transform,
-		                            x_transform, FFTW_MEASURE);
+		                            x_transform, FFTW_MEASURE|FFTW_DESTROY_INPUT);
 
 		plan2[d] = fftw_plan_r2r_3d(n, n, n, &tmp[0], &sol[0], z_transform_inv, y_transform_inv,
-		                            x_transform_inv, FFTW_MEASURE);
+		                            x_transform_inv, FFTW_MEASURE|FFTW_DESTROY_INPUT);
 	}
 
 	double h_x = d.x_length / n;

@@ -10,7 +10,6 @@ class GMGHelper
 	std::vector<DomainCollection> levels;
 	std::vector<SchwarzPrec>      smoothers;
 	std::vector<SchurHelper>      shs;
-	std::vector<PW<Mat>>          matrices;
 	std::vector<PW<Vec>>          u_vectors;
 	std::vector<PW<Vec>>          f_vectors;
 	std::vector<PW<Vec>>          r_vectors;

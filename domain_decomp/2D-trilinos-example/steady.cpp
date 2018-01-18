@@ -68,7 +68,7 @@ using namespace std;
 int main(int argc, char *argv[])
 {
 	Teuchos::GlobalMPISession     global(&argc, &argv, nullptr);
-	RCP<const Teuchos::Comm<int>> comm = Tpetra::DefaultPlatform::getDefaultPlatform().getComm();
+	RCP<const Teuchos::Comm<int>> comm = rcp(new Teuchos::MpiComm(MPI_COMM_WORLD);
 
 	int num_procs = comm->getSize();
 
