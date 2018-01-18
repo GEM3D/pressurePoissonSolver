@@ -17,9 +17,7 @@
 #
 
 #If environment variable FFTWDIR is specified, it has same effect as FFTW_ROOT
-if( NOT FFTW_ROOT AND ENV{FFTWDIR} )
-  set( FFTW_ROOT $ENV{FFTWDIR} )
-endif()
+find_path (FFTW_ROOT include/fftw3.h HINTS ENV FFTW_DIR)
 
 # Check if we can use PkgConfig
 find_package(PkgConfig)
@@ -27,15 +25,6 @@ find_package(PkgConfig)
 #Determine from PKG
 if( PKG_CONFIG_FOUND AND NOT FFTW_ROOT )
   pkg_check_modules( PKG_FFTW QUIET "fftw3" )
-endif()
-
-#Check whether to search static or dynamic libs
-set( CMAKE_FIND_LIBRARY_SUFFIXES_SAV ${CMAKE_FIND_LIBRARY_SUFFIXES} )
-
-if( ${FFTW_USE_STATIC_LIBS} )
-  set( CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_STATIC_LIBRARY_SUFFIX} )
-else()
-  set( CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_SHARED_LIBRARY_SUFFIX} )
 endif()
 
 if( FFTW_ROOT )
@@ -46,7 +35,6 @@ if( FFTW_ROOT )
     NAMES "fftw3"
     PATHS ${FFTW_ROOT}
     PATH_SUFFIXES "lib" "lib64"
-    NO_DEFAULT_PATH
   )
 
   #find includes
@@ -55,7 +43,6 @@ if( FFTW_ROOT )
     NAMES "fftw3.h"
     PATHS ${FFTW_ROOT}
     PATH_SUFFIXES "include"
-    NO_DEFAULT_PATH
   )
 
 else()

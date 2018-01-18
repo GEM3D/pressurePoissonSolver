@@ -68,6 +68,8 @@ endif()
   MESSAGE("Setting C compiler.")
   SET(CMAKE_C_COMPILE ${Trilinos_C_COMPILER})
 
+find_package(FFTW REQUIRED)
+include_directories(${FFTW_INCLUDES})
 
 find_program(CCACHE_FOUND ccache)
 if(CCACHE_FOUND)
@@ -99,7 +101,6 @@ ENDIF()
 include_directories(".")
 include_directories(SYSTEM ${Trilinos_TPL_INCLUDE_DIRS})
 include_directories(SYSTEM ${Trilinos_INCLUDE_DIRS})
-include_directories(${MPI_CXX_INCLUDE_PATH})
 include_directories(SYSTEM ${VTK_INCLUDE_DIRS})
 if(CUDA_FOUND)
 include_directories(${CUDA_INCLUDE_DIRS})
@@ -146,7 +147,6 @@ target_link_libraries(steady
     ClawWriter
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
-  ${MPI_CXX_LIBRARIES} 
 )
 target_link_libraries(heat
     SchurHelper
@@ -161,7 +161,6 @@ target_link_libraries(heat
     ClawWriter
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
-  ${MPI_CXX_LIBRARIES} 
 )
 if(VTK_FOUND)
     target_link_libraries(steady VtkWriter)
@@ -176,7 +175,6 @@ target_link_libraries(steady-nodd
     ClawWriter
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
-  ${MPI_CXX_LIBRARIES} 
 )
 if(VTK_FOUND)
     target_link_libraries(steady-nodd VtkWriter)
@@ -210,13 +208,11 @@ target_link_libraries(Factory
 target_link_libraries(SchurHelper
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
-  ${MPI_CXX_LIBRARIES} 
 )
 
 target_link_libraries(MatrixHelper
   ${Trilinos_TPL_LIBRARIES}
   ${Trilinos_LIBRARIES} 
-  ${MPI_CXX_LIBRARIES} 
 )
 
 target_link_libraries(DomainCollection

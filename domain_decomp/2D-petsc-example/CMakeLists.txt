@@ -43,6 +43,8 @@ endif()
   MESSAGE("Setting C compiler.")
   SET(CMAKE_C_COMPILE ${MPI_C_COMPILER})
 
+find_package(FFTW REQUIRED)
+include_directories(${FFTW_INCLUDES})
 
 find_program(CCACHE_FOUND ccache)
 if(CCACHE_FOUND)
@@ -158,7 +160,6 @@ target_link_libraries(AmgxWrapper
 endif()
 target_link_libraries(DomainCollection
     ${Zoltan_LIBRARIES}
-    "-L/cm/shared/apps/parmetis/4.0.3/lib/ -lparmetis -lmetis  -lm" 
 )
 
 add_subdirectory(PatchSolvers)

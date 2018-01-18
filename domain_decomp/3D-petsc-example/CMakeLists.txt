@@ -58,6 +58,8 @@ ELSE()
     MESSAGE("VTK not found, disabling vtk output")
 ENDIF()
 
+find_package(FFTW REQUIRED)
+include_directories(${FFTW_INCLUDES})
 
 # 
 # EDIT HERE:
@@ -67,10 +69,10 @@ ENDIF()
 # libraries (TPLs) with which Trilinos was built.
 #
 include_directories(".")
-include_directories(SYSTEM ${Trilinos_TPL_INCLUDE_DIRS})
-include_directories(SYSTEM ${Trilinos_INCLUDE_DIRS})
 include_directories(${MPI_CXX_INCLUDE_PATH})
+if(VTK_FOUND)
 include_directories(SYSTEM ${VTK_INCLUDE_DIRS})
+endif()
 if(CUDA_FOUND)
     include_directories(${CUDA_INCLUDE_DIRS})
 endif()
@@ -148,7 +150,6 @@ target_link_libraries(AmgxWrapper
 endif()
 target_link_libraries(DomainCollection 
     ${Zoltan_LIBRARIES}
-    "-L/cm/shared/apps/parmetis/4.0.3/lib/ -lparmetis -lmetis  -lm" 
 )
 
 add_subdirectory(PatchSolvers)
