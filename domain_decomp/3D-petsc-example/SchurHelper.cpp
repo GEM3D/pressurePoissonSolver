@@ -104,6 +104,8 @@ struct Block {
 	static const Side             side_table[6][6];
 	static const char             rots_table[6][6];
 	static const vector<Rotation> main_rot_plan[6];
+	static const vector<Rotation> aux_rot_plan_dirichlet[6];
+	static const vector<Rotation> aux_rot_plan_neumann[16];
 	char                          data = 0;
 	Side                          main;
 	Side                          aux;
@@ -150,14 +152,21 @@ struct Block {
 		for (Rotation rot : main_rot_plan[static_cast<int>(main)]) {
 			(*this) *= rot;
 		}
-		cerr << "NEUMANN: " << neumann << endl;
-		cerr << "AUX:     " << (int) aux << endl;
+		if (neumann.to_ulong() == 0) {
+			for (Rotation rot : aux_rot_plan_dirichlet[static_cast<int>(aux)]) {
+				(*this) *= rot;
+			}
+		} else {
+			for (Rotation rot : aux_rot_plan_neumann[neumann.to_ulong() >> 2]) {
+				(*this) *= rot;
+			}
+		}
 	}
 	bool operator<(const Block &b) const
 	{
 		return std::tie(i, j, data) < std::tie(b.i, b.j, b.data);
 	}
-	bool operator==(const Block &b) const { return neumann.to_ulong()==b.neumann.to_ulong(); }
+	bool operator==(const Block &b) const { return neumann.to_ulong() == b.neumann.to_ulong(); }
 	//
 	bool mainLeft() { return sideIsLeft(main); }
 	bool mainFlipped()
@@ -186,10 +195,7 @@ struct BlockKey {
 		s       = b.aux;
 		neumann = b.neumann.to_ulong();
 	}
-	friend bool operator<(const BlockKey &l, const BlockKey &r)
-	{
-		return l.s < r.s;
-	}
+	friend bool operator<(const BlockKey &l, const BlockKey &r) { return l.s < r.s; }
 };
 
 const Side Block::side_table[6][6]
@@ -207,6 +213,24 @@ const vector<Rotation> Block::main_rot_plan[6] = {{},
                                                   {Rotation::z_ccw},
                                                   {Rotation::y_ccw},
                                                   {Rotation::y_cw}};
+const vector<Rotation> Block::aux_rot_plan_dirichlet[6]
+= {{}, {}, {}, {Rotation::x_cw, Rotation::x_cw}, {Rotation::x_cw}, {Rotation::x_ccw}};
+const vector<Rotation> Block::aux_rot_plan_neumann[16] = {{},
+                                                          {},
+                                                          {Rotation::x_cw, Rotation::x_cw},
+                                                          {},
+                                                          {Rotation::x_cw},
+                                                          {Rotation::x_cw},
+                                                          {Rotation::x_cw, Rotation::x_cw},
+                                                          {Rotation::x_cw, Rotation::x_cw},
+                                                          {Rotation::x_ccw},
+                                                          {},
+                                                          {Rotation::x_ccw},
+                                                          {},
+                                                          {Rotation::x_ccw},
+                                                          {Rotation::x_cw},
+                                                          {Rotation::x_ccw},
+                                                          {}};
 void SchurHelper::assembleMatrix(inserter insertBlock)
 {
 	int        n = dc.n;
