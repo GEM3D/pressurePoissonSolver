@@ -186,8 +186,8 @@ struct Block {
 	int auxRot() { return data & 0b11; }
 };
 struct BlockKey {
-	Side          s;
 	unsigned char neumann;
+	Side          s;
 
 	BlockKey() {}
 	BlockKey(const Block &b)
@@ -249,7 +249,6 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 			}
 		}
 	}
-	int num_types = 0;
 	Vec u, f, r, e, gamma, interp;
 	VecCreateSeq(PETSC_COMM_SELF, n * n * n, &u);
 	VecCreateSeq(PETSC_COMM_SELF, n * n * n, &f);
@@ -261,7 +260,6 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 	VecGetArray(interp, &interp_view);
 	VecGetArray(gamma, &gamma_view);
 	while (!blocks.empty()) {
-		num_types++;
 		// the first in the set is the type of interface that we are going to solve for
 		set<Block> todo;
 		Block      curr_type = *blocks.begin();

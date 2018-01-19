@@ -17,11 +17,11 @@ void PBMatrix::insertBlock(int i, int j, std::shared_ptr<std::valarray<double>> 
 void PBMatrix::finalize()
 {
 	trans = map_type([](trans_type l, trans_type r) {
-		int l1 = l(4, 1, 3);
-		int l2 = l(4, 2, 1);
-		int r1 = r(4, 1, 3);
-		int r2 = r(4, 2, 1);
-		return std::tie(l1, l2) < std::tie(r1, r2);
+		char l1 = l(2, 0, 0);
+		char l2 = l(2, 0, 1);
+		char r1 = r(2, 0, 0);
+		char r2 = r(2, 0, 1);
+		return tie(l1, l2) < tie(r1, r2);
 	});
 
 	for (const PBlock &block : blocks) {
