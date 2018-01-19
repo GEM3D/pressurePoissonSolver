@@ -1,5 +1,7 @@
+#include "ContigFftwSolver.h"
 #include "DomainCollection.h"
 #include "FunctionWrapper.h"
+#include "GMGHelper.h"
 #include "Init.h"
 #include "MatrixHelper.h"
 #include "OctTree.h"
@@ -11,8 +13,6 @@
 #include "Writers/ClawWriter.h"
 #include "Writers/MMWriter.h"
 #include "args.h"
-#include "GMGHelper.h"
-#include "ContigFftwSolver.h"
 #ifdef ENABLE_AMGX
 #include "AmgxWrapper.h"
 #endif
@@ -183,11 +183,11 @@ int main(int argc, char *argv[])
 	// Create Mesh
 	///////////////
 	DomainCollection dc;
-    OctTree t;
+	OctTree          t;
 	if (f_mesh) {
-		string  d = args::get(f_mesh);
-		t = OctTree(d);
-		dc = DomainCollection(t);
+		string d = args::get(f_mesh);
+		t        = OctTree(d);
+		dc       = DomainCollection(t);
 	} else {
 		int d = args::get(f_cube);
 		dc    = DomainCollection(d, d, d);
@@ -248,19 +248,11 @@ int main(int argc, char *argv[])
 		nfunz = [](double x, double y, double z) { return 0; };
 	} else {
 		ffun = [](double x, double y, double z) {
-			return -3 * M_PI * M_PI * sin(M_PI * x) * sin(M_PI * y) * sin(M_PI * z);
+		    return -9 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
 		};
 		gfun = [](double x, double y, double z) {
-			return  sin(M_PI * x) * sin(M_PI * y) * sin(M_PI * z);
+		    return sin(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
 		};
-        /*
-		ffun = [](double x, double y, double z) {
-			return -9 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
-		};
-		gfun = [](double x, double y, double z) {
-			return sin(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
-		};
-        */
 		nfunx = [](double x, double y, double z) {
 			return M_PI * cos(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
 		};
@@ -318,10 +310,9 @@ int main(int argc, char *argv[])
 		PW<Vec>                 diff  = dc.getNewSchurVec();
 		PW<Vec>                 b     = dc.getNewSchurVec();
 		PW<Mat>                 A;
-		PW<PC>                  P;
 		shared_ptr<FuncWrap>    w;
 		shared_ptr<SchwarzPrec> sp;
-		shared_ptr<GMGHelper> gh;
+		shared_ptr<GMGHelper>   gh;
 
 		// Create linear problem for the Belos solver
 		PW<KSP> solver;
@@ -340,13 +331,13 @@ int main(int argc, char *argv[])
 #ifdef ENABLE_MUELU_CUDA
 		MueLuCudaWrapper *meulucudasolver = nullptr;
 #endif
-        ContigFftwSolver cfftsolver;
-        if(f_cfft){
+		ContigFftwSolver cfftsolver;
+		if (f_cfft) {
 			timer.start("FFT Setup");
-            cfftsolver=ContigFftwSolver(dc);
+			cfftsolver = ContigFftwSolver(dc);
 			timer.stop("FFT Setup");
 
-        }else if (f_noschur || dc.num_global_domains != 1) {
+		} else if (f_noschur || dc.num_global_domains != 1) {
 			// do iterative solve
 
 			if (!f_noschur) {
@@ -378,11 +369,11 @@ int main(int argc, char *argv[])
 				if (f_noschur) {
 					A = mh.formCRSMatrix();
 				} else {
-                    if(f_pbm){
-					A = sch.formPBMatrix();
-                    }else{
-					A = sch.formCRSMatrix();
-                    }
+					if (f_pbm) {
+						A = sch.formPBMatrix();
+					} else {
+						A = sch.formCRSMatrix();
+					}
 				}
 
 				timer.stop("Matrix Formation");
@@ -420,17 +411,19 @@ int main(int argc, char *argv[])
 				timer.start("Petsc Setup");
 				KSPSetOperators(solver, A, A);
 				KSPSetUp(solver);
-				PC pc;
-				KSPGetPC(solver, &pc);
-				if (f_scharz) {
-					sp.reset(new SchwarzPrec(&sch, &dc));
-					sp->getPrec(pc);
+				if (f_scharz || f_gmg) {
+					PC pc;
+					KSPGetPC(solver, &pc);
+					if (f_scharz) {
+						sp.reset(new SchwarzPrec(&sch, &dc));
+						sp->getPrec(pc);
+					}
+					if (f_gmg) {
+						gh.reset(new GMGHelper(n, t, p_solver, p_operator, p_interp));
+						gh->getPrec(pc);
+					}
+					PCSetUp(pc);
 				}
-				if (f_gmg) {
-					gh.reset(new GMGHelper(n,t, p_solver, p_operator, p_interp));
-					gh->getPrec(pc);
-				}
-				PCSetUp(pc);
 				timer.stop("Petsc Setup");
 			}
 			///////////////////
@@ -443,7 +436,7 @@ int main(int argc, char *argv[])
 		///////////////////
 		timer.start("Complete Solve");
 
-		if ((f_noschur || dc.num_global_domains != 1)&&!f_cfft) {
+		if ((f_noschur || dc.num_global_domains != 1) && !f_cfft) {
 			timer.start("Linear Solve");
 			if (false) {
 #ifdef ENABLE_MUELU
@@ -489,11 +482,11 @@ int main(int argc, char *argv[])
 			timer.stop("Linear Solve");
 		}
 
-        if(f_cfft){
+		if (f_cfft) {
 			timer.start("FFT Solve");
-            cfftsolver.solve(f,u);
+			cfftsolver.solve(f, u);
 			timer.stop("FFT Solve");
-        }else if (!f_noschur) {
+		} else if (!f_noschur) {
 			// Do one last solve
 			timer.start("Patch Solve");
 

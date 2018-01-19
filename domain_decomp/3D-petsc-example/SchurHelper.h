@@ -16,7 +16,7 @@
  *   - Provide member functions for calculating error, residual, etc.
  *   - Provide member functions that generate the Schur complement matrix.
  */
-class Block;
+struct Block;
 class SchurHelper
 {
 	private:

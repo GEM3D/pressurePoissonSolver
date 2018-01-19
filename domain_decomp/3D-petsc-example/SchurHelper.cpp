@@ -2,8 +2,8 @@
 #include "PBMatrix.h"
 #include <array>
 #include <iostream>
-#include <tuple>
 #include <numeric>
+#include <tuple>
 using namespace std;
 enum axis_enum { X_AXIS, Y_AXIS };
 enum bc_enum { DIRICHLET, NEUMANN, REFINED };
@@ -47,16 +47,20 @@ void SchurHelper::solveWithInterface(const Vec f, Vec u, const Vec gamma, Vec di
 void SchurHelper::solveWithSolution(const Vec f, Vec u)
 {
 	// initilize our local variables
-	VecScale(local_interp, 0);
+	VecScale(local_gamma, 0);
+	/*
 	for (auto &p : dc.domains) {
-		Domain &d = p.second;
-		interpolator->interpolate(d, u, local_interp);
+	    Domain &d = p.second;
+	    interpolator->interpolate(d, u, local_gamma);
 	}
+	*/
+	/*
 	VecScale(gamma, 0);
 	VecScatterBegin(scatter, local_interp, gamma, ADD_VALUES, SCATTER_REVERSE);
 	VecScatterEnd(scatter, local_interp, gamma, ADD_VALUES, SCATTER_REVERSE);
 	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
+	*/
 
 	// solve over domains on this proc
 	for (auto &p : dc.domains) {
@@ -75,7 +79,7 @@ void SchurHelper::applyWithInterface(const Vec u, const Vec gamma, Vec f)
 }
 void SchurHelper::apply(const Vec u, Vec f)
 {
-    VecScale(local_interp, 0);
+	VecScale(local_interp, 0);
 	for (auto &p : dc.domains) {
 		Domain &d = p.second;
 		interpolator->interpolate(d, u, local_interp);
@@ -105,14 +109,16 @@ struct Block {
 	Side                          aux;
 	int                           j;
 	int                           i;
-	Block(Side main, int j, Side aux, int i)
+	bitset<6>                     neumann;
+	Block(Side main, int j, Side aux, int i, bitset<6> neumann)
 	{
-		this->main = main;
-		this->j    = j;
-		this->aux  = aux;
-		this->i    = i;
-		data       = 0;
-		bool left  = sideIsLeft(main);
+		this->main    = main;
+		this->j       = j;
+		this->aux     = aux;
+		this->i       = i;
+		this->neumann = neumann;
+		data          = 0;
+		bool left     = sideIsLeft(main);
 		data |= left << 7;
 		left = sideIsLeft(aux);
 		data |= left << 3;
@@ -131,8 +137,12 @@ struct Block {
 		r = (r + rots_table[static_cast<int>(rot)][static_cast<int>(aux)]) & 0b11;
 		data &= ~0u << 2;
 		data |= r;
-		main = side_table[static_cast<int>(rot)][static_cast<int>(main)];
-		aux  = side_table[static_cast<int>(rot)][static_cast<int>(aux)];
+		main                  = side_table[static_cast<int>(rot)][static_cast<int>(main)];
+		aux                   = side_table[static_cast<int>(rot)][static_cast<int>(aux)];
+		bitset<6> old_neumann = neumann;
+		for (int i = 0; i < 6; i++) {
+			neumann[(int) side_table[(int) rot][i]] = old_neumann[i];
+		}
 		return *this;
 	}
 	void rotate()
@@ -140,12 +150,14 @@ struct Block {
 		for (Rotation rot : main_rot_plan[static_cast<int>(main)]) {
 			(*this) *= rot;
 		}
+		cerr << "NEUMANN: " << neumann << endl;
+		cerr << "AUX:     " << (int) aux << endl;
 	}
 	bool operator<(const Block &b) const
 	{
 		return std::tie(i, j, data) < std::tie(b.i, b.j, b.data);
 	}
-	bool operator==(const Block &b) const { return true; }
+	bool operator==(const Block &b) const { return neumann.to_ulong()==b.neumann.to_ulong(); }
 	//
 	bool mainLeft() { return sideIsLeft(main); }
 	bool mainFlipped()
@@ -165,11 +177,19 @@ struct Block {
 	int auxRot() { return data & 0b11; }
 };
 struct BlockKey {
-	Side s;
+	Side          s;
+	unsigned char neumann;
 
 	BlockKey() {}
-	BlockKey(const Block &b) { s = b.aux; }
-	friend bool operator<(const BlockKey &l, const BlockKey &r) { return l.s < r.s; }
+	BlockKey(const Block &b)
+	{
+		s       = b.aux;
+		neumann = b.neumann.to_ulong();
+	}
+	friend bool operator<(const BlockKey &l, const BlockKey &r)
+	{
+		return l.s < r.s;
+	}
 };
 
 const Side Block::side_table[6][6]
@@ -200,7 +220,7 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 				int j = iface.global_id[s];
 				if (j != -1) {
 					Side main = static_cast<Side>(s);
-					blocks.insert(Block(main, j, aux, i));
+					blocks.insert(Block(main, j, aux, i, iface.neumann));
 				}
 			}
 		}
@@ -243,8 +263,8 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 		ds.y_length  = 1;
 		ds.z_length  = 1;
 		ds.nbr_id[0] = 1;
-		// ds.neumann    = curr_type.neumann;
-		ds.local_i = {{0, 0, 0, 0, 0, 0}};
+		ds.neumann   = curr_type.neumann;
+		ds.local_i   = {{0, 0, 0, 0, 0, 0}};
 		solver->addDomain(ds);
 
 		map<BlockKey, shared_ptr<valarray<double>>> coeffs;
@@ -417,63 +437,63 @@ PW_explicit<Mat> SchurHelper::formCRSMatrix()
 }
 PW_explicit<Mat> SchurHelper::formPBMatrix()
 {
-	int     n = dc.n;
+	int n           = dc.n;
 	int local_size  = dc.ifaces.size() * n * n;
 	int global_size = dc.num_global_interfaces * n * n;
 
-    PBMatrix* APB = new PBMatrix(n,local_size,global_size);
+	PBMatrix *APB    = new PBMatrix(n, local_size, global_size);
 	auto insertBlock = [&](Block *b, shared_ptr<valarray<double>> coeffs) {
 		int global_i = b->i;
 		int global_j = b->j;
 
-		const function<int(int,int, int)> transforms_left[4]
-		= {[](int n,int xi, int yi) { return xi + yi * n; },
-		   [](int n,int xi, int yi) { return n - yi - 1 + xi * n; },
-		   [](int n,int xi, int yi) { return n - xi - 1 + (n - yi - 1) * n; },
-		   [](int n,int xi, int yi) { return yi + (n - xi - 1) * n; }};
+		const function<int(int, int, int)> transforms_left[4]
+		= {[](int n, int xi, int yi) { return xi + yi * n; },
+		   [](int n, int xi, int yi) { return n - yi - 1 + xi * n; },
+		   [](int n, int xi, int yi) { return n - xi - 1 + (n - yi - 1) * n; },
+		   [](int n, int xi, int yi) { return yi + (n - xi - 1) * n; }};
 
-		const function<int(int,int, int)> transforms_right[4]
-		= {[](int n,int xi, int yi) { return xi + yi * n; },
-		   [](int n,int xi, int yi) { return yi + (n - xi - 1) * n; },
-		   [](int n,int xi, int yi) { return n - xi - 1 + (n - yi - 1) * n; },
-		   [](int n,int xi, int yi) { return n - yi - 1 + xi * n; }};
+		const function<int(int, int, int)> transforms_right[4]
+		= {[](int n, int xi, int yi) { return xi + yi * n; },
+		   [](int n, int xi, int yi) { return yi + (n - xi - 1) * n; },
+		   [](int n, int xi, int yi) { return n - xi - 1 + (n - yi - 1) * n; },
+		   [](int n, int xi, int yi) { return n - yi - 1 + xi * n; }};
 
-		const function<int(int,int, int)> transforms_left_inv[4]
-		= {[](int n,int xi, int yi) {
+		const function<int(int, int, int)> transforms_left_inv[4]
+		= {[](int n, int xi, int yi) {
 			   xi = n - xi - 1;
 			   return xi + yi * n;
 		   },
-		   [](int n,int xi, int yi) {
+		   [](int n, int xi, int yi) {
 			   xi = n - xi - 1;
 			   return n - yi - 1 + xi * n;
 		   },
-		   [](int n,int xi, int yi) {
+		   [](int n, int xi, int yi) {
 			   xi = n - xi - 1;
 			   return n - xi - 1 + (n - yi - 1) * n;
 		   },
-		   [](int n,int xi, int yi) {
+		   [](int n, int xi, int yi) {
 			   xi = n - xi - 1;
 			   return yi + (n - xi - 1) * n;
 		   }};
-		const function<int(int,int, int)> transforms_right_inv[4]
-		= {[](int n,int xi, int yi) {
+		const function<int(int, int, int)> transforms_right_inv[4]
+		= {[](int n, int xi, int yi) {
 			   xi = n - xi - 1;
 			   return xi + yi * n;
 		   },
-		   [](int n,int xi, int yi) {
+		   [](int n, int xi, int yi) {
 			   xi = n - xi - 1;
 			   return yi + (n - xi - 1) * n;
 		   },
-		   [](int n,int xi, int yi) {
+		   [](int n, int xi, int yi) {
 			   xi = n - xi - 1;
 			   return n - xi - 1 + (n - yi - 1) * n;
 		   },
-		   [](int n,int xi, int yi) {
+		   [](int n, int xi, int yi) {
 			   xi = n - xi - 1;
 			   return n - yi - 1 + xi * n;
 		   }};
 
-		function<int(int,int, int)> col_trans, row_trans;
+		function<int(int, int, int)> col_trans, row_trans;
 		if (b->mainLeft()) {
 			if (b->mainFlipped()) {
 				col_trans = transforms_left_inv[b->mainRot()];
@@ -500,11 +520,11 @@ PW_explicit<Mat> SchurHelper::formPBMatrix()
 				row_trans = transforms_right[b->auxRot()];
 			}
 		}
-        APB->insertBlock(global_i,global_j,coeffs,col_trans,row_trans);
+		APB->insertBlock(global_i, global_j, coeffs, col_trans, row_trans);
 	};
 
 	assembleMatrix(insertBlock);
-    APB->finalize();
+	APB->finalize();
 
 	return APB->getMatrix();
 }

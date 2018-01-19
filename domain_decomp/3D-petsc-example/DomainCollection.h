@@ -89,6 +89,9 @@ class DomainCollection
 		for (auto &p : domains) {
 			p.second.setNeumann();
 		}
+		for (auto &p : ifaces) {
+			p.second.setNeumann();
+		}
 	}
 	PW_explicit<Vec> getNewSchurVec();
 	PW_explicit<Vec> getNewSchurDistVec();

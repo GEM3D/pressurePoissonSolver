@@ -11,6 +11,13 @@ struct Iface {
 	std::array<int, 6> g_id      = {{-1, -1, -1, -1, -1, -1}};
 	std::array<int, 6> local_id  = {{-1, -1, -1, -1, -1, -1}};
 	std::array<int, 6> global_id = {{-1, -1, -1, -1, -1, -1}};
+	std::bitset<6> neumann;
+	void           setNeumann()
+	{
+		for (int i = 0; i < 6; i++) {
+			neumann[i] = g_id[i] == -1;
+		}
+	}
 };
 struct IfaceSet {
 	int                gid       = -1;
@@ -30,6 +37,12 @@ struct IfaceSet {
 		return retval;
 	}
 	void insert(Iface i) { ifaces.push_back(i); }
+	void              setNeumann()
+	{
+		for (Iface &iface : ifaces) {
+			iface.setNeumann();
+		}
+	}
 	void setLocalIndexes(const std::map<int, int> &rev_map)
 	{
 		id_local = rev_map.at(gid);

@@ -4,6 +4,7 @@
 #include <deque>
 #include <fstream>
 #include <iostream>
+#include <numeric>
 #include <petscao.h>
 #include <set>
 #include <sstream>

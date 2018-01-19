@@ -47,11 +47,18 @@ class PBMatrix
 		pba->apply(x, b);
 		return 0;
 	}
+	static int destroy(Mat A){
+		PBMatrix *pba = nullptr;
+		MatShellGetContext(A, &pba);
+        delete pba;
+		return 0;
+    }
 	PW_explicit<Mat> getMatrix()
 	{
 		PW<Mat> A;
 		MatCreateShell(MPI_COMM_WORLD, local_size, local_size, global_size, global_size, this, &A);
 		MatShellSetOperation(A, MATOP_MULT, (void (*)(void)) multiply);
+		MatShellSetOperation(A, MATOP_DESTROY, (void (*)(void)) destroy);
 		return A;
 	}
 };
