@@ -28,8 +28,8 @@ class FuncWrap
 	PW_explicit<Mat> getMatrix()
 	{
 		PW<Mat> A;
-		int     M = dc->num_global_interfaces * pow(dc->n, 2);
-		int     m = dc->ifaces.size() * pow(dc->n, 2);
+		int     M = sh->getSchurVecGlobalSize();
+		int     m = sh->getSchurVecLocalSize();
 		MatCreateShell(MPI_COMM_WORLD, m, m, M, M, this, &A);
 		MatShellSetOperation(A, MATOP_MULT, (void (*)(void)) multiply);
 		return A;

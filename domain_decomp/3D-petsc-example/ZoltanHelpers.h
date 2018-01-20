@@ -140,10 +140,11 @@ struct DomainZoltanHelper {
 		for (int i = 0; i < num_ids; i++) {
 			auto &ds = dc->domains[global_ids[i]];
 			for (int q = 0; q < 8; q++) {
-				if (ds.nbr_id[q] != -1) {
+			/*	if (ds.nbr_id[q] != -1) {
 					auto &nbr   = dc->domains[ds.nbr_id[q]];
 					nbr.proc[q] = dest[i];
 				}
+                */
 			}
 		}
 		for (int i = 0; i < num_ids; i++) {
@@ -168,7 +169,7 @@ struct DomainZoltanHelper {
 		auto &ds             = dc->domains[*global_id];
 		int   num_iface      = 0;
 		for (int q = 0; q < 8; q++) {
-			if (ds.nbr_id[q] != -1) num_iface++;
+			//if (ds.nbr_id[q] != -1) num_iface++;
 		}
 		return num_iface;
 	}
@@ -182,11 +183,11 @@ struct DomainZoltanHelper {
 		auto &ds             = dc->domains[*global_id];
 		int   i              = 0;
 		for (int q = 0; q < 8; q++) {
-			if (ds.nbr_id[q] != -1) {
+		/*	if (ds.nbr_id[q] != -1) {
 				nbor_global_id[i] = ds.nbr_id[q];
 				nbor_procs[i]     = ds.proc[q];
 				i++;
-			}
+			}*/
 		}
 	}
 	//	static int dimensions(void *data, int *ierr);

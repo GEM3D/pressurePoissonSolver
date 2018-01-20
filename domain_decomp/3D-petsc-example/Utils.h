@@ -49,9 +49,9 @@ inline Slice getSlice(double *u_view, int n, Side s)
 	}
 	return retval;
 }
-inline Slice getSlice(Domain &d, double *u_view, Side s)
+inline Slice getSlice(SchurDomain &d, double *u_view, Side s)
 {
-	int start = d.id_local * d.n * d.n * d.n;
+	int start = d.local_index * d.n * d.n * d.n;
 	return getSlice(&u_view[start], d.n, s);
 }
 }

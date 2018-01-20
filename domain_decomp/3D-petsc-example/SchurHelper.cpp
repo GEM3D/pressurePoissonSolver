@@ -3,6 +3,7 @@
 #include <array>
 #include <iostream>
 #include <numeric>
+#include <petscao.h>
 #include <tuple>
 using namespace std;
 enum axis_enum { X_AXIS, Y_AXIS };
@@ -11,16 +12,25 @@ enum bc_enum { DIRICHLET, NEUMANN, REFINED };
 SchurHelper::SchurHelper(DomainCollection dc, shared_ptr<PatchSolver> solver,
                          shared_ptr<PatchOperator> op, shared_ptr<Interpolator> interpolator)
 {
-	this->dc           = dc;
+    this->n=dc.n;
+	for (auto &p : dc.domains) {
+		domains.push_back(p.second);
+	}
+	for (SchurDomain &sd : domains) {
+		sd.enumerateIfaces(ifaces);
+        solver->addDomain(sd);
+	}
+	indexDomainIfacesLocal();
+	indexIfacesLocal();
 	this->solver       = solver;
 	this->op           = op;
 	this->interpolator = interpolator;
-	local_gamma        = dc.getNewSchurDistVec();
-	local_interp       = dc.getNewSchurDistVec();
-	gamma              = dc.getNewSchurVec();
+	local_gamma        = getNewSchurDistVec();
+	local_interp       = getNewSchurDistVec();
+	gamma              = getNewSchurVec();
 	PW<IS> dist_is;
-	ISCreateBlock(MPI_COMM_WORLD, dc.n * dc.n, dc.iface_dist_map_vec.size(),
-	              &dc.iface_dist_map_vec[0], PETSC_COPY_VALUES, &dist_is);
+	ISCreateBlock(MPI_COMM_WORLD, dc.n * dc.n, iface_dist_map_vec.size(),
+	              &iface_dist_map_vec[0], PETSC_COPY_VALUES, &dist_is);
 	VecScatterCreate(gamma, dist_is, local_gamma, nullptr, &scatter);
 }
 
@@ -32,10 +42,9 @@ void SchurHelper::solveWithInterface(const Vec f, Vec u, const Vec gamma, Vec di
 
 	VecScale(local_interp, 0);
 	// solve over domains on this proc
-	for (auto &p : dc.domains) {
-		Domain &d = p.second;
-		solver->solve(d, f, u, local_gamma);
-		interpolator->interpolate(d, u, local_interp);
+	for (SchurDomain&sd : domains) {
+		solver->solve(sd, f, u, local_gamma);
+		interpolator->interpolate(sd, u, local_interp);
 	}
 
 	// export diff vector
@@ -63,26 +72,23 @@ void SchurHelper::solveWithSolution(const Vec f, Vec u)
 	*/
 
 	// solve over domains on this proc
-	for (auto &p : dc.domains) {
-		Domain &d = p.second;
-		solver->solve(d, f, u, local_gamma);
+	for (SchurDomain&sd : domains) {
+		solver->solve(sd, f, u, local_gamma);
 	}
 }
 void SchurHelper::applyWithInterface(const Vec u, const Vec gamma, Vec f)
 {
 	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
-	for (auto &p : dc.domains) {
-		Domain &d = p.second;
-		op->apply(d, u, local_gamma, f);
+	for (SchurDomain&sd : domains) {
+		op->apply(sd, u, local_gamma, f);
 	}
 }
 void SchurHelper::apply(const Vec u, Vec f)
 {
 	VecScale(local_interp, 0);
-	for (auto &p : dc.domains) {
-		Domain &d = p.second;
-		interpolator->interpolate(d, u, local_interp);
+	for (SchurDomain&sd : domains) {
+		interpolator->interpolate(sd, u, local_interp);
 	}
 	VecScale(gamma, 0);
 	VecScatterBegin(scatter, local_interp, gamma, ADD_VALUES, SCATTER_REVERSE);
@@ -90,9 +96,8 @@ void SchurHelper::apply(const Vec u, Vec f)
 	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 
-	for (auto &p : dc.domains) {
-		Domain &d = p.second;
-		op->apply(d, u, local_gamma, f);
+	for (SchurDomain&sd : domains) {
+		op->apply(sd, u, local_gamma, f);
 	}
 }
 enum class Rotation : char { x_cw, x_ccw, y_cw, y_ccw, z_cw, z_ccw };
@@ -233,9 +238,8 @@ const vector<Rotation> Block::aux_rot_plan_neumann[16] = {{},
                                                           {}};
 void SchurHelper::assembleMatrix(inserter insertBlock)
 {
-	int        n = dc.n;
 	set<Block> blocks;
-	for (auto &p : dc.ifaces) {
+	for (auto &p : ifaces) {
 		IfaceSet &ifs = p.second;
 		int       i   = ifs.id_global;
 		for (const Iface &iface : ifs.ifaces) {
@@ -277,17 +281,14 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 		}
 
 		// create domain representing curr_type
-		Domain ds;
-		ds.n         = n;
-		ds.id        = 0;
-		ds.id_local  = 0;
-		ds.x_length  = 1;
-		ds.y_length  = 1;
-		ds.z_length  = 1;
-		ds.nbr_id[0] = 1;
-		ds.neumann   = curr_type.neumann;
-		ds.local_i   = {{0, 0, 0, 0, 0, 0}};
-		solver->addDomain(ds);
+		SchurDomain sd;
+		sd.n        = n;
+		sd.x_length = 1;
+		sd.y_length = 1;
+		sd.z_length = 1;
+		sd.neumann = curr_type.neumann;
+        sd.getIfaceInfoPtr(Side::west)=new NormalIfaceInfo();
+		solver->addDomain(sd);
 
 		map<BlockKey, shared_ptr<valarray<double>>> coeffs;
 		// allocate blocks of coefficients
@@ -300,7 +301,7 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 
 		for (int j = 0; j < n * n; j++) {
 			gamma_view[j] = 1;
-			solver->solve(ds, f, u, gamma);
+			solver->solve(sd, f, u, gamma);
 			gamma_view[j] = 0;
 
 			// fill the blocks
@@ -308,7 +309,7 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 				Side      s    = p.first.s;
 				IfaceType type = IfaceType::normal;
 				VecScale(interp, 0);
-				interpolator->interpolate(ds, s, type, u, interp);
+				interpolator->interpolate(sd, s,0, type, u, interp);
 				valarray<double> &block = *p.second;
 				for (int i = 0; i < n * n; i++) {
 					block[i * n * n + j] = -interp_view[i];
@@ -341,11 +342,10 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 }
 PW_explicit<Mat> SchurHelper::formCRSMatrix()
 {
-	int     n = dc.n;
 	PW<Mat> A;
 	MatCreate(MPI_COMM_WORLD, &A);
-	int local_size  = dc.ifaces.size() * n * n;
-	int global_size = dc.num_global_interfaces * n * n;
+	int local_size  = ifaces.size() * n * n;
+	int global_size = getSchurVecGlobalSize();
 	MatSetSizes(A, local_size, local_size, global_size, global_size);
 	MatSetType(A, MATMPIAIJ);
 	MatMPIAIJSetPreallocation(A, 19 * n * n, nullptr, 19 * n * n, nullptr);
@@ -459,9 +459,8 @@ PW_explicit<Mat> SchurHelper::formCRSMatrix()
 }
 PW_explicit<Mat> SchurHelper::formPBMatrix()
 {
-	int n           = dc.n;
-	int local_size  = dc.ifaces.size() * n * n;
-	int global_size = dc.num_global_interfaces * n * n;
+	int local_size  = ifaces.size() * n * n;
+	int global_size = getSchurVecGlobalSize();
 
 	PBMatrix *APB    = new PBMatrix(n, local_size, global_size);
 	auto insertBlock = [&](Block *b, shared_ptr<valarray<double>> coeffs) {
@@ -549,4 +548,149 @@ PW_explicit<Mat> SchurHelper::formPBMatrix()
 	APB->finalize();
 
 	return APB->getMatrix();
+}
+void SchurHelper::indexDomainIfacesLocal()
+{
+	vector<int> map_vec;
+	map<int, int> rev_map;
+	if (!domains.empty()) {
+		int curr_i = 0;
+		for (SchurDomain &sd : domains) {
+			for (int id : sd.getIds()) {
+				if (rev_map.count(id)==0) {
+					rev_map[id] = curr_i;
+					map_vec.push_back(id);
+					curr_i++;
+				}
+			}
+		}
+		for (SchurDomain &sd : domains) {
+			sd.setLocalIndexes(rev_map);
+		}
+	}
+	iface_dist_map_vec = map_vec;
+}
+void SchurHelper::indexIfacesLocal()
+{
+	int         curr_i = 0;
+	vector<int> map_vec;
+	vector<int> off_proc_map_vec;
+	vector<int> off_proc_map_vec_send;
+	map<int, int> rev_map;
+	if (!ifaces.empty()) {
+		set<int> todo;
+		for (auto &p : ifaces) {
+			todo.insert(p.first);
+		}
+		set<int> enqueued;
+		while (!todo.empty()) {
+			deque<int> queue;
+			queue.push_back(*todo.begin());
+			enqueued.insert(*todo.begin());
+			while (!queue.empty()) {
+				int i = queue.front();
+				todo.erase(i);
+				queue.pop_front();
+				map_vec.push_back(i);
+				IfaceSet &ifs      = ifaces.at(i);
+				rev_map[i]         = curr_i;
+				curr_i++;
+				for (int nbr : ifs.getNbrs()) {
+					if (!enqueued.count(nbr)) {
+						enqueued.insert(nbr);
+						if (ifaces.count(nbr)) {
+							queue.push_back(nbr);
+						} else {
+							off_proc_map_vec.push_back(nbr);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// map off proc
+	for (int i : off_proc_map_vec) {
+		rev_map[i] = curr_i;
+		curr_i++;
+	}
+	for (auto &p : ifaces) {
+		p.second.setLocalIndexes(rev_map);
+	}
+	iface_map_vec          = map_vec;
+	iface_off_proc_map_vec = off_proc_map_vec;
+	indexIfacesGlobal();
+}
+void SchurHelper::indexIfacesGlobal()
+{
+	// global indices are going to be sequentially increasing with rank
+	int local_size = ifaces.size();
+	int start_i;
+	MPI_Scan(&local_size, &start_i, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+	start_i -= local_size;
+	vector<int> new_global(local_size);
+	iota(new_global.begin(), new_global.end(), start_i);
+
+	// create map for gids
+	PW<AO> ao;
+	AOCreateMapping(MPI_COMM_WORLD, local_size, &iface_map_vec[0], &new_global[0], &ao);
+
+	// get indices for schur matrix
+	{
+		// get global indices that we want to recieve for dest vector
+		vector<int> inds = iface_map_vec;
+		for (int i : iface_off_proc_map_vec) {
+			inds.push_back(i);
+		}
+
+		// get new global indices
+		AOApplicationToPetsc(ao, inds.size(), &inds[0]);
+		map<int, int> rev_map;
+		for (size_t i = 0; i < inds.size(); i++) {
+			rev_map[i] = inds[i];
+		}
+
+		// set new global indices in iface objects
+		for (auto &p : ifaces) {
+			p.second.setGlobalIndexes(rev_map);
+		}
+		for (size_t i = 0; i < iface_map_vec.size(); i++) {
+			iface_map_vec[i] = inds[i];
+		}
+		for (size_t i = 0; i < iface_off_proc_map_vec.size(); i++) {
+			iface_off_proc_map_vec[i] = inds[iface_map_vec.size() + i];
+		}
+	}
+	// get indices for local ifaces
+	{
+		// get global indices that we want to recieve for dest vector
+		vector<int> inds = iface_dist_map_vec;
+
+		// get new global indices
+		AOApplicationToPetsc(ao, inds.size(), &inds[0]);
+		map<int, int> rev_map;
+		for (size_t i = 0; i < inds.size(); i++) {
+			rev_map[i] = inds[i];
+		}
+
+		// set new global indices in domain objects
+		for (SchurDomain &sd : domains) {
+			sd.setGlobalIndexes(rev_map);
+		}
+		for (size_t i = 0; i < iface_dist_map_vec.size(); i++) {
+			iface_dist_map_vec[i] = inds[i];
+		}
+	}
+}
+PW_explicit<Vec> SchurHelper::getNewSchurVec()
+{
+	PW<Vec> u;
+	VecCreateMPI(MPI_COMM_WORLD, iface_map_vec.size() * n * n, PETSC_DETERMINE, &u);
+	return u;
+}
+PW_explicit<Vec> SchurHelper::getNewSchurDistVec()
+{
+	PW<Vec> u;
+	VecCreateSeq(PETSC_COMM_SELF, iface_dist_map_vec.size() * n * n, &u);
+	return u;
 }

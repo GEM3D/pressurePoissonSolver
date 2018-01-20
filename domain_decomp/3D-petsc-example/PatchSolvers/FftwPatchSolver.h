@@ -12,7 +12,7 @@ struct DomainK {
 	double h_y     = 0;
 
 	DomainK() {}
-	DomainK(const Domain &d)
+	DomainK(const SchurDomain &d)
 	{
 		this->neumann = d.neumann.to_ulong();
 		this->h_x     = d.x_length;
@@ -41,7 +41,7 @@ class FftwPatchSolver : public PatchSolver
 	public:
 	FftwPatchSolver(DomainCollection &dsc,double lambda=0);
 	~FftwPatchSolver();
-	void solve(Domain &d, const Vec f, Vec u, const Vec gamma);
-	void addDomain(Domain &d);
+	void solve(SchurDomain &d, const Vec f, Vec u, const Vec gamma);
+	void addDomain(SchurDomain &d);
 };
 #endif

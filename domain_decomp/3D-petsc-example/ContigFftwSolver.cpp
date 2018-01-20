@@ -32,7 +32,7 @@ void FftwChunk::apply(double *fhat)
 	valarray<double> in(size * n * n * n);
 	valarray<double> out(size * n * n * n);
 	get(fhat, &in[0]);
-	//in /= size;
+	// in /= size;
 	in /= sqrt(2 * size * n);
 	fftw_execute_r2r(plan, &in[0], &out[0]);
 	put(fhat, &out[0]);
@@ -42,17 +42,18 @@ void FftwChunk::applyInv(double *fhat)
 	valarray<double> in(size * n * n * n);
 	valarray<double> out(size * n * n * n);
 	get(fhat, &in[0]);
-	//in /= size;
-	//in /= sqrt(2 * size * n);
+	// in /= size;
+	// in /= sqrt(2 * size * n);
 	in /= sqrt(2 * size * n);
 	fftw_execute_r2r(plan_inv, &in[0], &out[0]);
-    //out /= sqrt(2 * size * n);
+	// out /= sqrt(2 * size * n);
 	put(fhat, &out[0]);
 }
-void FftwChunk::scale(double *fhat){
+void FftwChunk::scale(double *fhat)
+{
 	valarray<double> in(size * n * n * n);
 	get(fhat, &in[0]);
-    //in /= 8 * size * n*n*n;
+	// in /= 8 * size * n*n*n;
 	put(fhat, &in[0]);
 }
 void FftwChunkX::get(double *fhat, double *tmp)
@@ -160,18 +161,26 @@ ContigFftwSolver::ContigFftwSolver(DomainCollection &dc)
 	for (auto p : dc.domains) {
 		todo.insert(p.second);
 	}
+	auto getNbrId = [&](int id, Side s) {
+		Domain &d      = dc.domains[id];
+		int     retval = -1;
+		if (d.hasNbr(s)) {
+			retval = d.getNormalNbrInfo(s).id;
+		}
+		return retval;
+	};
 	while (!todo.empty()) {
 		Domain     d = *todo.begin();
 		FftwChunkX chunk;
 		// east nbrs
-		for (int id = d.id; id != -1; id = dc.domains[id].nbr(Side::east)) {
+		for (int id = d.id; id != -1; id = getNbrId(id, Side::east)) {
 			Domain nbr = dc.domains[id];
 			chunk.domains.push_back(nbr);
 			todo.erase(nbr);
 		}
 		// west nbrs
 		if (d.hasNbr(Side::west)) {
-			for (int id = d.nbr(Side::west); id != -1; id = dc.domains[id].nbr(Side::west)) {
+			for (int id = getNbrId(d.id, Side::west); id != -1; id = getNbrId(id, Side::west)) {
 				Domain nbr = dc.domains[id];
 				chunk.domains.push_front(nbr);
 				todo.erase(nbr);
@@ -187,14 +196,14 @@ ContigFftwSolver::ContigFftwSolver(DomainCollection &dc)
 		Domain     d = *todo.begin();
 		FftwChunkY chunk;
 		// north nbrs
-		for (int id = d.id; id != -1; id = dc.domains[id].nbr(Side::north)) {
+		for (int id = d.id; id != -1; id = getNbrId(id, Side::north)) {
 			Domain nbr = dc.domains[id];
 			chunk.domains.push_back(nbr);
 			todo.erase(nbr);
 		}
 		// south nbrs
 		if (d.hasNbr(Side::south)) {
-			for (int id = d.nbr(Side::south); id != -1; id = dc.domains[id].nbr(Side::south)) {
+			for (int id = getNbrId(d.id, Side::south); id != -1; id = getNbrId(id, Side::south)) {
 				Domain nbr = dc.domains[id];
 				chunk.domains.push_front(nbr);
 				todo.erase(nbr);
@@ -211,14 +220,14 @@ ContigFftwSolver::ContigFftwSolver(DomainCollection &dc)
 		FftwChunkZ chunk;
 		chunk.n = d.n;
 		// top nbrs
-		for (int id = d.id; id != -1; id = dc.domains[id].nbr(Side::top)) {
+		for (int id = d.id; id != -1; id = getNbrId(id, Side::top)) {
 			Domain nbr = dc.domains[id];
 			chunk.domains.push_back(nbr);
 			todo.erase(nbr);
 		}
 		// bottom nbrs
 		if (d.hasNbr(Side::bottom)) {
-			for (int id = d.nbr(Side::bottom); id != -1; id = dc.domains[id].nbr(Side::bottom)) {
+			for (int id = getNbrId(d.id, Side::bottom); id != -1; id = getNbrId(id, Side::bottom)) {
 				Domain nbr = dc.domains[id];
 				chunk.domains.push_front(nbr);
 				todo.erase(nbr);

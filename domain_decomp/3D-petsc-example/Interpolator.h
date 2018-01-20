@@ -1,14 +1,16 @@
 #ifndef INTERPOLATOR_H
 #define INTERPOLATOR_H
-#include "Domain.h"
 #include "Iface.h"
+#include "SchurDomain.h"
 #include "Side.h"
 #include <petscvec.h>
 class Interpolator
 {
 	public:
 	virtual ~Interpolator() {}
-	virtual void interpolate(Domain &d, const Vec u, Vec interp) = 0;
-	virtual void interpolate(Domain &d, Side s, IfaceType itype, const Vec u, Vec interp) = 0;
+	virtual void interpolate(SchurDomain &d, const Vec u, Vec interp) = 0;
+	virtual void interpolate(SchurDomain &d, Side s, int local_index, IfaceType itype, const Vec u,
+	                         Vec interp)
+	= 0;
 };
 #endif

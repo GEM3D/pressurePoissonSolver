@@ -1,9 +1,12 @@
 #ifndef SCHURHELPER_H
 #define SCHURHELPER_H
 #include "DomainCollection.h"
+#include "Iface.h"
 #include "Interpolator.h"
 #include "PatchOperator.h"
 #include "PatchSolvers/PatchSolver.h"
+#include "SchurDomain.h"
+#include <deque>
 #include <memory>
 #include <petscmat.h>
 #include <valarray>
@@ -20,6 +23,7 @@ struct Block;
 class SchurHelper
 {
 	private:
+	int n;
 
 	PW<Vec>        local_gamma;
 	PW<Vec>        gamma;
@@ -41,13 +45,21 @@ class SchurHelper
 	 */
 	std::shared_ptr<PatchSolver> solver;
 
-	typedef std::function<void(Block*, std::shared_ptr<std::valarray<double>>)>
-	     inserter;
+	typedef std::function<void(Block *, std::shared_ptr<std::valarray<double>>)> inserter;
 	void assembleMatrix(inserter insertBlock);
 
+	std::deque<SchurDomain> domains;
+	std::map<int, IfaceSet> ifaces;
+
+	std::vector<int> iface_dist_map_vec;
+	std::vector<int> iface_map_vec;
+	std::vector<int> iface_off_proc_map_vec;
+	void             indexIfacesLocal();
+	void             indexDomainIfacesLocal();
+	void             indexIfacesGlobal();
+
 	public:
-	DomainCollection dc;
-    SchurHelper()=default;
+	SchurHelper() = default;
 	/**
 	 * @brief Create a SchurHelper from a given DomainCollection
 	 *
@@ -85,5 +97,10 @@ class SchurHelper
 	 */
 	PW_explicit<Mat> formCRSMatrix();
 	PW_explicit<Mat> formPBMatrix();
+	PW_explicit<Vec> getNewSchurVec();
+	PW_explicit<Vec> getNewSchurDistVec();
+
+	int getSchurVecLocalSize() { return iface_map_vec.size() * n * n; }
+	int getSchurVecGlobalSize() { return iface_map_vec.size() * n * n; }
 };
 #endif

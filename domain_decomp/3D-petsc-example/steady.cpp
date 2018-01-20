@@ -248,10 +248,10 @@ int main(int argc, char *argv[])
 		nfunz = [](double x, double y, double z) { return 0; };
 	} else {
 		ffun = [](double x, double y, double z) {
-		    return -9 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
+			return -9 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
 		};
 		gfun = [](double x, double y, double z) {
-		    return sin(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
+			return sin(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
 		};
 		nfunx = [](double x, double y, double z) {
 			return M_PI * cos(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
@@ -306,9 +306,9 @@ int main(int argc, char *argv[])
 		timer.stop("Domain Initialization");
 
 		// Create the gamma and diff vectors
-		PW<Vec>                 gamma = dc.getNewSchurVec();
-		PW<Vec>                 diff  = dc.getNewSchurVec();
-		PW<Vec>                 b     = dc.getNewSchurVec();
+		PW<Vec>                 gamma = sch.getNewSchurVec();
+		PW<Vec>                 diff  = sch.getNewSchurVec();
+		PW<Vec>                 b     = sch.getNewSchurVec();
 		PW<Mat>                 A;
 		shared_ptr<FuncWrap>    w;
 		shared_ptr<SchwarzPrec> sp;

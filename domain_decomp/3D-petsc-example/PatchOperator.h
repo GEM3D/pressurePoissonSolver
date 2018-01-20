@@ -6,6 +6,6 @@ class PatchOperator
 {
 	public:
 	virtual ~PatchOperator() {}
-	virtual void apply(Domain &d, const Vec u, const Vec gamma, Vec f) = 0;
+	virtual void apply(SchurDomain &d, const Vec u, const Vec gamma, Vec f) = 0;
 };
 #endif

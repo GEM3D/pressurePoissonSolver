@@ -5,13 +5,13 @@
 class SevenPtPatchOperator : public PatchOperator
 {
 	public:
-	void apply(Domain &d, const Vec u, const Vec gamma, Vec f)
+	void apply(SchurDomain &d, const Vec u, const Vec gamma, Vec f)
 	{
 		using namespace Utils;
 		int     n     = d.n;
 		double  h_x   = d.x_length / n;
 		double  h_y   = d.y_length / n;
-		int     start = n * n * n * d.id_local;
+		int     start = n * n * n * d.local_index;
 		double *u_view, *f_view, *gamma_view;
 		VecGetArray(u, &u_view);
 		VecGetArray(f, &f_view);
@@ -21,27 +21,27 @@ class SevenPtPatchOperator : public PatchOperator
 
 		const double *boundary_west = nullptr;
 		if (d.hasNbr(Side::west)) {
-			boundary_west = &gamma_view[n * n * d.index(Side::west)];
+			boundary_west = &gamma_view[n * n * d.getIfaceLocalIndex(Side::west)];
 		}
 		const double *boundary_east = nullptr;
 		if (d.hasNbr(Side::east)) {
-			boundary_east = &gamma_view[n * n * d.index(Side::east)];
+			boundary_east = &gamma_view[n * n * d.getIfaceLocalIndex(Side::east)];
 		}
 		const double *boundary_south = nullptr;
 		if (d.hasNbr(Side::south)) {
-			boundary_south = &gamma_view[n * n * d.index(Side::south)];
+			boundary_south = &gamma_view[n * n * d.getIfaceLocalIndex(Side::south)];
 		}
 		const double *boundary_north = nullptr;
 		if (d.hasNbr(Side::north)) {
-			boundary_north = &gamma_view[n * n * d.index(Side::north)];
+			boundary_north = &gamma_view[n * n * d.getIfaceLocalIndex(Side::north)];
 		}
 		const double *boundary_bottom = nullptr;
 		if (d.hasNbr(Side::bottom)) {
-			boundary_bottom = &gamma_view[n * n * d.index(Side::bottom)];
+			boundary_bottom = &gamma_view[n * n * d.getIfaceLocalIndex(Side::bottom)];
 		}
 		const double *boundary_top = nullptr;
 		if (d.hasNbr(Side::top)) {
-			boundary_top = &gamma_view[n * n * d.index(Side::top)];
+			boundary_top = &gamma_view[n * n * d.getIfaceLocalIndex(Side::top)];
 		}
 
 		double center, north, east, south, west, bottom, top;

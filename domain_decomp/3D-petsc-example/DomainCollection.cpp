@@ -42,19 +42,18 @@ DomainCollection::DomainCollection(OctTree t, int level)
 		// set and enqueue nbrs
 		do {
 			if (n.nbr(s) != -1) {
-				d.nbr(s) = n.nbr(s);
-				int id   = n.nbr(s);
+				int id = n.nbr(s);
 				if (!qed.count(id)) {
 					q.push_back(id);
 					qed.insert(id);
 				}
+				d.getNbrInfoPtr(s) = new NormalNbrInfo(id);
 			}
 			s++;
 		} while (s != Side::west);
 		domains[d.id] = d;
 	}
 	num_global_domains = domains.size();
-	enumerateIfaces();
 	reIndex();
 }
 DomainCollection::DomainCollection(OctTree t)
@@ -86,8 +85,6 @@ DomainCollection::DomainCollection(OctTree t)
 		// set and enqueue nbrs
 		do {
 			if (n.nbr(s) == -1 && n.parent != -1 && t.nodes[n.parent].nbr(s) != -1) {
-				d.setHasCoarseNbr(s);
-				d.nbr(s)       = n.nbr(s);
 				OctNode parent = t.nodes[n.parent];
 				OctNode nbr    = t.nodes[parent.nbr(s)];
 				auto    octs   = getOctsOnSide(s);
@@ -95,37 +92,37 @@ DomainCollection::DomainCollection(OctTree t)
 				while (parent.child(octs[quad]) != n.id) {
 					quad++;
 				}
-				d.quadOnCoarse(s) = quad;
+				d.getNbrInfoPtr(s) = new CoarseNbrInfo(nbr.id, quad);
 				if (!qed.count(nbr.id)) {
 					q.push_back(nbr.id);
 					qed.insert(nbr.id);
 				}
 			} else if (n.nbr(s) != -1 && t.nodes[n.nbr(s)].hasChildren()) {
-				d.setHasFineNbr(s);
 				OctNode nbr  = t.nodes[n.nbr(s)];
 				auto    octs = getOctsOnSide(~s);
+				array<int, 4> nbr_ids;
 				for (int i = 0; i < 4; i++) {
-					int id = nbr.child(octs[i]);
-					d.nbr(s, i) = id;
+					int id     = nbr.child(octs[i]);
+					nbr_ids[i] = id;
 					if (!qed.count(id)) {
 						q.push_back(id);
 						qed.insert(id);
 					}
 				}
+				d.getNbrInfoPtr(s) = new FineNbrInfo(nbr_ids);
 			} else if (n.nbr(s) != -1) {
-				d.nbr(s) = n.nbr(s);
-				int id   = n.nbr(s);
+				int id = n.nbr(s);
 				if (!qed.count(id)) {
 					q.push_back(id);
 					qed.insert(id);
 				}
+				d.getNbrInfoPtr(s) = new NormalNbrInfo(id);
 			}
 			s++;
 		} while (s != Side::west);
 		domains[d.id] = d;
 	}
 	num_global_domains = domains.size();
-	enumerateIfaces();
 	reIndex();
 }
 DomainCollection::DomainCollection(int d_x, int d_y, int d_z)
@@ -141,22 +138,28 @@ DomainCollection::DomainCollection(int d_x, int d_y, int d_z)
 					ds.id           = getID(domain_x, domain_y, domain_z);
 					ds.refine_level = 1;
 					if (domain_x != 0) {
-						ds.nbr(Side::west) = getID(domain_x - 1, domain_y, domain_z);
+						ds.getNbrInfoPtr(Side::west)
+						= new NormalNbrInfo(getID(domain_x - 1, domain_y, domain_z));
 					}
 					if (domain_x != d_x - 1) {
-						ds.nbr(Side::east) = getID(domain_x + 1, domain_y, domain_z);
+						ds.getNbrInfoPtr(Side::east)
+						= new NormalNbrInfo(getID(domain_x + 1, domain_y, domain_z));
 					}
 					if (domain_y != 0) {
-						ds.nbr(Side::south) = getID(domain_x, domain_y - 1, domain_z);
+						ds.getNbrInfoPtr(Side::south)
+						= new NormalNbrInfo(getID(domain_x, domain_y - 1, domain_z));
 					}
 					if (domain_y != d_y - 1) {
-						ds.nbr(Side::north) = getID(domain_x, domain_y + 1, domain_z);
+						ds.getNbrInfoPtr(Side::north)
+						= new NormalNbrInfo(getID(domain_x, domain_y + 1, domain_z));
 					}
 					if (domain_z != 0) {
-						ds.nbr(Side::bottom) = getID(domain_x, domain_y, domain_z - 1);
+						ds.getNbrInfoPtr(Side::bottom)
+						= new NormalNbrInfo(getID(domain_x, domain_y, domain_z - 1));
 					}
 					if (domain_z != d_z - 1) {
-						ds.nbr(Side::top) = getID(domain_x, domain_y, domain_z + 1);
+						ds.getNbrInfoPtr(Side::top)
+						= new NormalNbrInfo(getID(domain_x, domain_y, domain_z + 1));
 					}
 					ds.x_length    = 1.0 / d_x;
 					ds.y_length    = 1.0 / d_y;
@@ -169,57 +172,11 @@ DomainCollection::DomainCollection(int d_x, int d_y, int d_z)
 			}
 		}
 	}
-	enumerateIfaces();
 	reIndex();
 }
-void DomainCollection::enumerateIfaces()
-{
-	for (auto &p : domains) {
-		Domain &d = p.second;
-		Side    s = Side::west;
-		do {
-			if (d.hasNbr(s)) {
-				Iface iface;
-				iface.g_id           = d.g_id();
-				iface.s              = s;
-				iface.type           = IfaceType::normal;
-				ifaces[d.gid(s)].gid = d.gid(s);
-				ifaces[d.gid(s)].insert(iface);
-			}
-			s++;
-		} while (s != Side::west);
-	}
-	num_global_interfaces = ifaces.size();
-}
-void DomainCollection::reIndex()
-{
-	indexDomainIfacesLocal();
-	indexDomainsLocal();
-	indexIfacesLocal();
-	/*
-	cerr << "IFACE_MAP_VEC: ";
-	for(int g: iface_map_vec){
-	    cerr << g << ", ";
-	}
-	cerr<<endl;
-	cerr << "IFACE_DIST_MAP_VEC: ";
-	for(int g: iface_dist_map_vec){
-	    cerr << g << ", ";
-	}
-	cerr<<endl;
-	*/
-}
+void DomainCollection::reIndex() { indexDomainsLocal(); }
 void DomainCollection::divide() {}
-void DomainCollection::determineCoarseness() {}
-void DomainCollection::determineAmrLevel() {}
-void DomainCollection::determineXY() {}
-void DomainCollection::zoltanBalance()
-{
-	zoltanBalanceDomains();
-	zoltanBalanceIfaces();
-}
-
-void DomainCollection::zoltanBalanceIfaces() {}
+void DomainCollection::zoltanBalance() { zoltanBalanceDomains(); }
 void DomainCollection::zoltanBalanceDomains()
 {
 	struct Zoltan_Struct *zz = Zoltan_Create(MPI_COMM_WORLD);
@@ -295,123 +252,6 @@ void DomainCollection::zoltanBalanceDomains()
 #endif
 	cout << endl;
 }
-
-void DomainCollection::indexIfacesGlobal()
-{
-	// global indices are going to be sequentially increasing with rank
-	int local_size = ifaces.size();
-	int start_i;
-	MPI_Scan(&local_size, &start_i, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-	start_i -= local_size;
-	vector<int> new_global(local_size);
-	iota(new_global.begin(), new_global.end(), start_i);
-
-	// create map for gids
-	PW<AO> ao;
-	AOCreateMapping(MPI_COMM_WORLD, local_size, &iface_map_vec[0], &new_global[0], &ao);
-
-	// get indices for schur matrix
-	{
-		// get global indices that we want to recieve for dest vector
-		vector<int> inds = iface_map_vec;
-		for (int i : iface_off_proc_map_vec) {
-			inds.push_back(i);
-		}
-
-		// get new global indices
-		AOApplicationToPetsc(ao, inds.size(), &inds[0]);
-		map<int, int> rev_map;
-		for (size_t i = 0; i < inds.size(); i++) {
-			rev_map[i] = inds[i];
-		}
-
-		// set new global indices in iface objects
-		for (auto &p : ifaces) {
-			p.second.setGlobalIndexes(rev_map);
-		}
-		for (size_t i = 0; i < iface_map_vec.size(); i++) {
-			iface_map_vec[i] = inds[i];
-		}
-		for (size_t i = 0; i < iface_off_proc_map_vec.size(); i++) {
-			iface_off_proc_map_vec[i] = inds[iface_map_vec.size() + i];
-		}
-	}
-	// get indices for local ifaces
-	{
-		// get global indices that we want to recieve for dest vector
-		vector<int> inds = iface_dist_map_vec;
-
-		// get new global indices
-		AOApplicationToPetsc(ao, inds.size(), &inds[0]);
-		map<int, int> rev_map;
-		for (size_t i = 0; i < inds.size(); i++) {
-			rev_map[i] = inds[i];
-		}
-
-		// set new global indices in domain objects
-		for (auto &p : domains) {
-			p.second.setGlobalIndexes(rev_map);
-		}
-		for (size_t i = 0; i < iface_dist_map_vec.size(); i++) {
-			iface_dist_map_vec[i] = inds[i];
-		}
-	}
-}
-void DomainCollection::indexIfacesLocal()
-{
-	int         curr_i = 0;
-	vector<int> map_vec;
-	vector<int> off_proc_map_vec;
-	vector<int> off_proc_map_vec_send;
-	map<int, int> rev_map;
-	if (!ifaces.empty()) {
-		set<int> todo;
-		for (auto &p : ifaces) {
-			todo.insert(p.first);
-		}
-		set<int> enqueued;
-		while (!todo.empty()) {
-			deque<int> queue;
-			queue.push_back(*todo.begin());
-			enqueued.insert(*todo.begin());
-			deque<int> off_proc_ifaces;
-			while (!queue.empty()) {
-				int i = queue.front();
-				todo.erase(i);
-				queue.pop_front();
-				map_vec.push_back(i);
-				IfaceSet &ifs      = ifaces[i];
-				rev_map[i]         = curr_i;
-				ifaces[i].id_local = curr_i;
-				curr_i++;
-				for (int nbr : ifs.getNbrs()) {
-					if (!enqueued.count(nbr)) {
-						enqueued.insert(nbr);
-						if (ifaces.count(nbr)) {
-							queue.push_back(nbr);
-						} else {
-							off_proc_map_vec.push_back(nbr);
-						}
-					}
-				}
-			}
-		}
-	}
-
-	set<int> neighbors;
-	map<int, set<int>> proc_recv;
-	// map off proc
-	for (int i : off_proc_map_vec) {
-		rev_map[i] = curr_i;
-		curr_i++;
-	}
-	for (auto &p : ifaces) {
-		p.second.setLocalIndexes(rev_map);
-	}
-	iface_map_vec          = map_vec;
-	iface_off_proc_map_vec = off_proc_map_vec;
-	indexIfacesGlobal();
-}
 void DomainCollection::indexDomainsGlobal()
 {
 	// global indices are going to be sequentially increasing with rank
@@ -475,17 +315,15 @@ void DomainCollection::indexDomainsLocal()
 				rev_map[i] = curr_i;
 				d.id_local = curr_i;
 				curr_i++;
-				for (int i : d.nbr_id) {
-					if (i != -1) {
-						if (!enqueued.count(i)) {
-							enqueued.insert(i);
-							if (domains.count(i)) {
-								queue.push_back(i);
-							} else {
-								if (!offs.count(i)) {
-									offs.insert(i);
-									off_proc_map_vec.push_back(i);
-								}
+				for (int i : d.getNbrIds()) {
+					if (!enqueued.count(i)) {
+						enqueued.insert(i);
+						if (domains.count(i)) {
+							queue.push_back(i);
+						} else {
+							if (!offs.count(i)) {
+								offs.insert(i);
+								off_proc_map_vec.push_back(i);
 							}
 						}
 					}
@@ -505,53 +343,6 @@ void DomainCollection::indexDomainsLocal()
 	domain_map_vec          = map_vec;
 	domain_off_proc_map_vec = off_proc_map_vec;
 	indexDomainsGlobal();
-}
-void DomainCollection::indexDomainIfacesLocal()
-{
-	vector<int> map_vec;
-	map<int, int> rev_map;
-	if (!domains.empty()) {
-		int      curr_i = 0;
-		set<int> todo;
-		for (auto &p : domains) {
-			todo.insert(p.first);
-		}
-		set<int> enqueued;
-		while (!todo.empty()) {
-			deque<int> queue;
-			queue.push_back(*todo.begin());
-			enqueued.insert(*todo.begin());
-			deque<int> off_proc_ifaces;
-			while (!queue.empty()) {
-				int i = queue.front();
-				queue.pop_front();
-				todo.erase(i);
-				Domain &ds = domains[i];
-				Side    s  = Side::west;
-				do {
-					int g_id = ds.gid(s);
-					if (g_id != -1 && rev_map.count(g_id) == 0) {
-						rev_map[g_id] = curr_i;
-						map_vec.push_back(g_id);
-						curr_i++;
-					}
-					s++;
-				} while (s != Side::west);
-				for (int nbr : ds.nbr_id) {
-					if (nbr != -1 && enqueued.count(nbr) == 0) {
-						enqueued.insert(nbr);
-						if (domains.count(nbr)) {
-							queue.push_back(nbr);
-						}
-					}
-				}
-			}
-		}
-		for (auto &p : domains) {
-			p.second.setLocalIndexes(rev_map);
-		}
-	}
-	iface_dist_map_vec = map_vec;
 }
 double DomainCollection::integrate(const Vec u)
 {
@@ -587,18 +378,6 @@ double DomainCollection::volume()
 	double retval;
 	MPI_Allreduce(&sum, &retval, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 	return retval;
-}
-PW_explicit<Vec> DomainCollection::getNewSchurVec()
-{
-	PW<Vec> u;
-	VecCreateMPI(MPI_COMM_WORLD, ifaces.size() * n * n, PETSC_DETERMINE, &u);
-	return u;
-}
-PW_explicit<Vec> DomainCollection::getNewSchurDistVec()
-{
-	PW<Vec> u;
-	VecCreateSeq(PETSC_COMM_SELF, iface_dist_map_vec.size() * n * n, &u);
-	return u;
 }
 PW_explicit<Vec> DomainCollection::getNewDomainVec()
 {

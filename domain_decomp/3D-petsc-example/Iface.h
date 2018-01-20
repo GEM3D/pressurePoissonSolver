@@ -2,25 +2,26 @@
 #define IFACE_H
 #include "IfaceType.h"
 #include "Side.h"
+#include <bitset>
 #include <map>
 #include <set>
 #include <vector>
 struct Iface {
 	IfaceType type;
 	Side      s;
-	std::array<int, 6> g_id      = {{-1, -1, -1, -1, -1, -1}};
+	std::array<int, 6> ids       = {{-1, -1, -1, -1, -1, -1}};
 	std::array<int, 6> local_id  = {{-1, -1, -1, -1, -1, -1}};
 	std::array<int, 6> global_id = {{-1, -1, -1, -1, -1, -1}};
 	std::bitset<6> neumann;
-	void           setNeumann()
+	Iface(std::array<int, 6> ids, IfaceType type, Side s)
 	{
-		for (int i = 0; i < 6; i++) {
-			neumann[i] = g_id[i] == -1;
-		}
+		this->ids  = ids;
+		this->type = type;
+		this->s    = s;
 	}
 };
 struct IfaceSet {
-	int                gid       = -1;
+	int                id        = -1;
 	int                id_local  = -1;
 	int                id_global = -1;
 	std::vector<Iface> ifaces;
@@ -28,8 +29,8 @@ struct IfaceSet {
 	{
 		std::set<int> retval;
 		for (const Iface &iface : ifaces) {
-			for (const int i : iface.g_id) {
-				if (i != -1 && i != gid) {
+			for (const int i : iface.ids) {
+				if (i != -1 && i != id) {
 					retval.insert(i);
 				}
 			}
@@ -37,19 +38,13 @@ struct IfaceSet {
 		return retval;
 	}
 	void insert(Iface i) { ifaces.push_back(i); }
-	void              setNeumann()
-	{
-		for (Iface &iface : ifaces) {
-			iface.setNeumann();
-		}
-	}
 	void setLocalIndexes(const std::map<int, int> &rev_map)
 	{
-		id_local = rev_map.at(gid);
+		id_local = rev_map.at(id);
 		for (Iface &iface : ifaces) {
 			for (int i = 0; i < 6; i++) {
-				if (iface.g_id[i] != -1) {
-					iface.local_id[i] = rev_map.at(iface.g_id[i]);
+				if (iface.ids[i] != -1) {
+					iface.local_id[i] = rev_map.at(iface.ids[i]);
 				}
 			}
 		}

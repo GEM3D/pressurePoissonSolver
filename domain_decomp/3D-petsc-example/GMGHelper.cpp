@@ -15,7 +15,6 @@ GMGHelper::GMGHelper(int n, OctTree t, std::shared_ptr<PatchSolver> solver,
 		levels[i].n = n;
 		for (auto &p : levels[i].domains) {
 			p.second.n = n;
-			solver->addDomain(p.second);
 		}
 		shs[i]       = SchurHelper(levels[i], solver, op, interpolator);
 		smoothers[i] = SchwarzPrec(&shs[i], &levels[i]);

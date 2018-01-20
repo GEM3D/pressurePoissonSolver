@@ -1,7 +1,6 @@
 #ifndef DOMAINSIGNATURECOLLECTION_H
 #define DOMAINSIGNATURECOLLECTION_H
 #include "Domain.h"
-#include "Iface.h"
 #include "InterpCase.h"
 #include "OctTree.h"
 #include "PW.h"
@@ -22,11 +21,6 @@
 class DomainCollection
 {
 	private:
-	void enumerateIfaces();
-	void determineCoarseness();
-	void determineAmrLevel();
-	void determineXY();
-	void zoltanBalanceIfaces();
 	void zoltanBalanceDomains();
 
 	public:
@@ -46,12 +40,8 @@ class DomainCollection
 	 */
 	std::map<int, Domain> domains;
 
-	std::map<int, IfaceSet> ifaces;
 	std::vector<int> domain_map_vec;
 	std::vector<int> domain_off_proc_map_vec;
-	std::vector<int> iface_dist_map_vec;
-	std::vector<int> iface_map_vec;
-	std::vector<int> iface_off_proc_map_vec;
 
 	/**
 	 * @brief Default empty constructor.
@@ -74,27 +64,17 @@ class DomainCollection
 	void zoltanBalance();
 	void divide();
 
-	void indexIfacesLocal();
-	void indexIfacesGlobal();
-
 	void indexDomainsLocal();
 	void indexDomainsGlobal();
 
 	void reIndex();
-
-	void indexDomainIfacesLocal();
 
 	void setNeumann()
 	{
 		for (auto &p : domains) {
 			p.second.setNeumann();
 		}
-		for (auto &p : ifaces) {
-			p.second.setNeumann();
-		}
 	}
-	PW_explicit<Vec> getNewSchurVec();
-	PW_explicit<Vec> getNewSchurDistVec();
 	PW_explicit<Vec> getNewDomainVec();
 
 	int    getGlobalNumCells() { return num_global_domains * n * n * n; }

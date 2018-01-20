@@ -4,7 +4,8 @@
 class TriLinInterp : public Interpolator
 {
 	public:
-	void interpolate(Domain &d, const Vec u, Vec interp);
-	void interpolate(Domain &d, Side s, IfaceType itype, const Vec u, Vec interp);
+	void interpolate(SchurDomain &d, const Vec u, Vec interp);
+	void interpolate(SchurDomain &d, Side s, int local_index, IfaceType itype, const Vec u,
+	                 Vec interp);
 };
 #endif

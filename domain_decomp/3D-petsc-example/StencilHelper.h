@@ -150,9 +150,10 @@ class NormalSH : public StencilHelper
 	public:
 	NormalSH(Domain &d, Side s)
 	{
-		double h       = 0;
-		int    idx     = d.id_global * d.n * d.n * d.n;
-		int    nbr_idx = d.globalNbr(s) * d.n * d.n * d.n;
+		NormalNbrInfo &nbr_info = d.getNormalNbrInfo(s);
+		double         h        = 0;
+		int            idx      = d.id_global * d.n * d.n * d.n;
+		int            nbr_idx  = nbr_info.global_index * d.n * d.n * d.n;
 		switch (s) {
 			case Side::west:
 				h         = d.x_length / d.n;
@@ -208,7 +209,7 @@ class NormalSH : public StencilHelper
 		return &col;
 	}
 };
-class FineSH : public StencilHelper
+class CoarseSH : public StencilHelper
 {
 	private:
 	std::valarray<double> coeff = {{5.0 / 6, -1.0 / 6, -1.0 / 6, -1.0 / 6, 4.0 / 6}};
@@ -221,13 +222,14 @@ class FineSH : public StencilHelper
 	int                   n;
 
 	public:
-	FineSH(Domain &d, Side s)
+	CoarseSH(Domain &d, Side s)
 	{
-		double h    = 0;
-		n           = d.n;
-		int idx     = d.id_global * d.n * d.n * d.n;
-		int nbr_idx = d.globalNbr(s) * d.n * d.n * d.n;
-		quad        = d.quadOnCoarse(s);
+		CoarseNbrInfo &nbr_info = d.getCoarseNbrInfo(s);
+		double         h        = 0;
+		n                       = d.n;
+		int idx                 = d.id_global * d.n * d.n * d.n;
+		int nbr_idx             = nbr_info.global_index * d.n * d.n * d.n;
+		quad                    = nbr_info.quad_on_coarse;
 		switch (s) {
 			case Side::west:
 				h         = d.x_length / d.n;
@@ -279,19 +281,18 @@ class FineSH : public StencilHelper
 	double *coeffs(int xi, int yi) { return &coeff[0]; }
 	int *cols(int xi, int yi)
 	{
-		colz[0] = start + stridex * xi + stridey * yi;
 		switch (quad) {
 			case 0:
-				colz[4] = nbr_start + stridex * xi / 2 + stridey * yi / 2;
+				colz[4] = nbr_start + stridex * (xi / 2) + stridey * (yi / 2);
 				break;
 			case 1:
-				colz[4] = nbr_start + stridex * (xi + n) / 2 + stridey * yi / 2;
+				colz[4] = nbr_start + stridex * ((xi + n) / 2) + stridey * (yi / 2);
 				break;
 			case 2:
-				colz[4] = nbr_start + stridex * xi / 2 + stridey * (yi + n) / 2;
+				colz[4] = nbr_start + stridex * (xi / 2) + stridey * ((yi + n) / 2);
 				break;
 			case 3:
-				colz[4] = nbr_start + stridex * (xi + n) / 2 + stridey * (yi + n) / 2;
+				colz[4] = nbr_start + stridex * ((xi + n) / 2) + stridey * ((yi + n) / 2);
 				break;
 			default:
 				break;
@@ -308,13 +309,14 @@ class FineSH : public StencilHelper
 		} else {
 			nyi = yi - 1;
 		}
+		colz[0] = start + stridex * xi + stridey * yi;
 		colz[1] = start + stridex * nxi + stridey * yi;
 		colz[2] = start + stridex * xi + stridey * nyi;
 		colz[3] = start + stridex * nxi + stridey * nyi;
 		return colz;
 	}
 };
-class CoarseSH : public StencilHelper
+class FineSH : public StencilHelper
 {
 	private:
 	std::valarray<double> coeff = {{-1.0 / 3, 1.0 / 3, 1.0 / 3, 1.0 / 3, 1.0 / 3}};
@@ -326,14 +328,15 @@ class CoarseSH : public StencilHelper
 	int                   n;
 
 	public:
-	CoarseSH(Domain &d, Side s)
+	FineSH(Domain &d, Side s)
 	{
-		double h = 0;
-		n        = d.n;
-		int idx  = d.id_global * d.n * d.n * d.n;
+		FineNbrInfo &nbr_info = d.getFineNbrInfo(s);
+		double       h        = 0;
+		n                     = d.n;
+		int idx               = d.id_global * d.n * d.n * d.n;
 		int nbr_idx[4];
 		for (int i = 0; i < 4; i++) {
-			nbr_idx[i] = d.globalNbr(s, i) * d.n * d.n * d.n;
+			nbr_idx[i] = nbr_info.global_indexes[i] * d.n * d.n * d.n;
 		}
 		switch (s) {
 			case Side::west:
@@ -413,12 +416,16 @@ StencilHelper *getStencilHelper(Domain &d, Side s)
 {
 	StencilHelper *retval = nullptr;
 	if (d.hasNbr(s)) {
-		if (d.hasCoarseNbr(s)) {
-			retval = new FineSH(d, s);
-		} else if (d.hasFineNbr(s)) {
-			retval = new CoarseSH(d, s);
-		} else {
-			retval = new NormalSH(d, s);
+		switch (d.getNbrType(s)) {
+			case NbrType::Normal:
+				retval = new NormalSH(d, s);
+				break;
+			case NbrType::Fine:
+				retval = new FineSH(d, s);
+				break;
+			case NbrType::Coarse:
+				retval = new CoarseSH(d, s);
+				break;
 		}
 	} else {
 		if (d.isNeumann(s)) {

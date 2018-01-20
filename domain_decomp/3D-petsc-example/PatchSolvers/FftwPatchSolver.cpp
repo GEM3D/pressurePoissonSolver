@@ -10,11 +10,8 @@ FftwPatchSolver::FftwPatchSolver(DomainCollection &dc, double lambda)
 {
 	n            = dc.n;
 	this->lambda = lambda;
-	for (auto &p : dc.domains) {
-		addDomain(p.second);
-	}
 }
-void FftwPatchSolver::addDomain(Domain &d)
+void FftwPatchSolver::addDomain(SchurDomain &d)
 {
 	if (!initialized) {
 		initialized = true;
@@ -67,10 +64,10 @@ void FftwPatchSolver::addDomain(Domain &d)
 		}
 
 		plan1[d] = fftw_plan_r2r_3d(n, n, n, &f_copy[0], &tmp[0], z_transform, y_transform,
-		                            x_transform, FFTW_MEASURE|FFTW_DESTROY_INPUT);
+		                            x_transform, FFTW_MEASURE | FFTW_DESTROY_INPUT);
 
 		plan2[d] = fftw_plan_r2r_3d(n, n, n, &tmp[0], &sol[0], z_transform_inv, y_transform_inv,
-		                            x_transform_inv, FFTW_MEASURE|FFTW_DESTROY_INPUT);
+		                            x_transform_inv, FFTW_MEASURE | FFTW_DESTROY_INPUT);
 	}
 
 	double h_x = d.x_length / n;
@@ -154,7 +151,7 @@ FftwPatchSolver::~FftwPatchSolver()
 		fftw_destroy_plan(p.second);
 	}
 }
-void FftwPatchSolver::solve(Domain &d, const Vec f, Vec u, const Vec gamma)
+void FftwPatchSolver::solve(SchurDomain &d, const Vec f, Vec u, const Vec gamma)
 {
 	double h_x      = d.x_length / n;
 	double h_y      = d.x_length / n;
@@ -181,15 +178,14 @@ void FftwPatchSolver::solve(Domain &d, const Vec f, Vec u, const Vec gamma)
 	VecGetArrayRead(f, &f_view);
 	VecGetArrayRead(gamma, &gamma_view);
 
-	int start = d.id_local * n * n * n;
+	int start = d.local_index * n * n * n;
 	for (int i = 0; i < n * n * n; i++) {
 		f_copy[i] = f_view[start + i];
 	}
 
-	Side s = Side::west;
-	do {
+	for (Side s : getSideValues()) {
 		if (d.hasNbr(s)) {
-			int    idx = n * n * d.index(s);
+			int    idx = n * n * d.getIfaceLocalIndex(s);
 			Slice  sl  = getSlice(&f_copy[0], n, s);
 			double h2  = pow(getSpacing(s), 2);
 			for (int yi = 0; yi < n; yi++) {
@@ -198,8 +194,7 @@ void FftwPatchSolver::solve(Domain &d, const Vec f, Vec u, const Vec gamma)
 				}
 			}
 		}
-		s++;
-	} while (s != Side::west);
+	}
 
 	fftw_execute(plan1[d]);
 
