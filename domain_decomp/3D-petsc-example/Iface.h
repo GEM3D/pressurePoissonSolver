@@ -13,11 +13,12 @@ struct Iface {
 	std::array<int, 6> local_id  = {{-1, -1, -1, -1, -1, -1}};
 	std::array<int, 6> global_id = {{-1, -1, -1, -1, -1, -1}};
 	std::bitset<6> neumann;
-	Iface(std::array<int, 6> ids, IfaceType type, Side s)
+	Iface(std::array<int, 6> ids, IfaceType type, Side s, std::bitset<6> neumann)
 	{
-		this->ids  = ids;
-		this->type = type;
-		this->s    = s;
+		this->ids     = ids;
+		this->type    = type;
+		this->s       = s;
+		this->neumann = neumann;
 	}
 };
 struct IfaceSet {

@@ -13,8 +13,9 @@ class IfaceInfo
 	virtual void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types,
 	                            std::deque<Side> &sides, Side s)
 	= 0;
-	virtual void setLocalIndexes(const std::map<int, int> &rev_map)  = 0;
-	virtual void setGlobalIndexes(const std::map<int, int> &rev_map) = 0;
+	virtual void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType> &types) = 0;
+	virtual void setLocalIndexes(const std::map<int, int> &rev_map)                 = 0;
+	virtual void setGlobalIndexes(const std::map<int, int> &rev_map)                = 0;
 };
 class NormalIfaceInfo : public IfaceInfo
 {
@@ -47,6 +48,11 @@ class NormalIfaceInfo : public IfaceInfo
 		types.push_back(IfaceType::normal);
 		sides.push_back(s);
 	}
+	void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType> &types)
+	{
+		idx.push_back(local_index);
+		types.push_back(IfaceType::normal);
+	}
 	void setLocalIndexes(const std::map<int, int> &rev_map) { local_index = rev_map.at(id); }
 	void setGlobalIndexes(const std::map<int, int> &rev_map)
 	{
@@ -76,6 +82,13 @@ class CoarseIfaceInfo : public IfaceInfo
 		types.push_back(IfaceType::fine_to_coarse_0 + quad_on_coarse);
 		sides.push_back(s);
 		sides.push_back(s);
+	}
+	void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType> &types)
+	{
+		idx.push_back(local_index);
+		idx.push_back(coarse_local_index);
+		types.push_back(IfaceType::fine_to_fine_0 + quad_on_coarse);
+		types.push_back(IfaceType::fine_to_coarse_0 + quad_on_coarse);
 	}
 	void getIds(std::vector<int> &ids)
 	{
@@ -117,6 +130,15 @@ class FineIfaceInfo : public IfaceInfo
 			ids.push_back(fine_ids[i]);
 			types.push_back(IfaceType::coarse_to_fine_0 + i);
 			sides.push_back(s);
+		}
+	}
+	void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType> &types)
+	{
+		idx.push_back(local_index);
+		types.push_back(IfaceType::coarse_to_coarse);
+		for (int i = 0; i < 4; i++) {
+			idx.push_back(fine_local_indexes[i]);
+			types.push_back(IfaceType::coarse_to_fine_0 + i);
 		}
 	}
 	void getIds(std::vector<int> &ids)
@@ -208,7 +230,7 @@ struct SchurDomain {
 			Side      s    = iface_sides[i];
 			IfaceSet &ifs  = ifaces[id];
 			ifs.id         = id;
-			ifs.insert(Iface(ids, type, s));
+			ifs.insert(Iface(ids, type, s, neumann));
 		}
 	}
 	std::vector<int> getIds()

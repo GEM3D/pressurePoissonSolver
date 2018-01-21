@@ -355,7 +355,7 @@ double DomainCollection::integrate(const Vec u)
 		int     start = d.n * d.n * d.n * d.id_local;
 
 		double patch_sum = 0;
-		for (int i = 0; i < d.n * d.n; i++) {
+		for (int i = 0; i < d.n * d.n * d.n; i++) {
 			patch_sum += u_view[start + i];
 		}
 

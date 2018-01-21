@@ -6,19 +6,17 @@
 #include <petscao.h>
 #include <tuple>
 using namespace std;
-enum axis_enum { X_AXIS, Y_AXIS };
-enum bc_enum { DIRICHLET, NEUMANN, REFINED };
 
 SchurHelper::SchurHelper(DomainCollection dc, shared_ptr<PatchSolver> solver,
                          shared_ptr<PatchOperator> op, shared_ptr<Interpolator> interpolator)
 {
-    this->n=dc.n;
+	this->n = dc.n;
 	for (auto &p : dc.domains) {
 		domains.push_back(p.second);
 	}
 	for (SchurDomain &sd : domains) {
 		sd.enumerateIfaces(ifaces);
-        solver->addDomain(sd);
+		solver->addDomain(sd);
 	}
 	indexDomainIfacesLocal();
 	indexIfacesLocal();
@@ -29,8 +27,8 @@ SchurHelper::SchurHelper(DomainCollection dc, shared_ptr<PatchSolver> solver,
 	local_interp       = getNewSchurDistVec();
 	gamma              = getNewSchurVec();
 	PW<IS> dist_is;
-	ISCreateBlock(MPI_COMM_WORLD, dc.n * dc.n, iface_dist_map_vec.size(),
-	              &iface_dist_map_vec[0], PETSC_COPY_VALUES, &dist_is);
+	ISCreateBlock(MPI_COMM_WORLD, dc.n * dc.n, iface_dist_map_vec.size(), &iface_dist_map_vec[0],
+	              PETSC_COPY_VALUES, &dist_is);
 	VecScatterCreate(gamma, dist_is, local_gamma, nullptr, &scatter);
 }
 
@@ -42,7 +40,7 @@ void SchurHelper::solveWithInterface(const Vec f, Vec u, const Vec gamma, Vec di
 
 	VecScale(local_interp, 0);
 	// solve over domains on this proc
-	for (SchurDomain&sd : domains) {
+	for (SchurDomain &sd : domains) {
 		solver->solve(sd, f, u, local_gamma);
 		interpolator->interpolate(sd, u, local_interp);
 	}
@@ -72,7 +70,7 @@ void SchurHelper::solveWithSolution(const Vec f, Vec u)
 	*/
 
 	// solve over domains on this proc
-	for (SchurDomain&sd : domains) {
+	for (SchurDomain &sd : domains) {
 		solver->solve(sd, f, u, local_gamma);
 	}
 }
@@ -80,14 +78,14 @@ void SchurHelper::applyWithInterface(const Vec u, const Vec gamma, Vec f)
 {
 	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
-	for (SchurDomain&sd : domains) {
+	for (SchurDomain &sd : domains) {
 		op->apply(sd, u, local_gamma, f);
 	}
 }
 void SchurHelper::apply(const Vec u, Vec f)
 {
 	VecScale(local_interp, 0);
-	for (SchurDomain&sd : domains) {
+	for (SchurDomain &sd : domains) {
 		interpolator->interpolate(sd, u, local_interp);
 	}
 	VecScale(gamma, 0);
@@ -96,7 +94,7 @@ void SchurHelper::apply(const Vec u, Vec f)
 	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 
-	for (SchurDomain&sd : domains) {
+	for (SchurDomain &sd : domains) {
 		op->apply(sd, u, local_gamma, f);
 	}
 }
@@ -111,19 +109,24 @@ struct Block {
 	static const vector<Rotation> main_rot_plan[6];
 	static const vector<Rotation> aux_rot_plan_dirichlet[6];
 	static const vector<Rotation> aux_rot_plan_neumann[16];
+	static const char             rot_quad_lookup_left[4][4];
+	static const char             rot_quad_lookup_right[4][4];
+	static const char             quad_flip_lookup[4];
 	char                          data = 0;
+	IfaceType                     type;
 	Side                          main;
 	Side                          aux;
 	int                           j;
 	int                           i;
 	bitset<6>                     neumann;
-	Block(Side main, int j, Side aux, int i, bitset<6> neumann)
+	Block(Side main, int j, Side aux, int i, bitset<6> neumann, IfaceType type)
 	{
 		this->main    = main;
 		this->j       = j;
 		this->aux     = aux;
 		this->i       = i;
 		this->neumann = neumann;
+		this->type    = type;
 		data          = 0;
 		bool left     = sideIsLeft(main);
 		data |= left << 7;
@@ -131,7 +134,7 @@ struct Block {
 		data |= left << 3;
 		rotate();
 	}
-	Block &operator*=(const Rotation &rot)
+	void applyRotation(const Rotation rot)
 	{
 		char r;
 		// main rotation
@@ -150,21 +153,60 @@ struct Block {
 		for (int i = 0; i < 6; i++) {
 			neumann[(int) side_table[(int) rot][i]] = old_neumann[i];
 		}
-		return *this;
 	}
 	void rotate()
 	{
 		for (Rotation rot : main_rot_plan[static_cast<int>(main)]) {
-			(*this) *= rot;
+			applyRotation(rot);
 		}
 		if (neumann.to_ulong() == 0) {
 			for (Rotation rot : aux_rot_plan_dirichlet[static_cast<int>(aux)]) {
-				(*this) *= rot;
+				applyRotation(rot);
 			}
 		} else {
 			for (Rotation rot : aux_rot_plan_neumann[neumann.to_ulong() >> 2]) {
-				(*this) *= rot;
+				applyRotation(rot);
 			}
+		}
+		// updated iface type
+		auto rotateQuad = [&](int quad) {
+			if (auxOrigLeft()) {
+				quad = rot_quad_lookup_left[auxRot()][quad];
+			} else {
+				quad = rot_quad_lookup_right[auxRot()][quad];
+			}
+			if (auxFlipped()) {
+				quad = quad_flip_lookup[quad];
+			}
+			return quad;
+		};
+		switch (type) {
+			case IfaceType::fine_to_coarse_0:
+			case IfaceType::fine_to_coarse_1:
+			case IfaceType::fine_to_coarse_2:
+			case IfaceType::fine_to_coarse_3: {
+				int quad = (int) type - (int) IfaceType::fine_to_coarse_0;
+				quad     = rotateQuad(quad);
+				type     = IfaceType::fine_to_coarse_0 + quad;
+			} break;
+			case IfaceType::fine_to_fine_0:
+			case IfaceType::fine_to_fine_1:
+			case IfaceType::fine_to_fine_2:
+			case IfaceType::fine_to_fine_3: {
+				int quad = (int) type - (int) IfaceType::fine_to_fine_0;
+				quad     = rotateQuad(quad);
+				type     = IfaceType::fine_to_fine_0 + quad;
+			} break;
+			case IfaceType::coarse_to_fine_0:
+			case IfaceType::coarse_to_fine_1:
+			case IfaceType::coarse_to_fine_2:
+			case IfaceType::coarse_to_fine_3: {
+				int quad = (int) type - (int) IfaceType::coarse_to_fine_0;
+				quad     = rotateQuad(quad);
+				type     = IfaceType::coarse_to_fine_0 + quad;
+			} break;
+			default:
+				break;
 		}
 	}
 	bool operator<(const Block &b) const
@@ -181,6 +223,7 @@ struct Block {
 		return left != orig_left;
 	}
 	int  mainRot() { return (data >> 4) & 0b11; }
+	bool auxOrigLeft() { return (data >> 3) & 0b1; }
 	bool auxLeft() { return sideIsLeft(aux); }
 	bool auxFlipped()
 	{
@@ -191,16 +234,19 @@ struct Block {
 	int auxRot() { return data & 0b11; }
 };
 struct BlockKey {
-	unsigned char neumann;
-	Side          s;
+	IfaceType type;
+	Side      s;
 
 	BlockKey() {}
 	BlockKey(const Block &b)
 	{
-		s       = b.aux;
-		neumann = b.neumann.to_ulong();
+		type = b.type;
+		s    = b.aux;
 	}
-	friend bool operator<(const BlockKey &l, const BlockKey &r) { return l.s < r.s; }
+	friend bool operator<(const BlockKey &l, const BlockKey &r)
+	{
+		return tie(l.s, l.type) < tie(r.s, r.type);
+	}
 };
 
 const Side Block::side_table[6][6]
@@ -236,6 +282,11 @@ const vector<Rotation> Block::aux_rot_plan_neumann[16] = {{},
                                                           {Rotation::x_cw},
                                                           {Rotation::x_ccw},
                                                           {}};
+const char Block::rot_quad_lookup_left[4][4]
+= {{0, 1, 2, 3}, {1, 3, 0, 2}, {3, 2, 1, 0}, {2, 0, 3, 1}};
+const char Block::rot_quad_lookup_right[4][4]
+= {{0, 1, 2, 3}, {2, 0, 3, 1}, {3, 2, 1, 0}, {1, 3, 0, 2}};
+const char Block::quad_flip_lookup[4] = {1, 0, 3, 2};
 void SchurHelper::assembleMatrix(inserter insertBlock)
 {
 	set<Block> blocks;
@@ -248,7 +299,7 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 				int j = iface.global_id[s];
 				if (j != -1) {
 					Side main = static_cast<Side>(s);
-					blocks.insert(Block(main, j, aux, i, iface.neumann));
+					blocks.insert(Block(main, j, aux, i, iface.neumann, iface.type));
 				}
 			}
 		}
@@ -282,12 +333,12 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 
 		// create domain representing curr_type
 		SchurDomain sd;
-		sd.n        = n;
-		sd.x_length = 1;
-		sd.y_length = 1;
-		sd.z_length = 1;
-		sd.neumann = curr_type.neumann;
-        sd.getIfaceInfoPtr(Side::west)=new NormalIfaceInfo();
+		sd.n                           = n;
+		sd.x_length                    = 1;
+		sd.y_length                    = 1;
+		sd.z_length                    = 1;
+		sd.neumann                     = curr_type.neumann;
+		sd.getIfaceInfoPtr(Side::west) = new NormalIfaceInfo();
 		solver->addDomain(sd);
 
 		map<BlockKey, shared_ptr<valarray<double>>> coeffs;
@@ -306,10 +357,11 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 
 			// fill the blocks
 			for (auto &p : coeffs) {
-				Side      s    = p.first.s;
-				IfaceType type = IfaceType::normal;
+				BlockKey  bk   = p.first;
+				Side      s    = bk.s;
+				IfaceType type = bk.type;
 				VecScale(interp, 0);
-				interpolator->interpolate(sd, s,0, type, u, interp);
+				interpolator->interpolate(sd, s, 0, type, u, interp);
 				valarray<double> &block = *p.second;
 				for (int i = 0; i < n * n; i++) {
 					block[i * n * n + j] = -interp_view[i];
@@ -318,6 +370,13 @@ void SchurHelper::assembleMatrix(inserter insertBlock)
 					switch (type) {
 						case IfaceType::normal:
 							block[n * n * j + j] += 0.5;
+							break;
+						case IfaceType::coarse_to_coarse:
+						case IfaceType::fine_to_fine_0:
+						case IfaceType::fine_to_fine_1:
+						case IfaceType::fine_to_fine_2:
+						case IfaceType::fine_to_fine_3:
+							block[n * n * j + j] += 1.0;
 							break;
 						default:
 							break;
@@ -557,7 +616,7 @@ void SchurHelper::indexDomainIfacesLocal()
 		int curr_i = 0;
 		for (SchurDomain &sd : domains) {
 			for (int id : sd.getIds()) {
-				if (rev_map.count(id)==0) {
+				if (rev_map.count(id) == 0) {
 					rev_map[id] = curr_i;
 					map_vec.push_back(id);
 					curr_i++;
@@ -592,8 +651,8 @@ void SchurHelper::indexIfacesLocal()
 				todo.erase(i);
 				queue.pop_front();
 				map_vec.push_back(i);
-				IfaceSet &ifs      = ifaces.at(i);
-				rev_map[i]         = curr_i;
+				IfaceSet &ifs = ifaces.at(i);
+				rev_map[i]    = curr_i;
 				curr_i++;
 				for (int nbr : ifs.getNbrs()) {
 					if (!enqueued.count(nbr)) {
