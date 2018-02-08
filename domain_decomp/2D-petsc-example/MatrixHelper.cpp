@@ -7,8 +7,8 @@ PW_explicit<Mat> MatrixHelper::formCRSMatrix(double lambda)
 {
 	PW<Mat> A;
 	MatCreate(MPI_COMM_WORLD, &A);
-	int     local_size  = dc.domains.size() * dc.n*dc.n;
-	int     global_size = dc.num_global_domains * dc.n*dc.n;
+	int local_size  = dc.domains.size() * dc.n * dc.n;
+	int global_size = dc.num_global_domains * dc.n * dc.n;
 	MatSetSizes(A, local_size, local_size, global_size, global_size);
 	MatSetType(A, MATMPIAIJ);
 	MatMPIAIJSetPreallocation(A, 19, nullptr, 19, nullptr);
@@ -76,6 +76,17 @@ PW_explicit<Mat> MatrixHelper::formCRSMatrix(double lambda)
 			delete sh;
 			s++;
 		} while (s != Side::north);
+	}
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+	if (dc.neumann&&rank==0) {
+		int           ncols;
+		const int *   cols;
+		const double *vals;
+		MatGetRow(A, 0, &ncols, &cols, &vals);
+		vector<double> zeros(ncols);
+		MatSetValues(A, 1, 0, ncols, cols, &zeros[0], INSERT_VALUES);
+		MatRestoreRow(A, 0, &ncols, &cols, &vals);
 	}
 	MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
 	MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);

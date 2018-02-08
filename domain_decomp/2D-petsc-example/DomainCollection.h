@@ -152,9 +152,10 @@ class DomainCollection
 	void zoltanBalanceDomains();
 
 	public:
-	int rank;
-	int n = 4;
-	int num_pins;
+	bool neumann = false;
+	int  rank;
+	int  n = 4;
+	int  num_pins;
 	/**
 	 * @brief Number of total domains.
 	 */
@@ -210,6 +211,7 @@ class DomainCollection
 
 	void setNeumann()
 	{
+		neumann = true;
 		for (auto &p : domains) {
 			p.second.setNeumann();
 		}
