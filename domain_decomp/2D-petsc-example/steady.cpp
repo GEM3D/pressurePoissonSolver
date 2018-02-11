@@ -430,7 +430,7 @@ int main(int argc, char *argv[])
 				}
 #endif
 			} else {
-				KSPSetTolerances(solver, 0.0, tol, PETSC_DEFAULT, 5000);
+				KSPSetTolerances(solver, tol, tol, PETSC_DEFAULT, 5000);
 				if (f_noschur) {
 					KSPSolve(solver, f, u);
 				} else {
