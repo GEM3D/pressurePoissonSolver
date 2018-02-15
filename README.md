@@ -13,6 +13,7 @@ we are considering :
 * Grady Wright
 * Donna Calhoun
 * Scott Aiton (Undergraduate)
+* Brenton Peck (Undergraduate)
 
 # Examples to date :
 
