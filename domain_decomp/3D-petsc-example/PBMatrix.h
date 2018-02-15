@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 #include <petscmat.h>
+#include <petscpc.h>
 #include <set>
 #include <valarray>
 struct PBlock {
@@ -41,6 +42,7 @@ class PBMatrix
 	                 std::function<int(int, int, int)>                    row_trans);
 	void apply(Vec x, Vec b);
 	void       finalize();
+    PBMatrix*       getDiagInv();
 	static int multiply(Mat A, Vec x, Vec b)
 	{
 		PBMatrix *pba = nullptr;
@@ -62,6 +64,19 @@ class PBMatrix
 		MatShellSetOperation(A, MATOP_MULT, (void (*)(void)) multiply);
 		MatShellSetOperation(A, MATOP_DESTROY, (void (*)(void)) destroy);
 		return A;
+	}
+	static int multiplyPC(PC A, Vec x, Vec b)
+	{
+		PBMatrix *pba = nullptr;
+		PCShellGetContext(A, (void **) &pba);
+		pba->apply(x, b);
+		return 0;
+	}
+	void getPrec(PC P)
+	{
+		PCSetType(P, PCSHELL);
+		PCShellSetContext(P, this);
+		PCShellSetApply(P, multiplyPC);
 	}
 };
 #endif

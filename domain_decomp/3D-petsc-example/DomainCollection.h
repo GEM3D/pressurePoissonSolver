@@ -27,6 +27,7 @@ class DomainCollection
 	int rank;
 	int n = 4;
 	int num_pins;
+    bool neumann=false;
 	/**
 	 * @brief Number of total domains.
 	 */
@@ -71,6 +72,7 @@ class DomainCollection
 
 	void setNeumann()
 	{
+        neumann=true;
 		for (auto &p : domains) {
 			p.second.setNeumann();
 		}

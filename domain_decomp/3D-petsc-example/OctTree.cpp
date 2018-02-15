@@ -27,5 +27,6 @@ OctTree::OctTree(string file_name)
 		if (n.level > num_levels) {
 			num_levels = n.level;
 		}
+        levels[n.level]=&nodes[n.id];
 	}
 }

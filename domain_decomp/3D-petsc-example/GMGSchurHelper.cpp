@@ -1,6 +1,6 @@
-#include "GMGHelper.h"
+#include "GMGSchurHelper.h"
 using namespace std;
-GMGHelper::GMGHelper(int n, OctTree t, DomainCollection &dc, SchurHelper &sh)
+GMGSchurHelper::GMGSchurHelper(int n, OctTree t, DomainCollection &dc, SchurHelper &sh)
 {
 	num_levels = t.num_levels;
 	top_level  = t.num_levels - 1;
@@ -24,7 +24,7 @@ GMGHelper::GMGHelper(int n, OctTree t, DomainCollection &dc, SchurHelper &sh)
 		r_vectors[i] = levels[i].getNewDomainVec();
 	}
 }
-void GMGHelper::restrictForLevel(int level)
+void GMGSchurHelper::restrictForLevel(int level)
 {
 	const DomainCollection &coarse_dc = levels[level];
 	const DomainCollection &fine_dc   = levels[level + 1];
@@ -79,7 +79,7 @@ void GMGHelper::restrictForLevel(int level)
 	VecRestoreArray(r_vectors[level + 1], &r_fine);
 	VecRestoreArray(f_vectors[level], &f_coarse);
 }
-void GMGHelper::prolongateFromLevel(int level)
+void GMGSchurHelper::prolongateFromLevel(int level)
 {
 	const DomainCollection &coarse_dc = levels[level];
 	const DomainCollection &fine_dc   = levels[level + 1];
@@ -132,18 +132,15 @@ void GMGHelper::prolongateFromLevel(int level)
 	VecRestoreArray(u_vectors[level + 1], &u_fine);
 	VecRestoreArray(u_vectors[level], &u_coarse);
 }
-void GMGHelper::apply(Vec f, Vec u)
+void GMGSchurHelper::apply(Vec b, Vec gamma)
 {
-	f_vectors[top_level] = f;
-	u_vectors[top_level] = u;
 	// finest level
-	shs[top_level].solveWithSolution(f, u);
-	shs[top_level].apply(u, r_vectors[top_level]);
-	VecAYPX(r_vectors[top_level], -1, f);
+	//shs[top_level].apply(u, r_vectors[top_level]);
+	//VecAYPX(r_vectors[top_level], -1, f);
 	// down-cycle
 	for (int i = top_level - 1; i >= 1; i--) {
 		restrictForLevel(i);
-	VecScale(u_vectors[i], 0);
+		VecScale(u_vectors[i], 0);
 		shs[i].solveWithSolution(f_vectors[i], u_vectors[i]);
 		shs[i].apply(u_vectors[i], r_vectors[i]);
 		VecAYPX(r_vectors[i], -1, f_vectors[i]);
@@ -156,7 +153,7 @@ void GMGHelper::apply(Vec f, Vec u)
 	// up cycle
 	for (int i = 1; i <= num_levels - 2; i++) {
 		shs[i].solveWithSolution(f_vectors[i], u_vectors[i]);
-	     prolongateFromLevel(i);
+		prolongateFromLevel(i);
 	}
 	// finest level
 }

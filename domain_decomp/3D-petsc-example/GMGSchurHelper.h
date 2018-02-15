@@ -1,10 +1,10 @@
-#ifndef GMGHELPER_H
-#define GMGHELPER_H
+#ifndef GMGSCHURHELPER_H
+#define GMGSCHURHELPER_H
 #include "DomainCollection.h"
 #include "MatrixHelper.h"
 #include "SchurHelper.h"
 #include <petscpc.h>
-class GMGHelper
+class GMGSchurHelper
 {
 	private:
 	int                           num_levels;
@@ -21,14 +21,14 @@ class GMGHelper
 	public:
 	static int multiply(PC A, Vec f, Vec u)
 	{
-		GMGHelper *gh = nullptr;
+		GMGSchurHelper *gh = nullptr;
 		PCShellGetContext(A, (void **) &gh);
 		VecScale(u, 0);
 		gh->apply(f, u);
 		return 0;
 	}
 
-	GMGHelper(int n, OctTree t, DomainCollection &dc,SchurHelper &sh);
+	GMGSchurHelper(int n, OctTree t, DomainCollection &dc,SchurHelper &sh);
 
 	void getPrec(PC P)
 	{

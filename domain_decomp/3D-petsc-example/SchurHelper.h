@@ -1,6 +1,7 @@
 #ifndef SCHURHELPER_H
 #define SCHURHELPER_H
 #include "DomainCollection.h"
+#include "PBMatrix.h"
 #include "Iface.h"
 #include "Interpolator.h"
 #include "PatchOperator.h"
@@ -9,6 +10,7 @@
 #include <deque>
 #include <memory>
 #include <petscmat.h>
+#include <petscpc.h>
 #include <valarray>
 /**
  * @brief This class represents a collection of domains that a single processor owns.
@@ -96,11 +98,18 @@ class SchurHelper
 	 * @return the formed matrix
 	 */
 	PW_explicit<Mat> formCRSMatrix();
-	PW_explicit<Mat> formPBMatrix();
+	PBMatrix* formPBMatrix();
+void getPBDiagInv(PC p);
+	PW_explicit<Mat> getPBMatrix();
+	PW_explicit<Mat> getPBDiagInv();
 	PW_explicit<Vec> getNewSchurVec();
 	PW_explicit<Vec> getNewSchurDistVec();
 
 	int getSchurVecLocalSize() { return iface_map_vec.size() * n * n; }
 	int getSchurVecGlobalSize() { return iface_map_vec.size() * n * n; }
+	// getters
+	std::shared_ptr<Interpolator>  getInterpolator() { return interpolator; }
+	std::shared_ptr<PatchOperator> getOp() { return op; }
+	std::shared_ptr<PatchSolver>   getSolver() { return solver; }
 };
 #endif
