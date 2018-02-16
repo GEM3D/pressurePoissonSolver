@@ -17,9 +17,9 @@ enable_language(C)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+find_package(PkgConfig REQUIRED)
 find_package(PETSc)
 if(NOT PETSc_FOUND)
-find_package(PkgConfig REQUIRED)
     pkg_search_module(PETSc REQUIRED PETSc)
     set(PETSC_LIBRARIES ${PETSc_LIBRARIES})
     set(PETSC_INCLUDES ${PETSc_INCLUDES})
@@ -44,7 +44,9 @@ set (CMAKE_CXX_FLAGS_DEBUG  "-Wall --std=c++11 -g -O0 ")
 
 find_package(CUDA)
 find_package(AMGX)
-find_package(VTK)
+if(ENABLE_VTK)
+    find_package(VTK)
+endif()
 if(AMGX_FOUND)
     SET(CMAKE_CXX_FLAGS "-DENABLE_AMGX ${CMAKE_CXX_FLAGS}")
 endif()
@@ -171,6 +173,7 @@ target_link_libraries(AmgxWrapper
 endif()
 target_link_libraries(DomainCollection
     ${Zoltan_LIBRARIES}
+    ${Zoltan_LIBRARIES_EXTRA}
 )
 
 add_subdirectory(PatchSolvers)
