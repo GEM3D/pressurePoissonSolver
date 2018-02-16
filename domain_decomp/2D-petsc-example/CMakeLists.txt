@@ -16,9 +16,11 @@ enable_language(C)
 
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+find_package(PkgConfig REQUIRED)
+pkg_search_module(PETSc REQUIRED PETSc)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 find_package(Zoltan REQUIRED)
-find_package(PETSc REQUIRED)
+#find_package(PETSc REQUIRED)
 # If you haven't already set the C++ compiler, use the same compiler
 # that was used to build Trilinos on your machine.  You do _not_ need
 # to edit this line.
@@ -34,6 +36,7 @@ set (CMAKE_CXX_FLAGS_DEBUG  "-Wall --std=c++11 -g -O0 ")
 
 find_package(CUDA)
 find_package(AMGX)
+find_package(VTK)
 if(AMGX_FOUND)
     SET(CMAKE_CXX_FLAGS "-DENABLE_AMGX ${CMAKE_CXX_FLAGS}")
 endif()
