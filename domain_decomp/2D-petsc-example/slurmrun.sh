@@ -1,8 +1,6 @@
 #!/bin/bash
 export jobName=test
 #Account and Email Information
-#SBATCH --mail-type=end
-#SBATCH --mail-user=scott@aiton.net
 
 # Specify parition (queue)
 #SBATCH --partition=batch
@@ -22,16 +20,7 @@ export jobName=test
 #Exclusively check out a node
 #SBATCH --exclusive
 
-#Module Load Section
-module load openmpi/2.0.1
-module load cuda75/7.5
-module load gcc/4.8.1 
-module load extra
-module load my-petsc
-
 cd $SLURM_SUBMIT_DIR
-
-export CUDA_LAUNCH_BLOCKING=1
 
 srun --mpi=pmi2 $@
 sleep 10s
