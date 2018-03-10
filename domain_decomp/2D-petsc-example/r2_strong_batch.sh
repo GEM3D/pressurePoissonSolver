@@ -11,6 +11,6 @@ sbatchbase=" --ntasks-per-node 24 "
 while [ $PROCS -le 64 ]; do
     sbatch $sbatchbase --job-name="${filebase}_${PROCS}" -n $PROCS \
         -e ${filebase}_${PROCS}.err -o ${filebase}_${PROCS}.out \
-        slurmrun.sh $cmdbase :: $petscopts
+        r2run.sh $cmdbase :: $petscopts
     let PROCS*=2
 done
