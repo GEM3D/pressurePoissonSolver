@@ -17,7 +17,7 @@ enable_language(C)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
-find_package(PETSc)
+find_package(PETSc COMPONENTS C)
 if(NOT PETSC_FOUND)
     find_package(PkgConfig REQUIRED)
     pkg_search_module(PETSc REQUIRED PETSc)
@@ -107,6 +107,7 @@ add_executable(steady steady.cpp)
 add_executable(heat heat.cpp)
 add_library(SchurHelper SchurHelper.cpp)
 add_library(MatrixHelper MatrixHelper.cpp)
+add_library(IfaceMatrixHelper IfaceMatrixHelper.cpp)
 add_library(DomainCollection DomainCollection.cpp)
 add_library(Interpolators QuadInterpolator.cpp FourthInterpolator.cpp)
 add_library(Init Init.cpp)
@@ -122,6 +123,7 @@ target_link_libraries(steady
     DomainCollection
     Init
     MatrixHelper
+    IfaceMatrixHelper
     FftwPatchSolver
     FishpackPatchSolver
     Interpolators
