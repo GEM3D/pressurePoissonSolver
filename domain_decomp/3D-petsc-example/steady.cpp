@@ -2,6 +2,7 @@
 #include "DomainCollection.h"
 #include "FunctionWrapper.h"
 #include "GMGHelper.h"
+#include "GMGSchurHelper.h"
 #include "Init.h"
 #include "MatrixHelper.h"
 #include "OctTree.h"
@@ -132,8 +133,10 @@ int main(int argc, char *argv[])
 #endif
 	args::Flag f_scharz(parser, "", "use schwarz preconditioner", {"schwarz"});
 	args::Flag f_gmg(parser, "", "use GMG preconditioner", {"gmg"});
+	args::Flag f_gmgs(parser, "", "use GMG preconditioner", {"gmgs"});
 	args::Flag f_cfft(parser, "", "use GMG preconditioner", {"cfft"});
 	args::Flag f_pbm(parser, "", "use GMG preconditioner", {"pbm"});
+	args::Flag f_ibd(parser, "", "use GMG preconditioner", {"ibd"});
 
 	int num_procs;
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
@@ -313,6 +316,7 @@ int main(int argc, char *argv[])
 		shared_ptr<FuncWrap>    w;
 		shared_ptr<SchwarzPrec> sp;
 		shared_ptr<GMGHelper>   gh;
+		shared_ptr<GMGSchurHelper>   ghs;
 
 		// Create linear problem for the Belos solver
 		PW<KSP> solver;
@@ -370,7 +374,7 @@ int main(int argc, char *argv[])
 					A = mh.formCRSMatrix();
 				} else {
 					if (f_pbm) {
-						A = sch.formPBMatrix();
+						A = sch.getPBMatrix();
 					} else {
 						A = sch.formCRSMatrix();
 					}
@@ -411,7 +415,7 @@ int main(int argc, char *argv[])
 				timer.start("Petsc Setup");
 				KSPSetOperators(solver, A, A);
 				KSPSetUp(solver);
-				if (f_scharz || f_gmg) {
+				if (f_scharz || f_gmg || f_gmgs || f_ibd) {
 					PC pc;
 					KSPGetPC(solver, &pc);
 					if (f_scharz) {
@@ -419,8 +423,15 @@ int main(int argc, char *argv[])
 						sp->getPrec(pc);
 					}
 					if (f_gmg) {
-						gh.reset(new GMGHelper(n, t, p_solver, p_operator, p_interp));
+						gh.reset(new GMGHelper(n, t, dc, sch));
 						gh->getPrec(pc);
+					}
+					if (f_gmgs) {
+						ghs.reset(new GMGSchurHelper(n, t, dc, sch));
+						ghs->getPrec(pc);
+					}
+					if (f_ibd) {
+						sch.getPBDiagInv(pc);
 					}
 					PCSetUp(pc);
 				}

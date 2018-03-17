@@ -17,8 +17,18 @@ enable_language(C)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+find_package(PETSc COMPONENTS C)
+if(NOT PETSC_FOUND)
+    find_package(PkgConfig REQUIRED)
+    pkg_search_module(PETSc REQUIRED PETSc)
+    set(PETSC_LIBRARIES ${PETSc_LIBRARIES})
+    set(PETSC_INCLUDES ${PETSc_INCLUDES})
+endif()
+if(NOT PETSC_FOUND)
+    message( FATAL_ERROR "PETSc was not found" )
+endif()
 find_package(Zoltan REQUIRED)
-find_package(PETSc REQUIRED)
+#find_package(PETSc REQUIRED)
 # If you haven't already set the C++ compiler, use the same compiler
 # that was used to build Trilinos on your machine.  You do _not_ need
 # to edit this line.
@@ -34,6 +44,9 @@ set (CMAKE_CXX_FLAGS_DEBUG  "-Wall --std=c++11 -g -O0 ")
 
 find_package(CUDA)
 find_package(AMGX)
+if(ENABLE_VTK)
+    find_package(VTK)
+endif()
 if(AMGX_FOUND)
     SET(CMAKE_CXX_FLAGS "-DENABLE_AMGX ${CMAKE_CXX_FLAGS}")
 endif()
@@ -94,6 +107,7 @@ add_executable(steady steady.cpp)
 add_executable(heat heat.cpp)
 add_library(SchurHelper SchurHelper.cpp)
 add_library(MatrixHelper MatrixHelper.cpp)
+#add_library(IfaceMatrixHelper IfaceMatrixHelper.cpp)
 add_library(DomainCollection DomainCollection.cpp)
 add_library(Interpolators QuadInterpolator.cpp FourthInterpolator.cpp)
 add_library(Init Init.cpp)
@@ -109,6 +123,7 @@ target_link_libraries(steady
     DomainCollection
     Init
     MatrixHelper
+    #    IfaceMatrixHelper
     FftwPatchSolver
     FishpackPatchSolver
     Interpolators
@@ -160,6 +175,7 @@ target_link_libraries(AmgxWrapper
 endif()
 target_link_libraries(DomainCollection
     ${Zoltan_LIBRARIES}
+    ${Zoltan_LIBRARIES_EXTRA}
 )
 
 add_subdirectory(PatchSolvers)

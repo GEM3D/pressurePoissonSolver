@@ -27,7 +27,12 @@ set(PETSC_VALID_COMPONENTS
   CXX)
 
 if(NOT PETSc_FIND_COMPONENTS)
+  get_property (_enabled_langs GLOBAL PROPERTY ENABLED_LANGUAGES)
+  if ("C" IN_LIST _enabled_langs)
     set(PETSC_LANGUAGE_BINDINGS "C")
+  else ()
+    set(PETSC_LANGUAGE_BINDINGS "CXX")
+  endif ()
 else()
   # Right now, this is designed for compatability with the --with-clanguage option, so
   # only allow one item in the components list.

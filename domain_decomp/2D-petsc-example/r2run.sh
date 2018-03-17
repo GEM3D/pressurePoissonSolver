@@ -20,7 +20,9 @@ export jobName=test
 #Exclusively check out a node
 #SBATCH --exclusive
 
+
+
 cd $SLURM_SUBMIT_DIR
 
-srun --mpi=pmi2 $@
+mpirun $@
 sleep 10s

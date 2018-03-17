@@ -5,6 +5,7 @@
 #include <string>
 struct OctTree {
 	std::map<int, OctNode> nodes;
+	std::map<int, OctNode*> levels;
 	int root;
     int num_levels=1;
     OctTree()=default;

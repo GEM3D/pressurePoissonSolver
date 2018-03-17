@@ -1,5 +1,4 @@
 #include "SchurHelper.h"
-#include "PBMatrix.h"
 #include <array>
 #include <iostream>
 #include <numeric>
@@ -55,19 +54,15 @@ void SchurHelper::solveWithSolution(const Vec f, Vec u)
 {
 	// initilize our local variables
 	VecScale(local_gamma, 0);
-	/*
-	for (auto &p : dc.domains) {
-	    Domain &d = p.second;
-	    interpolator->interpolate(d, u, local_gamma);
+	VecScale(local_interp, 0);
+	for (SchurDomain &sd : domains) {
+	    interpolator->interpolate(sd, u, local_interp);
 	}
-	*/
-	/*
 	VecScale(gamma, 0);
 	VecScatterBegin(scatter, local_interp, gamma, ADD_VALUES, SCATTER_REVERSE);
 	VecScatterEnd(scatter, local_interp, gamma, ADD_VALUES, SCATTER_REVERSE);
 	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
-	*/
 
 	// solve over domains on this proc
 	for (SchurDomain &sd : domains) {
@@ -95,7 +90,7 @@ void SchurHelper::apply(const Vec u, Vec f)
 	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 
 	for (SchurDomain &sd : domains) {
-		op->apply(sd, u, local_gamma, f);
+		op->apply(sd, u, local_interp, f);
 	}
 }
 enum class Rotation : char { x_cw, x_ccw, y_cw, y_ccw, z_cw, z_ccw };
@@ -407,7 +402,7 @@ PW_explicit<Mat> SchurHelper::formCRSMatrix()
 	int global_size = getSchurVecGlobalSize();
 	MatSetSizes(A, local_size, local_size, global_size, global_size);
 	MatSetType(A, MATMPIAIJ);
-	MatMPIAIJSetPreallocation(A, 19 * n * n, nullptr, 19 * n * n, nullptr);
+	MatMPIAIJSetPreallocation(A, 10 * n * n, nullptr, 10 * n * n, nullptr);
 
 	auto insertBlock = [&](Block *b, shared_ptr<valarray<double>> coeffs) {
 		int global_i = b->i * n * n;
@@ -516,12 +511,12 @@ PW_explicit<Mat> SchurHelper::formCRSMatrix()
 	MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
 	return A;
 }
-PW_explicit<Mat> SchurHelper::formPBMatrix()
+PBMatrix* SchurHelper::formPBMatrix()
 {
 	int local_size  = ifaces.size() * n * n;
 	int global_size = getSchurVecGlobalSize();
 
-	PBMatrix *APB    = new PBMatrix(n, local_size, global_size);
+	PBMatrix* APB=new PBMatrix(n, local_size, global_size);
 	auto insertBlock = [&](Block *b, shared_ptr<valarray<double>> coeffs) {
 		int global_i = b->i;
 		int global_j = b->j;
@@ -606,7 +601,16 @@ PW_explicit<Mat> SchurHelper::formPBMatrix()
 	assembleMatrix(insertBlock);
 	APB->finalize();
 
-	return APB->getMatrix();
+	return APB;
+}
+PW_explicit<Mat> SchurHelper::getPBMatrix(){
+	return formPBMatrix()->getMatrix();
+}
+PW_explicit<Mat> SchurHelper::getPBDiagInv(){
+	return formPBMatrix()->getDiagInv()->getMatrix();
+}
+void SchurHelper::getPBDiagInv(PC p){
+	formPBMatrix()->getDiagInv()->getPrec(p);
 }
 void SchurHelper::indexDomainIfacesLocal()
 {
