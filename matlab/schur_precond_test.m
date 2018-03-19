@@ -64,20 +64,23 @@ b = rand(n,1);
 
 % GMRES parameters
 tol = 1e-12;
-restart = 50;
-maxiter = 100; 
+restart = 100;
+maxiter = 1000; 
 
 % No preconditioning
 tic
 [x,flag,relrest,itert,resvect] = gmres(S,b,restart,tol,maxiter);
+% [x,flag,relrest,itert,resvect] = bicgstab(S,b,tol,maxiter);
 toc
 % Preconditioning using Chebyshev basis
 tic
-[c_x,c_flag,c_relrest,c_itert,c_resvect] = gmres(S,b,50,1e-12,100,@polyPrecondCheb,[],[],A,cc,[0 d]);
+[c_x,c_flag,c_relrest,c_itert,c_resvect] = gmres(S,b,restart,tol,maxiter,@polyPrecondCheb,[],[],A,cc,[0 d]);
+% [c_x,c_flag,c_relrest,c_itert,c_resvect] = bicgstab(S,b,tol,maxiter,@polyPrecondCheb,[],[],A,cc,[0 d]);
 toc
 % Preconditioning using Monomial basis
 tic
-[m_x,m_flag,m_relrest,m_itert,m_resvect] = gmres(S,b,50,1e-12,100,@polyPrecondMono,[],[],A,cm);
+[m_x,m_flag,m_relrest,m_itert,m_resvect] = gmres(S,b,restart,tol,maxiter,@polyPrecondMono,[],[],A,cm);
+% [m_x,m_flag,m_relrest,m_itert,m_resvect] = bicgstab(S,b,tol,maxiter,@polyPrecondMono,[],[],A,cm);
 toc
 loglog(1:numel(c_resvect),c_resvect,'o-',...
          1:numel(m_resvect),m_resvect,'x-',...
