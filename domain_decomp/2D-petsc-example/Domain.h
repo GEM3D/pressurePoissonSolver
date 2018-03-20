@@ -31,11 +31,11 @@ struct Domain {
 	std::array<int, 4> local_i          = {{-1, -1, -1, -1}};
 	std::array<int, 4> local_i_center   = {{-1, -1, -1, -1}};
 	std::array<int, 8> local_i_refined  = {{-1, -1, -1, -1, -1, -1, -1, -1}};
-	std::bitset<4> nbr_coarse;
-	std::bitset<4> nbr_fine;
-	std::bitset<4> left_of_coarse;
-	std::bitset<4> neumann;
-	bool           zero_patch = false;
+	std::bitset<4>     nbr_coarse;
+	std::bitset<4>     nbr_fine;
+	std::bitset<4>     left_of_coarse;
+	std::bitset<4>     neumann;
+	bool               zero_patch = false;
 	/**
 	 * @brief The lower left x coordinate of domain
 	 */
@@ -54,13 +54,13 @@ struct Domain {
 	double y_length = 1;
 
 	friend bool operator<(const Domain &l, const Domain &r) { return l.id < r.id; }
-	int &gid(Side s) { return g_id[static_cast<int>(s)]; }
-	int &gidCenter(Side s) { return g_id_center[static_cast<int>(s)]; }
-	int &gidRefinedLeft(Side s) { return g_id_refined[2 * static_cast<int>(s)]; }
-	int &gidRefinedRight(Side s) { return g_id_refined[1 + 2 * static_cast<int>(s)]; }
-	int &globalIndex(Side s) { return global_i[static_cast<int>(s)]; }
-	int &globalIndexCenter(Side s) { return global_i_center[static_cast<int>(s)]; }
-	int &globalIndexRefinedLeft(Side s) { return global_i_refined[2 * static_cast<int>(s)]; }
+	int &       gid(Side s) { return g_id[static_cast<int>(s)]; }
+	int &       gidCenter(Side s) { return g_id_center[static_cast<int>(s)]; }
+	int &       gidRefinedLeft(Side s) { return g_id_refined[2 * static_cast<int>(s)]; }
+	int &       gidRefinedRight(Side s) { return g_id_refined[1 + 2 * static_cast<int>(s)]; }
+	int &       globalIndex(Side s) { return global_i[static_cast<int>(s)]; }
+	int &       globalIndexCenter(Side s) { return global_i_center[static_cast<int>(s)]; }
+	int &       globalIndexRefinedLeft(Side s) { return global_i_refined[2 * static_cast<int>(s)]; }
 	int &globalIndexRefinedRight(Side s) { return global_i_refined[1 + 2 * static_cast<int>(s)]; }
 	int &index(Side s) { return local_i[static_cast<int>(s)]; }
 	int &indexCenter(Side s) { return local_i_center[static_cast<int>(s)]; }
@@ -78,7 +78,7 @@ struct Domain {
 	inline void setHasFineNbr(Side s) { nbr_fine[static_cast<int>(s)] = true; }
 	inline void setHasCoarseNbr(Side s) { nbr_coarse[static_cast<int>(s)] = true; }
 	inline void setLeftOfCoarse(Side s) { left_of_coarse[static_cast<int>(s)] = true; }
-	void setLocalIndexes(std::map<int, int> &rev_map)
+	void        setLocalIndexes(std::map<int, int> &rev_map)
 	{
 		for (int i = 0; i < 4; i++) {
 			if (g_id[i] != -1) {
