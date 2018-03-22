@@ -1,243 +1,446 @@
-#ifndef DOMAINCOLLECTION_H
-#define DOMAINCOLLECTION_H
+#ifndef DOMAINSIGNATURECOLLECTION_H
+#define DOMAINSIGNATURECOLLECTION_H
 #include "Domain.h"
-#include "Iface.h"
-#include "DomainSignatureCollection.h"
+#include "InterpCase.h"
 #include "MyTypeDefs.h"
-#include "RBMatrix.h"
+#include "Side.h"
+#include <Teuchos_Comm.hpp>
+#include <Teuchos_GlobalMPISession.hpp>
+#include <Teuchos_RCP.hpp>
+#include <map>
+#include <set>
+#include <string>
+#include <vector>
+#include <zoltan_cpp.h>
+enum class BlockType {
+	plain,
+	fine,
+	fine_out_left,
+	fine_out_right,
+	coarse,
+	coarse_out_left,
+	coarse_out_right
+};
+struct MatrixBlock {
+	const bool flip_j_table[4][4] = {{false, false, false, false},
+	                                 {true, true, true, true},
+	                                 {true, true, true, true},
+	                                 {false, false, false, false}};
+	const bool flip_i_table[4][4] = {{false, false, false, false},
+	                                 {true, false, true, false},
+	                                 {true, true, true, true},
+	                                 {false, true, false, true}};
+	int            i, j;
+	bool           flip_i, flip_j, right;
+	bool           zero_patch;
+	std::bitset<4> neumann;
+	Side           s;
+	InterpCase     type;
+	double         length;
+	MatrixBlock(int i, int j, Side main, Side aux, std::bitset<4> neumann, bool zero_patch,
+	            InterpCase type, double length)
+	{
+		this->i      = i;
+		this->j      = j;
+		this->flip_i = flip_i_table[static_cast<int>(main)][static_cast<int>(aux)];
+		this->flip_j = flip_j_table[static_cast<int>(main)][static_cast<int>(aux)];
+		this->right  = main == Side::south || main == Side::west;
+		for (int q = 0; q < 4; q++) {
+			this->neumann[q] = neumann[(static_cast<int>(main) + q) % 4];
+		}
+		this->zero_patch = zero_patch;
+		this->type       = type;
+		this->s          = aux;
+		this->length     = length;
+	}
+	friend bool operator==(const MatrixBlock &l, const MatrixBlock &r)
+	{
+		return std::tie(l.neumann, l.zero_patch, l.length)
+		       == std::tie(r.neumann, r.zero_patch, r.length);
+	}
+	friend bool operator<(const MatrixBlock &l, const MatrixBlock &r)
+	{
+		return std::tie(l.j, l.i, l.right) < std::tie(r.j, r.i, r.right);
+	}
+};
+
+enum class IfaceType {
+	normal,
+	coarse_on_left,
+	coarse_on_right,
+	refined_on_left_left_of_coarse,
+	refined_on_left_right_of_coarse,
+	refined_on_right_left_of_coarse,
+	refined_on_right_right_of_coarse
+};
+using DsMemPtr = int &(Domain::*) (Side);
+struct Iface {
+	std::set<MatrixBlock> getRowBlocks(int *id, DsMemPtr normal);
+	bool      y_axis;
+	int       id        = -1;
+	int       id_global = -1;
+	int       id_local  = -1;
+	Domain    left, right, extra;
+	IfaceType type;
+
+	std::vector<int> getEdges()
+	{
+		std::vector<int> edges;
+		for (int i : left.global_i) {
+			if (i != -1 && i != id) {
+				edges.push_back(i);
+			}
+		}
+		for (int i : right.global_i) {
+			if (i != -1 && i != id) {
+				edges.push_back(i);
+			}
+		}
+		for (int i : extra.global_i) {
+			if (i != -1 && i != id) {
+				edges.push_back(i);
+			}
+		}
+		return edges;
+	}
+
+	friend bool operator<(const Iface &l, const Iface &r) { return l.id < r.id; }
+	std::set<MatrixBlock> getRowBlocks();
+	std::set<MatrixBlock> getGlobalRowBlocks();
+	std::set<MatrixBlock> getGidRowBlocks();
+	std::set<int>         getPins();
+	void setLocalIndexes(std::map<int, int> &rev_map)
+	{
+		left.setLocalIndexes(rev_map);
+		right.setLocalIndexes(rev_map);
+		extra.setLocalIndexes(rev_map);
+	}
+	void setGlobalIndexes(std::map<int, int> &rev_map)
+	{
+		left.setGlobalIndexes(rev_map);
+		right.setGlobalIndexes(rev_map);
+		extra.setGlobalIndexes(rev_map);
+	}
+	void setZeroPatch()
+	{
+		left.setZeroPatch();
+		right.setZeroPatch();
+		extra.setZeroPatch();
+	}
+	void setNeumann()
+	{
+		left.setNeumann();
+		right.setNeumann();
+		extra.setNeumann();
+	}
+};
+
 /**
- * @brief This class represents a collection of domains that a single processor owns.
+ * @brief A collection of Domain Signatures
  *
- * The purposes of this class:
- *   - Provide a member function for solving with a given interface vector.
- *   - Handle the initialization of the domains.
- *   - Provide member functions for calculating error, residual, etc.
- *   - Provide member functions that generate the Schur complement matrix.
+ * There are two purposes for this class:
+ *   -# Partition the domains across processors
+ *   -# Determine the number of interfaces, and provide a unique index to each interface.
  */
 class DomainCollection
 {
 	private:
-	/**
-	 * @brief A map of domain ids to the domain objects.
-	 */
-	std::map<int, Teuchos::RCP<Domain>> domains;
-	/**
-	 * @brief The MPI communicator used.
-	 */
+	void enumerateIfaces();
+	void determineCoarseness();
+	void determineAmrLevel();
+	void determineXY();
+	void zoltanBalanceIfaces();
+	void zoltanBalanceDomains();
+
+	public:
+	int                                    rank;
+	int                                    n = 4;
 	Teuchos::RCP<const Teuchos::Comm<int>> comm;
+	int                                    num_pins;
 	/**
-	 * @brief The number of cells in a single dimension.
-	 *
-	 * i.e. n means nxn cells in each domain.
-	 */
-	int n;
-
-	int num_cols = 0;
-
-	bool amr = false;
-	/**
-	 * @brief Spacing of coarsest grid in x direction
-	 */
-	double h_x;
-	/**
-	 * @brief Spacing of coarsest grid in y direction
-	 */
-	double h_y;
-	/**
-	 * @brief Number of global domains
+	 * @brief Number of total domains.
 	 */
 	int num_global_domains;
 	/**
-     * TODO update this
-	 * @brief a vector of integers that stores information for each inteface.
+	 * @brief Number of total interfaces.
+	 */
+	int num_global_interfaces;
+	/**
+	 * @brief A map that maps the id of a domain to its domain signature.
+	 */
+	std::map<int, Domain> domains;
+	std::map<int, Iface>  ifaces;
+
+	std::vector<int> iface_map_vec;
+	std::vector<int> iface_off_proc_map_vec;
+	std::vector<int> iface_dist_map_vec;
+	std::vector<int> domain_map_vec;
+	std::vector<int> domain_off_proc_map_vec;
+
+	/**
+	 * @brief Default empty constructor.
+	 */
+	DomainCollection() = default;
+
+	/**
+	 * @brief Generate a grid of domains.
 	 *
-	 * For the current format each interface requires 15 integers in order to store information.
-	 *
-	 * Each index represents:
-	 *   0. The interface's global index in the interface value array.
-	 *   1. The interfaces type
-	 *   2. The interfaces western neighbor on it's right
-	 *   3. The interfaces western neighbor on it's right type
-	 *   4. The interfaces northern neighbor on it's right
-	 *   5. The interfaces northern neighbor on it's right type
-	 *   6. The interfaces eastern neighbor on it's right
-	 *   7. The interfaces eastern neighbor on it's right type
-	 *   8. The interfaces western neighbor on it's left
-	 *   9. The interfaces western neighbor on it's left type
-	 *   10. The interfaces northern neighbor on it's left
-	 *   11. The interfaces northern neighbor on it's left type
-	 *   12. The interfaces eastern neighbor on it's left
-	 *   13. The interfaces eastern neighbor on it's left type
-	 *   14. The axis that the interface resides on
+	 * @param d_x number of domains in the x direction.
+	 * @param d_y number of domains in the y direction.
+	 * @param rank the rank of the MPI process.
 	 */
-	Teuchos::RCP<int_vector_type> iface_info;
-
-    std::set<Iface> ifaces;
-
-	public:
+	DomainCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm, int d_x, int d_y, int rank);
+	DomainCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm, int d_x, int d_y, int rank,
+	                 bool amr);
+	DomainCollection(Teuchos::RCP<const Teuchos::Comm<int>> comm, std::string file_name, int rank);
 	/**
-	 * @brief Tpetra map that assures each domains has access to it's interface values
+	 * @brief Balance the domains over processors using Zoltan
 	 */
-	Teuchos::RCP<map_type> collection_map;
+	void zoltanBalance();
+	void divide();
 	/**
-	 * @brief Tpetra map that assures each domains has access to it's interface information values
+	 * @brief Index the interfaces using a Breadth First Search.
 	 */
-	Teuchos::RCP<map_type> collection_iface_map;
-	/**
-	 * @brief Tpetra map for interface values used in Schur complement matrix
-	 */
-	Teuchos::RCP<map_type> matrix_map;
-	/**
-	 * @brief Tpetra map use for interface information.
-	 */
-	Teuchos::RCP<map_type> iface_map;
+	void indexInterfacesBFS();
 
-	/**
-	 * @brief Create a DomainCollection from a given DomainSignatureCollection
-	 *
-	 * @param dsc the DomainSignatureCollection
-	 * @param n number of cells in each direction for each domain
-	 * @param h_x the x spacing
-	 * @param h_y the y spacing
-	 * @param comm the teuchos communicator
-	 */
-	DomainCollection(DomainSignatureCollection dsc, int n, double h_x, double h_y,
-	                 Teuchos::RCP<const Teuchos::Comm<int>> comm);
+	void indexIfacesLocal();
+	void indexIfacesGlobal();
 
-	/**
-	 * @brief Initialize domains using Dirichlet boundary conditions.
-	 *
-	 * @param ffun the function we are solving for
-	 * @param gfun the exact solution
-	 */
-	void initDirichlet(std::function<double(double, double)> ffun,
-	                   std::function<double(double, double)> gfun);
+	void indexDomainsLocal();
+	void indexDomainsGlobal();
 
-	void initDirichletRefined(std::function<double(double, double)> ffun,
-	                          std::function<double(double, double)> gfun);
+	void indexDomainIfacesLocal();
 
-	/**
-	 * @brief Initialize domains using Neumann boundary conditions
-	 *
-	 * @param ffun the function we are solving for
-	 * @param efun the exact solution
-	 * @param nfunx the d/dx derivative
-	 * @param nfuny the d/dy derivative
-	 */
-	void initNeumann(std::function<double(double, double)> ffun,
-	                 std::function<double(double, double)> efun,
-	                 std::function<double(double, double)> nfunx,
-	                 std::function<double(double, double)> nfuny, bool amr);
-
-	/**
-	 * @brief output solution in MatrixMarket format
-	 *
-	 * @param out the stream to output to
-	 */
-	void outputSolution(std::ostream &out);
-	void outputSolutionRefined(std::ostream &out);
-
-	/**
-	 * @brief output residual in MatrixMarket format
-	 *
-	 * @param out the stream to output to
-	 */
-	void outputResidual(std::ostream &out);
-	void outputResidualRefined(std::ostream &out);
-
-	/**
-	 * @brief output error in MatrixMarket format
-	 *
-	 * @param out the stream to output to
-	 */
-	void outputError(std::ostream &out);
-	void outputErrorRefined(std::ostream &out);
-
-	/**
-	 * @brief Solve with a given set of interface values
-	 *
-	 * @param gamma the interface values to use
-	 * @param diff the resulting difference
-	 */
-	void solveWithInterface(const vector_type &gamma, vector_type &diff);
-
-	/**
-	 * @brief Generate Tpetra maps
-	 */
-	void generateMaps();
-
-	/**
-	 * @brief Distribute interface information
-	 */
-	void distributeIfaceInfo();
-
-	/**
-	 * @return norm of difference of exact and computed solution
-	 */
-	double diffNorm();
-
-	/**
-	 * @brief norm function used in Neumann case
-	 *
-	 * @param uavg average of computed solution
-	 * @param eavg average of exact solution
-	 *
-	 * @return norm of difference of exact and computed solution
-	 */
-	double diffNorm(double uavg, double eavg);
-
-	/**
-	 * @return norm of exact solution
-	 */
-	double exactNorm();
-
-	/**
-	 * @return norm of right hand side
-	 */
-	double fNorm();
-
-	/**
-	 * @brief norm function used in Neumann case
-	 *
-	 * @param eavg average of exact solution
-	 *
-	 * @return norm of exact solution
-	 */
-	double exactNorm(double eavg);
-
-	/**
-	 * @return sum of computed solution
-	 */
-	double uSum();
-
-	/**
-	 * @return sum of exact solution
-	 */
-	double exactSum();
-
-	/**
-	 * @return the residual
-	 */
-	double residual();
-
-	/**
-	 * @brief Form the Schur complement matrix using an RBMatrix
-	 *
-	 * @param map the map used in the matrix
-	 *
-	 * @return the formed matrix
-	 */
-	Teuchos::RCP<RBMatrix> formRBMatrix(Teuchos::RCP<map_type> map, int delete_row = -1);
-
-	void swapResidSol(){
+	void setNeumann()
+	{
 		for (auto &p : domains) {
-			p.second->swapResidSol();
+			p.second.setNeumann();
+		}
+		for (auto &p : ifaces) {
+			p.second.setNeumann();
 		}
 	}
-	void sumResidIntoSol(){
+	void setZeroPatch()
+	{
 		for (auto &p : domains) {
-			p.second->sumResidIntoSol();
+			p.second.setZeroPatch();
 		}
-    }
+		for (auto &p : ifaces) {
+			p.second.setZeroPatch();
+		}
+	}
+	Teuchos::RCP<map_type> getSchurRowMap();
+	Teuchos::RCP<map_type> getSchurDistMap();
+	Teuchos::RCP<map_type> getDomainRowMap();
+
+	int    getGlobalNumCells() { return num_global_domains * n * n; }
+	double integrate(const vector_type &u);
+	double area();
+};
+struct IfaceZoltanHelper {
+	// query functions that respond to requests from Zoltan
+	static int get_number_of_objects(void *data, int *ierr)
+	{
+		DomainCollection *dc = (DomainCollection *) data;
+		*ierr                = ZOLTAN_OK;
+
+		return dc->ifaces.size();
+	}
+	//	static void coord(void *data, int num_gid_entries, int num_lid_entries, ZOLTAN_ID_PTR
+	// global_id,
+	//	                  ZOLTAN_ID_PTR local_id, double *geom_vec, int *ierr);
+	static void get_object_list(void *data, int sizeGID, int sizeLID, ZOLTAN_ID_PTR globalID,
+	                            ZOLTAN_ID_PTR localID, int wgt_dim, float *obj_wgts, int *ierr)
+	{
+		DomainCollection *dc = (DomainCollection *) data;
+		*ierr                = ZOLTAN_OK;
+
+		// In this example, return the IDs of our objects, but no weights.
+		// Zoltan will assume equally weighted objects.
+
+		int i = 0;
+		for (auto &p : dc->ifaces) {
+			globalID[i]  = p.first;
+			localID[i]   = p.first;
+			float weight = 1.0;
+			obj_wgts[i]  = weight;
+			i++;
+		}
+		return;
+	}
+	static void object_sizes(void *data, int num_gid_entries, int num_lid_entries, int num_ids,
+	                         ZOLTAN_ID_PTR global_ids, ZOLTAN_ID_PTR local_ids, int *sizes,
+	                         int *ierr)
+	{
+		DomainCollection *dc = (DomainCollection *) data;
+		*ierr                = ZOLTAN_OK;
+		for (int i = 0; i < num_ids; i++) {
+			sizes[i] = sizeof(dc->ifaces[global_ids[i]]);
+		}
+	}
+	static void pack_objects(void *data, int num_gid_entries, int num_lid_entries, int num_ids,
+	                         ZOLTAN_ID_PTR global_ids, ZOLTAN_ID_PTR local_ids, int *dest,
+	                         int *sizes, int *idx, char *buf, int *ierr)
+	{
+		DomainCollection *dc = (DomainCollection *) data;
+		*ierr                = ZOLTAN_OK;
+		for (int i = 0; i < num_ids; i++) {
+			*((Iface *) &buf[idx[i]]) = dc->ifaces[global_ids[i]];
+			dc->ifaces.erase(global_ids[i]);
+		}
+	}
+	static void unpack_objects(void *data, int num_gid_entries, int num_ids,
+	                           ZOLTAN_ID_PTR global_ids, int *sizes, int *idx, char *buf, int *ierr)
+	{
+		DomainCollection *dc = (DomainCollection *) data;
+		*ierr                = ZOLTAN_OK;
+		for (int i = 0; i < num_ids; i++) {
+			dc->ifaces[global_ids[i]] = *((Iface *) &buf[idx[i]]);
+		}
+	}
+	static void ZOLTAN_HG_SIZE_CS_FN(void *data, int *num_lists, int *num_pins, int *format,
+	                                 int *ierr)
+	{
+		DomainCollection *dc = (DomainCollection *) data;
+		*ierr                = ZOLTAN_OK;
+		*num_lists           = dc->ifaces.size();
+		*num_pins            = dc->num_pins;
+		*format              = ZOLTAN_COMPRESSED_EDGE;
+	}
+	static void ZOLTAN_HG_CS_FN(void *data, int num_gid_entries, int num_vtx_edge, int num_pins,
+	                            int format, ZOLTAN_ID_PTR vtxedge_GID, int *vtxedge_ptr,
+	                            ZOLTAN_ID_PTR pin_GID, int *ierr)
+	{
+		DomainCollection *dc = (DomainCollection *) data;
+		*ierr                = ZOLTAN_OK;
+		int edge_i           = 0;
+		int list_i           = 0;
+		for (auto p : dc->ifaces) {
+			std::set<int> list  = p.second.getPins();
+			vtxedge_GID[edge_i] = p.first;
+			vtxedge_ptr[edge_i] = list_i;
+			for (int i : list) {
+				pin_GID[list_i] = i;
+				list_i++;
+			}
+			edge_i++;
+		}
+	}
+};
+
+struct DomainZoltanHelper {
+	// query functions that respond to requests from Zoltan
+	static int get_number_of_objects(void *data, int *ierr)
+	{
+		DomainCollection *dc = (DomainCollection *) data;
+		*ierr                = ZOLTAN_OK;
+
+		return dc->domains.size();
+	}
+	//	static void coord(void *data, int num_gid_entries, int num_lid_entries, ZOLTAN_ID_PTR
+	// global_id,
+	//	                  ZOLTAN_ID_PTR local_id, double *geom_vec, int *ierr);
+	static void get_object_list(void *data, int sizeGID, int sizeLID, ZOLTAN_ID_PTR globalID,
+	                            ZOLTAN_ID_PTR localID, int wgt_dim, float *obj_wgts, int *ierr)
+	{
+		DomainCollection *dc = (DomainCollection *) data;
+		*ierr                = ZOLTAN_OK;
+
+		// In this example, return the IDs of our objects, but no weights.
+		// Zoltan will assume equally weighted objects.
+
+		int i = 0;
+		for (auto &p : dc->domains) {
+			globalID[i] = p.first;
+			localID[i]  = p.first;
+			i++;
+		}
+		return;
+	}
+	static void object_sizes(void *data, int num_gid_entries, int num_lid_entries, int num_ids,
+	                         ZOLTAN_ID_PTR global_ids, ZOLTAN_ID_PTR local_ids, int *sizes,
+	                         int *ierr)
+	{
+		DomainCollection *dc = (DomainCollection *) data;
+		*ierr                = ZOLTAN_OK;
+		for (int i = 0; i < num_ids; i++) {
+			auto ds         = dc->domains[global_ids[i]];
+			int  num_ifaces = 0;
+			if (ds.hasCoarseNbr(Side::north)) {
+				num_ifaces += 2;
+			} else if (ds.hasFineNbr(Side::north)) {
+				num_ifaces += 3;
+			} else if (ds.hasNbr(Side::north)) {
+				num_ifaces += 1;
+			}
+			if (ds.hasCoarseNbr(Side::east)) {
+				num_ifaces += 2;
+			} else if (ds.hasFineNbr(Side::east)) {
+				num_ifaces += 3;
+			} else if (ds.hasNbr(Side::east)) {
+				num_ifaces += 1;
+			}
+			sizes[i] = sizeof(int) + sizeof(Domain) + num_ifaces * sizeof(Iface);
+		}
+	}
+	static void pack_objects(void *data, int num_gid_entries, int num_lid_entries, int num_ids,
+	                         ZOLTAN_ID_PTR global_ids, ZOLTAN_ID_PTR local_ids, int *dest,
+	                         int *sizes, int *idx, char *buf, int *ierr)
+	{
+		DomainCollection *dc = (DomainCollection *) data;
+		*ierr                = ZOLTAN_OK;
+		for (int i = 0; i < num_ids; i++) {
+			auto &ds = dc->domains[global_ids[i]];
+			for (int q = 0; q < 8; q++) {
+				if (ds.nbr_id[q] != -1) {
+					auto &nbr   = dc->domains[ds.nbr_id[q]];
+					nbr.proc[q] = dest[i];
+				}
+			}
+		}
+		for (int i = 0; i < num_ids; i++) {
+			*((Domain *) &buf[idx[i] + sizeof(int)]) = dc->domains[global_ids[i]];
+			dc->domains.erase(global_ids[i]);
+		}
+	}
+	static void unpack_objects(void *data, int num_gid_entries, int num_ids,
+	                           ZOLTAN_ID_PTR global_ids, int *sizes, int *idx, char *buf, int *ierr)
+	{
+		DomainCollection *dc = (DomainCollection *) data;
+		*ierr                = ZOLTAN_OK;
+		for (int i = 0; i < num_ids; i++) {
+			dc->domains[global_ids[i]] = *((Domain *) &buf[idx[i] + sizeof(int)]);
+		}
+	}
+	static int numInterfaces(void *data, int num_gid_entries, int num_lid_entries,
+	                         ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id, int *ierr)
+	{
+		DomainCollection *dc = (DomainCollection *) data;
+		*ierr                = ZOLTAN_OK;
+		auto &ds             = dc->domains[*global_id];
+		int   num_iface      = 0;
+		for (int q = 0; q < 8; q++) {
+			if (ds.nbr_id[q] != -1) num_iface++;
+		}
+		return num_iface;
+	}
+	static void interfaceList(void *data, int num_gid_entries, int num_lid_entries,
+	                          ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id,
+	                          ZOLTAN_ID_PTR nbor_global_id, int *nbor_procs, int wgt_dim,
+	                          float *ewgts, int *ierr)
+	{
+		DomainCollection *dc = (DomainCollection *) data;
+		*ierr                = ZOLTAN_OK;
+		auto &ds             = dc->domains[*global_id];
+		int   i              = 0;
+		for (int q = 0; q < 8; q++) {
+			if (ds.nbr_id[q] != -1) {
+				nbor_global_id[i] = ds.nbr_id[q];
+				nbor_procs[i]     = ds.proc[q];
+				i++;
+			}
+		}
+	}
+	//	static int dimensions(void *data, int *ierr);
 };
 #endif

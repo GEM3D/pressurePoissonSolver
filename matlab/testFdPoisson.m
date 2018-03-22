@@ -2,17 +2,17 @@
 % Script for testing fd2poisson over the square [a,b]x[a,b]
 a = 0; 
 b = 1;
-k = 11;
+k = 7;
 m = 2^k;  % Number of interior grid points in one direction
 
 f = @(x,y) -5*pi^2*sin(pi*x).*cos(2*pi*y);  % Laplacian(u) = f
 g = @(x,y) sin(pi*x).*cos(2*pi*y);          % u = g on Boundary
 uexact = @(x,y) g(x,y);                     % Exact solution is g.
 
-% % Compute and time the solution
-% tic
-% [usp,x,y] = fd2poissonsp(f,g,a,b,m,m/2);
-% gesp = toc;
+% Compute and time the solution
+tic
+[usp,x,y] = fd2poissonsp(f,g,a,b,m,m);
+gesp = toc;
 
 tic
 [ufft,x,y] = fd2poissonfft(f,g,[],[],a,b,m,m,1);
@@ -50,9 +50,13 @@ nfuny = @(x,y) -2*pi*sin(pi*(x+1/sqrt(99))).*sin(2*pi*(y-1/sqrt(101)));    % Neu
 [u,x,y] = fd2poissonfft(f,dfun,[],[],a,b,m,m,1);
 fprintf('Error in Dirichlet NSEW solution: %1.4e\n',norm(u(:)-uexact(x(:),y(:)),inf));
 
-% Neumann NSEW
+%% Neumann NSEW
+m = 2^11;
+tic
 [u,x,y] = fd2poissonfft(f,[],nfunx,nfuny,a,b,m,m,10);
 fprintf('Error in Neumann NSEW solution: %1.4e\n',norm(u(:)-uexact(x(:),y(:)),inf));
+toc
+%%
 
 % Neumann SW Dirichlet NE
 [u,x,y] = fd2poissonfft(f,dfun,nfunx,nfuny,a,b,m,m,2);
