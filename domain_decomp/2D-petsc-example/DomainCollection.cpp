@@ -1091,9 +1091,6 @@ void DomainCollection::indexDomainsGlobal()
 	for (auto &p : domains) {
 		p.second.setGlobalNeighborIndexes(rev_map);
 	}
-	for (auto &p : ifaces) {
-		p.second.setGlobalNeighborIndexes(rev_map);
-	}
 	for (size_t i = 0; i < domain_map_vec.size(); i++) {
 		domain_map_vec[i] = inds[i];
 	}
@@ -1151,9 +1148,6 @@ void DomainCollection::indexDomainsLocal()
 		curr_i++;
 	}
 	for (auto &p : domains) {
-		p.second.setLocalNeighborIndexes(rev_map);
-	}
-	for (auto &p : ifaces) {
 		p.second.setLocalNeighborIndexes(rev_map);
 	}
 	// domain_rev_map          = rev_map;

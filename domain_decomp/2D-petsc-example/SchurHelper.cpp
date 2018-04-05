@@ -42,25 +42,6 @@ void SchurHelper::solveWithInterface(const Vec f, Vec u, const Vec gamma, Vec di
 	VecScatterEnd(scatter, local_interp, diff, ADD_VALUES, SCATTER_REVERSE);
 	VecAXPBY(diff, 1.0, -1.0, gamma);
 }
-void SchurHelper::solveAndInterpolateWithInterface(const Vec f, Vec u, const Vec gamma, Vec interp)
-{
-	// initilize our local variables
-	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
-	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
-
-    VecScale(local_interp,0);
-	// solve over domains on this proc
-	for (auto &p : dc.domains) {
-		Domain &d = p.second;
-		solver->solve(d, f, u, local_gamma);
-		interpolator->interpolate(d, u, local_interp);
-	}
-
-	// export diff vector
-	VecScale(interp, 0);
-	VecScatterBegin(scatter, local_interp, interp, ADD_VALUES, SCATTER_REVERSE);
-	VecScatterEnd(scatter, local_interp, interp, ADD_VALUES, SCATTER_REVERSE);
-}
 void SchurHelper::applyWithInterface(const Vec u, const Vec gamma, Vec f)
 {
 	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);

@@ -1,14 +1,12 @@
 #include "DomainCollection.h"
 #include "FivePtPatchOperator.h"
 #include "FunctionWrapper.h"
-#include "IfaceMatrixHelper.h"
 #include "Init.h"
 #include "MatrixHelper.h"
 #include "PatchSolvers/FftwPatchSolver.h"
 #include "PatchSolvers/FishpackPatchSolver.h"
 #include "QuadInterpolator.h"
 #include "SchurHelper.h"
-#include "PolyChebPrec.h"
 #include "Writers/ClawWriter.h"
 #include "Writers/MMWriter.h"
 #ifdef ENABLE_AMGX
@@ -81,19 +79,17 @@ int main(int argc, char *argv[])
 	// mesh options
 	args::ValueFlag<string> f_mesh(parser, "file_name", "read in a mesh", {"mesh"});
 	args::ValueFlag<int>    f_square(parser, "num_domains",
-                                  "create a num_domains x num_domains square of grids", {"square"});
-	args::ValueFlag<int>    f_amr(parser, "num_domains",
-                               "create a num_domains x num_domains square "
-                               "of grids, and a num_domains*2 x "
-                               "num_domains*2 refined square next to it",
-                               {"amr"});
+	                              "create a num_domains x num_domains square of grids", {"square"});
+	args::ValueFlag<int> f_amr(parser, "num_domains", "create a num_domains x num_domains square "
+	                                                  "of grids, and a num_domains*2 x "
+	                                                  "num_domains*2 refined square next to it",
+	                           {"amr"});
 
 	// output options
 	args::Flag f_outclaw(parser, "outclaw", "output amrclaw ascii file", {"outclaw"});
 #ifdef HAVE_VTK
 	args::ValueFlag<string> f_outvtk(parser, "", "output to vtk format", {"outvtk"});
 #endif
-	args::ValueFlag<string> f_outim(parser, "filename", "output full interface matrix", {"outim"});
 	args::ValueFlag<string> f_m(parser, "matrix filename", "the file to write the matrix to",
 	                            {'m'});
 	args::ValueFlag<string> f_s(parser, "solution filename", "the file to write the solution to",
@@ -131,7 +127,6 @@ int main(int argc, char *argv[])
 	args::ValueFlag<string> f_meulucuda(parser, "", "solve schur compliment system with muelu",
 	                                    {"muelucuda"});
 #endif
-	args::Flag f_cheb(parser, "", "cheb preconditioner", {"cheb"});
 
 	int num_procs;
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
@@ -280,15 +275,6 @@ int main(int argc, char *argv[])
 
 		SchurHelper  sch(dc, p_solver, p_operator, p_interp);
 		MatrixHelper mh(dc);
-		if (f_outim) {
-			IfaceMatrixHelper imh(dc);
-			PW<Mat>           IA = imh.formCRSMatrix();
-			PetscViewer viewer;
-			PetscViewerBinaryOpen(PETSC_COMM_WORLD, args::get(f_outim).c_str(), FILE_MODE_WRITE,
-			                      &viewer);
-			MatView(IA, viewer);
-			PetscViewerDestroy(&viewer);
-		}
 
 		PW<Vec> u     = dc.getNewDomainVec();
 		PW<Vec> exact = dc.getNewDomainVec();
@@ -400,11 +386,6 @@ int main(int argc, char *argv[])
 				KSPSetUp(solver);
 				PC pc;
 				KSPGetPC(solver, &pc);
-                if (f_cheb){
-                    PolyChebPrec * pcp = new PolyChebPrec(sch,dc);
-				    pcp->getPrec(pc);
-					PCSetUp(pc);
-				}
 				PCSetUp(pc);
 				timer.stop("Petsc Setup");
 			}
