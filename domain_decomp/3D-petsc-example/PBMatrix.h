@@ -23,6 +23,7 @@ struct PBlock {
 		return std::tie(l.coeffs, l.i, l.j, lc, lr) < std::tie(r.coeffs, r.i, r.j, rc, rr);
 	}
 };
+struct BlockJacobiSmoother;
 class PBMatrix
 {
 	private:
@@ -42,7 +43,8 @@ class PBMatrix
 	                 std::function<int(int, int, int)>                    row_trans);
 	void apply(Vec x, Vec b);
 	void       finalize();
-    PBMatrix*       getDiagInv();
+	PBMatrix * getDiagInv();
+	BlockJacobiSmoother getBlockJacobiSmoother();
 	static int multiply(Mat A, Vec x, Vec b)
 	{
 		PBMatrix *pba = nullptr;
@@ -77,6 +79,18 @@ class PBMatrix
 		PCSetType(P, PCSHELL);
 		PCShellSetContext(P, this);
 		PCShellSetApply(P, multiplyPC);
+	}
+};
+struct BlockJacobiSmoother {
+	std::shared_ptr<PBMatrix> D;
+	std::shared_ptr<PBMatrix> R;
+	void apply(Vec x, Vec b)
+	{
+		PW<Vec> tmp;
+		VecDuplicate(x, &tmp);
+		R->apply(x, tmp);
+		VecAYPX(tmp, -1, b);
+		D->apply(tmp, x);
 	}
 };
 #endif

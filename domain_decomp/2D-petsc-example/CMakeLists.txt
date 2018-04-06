@@ -107,9 +107,10 @@ add_executable(steady steady.cpp)
 add_executable(heat heat.cpp)
 add_library(SchurHelper SchurHelper.cpp)
 add_library(MatrixHelper MatrixHelper.cpp)
-#add_library(IfaceMatrixHelper IfaceMatrixHelper.cpp)
+add_library(IfaceMatrixHelper IfaceMatrixHelper.cpp)
 add_library(DomainCollection DomainCollection.cpp)
 add_library(Interpolators QuadInterpolator.cpp FourthInterpolator.cpp)
+add_library(PolyPrecs PolyChebPrec.cpp)
 add_library(Init Init.cpp)
 
 #
@@ -123,12 +124,13 @@ target_link_libraries(steady
     DomainCollection
     Init
     MatrixHelper
-    #    IfaceMatrixHelper
+    IfaceMatrixHelper
     FftwPatchSolver
     FishpackPatchSolver
     Interpolators
     MMWriter
     ClawWriter
+    PolyPrecs
   ${MPI_CXX_LIBRARIES} 
   ${PETSC_LIBRARIES} 
 )

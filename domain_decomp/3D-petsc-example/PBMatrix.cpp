@@ -159,3 +159,57 @@ PBMatrix *PBMatrix::getDiagInv()
 	APB->finalize();
 	return APB;
 }
+BlockJacobiSmoother PBMatrix::getBlockJacobiSmoother()
+{
+	PBMatrix *APB = new PBMatrix(n, local_size, global_size);
+	PBMatrix *R = new PBMatrix(n, local_size, global_size);
+	map<int, set<PBlockMin>> diags;
+	for (const PBlock &b : blocks) {
+		if (b.i == b.j) {
+			diags[b.i].insert(b);
+		}else{
+			R->blocks.insert(b);
+		}
+	}
+	map<set<PBlockMin>, shared_ptr<valarray<double>>> invs;
+	for (auto &p : diags) {
+		int                           i   = p.first;
+		shared_ptr<valarray<double>> &inv = invs[p.second];
+		if (inv == nullptr) {
+			inv.reset(new valarray<double>(n * n * n * n));
+			valarray<double> &diag_coeffs = *inv;
+
+			// sum up blocks
+			for (const PBlockMin &b : p.second) {
+				valarray<double> &coeffs = *b.coeffs;
+				for (int row_yi = 0; row_yi < n; row_yi++) {
+					for (int row_xi = 0; row_xi < n; row_xi++) {
+						int i_dest = row_xi + row_yi * n;
+						int i_orig = b.row_trans(n, row_xi, row_yi);
+						for (int col_yi = 0; col_yi < n; col_yi++) {
+							for (int col_xi = 0; col_xi < n; col_xi++) {
+								int j_dest = col_xi + col_yi * n;
+								int j_orig = b.col_trans(n, col_xi, col_yi);
+
+								diag_coeffs[i_dest * n * n + j_dest]
+								+= coeffs[i_orig * n * n + j_orig];
+							}
+						}
+					}
+				}
+			}
+
+			// invert
+			inverse(&diag_coeffs[0], n * n);
+		}
+
+		auto trans = [](int n, int xi, int yi) { return xi + yi * n; };
+		APB->insertBlock(i, i, inv, trans, trans);
+	}
+	APB->finalize();
+	R->finalize();
+	BlockJacobiSmoother jacobi;
+	jacobi.D.reset(APB);
+	jacobi.R.reset(R);
+	return jacobi;
+}

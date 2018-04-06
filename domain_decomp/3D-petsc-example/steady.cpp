@@ -14,6 +14,7 @@
 #include "Writers/ClawWriter.h"
 #include "Writers/MMWriter.h"
 #include "args.h"
+#include "PolyChebPrec.h"
 #ifdef ENABLE_AMGX
 #include "AmgxWrapper.h"
 #endif
@@ -137,6 +138,7 @@ int main(int argc, char *argv[])
 	args::Flag f_cfft(parser, "", "use GMG preconditioner", {"cfft"});
 	args::Flag f_pbm(parser, "", "use GMG preconditioner", {"pbm"});
 	args::Flag f_ibd(parser, "", "use GMG preconditioner", {"ibd"});
+	args::Flag f_cheb(parser, "", "cheb preconditioner", {"cheb"});
 
 	int num_procs;
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
@@ -415,7 +417,6 @@ int main(int argc, char *argv[])
 				timer.start("Petsc Setup");
 				KSPSetOperators(solver, A, A);
 				KSPSetUp(solver);
-				if (f_scharz || f_gmg || f_gmgs || f_ibd) {
 					PC pc;
 					KSPGetPC(solver, &pc);
 					if (f_scharz) {
@@ -433,8 +434,12 @@ int main(int argc, char *argv[])
 					if (f_ibd) {
 						sch.getPBDiagInv(pc);
 					}
+                if (f_cheb){
+                    PolyChebPrec * pcp = new PolyChebPrec(sch,dc);
+				    pcp->getPrec(pc);
 					PCSetUp(pc);
 				}
+					PCSetUp(pc);
 				timer.stop("Petsc Setup");
 			}
 			///////////////////

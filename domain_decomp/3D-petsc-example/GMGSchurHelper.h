@@ -11,9 +11,12 @@ class GMGSchurHelper
 	int                           top_level;
 	std::vector<DomainCollection> levels;
 	std::vector<SchurHelper>      shs;
+	std::vector<BlockJacobiSmoother>      jacobis;
 	std::vector<PW<Vec>>          u_vectors;
 	std::vector<PW<Vec>>          f_vectors;
 	std::vector<PW<Vec>>          r_vectors;
+	std::vector<PW<Vec>>          b_vectors;
+	std::vector<PW<Vec>>          g_vectors;
 
 	void restrictForLevel(int level);
 	void prolongateFromLevel(int level);

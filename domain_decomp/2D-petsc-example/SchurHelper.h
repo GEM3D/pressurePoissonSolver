@@ -64,6 +64,7 @@ class SchurHelper
 	 * @param diff the resulting difference
 	 */
 	void solveWithInterface(const Vec f, Vec u, const Vec gamma, Vec diff);
+	void solveAndInterpolateWithInterface(const Vec f, Vec u, const Vec gamma, Vec interp);
 
 	/**
 	 * @brief Apply patch operator with a given set of interface values
