@@ -86,19 +86,13 @@ struct Iface {
 	{
 		std::vector<int> edges;
 		for (int i : left.global_i) {
-			if (i != -1 && i != id) {
-				edges.push_back(i);
-			}
+			if (i != -1 && i != id) { edges.push_back(i); }
 		}
 		for (int i : right.global_i) {
-			if (i != -1 && i != id) {
-				edges.push_back(i);
-			}
+			if (i != -1 && i != id) { edges.push_back(i); }
 		}
 		for (int i : extra.global_i) {
-			if (i != -1 && i != id) {
-				edges.push_back(i);
-			}
+			if (i != -1 && i != id) { edges.push_back(i); }
 		}
 		return edges;
 	}
@@ -125,17 +119,13 @@ struct Iface {
 	{
 		left.setLocalNeighborIndexes(rev_map);
 		right.setLocalNeighborIndexes(rev_map);
-		if (extra.id != -1) {
-			extra.setLocalNeighborIndexes(rev_map);
-		}
+		if (extra.id != -1) { extra.setLocalNeighborIndexes(rev_map); }
 	}
 	void setGlobalNeighborIndexes(std::map<int, int> &rev_map)
 	{
 		left.setGlobalNeighborIndexes(rev_map);
 		right.setGlobalNeighborIndexes(rev_map);
-		if (extra.id != -1) {
-			extra.setGlobalNeighborIndexes(rev_map);
-		}
+		if (extra.id != -1) { extra.setGlobalNeighborIndexes(rev_map); }
 	}
 	void setZeroPatch()
 	{
@@ -167,10 +157,12 @@ class DomainCollection
 	void determineXY();
 	void zoltanBalanceIfaces();
 	void zoltanBalanceDomains();
+	void getRankSize();
 
 	public:
 	bool neumann = false;
 	int  rank;
+	int  size;
 	int  n = 4;
 	int  num_pins;
 	/**
