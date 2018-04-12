@@ -1,9 +1,9 @@
 #ifndef SCHURHELPER_H
 #define SCHURHELPER_H
 #include "DomainCollection.h"
-#include "PBMatrix.h"
 #include "Iface.h"
 #include "Interpolator.h"
+#include "PBMatrix.h"
 #include "PatchOperator.h"
 #include "PatchSolvers/PatchSolver.h"
 #include "SchurDomain.h"
@@ -80,7 +80,9 @@ class SchurHelper
 	 * @param diff the resulting difference
 	 */
 	void solveWithInterface(const Vec f, Vec u, const Vec gamma, Vec diff);
+	void solveAndInterpolateWithInterface(const Vec f, Vec u, const Vec gamma, Vec interp);
 	void solveWithSolution(const Vec f, Vec u);
+	void interpolateToInterface(const Vec f, Vec u,Vec gamma);
 
 	/**
 	 * @brief Apply patch operator with a given set of interface values
@@ -98,8 +100,8 @@ class SchurHelper
 	 * @return the formed matrix
 	 */
 	PW_explicit<Mat> formCRSMatrix();
-	PBMatrix* formPBMatrix();
-void getPBDiagInv(PC p);
+	PBMatrix *       formPBMatrix();
+	void getPBDiagInv(PC p);
 	PW_explicit<Mat> getPBMatrix();
 	PW_explicit<Mat> getPBDiagInv();
 	PW_explicit<Vec> getNewSchurVec();

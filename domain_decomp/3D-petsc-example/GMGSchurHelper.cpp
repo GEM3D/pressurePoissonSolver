@@ -9,9 +9,15 @@ GMGSchurHelper::GMGSchurHelper(int n, OctTree t, DomainCollection &dc, SchurHelp
 	u_vectors.resize(num_levels);
 	f_vectors.resize(num_levels);
 	r_vectors.resize(num_levels);
+	b_vectors.resize(num_levels);
+	g_vectors.resize(num_levels);
+	jacobis.resize(num_levels);
 	levels[top_level]    = dc;
 	shs[top_level]       = sh;
+	u_vectors[top_level] = dc.getNewDomainVec();
+	f_vectors[top_level] = dc.getNewDomainVec();
 	r_vectors[top_level] = dc.getNewDomainVec();
+	jacobis[top_level]   = shs[top_level].formPBMatrix()->getBlockJacobiSmoother();
 	for (int i = 0; i < top_level; i++) {
 		levels[i]   = DomainCollection(t, i + 1);
 		levels[i].n = n;
@@ -22,6 +28,11 @@ GMGSchurHelper::GMGSchurHelper(int n, OctTree t, DomainCollection &dc, SchurHelp
 		f_vectors[i] = levels[i].getNewDomainVec();
 		u_vectors[i] = levels[i].getNewDomainVec();
 		r_vectors[i] = levels[i].getNewDomainVec();
+		b_vectors[i] = shs[i].getNewSchurVec();
+		g_vectors[i] = shs[i].getNewSchurVec();
+		if (i != 0) {
+			jacobis[i] = shs[i].formPBMatrix()->getBlockJacobiSmoother();
+		}
 	}
 }
 void GMGSchurHelper::restrictForLevel(int level)
@@ -135,25 +146,38 @@ void GMGSchurHelper::prolongateFromLevel(int level)
 void GMGSchurHelper::apply(Vec b, Vec gamma)
 {
 	// finest level
-	//shs[top_level].apply(u, r_vectors[top_level]);
-	//VecAYPX(r_vectors[top_level], -1, f);
+	jacobis[top_level].apply(gamma, b);
+	jacobis[top_level].apply(gamma, b);
+	shs[top_level].apply(u_vectors[top_level], r_vectors[top_level]);
+	VecAYPX(r_vectors[top_level], -1, f_vectors[top_level]);
 	// down-cycle
 	for (int i = top_level - 1; i >= 1; i--) {
 		restrictForLevel(i);
 		VecScale(u_vectors[i], 0);
-		shs[i].solveWithSolution(f_vectors[i], u_vectors[i]);
+		VecScale(b_vectors[i], 0);
+		VecScale(g_vectors[i], 0);
+		shs[i].solveWithInterface(f_vectors[i], u_vectors[i], g_vectors[i], b_vectors[i]);
+		VecScale(b_vectors[i], -1.0);
+		jacobis[i].apply(g_vectors[i], b_vectors[i]);
 		shs[i].apply(u_vectors[i], r_vectors[i]);
 		VecAYPX(r_vectors[i], -1, f_vectors[i]);
 	}
 	// coarse level
-	restrictForLevel(0);
 	VecScale(u_vectors[0], 0);
-	shs[0].solveWithSolution(f_vectors[0], u_vectors[0]);
+	VecScale(u_vectors[0], 0);
+	VecScale(b_vectors[0], 0);
+	VecScale(g_vectors[0], 0);
+	restrictForLevel(0);
+	shs[0].solveWithInterface(f_vectors[0], u_vectors[0], g_vectors[0], b_vectors[0]);
 	prolongateFromLevel(0);
 	// up cycle
 	for (int i = 1; i <= num_levels - 2; i++) {
-		shs[i].solveWithSolution(f_vectors[i], u_vectors[i]);
+		//	shs[i].interpolateToInterface(f_vectors[i], u_vectors[i], g_vectors[i]);
+		// shs[i].solveWithSolution(f_vectors[i], u_vectors[i]);
+		// shs[i].solveWithInterface(f_vectors[i], u_vectors[i], g_vectors[i], b_vectors[i]);
 		prolongateFromLevel(i);
 	}
 	// finest level
+	// shs[top_level].interpolateToInterface(f_vectors[top_level], u_vectors[top_level],
+	//                                    gamma);
 }

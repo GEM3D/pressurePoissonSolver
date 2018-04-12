@@ -24,7 +24,7 @@ find_package(PETSc REQUIRED)
 # to edit this line.
 project(DomainDecomp)
 find_package(MPI REQUIRED)
-set (CMAKE_CXX_FLAGS "-Wall --std=c++11 -O3 ${CMAKE_CXX_FLAGS}")
+set (CMAKE_CXX_FLAGS "-Wall --std=c++11 -O3 -march=native ${CMAKE_CXX_FLAGS}")
 if(NUM_GPU)
     set (CMAKE_CXX_FLAGS "-DNUM_GPU=${NUM_GPU} ${CMAKE_CXX_FLAGS}")
 endif()
@@ -108,6 +108,7 @@ add_library(Init Init.cpp)
 add_library(GMGHelper GMGHelper.cpp GMGSchurHelper.cpp)
 add_library(ContigFftwSolver ContigFftwSolver.cpp)
 add_library(PBMatrix PBMatrix.cpp)
+add_library(PolyPrecs PolyChebPrec.cpp)
 
 #
 # EDIT HERE: Change trilinosExample to the name of the executable
@@ -127,6 +128,7 @@ target_link_libraries(steady
     ClawWriter
     ContigFftwSolver
     PBMatrix
+    PolyPrecs
   ${MPI_CXX_LIBRARIES} 
   ${PETSC_LIBRARIES} 
 )

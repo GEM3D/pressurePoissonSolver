@@ -4,6 +4,7 @@
 #include "InterpCase.h"
 #include "PW.h"
 #include "Side.h"
+#include <functional>
 #include <map>
 #include <memory>
 #include <petscvec.h>
@@ -20,14 +21,14 @@ enum class BlockType {
 	coarse_out_right
 };
 struct MatrixBlock {
-	const bool flip_j_table[4][4] = {{false, false, false, false},
-	                                 {true, true, true, true},
-	                                 {true, true, true, true},
-	                                 {false, false, false, false}};
-	const bool flip_i_table[4][4] = {{false, false, false, false},
-	                                 {true, false, true, false},
-	                                 {true, true, true, true},
-	                                 {false, true, false, true}};
+	const bool     flip_j_table[4][4] = {{false, false, false, false},
+                                     {true, true, true, true},
+                                     {true, true, true, true},
+                                     {false, false, false, false}};
+	const bool     flip_i_table[4][4] = {{false, false, false, false},
+                                     {true, false, true, false},
+                                     {true, true, true, true},
+                                     {false, true, false, true}};
 	int            i, j;
 	bool           flip_i, flip_j, right;
 	bool           zero_patch;
@@ -74,40 +75,34 @@ enum class IfaceType {
 using DsMemPtr = int &(Domain::*) (Side);
 struct Iface {
 	std::set<MatrixBlock> getRowBlocks(int *id, DsMemPtr normal);
-	bool      y_axis;
-	int       id        = -1;
-	int       id_global = -1;
-	int       id_local  = -1;
-	Domain    left, right, extra;
-	IfaceType type;
+	bool                  y_axis;
+	int                   id        = -1;
+	int                   id_global = -1;
+	int                   id_local  = -1;
+	Domain                left, right, extra;
+	IfaceType             type;
 
 	std::vector<int> getEdges()
 	{
 		std::vector<int> edges;
 		for (int i : left.global_i) {
-			if (i != -1 && i != id) {
-				edges.push_back(i);
-			}
+			if (i != -1 && i != id) { edges.push_back(i); }
 		}
 		for (int i : right.global_i) {
-			if (i != -1 && i != id) {
-				edges.push_back(i);
-			}
+			if (i != -1 && i != id) { edges.push_back(i); }
 		}
 		for (int i : extra.global_i) {
-			if (i != -1 && i != id) {
-				edges.push_back(i);
-			}
+			if (i != -1 && i != id) { edges.push_back(i); }
 		}
 		return edges;
 	}
 
-	friend bool operator<(const Iface &l, const Iface &r) { return l.id < r.id; }
+	friend bool           operator<(const Iface &l, const Iface &r) { return l.id < r.id; }
 	std::set<MatrixBlock> getRowBlocks();
 	std::set<MatrixBlock> getGlobalRowBlocks();
 	std::set<MatrixBlock> getGidRowBlocks();
 	std::set<int>         getPins();
-	void setLocalIndexes(std::map<int, int> &rev_map)
+	void                  setLocalIndexes(std::map<int, int> &rev_map)
 	{
 		left.setLocalIndexes(rev_map);
 		right.setLocalIndexes(rev_map);
@@ -119,6 +114,18 @@ struct Iface {
 		left.setGlobalIndexes(rev_map);
 		right.setGlobalIndexes(rev_map);
 		extra.setGlobalIndexes(rev_map);
+	}
+	void setLocalNeighborIndexes(std::map<int, int> &rev_map)
+	{
+		left.setLocalNeighborIndexes(rev_map);
+		right.setLocalNeighborIndexes(rev_map);
+		if (extra.id != -1) { extra.setLocalNeighborIndexes(rev_map); }
+	}
+	void setGlobalNeighborIndexes(std::map<int, int> &rev_map)
+	{
+		left.setGlobalNeighborIndexes(rev_map);
+		right.setGlobalNeighborIndexes(rev_map);
+		if (extra.id != -1) { extra.setGlobalNeighborIndexes(rev_map); }
 	}
 	void setZeroPatch()
 	{
@@ -150,10 +157,12 @@ class DomainCollection
 	void determineXY();
 	void zoltanBalanceIfaces();
 	void zoltanBalanceDomains();
+	void getRankSize();
 
 	public:
 	bool neumann = false;
 	int  rank;
+	int  size;
 	int  n = 4;
 	int  num_pins;
 	/**

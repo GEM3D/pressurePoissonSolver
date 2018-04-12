@@ -4,16 +4,21 @@
 #include <deque>
 #include <fstream>
 #include <iostream>
+#include <numeric>
 #include <petscao.h>
 #include <set>
 #include <sstream>
 #include <utility>
-#include <numeric>
 #include <zoltan.h>
 using namespace std;
-DomainCollection::DomainCollection(string file_name)
+void DomainCollection::getRankSize()
 {
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+}
+DomainCollection::DomainCollection(string file_name)
+{
+	getRankSize();
 	if (rank == 0) {
 		num_global_interfaces = 0;
 		ifstream mesh(file_name);
@@ -62,7 +67,7 @@ DomainCollection::DomainCollection(string file_name)
 }
 DomainCollection::DomainCollection(int d_x, int d_y)
 {
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	getRankSize();
 	num_global_domains = d_x * d_y;
 	if (rank == 0) {
 		for (int domain_y = 0; domain_y < d_y; domain_y++) {
@@ -164,7 +169,7 @@ void DomainCollection::enumerateIfaces()
 }
 DomainCollection::DomainCollection(int d_x, int d_y, bool amr)
 {
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	getRankSize();
 	num_global_domains = d_x * d_y * 5;
 	if (rank == 0) {
 		for (int domain_y = 0; domain_y < d_y; domain_y++) {
@@ -467,9 +472,7 @@ void DomainCollection::determineAmrLevel()
 					Domain &nbr = domains.at(d.nbr(s));
 
 					nbr.refine_level = curr_level - 1;
-					if (curr_level - 1 < min_level) {
-						min_level = curr_level;
-					}
+					if (curr_level - 1 < min_level) { min_level = curr_level; }
 
 					if (enqueued.count(d.nbr(s)) == 0) {
 						queue.push_back(d.nbr(s));
@@ -506,18 +509,10 @@ void DomainCollection::determineXY()
 		int     curr = queue.front();
 		Domain &d    = domains.at(curr);
 		queue.pop_front();
-		if (d.x_start < x_min) {
-			x_min = d.x_start;
-		}
-		if (d.y_start < y_min) {
-			y_min = d.y_start;
-		}
-		if (d.x_start + d.x_length > x_max) {
-			x_max = d.x_start + d.x_length;
-		}
-		if (d.y_start + d.y_length > y_max) {
-			y_max = d.y_start + d.y_length;
-		}
+		if (d.x_start < x_min) { x_min = d.x_start; }
+		if (d.y_start < y_min) { y_min = d.y_start; }
+		if (d.x_start + d.x_length > x_max) { x_max = d.x_start + d.x_length; }
+		if (d.y_start + d.y_length > y_max) { y_max = d.y_start + d.y_length; }
 		visited.insert(curr);
 		Side s = Side::north;
 		do {
@@ -655,9 +650,7 @@ void DomainCollection::determineXY()
 	double x_scale = x_max - x_min;
 	double y_scale = y_max - y_min;
 	double scale   = x_scale;
-	if (y_scale > scale) {
-		scale = y_scale;
-	}
+	if (y_scale > scale) { scale = y_scale; }
 	for (auto &p : domains) {
 		Domain &d = p.second;
 		d.x_start += x_shift;
@@ -1007,10 +1000,10 @@ void DomainCollection::indexIfacesGlobal()
 }
 void DomainCollection::indexIfacesLocal()
 {
-	int         curr_i = 0;
-	vector<int> map_vec;
-	vector<int> off_proc_map_vec;
-	vector<int> off_proc_map_vec_send;
+	int           curr_i = 0;
+	vector<int>   map_vec;
+	vector<int>   off_proc_map_vec;
+	vector<int>   off_proc_map_vec_send;
 	map<int, int> rev_map;
 	if (!ifaces.empty()) {
 		set<int> todo;
@@ -1047,7 +1040,7 @@ void DomainCollection::indexIfacesLocal()
 		}
 	}
 
-	set<int> neighbors;
+	set<int>           neighbors;
 	map<int, set<int>> proc_recv;
 	// map off proc
 	for (int i : off_proc_map_vec) {
@@ -1091,6 +1084,12 @@ void DomainCollection::indexDomainsGlobal()
 	for (auto &p : domains) {
 		p.second.setGlobalNeighborIndexes(rev_map);
 	}
+	// for full matrix with gammas
+	if (size == 0) {
+		for (auto &p : ifaces) {
+			p.second.setGlobalNeighborIndexes(rev_map);
+		}
+	}
 	for (size_t i = 0; i < domain_map_vec.size(); i++) {
 		domain_map_vec[i] = inds[i];
 	}
@@ -1100,11 +1099,11 @@ void DomainCollection::indexDomainsGlobal()
 }
 void DomainCollection::indexDomainsLocal()
 {
-	int         curr_i = 0;
-	vector<int> map_vec;
-	vector<int> off_proc_map_vec;
+	int           curr_i = 0;
+	vector<int>   map_vec;
+	vector<int>   off_proc_map_vec;
 	map<int, int> rev_map;
-	set<int> offs;
+	set<int>      offs;
 	if (!domains.empty()) {
 		set<int> todo;
 		for (auto &p : domains) {
@@ -1150,6 +1149,12 @@ void DomainCollection::indexDomainsLocal()
 	for (auto &p : domains) {
 		p.second.setLocalNeighborIndexes(rev_map);
 	}
+	// for matrix with gammas
+	if (size == 0) {
+		for (auto &p : ifaces) {
+			p.second.setLocalNeighborIndexes(rev_map);
+		}
+	}
 	// domain_rev_map          = rev_map;
 	domain_map_vec          = map_vec;
 	domain_off_proc_map_vec = off_proc_map_vec;
@@ -1157,7 +1162,7 @@ void DomainCollection::indexDomainsLocal()
 }
 void DomainCollection::indexDomainIfacesLocal()
 {
-	vector<int> map_vec;
+	vector<int>   map_vec;
 	map<int, int> rev_map;
 	if (!domains.empty()) {
 		int      curr_i = 0;
@@ -1200,9 +1205,7 @@ void DomainCollection::indexDomainIfacesLocal()
 				for (int nbr : ds.nbr_id) {
 					if (nbr != -1 && enqueued.count(nbr) == 0) {
 						enqueued.insert(nbr);
-						if (domains.count(nbr)) {
-							queue.push_back(nbr);
-						}
+						if (domains.count(nbr)) { queue.push_back(nbr); }
 					}
 				}
 			}
@@ -1216,65 +1219,63 @@ void DomainCollection::indexDomainIfacesLocal()
 std::set<MatrixBlock> Iface::getRowBlocks(int *id, DsMemPtr normal)
 {
 	std::set<MatrixBlock> blocks;
-	auto getBlockType = [=](bool left) {
-		InterpCase ret = InterpCase::normal;
-		switch (type) {
-			case IfaceType::normal:
-				ret = InterpCase::normal;
-				break;
-			case IfaceType::coarse_on_left:
-				if (left) {
-					ret = InterpCase::coarse_from_coarse;
-				} else {
-					ret = InterpCase::coarse_from_fine_on_left;
-				}
-				break;
-			case IfaceType::coarse_on_right:
-				if (left) {
-					ret = InterpCase::coarse_from_fine_on_left;
-				} else {
-					ret = InterpCase::coarse_from_coarse;
-				}
-				break;
-			case IfaceType::refined_on_left_left_of_coarse:
-				if (left) {
-					ret = InterpCase::fine_from_fine_on_left;
-				} else {
-					ret = InterpCase::fine_from_coarse_to_fine_on_left;
-				}
-				break;
-			case IfaceType::refined_on_left_right_of_coarse:
-				if (left) {
-					ret = InterpCase::fine_from_fine_on_right;
-				} else {
-					ret = InterpCase::fine_from_coarse_to_fine_on_right;
-				}
-				break;
-			case IfaceType::refined_on_right_left_of_coarse:
-				if (left) {
-					ret = InterpCase::fine_from_coarse_to_fine_on_left;
-				} else {
-					ret = InterpCase::fine_from_fine_on_left;
-				}
-				break;
-			case IfaceType::refined_on_right_right_of_coarse:
-				if (left) {
-					ret = InterpCase::fine_from_coarse_to_fine_on_right;
-				} else {
-					ret = InterpCase::fine_from_fine_on_right;
-				}
-				break;
-		}
-		return ret;
+	auto                  getBlockType = [=](bool left) {
+        InterpCase ret = InterpCase::normal;
+        switch (type) {
+            case IfaceType::normal:
+                ret = InterpCase::normal;
+                break;
+            case IfaceType::coarse_on_left:
+                if (left) {
+                    ret = InterpCase::coarse_from_coarse;
+                } else {
+                    ret = InterpCase::coarse_from_fine_on_left;
+                }
+                break;
+            case IfaceType::coarse_on_right:
+                if (left) {
+                    ret = InterpCase::coarse_from_fine_on_left;
+                } else {
+                    ret = InterpCase::coarse_from_coarse;
+                }
+                break;
+            case IfaceType::refined_on_left_left_of_coarse:
+                if (left) {
+                    ret = InterpCase::fine_from_fine_on_left;
+                } else {
+                    ret = InterpCase::fine_from_coarse_to_fine_on_left;
+                }
+                break;
+            case IfaceType::refined_on_left_right_of_coarse:
+                if (left) {
+                    ret = InterpCase::fine_from_fine_on_right;
+                } else {
+                    ret = InterpCase::fine_from_coarse_to_fine_on_right;
+                }
+                break;
+            case IfaceType::refined_on_right_left_of_coarse:
+                if (left) {
+                    ret = InterpCase::fine_from_coarse_to_fine_on_left;
+                } else {
+                    ret = InterpCase::fine_from_fine_on_left;
+                }
+                break;
+            case IfaceType::refined_on_right_right_of_coarse:
+                if (left) {
+                    ret = InterpCase::fine_from_coarse_to_fine_on_right;
+                } else {
+                    ret = InterpCase::fine_from_fine_on_right;
+                }
+                break;
+        }
+        return ret;
 	};
 	int i = *id;
 	// left domain(s)
 	{
 		std::bitset<4> neumann = left.neumann;
 		Side           iface_s = Side::north;
-		if (y_axis) {
-			iface_s = Side::east;
-		}
+		if (y_axis) { iface_s = Side::east; }
 		// north block
 		{
 			Side        s    = Side::north;
@@ -1324,9 +1325,7 @@ std::set<MatrixBlock> Iface::getRowBlocks(int *id, DsMemPtr normal)
 	{
 		std::bitset<4> neumann = right.neumann;
 		Side           iface_s = Side::south;
-		if (y_axis) {
-			iface_s = Side::west;
-		}
+		if (y_axis) { iface_s = Side::west; }
 		// north block
 		{
 			Side        s    = Side::north;
@@ -1375,14 +1374,10 @@ std::set<MatrixBlock> Iface::getRowBlocks(int *id, DsMemPtr normal)
 	if (type == IfaceType::coarse_on_left || type == IfaceType::coarse_on_right) {
 		std::bitset<4> neumann = extra.neumann;
 		Side           iface_s = Side::south;
-		if (y_axis) {
-			iface_s = Side::west;
-		}
+		if (y_axis) { iface_s = Side::west; }
 		if (type == IfaceType::coarse_on_right) {
 			iface_s = Side::north;
-			if (y_axis) {
-				iface_s = Side::east;
-			}
+			if (y_axis) { iface_s = Side::east; }
 		}
 		// north block
 		{
