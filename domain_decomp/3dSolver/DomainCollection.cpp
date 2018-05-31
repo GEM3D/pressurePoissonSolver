@@ -13,51 +13,62 @@
 using namespace std;
 DomainCollection::DomainCollection(OctTree t, int level)
 {
-	OctNode root  = t.nodes[t.root];
-	OctNode child = root;
-	for (int i = 1; i < level; i++) {
-		child = t.nodes[child.child_id[0]];
-	}
-	deque<int> q;
-	set<int>   qed;
-	q.push_back(child.id);
-	qed.insert(child.id);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	if (rank == 0) {
+		OctNode root  = t.nodes[t.root];
+		OctNode child = root;
+		for (int i = 1; i < level; i++) {
+			child = t.nodes[child.child_id[0]];
+		}
+		deque<int> q;
+		set<int>   qed;
+		q.push_back(child.id);
+		qed.insert(child.id);
 
-	while (!q.empty()) {
-		Domain  d;
-		OctNode n = t.nodes[q.front()];
-		q.pop_front();
+		while (!q.empty()) {
+			Domain  d;
+			OctNode n = t.nodes[q.front()];
+			q.pop_front();
 
-		d.id        = n.id;
-		d.x_length  = n.x_length;
-		d.y_length  = n.y_length;
-		d.z_length  = n.z_length;
-		d.x_start   = n.x_start;
-		d.y_start   = n.y_start;
-		d.z_start   = n.z_start;
-		d.child_id  = n.child_id;
-		d.parent_id = n.parent;
+			d.id        = n.id;
+			d.x_length  = n.x_length;
+			d.y_length  = n.y_length;
+			d.z_length  = n.z_length;
+			d.x_start   = n.x_start;
+			d.y_start   = n.y_start;
+			d.z_start   = n.z_start;
+			d.child_id  = n.child_id;
+			d.parent_id = n.parent;
 
-		Side s = Side::west;
-		// set and enqueue nbrs
-		do {
-			if (n.nbr(s) != -1) {
-				int id = n.nbr(s);
-				if (!qed.count(id)) {
-					q.push_back(id);
-					qed.insert(id);
+			Side s = Side::west;
+			// set and enqueue nbrs
+			do {
+				if (n.nbr(s) != -1) {
+					int id = n.nbr(s);
+					if (!qed.count(id)) {
+						q.push_back(id);
+						qed.insert(id);
+					}
+					d.getNbrInfoPtr(s) = new NormalNbrInfo(id);
 				}
-				d.getNbrInfoPtr(s) = new NormalNbrInfo(id);
-			}
-			s++;
-		} while (s != Side::west);
-		domains[d.id] = d;
+				s++;
+			} while (s != Side::west);
+			domains[d.id] = d;
+		}
 	}
-	num_global_domains = domains.size();
+	int num_local_domains = domains.size();
+	MPI_Allreduce(&num_local_domains, &num_global_domains, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+
 	reIndex();
+
+	for (auto &p : domains) {
+		p.second.setPtrs(domains);
+	}
 }
 DomainCollection::DomainCollection(OctTree t)
 {
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if(rank==0){
 	OctNode root  = t.nodes[t.root];
 	OctNode child = root;
 	while (child.hasChildren()) {
@@ -98,8 +109,8 @@ DomainCollection::DomainCollection(OctTree t)
 					qed.insert(nbr.id);
 				}
 			} else if (n.nbr(s) != -1 && t.nodes[n.nbr(s)].hasChildren()) {
-				OctNode nbr  = t.nodes[n.nbr(s)];
-				auto    octs = getOctsOnSide(~s);
+				OctNode       nbr  = t.nodes[n.nbr(s)];
+				auto          octs = getOctsOnSide(~s);
 				array<int, 4> nbr_ids;
 				for (int i = 0; i < 4; i++) {
 					int id     = nbr.child(octs[i]);
@@ -122,8 +133,14 @@ DomainCollection::DomainCollection(OctTree t)
 		} while (s != Side::west);
 		domains[d.id] = d;
 	}
-	num_global_domains = domains.size();
+    }
+	int num_local_domains = domains.size();
+	MPI_Allreduce(&num_local_domains, &num_global_domains, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 	reIndex();
+
+	for (auto &p : domains) {
+		p.second.setPtrs(domains);
+	}
 }
 DomainCollection::DomainCollection(int d_x, int d_y, int d_z)
 {
@@ -173,32 +190,141 @@ DomainCollection::DomainCollection(int d_x, int d_y, int d_z)
 		}
 	}
 	reIndex();
+
+	for (auto &p : domains) {
+		p.second.setPtrs(domains);
+	}
 }
 void DomainCollection::reIndex() { indexDomainsLocal(); }
 void DomainCollection::divide() {}
-void DomainCollection::zoltanBalance() { zoltanBalanceDomains(); }
+void DomainCollection::zoltanBalance()
+{
+	zoltanBalanceDomains();
+	for (auto &p : domains) {
+		p.second.setPtrs(domains);
+	}
+	reIndex();
+}
 void DomainCollection::zoltanBalanceDomains()
 {
 	struct Zoltan_Struct *zz = Zoltan_Create(MPI_COMM_WORLD);
 
 	// parameters
-	Zoltan_Set_Param(zz, "LB_METHOD", "GRAPH");       /* Zoltan method: "BLOCK" */
+	Zoltan_Set_Param(zz, "LB_METHOD", "HYPERGRAPH");  /* Zoltan method: HYPERGRAPH */
 	Zoltan_Set_Param(zz, "LB_APPROACH", "PARTITION"); /* Zoltan method: "BLOCK" */
 	Zoltan_Set_Param(zz, "NUM_GID_ENTRIES", "1");     /* global ID is 1 integer */
-	Zoltan_Set_Param(zz, "NUM_LID_ENTRIES", "1");     /* local ID is 1 integer */
+	Zoltan_Set_Param(zz, "NUM_LID_ENTRIES", "0");     /* don't use local IDs */
 	Zoltan_Set_Param(zz, "OBJ_WEIGHT_DIM", "0");      /* we omit object weights */
-	Zoltan_Set_Param(zz, "AUTO_MIGRATE", "TRUE");     /* we omit object weights */
+	Zoltan_Set_Param(zz, "AUTO_MIGRATE", "FALSE");    /* we omit object weights */
 
 	// Query functions
-	Zoltan_Set_Num_Obj_Fn(zz, DomainZoltanHelper::get_number_of_objects, this);
-	Zoltan_Set_Obj_List_Fn(zz, DomainZoltanHelper::get_object_list, this);
-	Zoltan_Set_Pack_Obj_Multi_Fn(zz, DomainZoltanHelper::pack_objects, this);
-	Zoltan_Set_Unpack_Obj_Multi_Fn(zz, DomainZoltanHelper::unpack_objects, this);
-	Zoltan_Set_Obj_Size_Multi_Fn(zz, DomainZoltanHelper::object_sizes, this);
-	Zoltan_Set_Num_Edges_Fn(zz, DomainZoltanHelper::numInterfaces, this);
-	Zoltan_Set_Edge_List_Fn(zz, DomainZoltanHelper::interfaceList, this);
-	// zz->Set_Geom_Fn(DomainCollection::coord, this);
-	// zz->Set_Num_Geom_Fn(DomainCollection::dimensions, this);
+	// Number of Vertices
+	auto numObjFn = [](void *data, int *ierr) -> int {
+		DomainCollection &dc = *(DomainCollection *) data;
+		*ierr                = ZOLTAN_OK;
+		return dc.domains.size();
+	};
+	Zoltan_Set_Num_Obj_Fn(zz, numObjFn, this);
+
+	// List of vertices
+	auto objListFn
+	= [](void *data, int num_gid_entries, int num_lid_entries, ZOLTAN_ID_PTR global_ids,
+	     ZOLTAN_ID_PTR local_ids, int wgt_dim, float *obj_wgts, int *ierr) {
+		  DomainCollection &dc = *(DomainCollection *) data;
+		  *ierr                = ZOLTAN_OK;
+		  int pos              = 0;
+		  for (auto p : dc.domains) {
+			  global_ids[pos] = p.first;
+			  pos++;
+		  }
+	  };
+	Zoltan_Set_Obj_List_Fn(zz, objListFn, this);
+
+	// Construct hypergraph
+	struct CompressedVertex {
+		vector<int> vertices;
+		vector<int> ptrs;
+		vector<int> edges;
+	};
+	CompressedVertex graph;
+	for (auto &p : domains) {
+		Domain &d = p.second;
+		graph.vertices.push_back(d.id);
+		graph.ptrs.push_back(graph.edges.size());
+		for (Side s : getSideValues()) {
+			int edge_id = -1;
+			if (d.hasNbr(s)) {
+				switch (d.getNbrType(s)) {
+					case NbrType::Normal:
+						if (isENT(s)) {
+							edge_id = d.id;
+						} else {
+							edge_id = d.getNormalNbrInfo(s).id;
+						}
+						break;
+					case NbrType::Fine:
+						edge_id = d.id;
+						break;
+					case NbrType::Coarse:
+						edge_id = d.getCoarseNbrInfo(s).id;
+						break;
+				}
+			}
+			graph.edges.push_back(edge_id ^ s);
+		}
+	}
+
+	// set graph functions
+	Zoltan_Set_HG_Size_CS_Fn(zz,
+	                         [](void *data, int *num_lists, int *num_pins, int *format, int *ierr) {
+		                         CompressedVertex &graph = *(CompressedVertex *) data;
+		                         *ierr                   = ZOLTAN_OK;
+		                         *num_lists              = graph.vertices.size();
+		                         *num_pins               = graph.edges.size();
+		                         *format                 = ZOLTAN_COMPRESSED_VERTEX;
+	                         },
+	                         &graph);
+	Zoltan_Set_HG_CS_Fn(zz,
+	                    [](void *data, int num_gid_entries, int num_vtx_edge, int num_pins,
+	                       int format, ZOLTAN_ID_PTR vtxedge_GID, int *vtxedge_ptr,
+	                       ZOLTAN_ID_PTR pin_GID, int *ierr) {
+		                    CompressedVertex &graph = *(CompressedVertex *) data;
+		                    *ierr                   = ZOLTAN_OK;
+		                    copy(graph.vertices.begin(), graph.vertices.end(), vtxedge_GID);
+		                    copy(graph.ptrs.begin(), graph.ptrs.end(), vtxedge_ptr);
+		                    copy(graph.edges.begin(), graph.edges.end(), pin_GID);
+	                    },
+	                    &graph);
+
+	Zoltan_Set_Obj_Size_Fn(zz,
+	                       [](void *data, int num_gid_entries, int num_lid_entries,
+	                          ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id, int *ierr) {
+		                       DomainCollection &dc = *(DomainCollection *) data;
+		                       *ierr                = ZOLTAN_OK;
+		                       return dc.domains[*global_id].serialize(nullptr);
+	                       },
+	                       this);
+	Zoltan_Set_Pack_Obj_Fn(zz,
+	                       [](void *data, int num_gid_entries, int num_lid_entries,
+	                          ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id, int dest, int size,
+	                          char *buf, int *ierr) {
+		                       DomainCollection &dc = *(DomainCollection *) data;
+		                       *ierr                = ZOLTAN_OK;
+		                       dc.domains[*global_id].serialize(buf);
+		                       dc.domains.erase(*global_id);
+	                       },
+	                       this);
+	Zoltan_Set_Unpack_Obj_Fn(
+	zz,
+	[](void *data, int num_gid_entries, ZOLTAN_ID_PTR global_id, int size, char *buf, int *ierr) {
+		DomainCollection &dc   = *(DomainCollection *) data;
+		*ierr                  = ZOLTAN_OK;
+		dc.domains[*global_id] = Domain::deserialize(buf);
+	},
+	this);
+	// Zoltan_Set_Obj_Size_Multi_Fn(zz, DomainZoltanHelper::object_sizes, this);
+	// Zoltan_Set_Pack_Obj_Multi_Fn(zz, DomainZoltanHelper::pack_objects, this);
+	// Zoltan_Set_Unpack_Obj_Multi_Fn(zz, DomainZoltanHelper::unpack_objects, this);
 
 	////////////////////////////////////////////////////////////////
 	// Zoltan can now partition the objects in this collection.
@@ -226,6 +352,16 @@ void DomainCollection::zoltanBalanceDomains()
 	                             &numExport, &exportGlobalIds, &exportLocalIds, &exportProcs,
 	                             &exportToPart);
 
+	// update ranks of neighbors before migrating
+	for (int i = 0; i < numExport; i++) {
+		int curr_id   = exportGlobalIds[i];
+		int dest_rank = exportProcs[i];
+		domains[curr_id].updateRank(dest_rank);
+	}
+
+	rc = Zoltan_Migrate(zz, numImport, importGlobalIds, importLocalIds, importProcs, importToPart,
+	                    numExport, exportGlobalIds, exportLocalIds, exportProcs, exportToPart);
+
 	if (rc != ZOLTAN_OK) {
 		cerr << "zoltan error\n";
 		Zoltan_Destroy(&zz);
@@ -251,6 +387,243 @@ void DomainCollection::zoltanBalanceDomains()
 	cout << prev << "\n";
 #endif
 	cout << endl;
+}
+void DomainCollection::zoltanBalanceWithLower(DomainCollection &lower)
+{
+	struct Zoltan_Struct *zz = Zoltan_Create(MPI_COMM_WORLD);
+
+	// parameters
+	Zoltan_Set_Param(zz, "LB_METHOD", "HYPERGRAPH");  /* Zoltan method: HYPERGRAPH */
+	Zoltan_Set_Param(zz, "LB_APPROACH", "PARTITION"); /* Zoltan method: "BLOCK" */
+	Zoltan_Set_Param(zz, "NUM_GID_ENTRIES", "1");     /* global ID is 1 integer */
+	Zoltan_Set_Param(zz, "NUM_LID_ENTRIES", "0");     /* don't use local IDs */
+	Zoltan_Set_Param(zz, "OBJ_WEIGHT_DIM", "1");      /* we omit object weights */
+	Zoltan_Set_Param(zz, "EDGE_WEIGHT_DIM", "0");     /* we omit object weights */
+	Zoltan_Set_Param(zz, "AUTO_MIGRATE", "FALSE");    /* we omit object weights */
+
+	// Query functions
+	// Number of Vertices
+	struct Levels {
+		DomainCollection *upper;
+		DomainCollection *lower;
+	};
+	Levels levels = {this, &lower};
+	Zoltan_Set_Num_Obj_Fn(zz,
+	                      [](void *data, int *ierr) -> int {
+		                      Levels *levels = (Levels *) data;
+		                      *ierr          = ZOLTAN_OK;
+		                      return levels->upper->domains.size() + levels->lower->domains.size();
+	                      },
+	                      &levels);
+
+	// List of vertices
+	Zoltan_Set_Obj_List_Fn(zz,
+	                       [](void *data, int num_gid_entries, int num_lid_entries,
+	                          ZOLTAN_ID_PTR global_ids, ZOLTAN_ID_PTR local_ids, int wgt_dim,
+	                          float *obj_wgts, int *ierr) {
+		                       Levels *levels = (Levels *) data;
+		                       *ierr          = ZOLTAN_OK;
+		                       int pos        = 0;
+		                       for (auto p : levels->upper->domains) {
+			                       global_ids[pos] = p.first;
+			                       obj_wgts[pos]   = 1;
+			                       pos++;
+		                       }
+		                       for (auto p : levels->lower->domains) {
+			                       global_ids[pos] = p.first;
+			                       obj_wgts[pos]   = 0;
+			                       pos++;
+		                       }
+	                       },
+	                       &levels);
+
+	// Construct hypergraph
+	struct CompressedVertex {
+		vector<int> vertices;
+		vector<int> ptrs;
+		vector<int> edges;
+	};
+	CompressedVertex graph;
+	// process coarse level
+	for (auto &p : domains) {
+		Domain &d = p.second;
+		graph.vertices.push_back(d.id);
+		graph.ptrs.push_back(graph.edges.size());
+		// patch to patch communication
+		for (Side s : getSideValues()) {
+			int edge_id = -1;
+			if (d.hasNbr(s)) {
+				switch (d.getNbrType(s)) {
+					case NbrType::Normal:
+						if (isENT(s)) {
+							edge_id = d.id;
+						} else {
+							edge_id = d.getNormalNbrInfo(s).id;
+						}
+						break;
+					case NbrType::Fine:
+						edge_id = d.id;
+						break;
+					case NbrType::Coarse:
+						edge_id = d.getCoarseNbrInfo(s).id;
+						break;
+				}
+			}
+			graph.edges.push_back(edge_id ^ s);
+		}
+		// level to level communication
+		graph.edges.push_back(-d.id - 1);
+	}
+	// process fine level
+	for (auto &p : lower.domains) {
+		Domain &d = p.second;
+		graph.vertices.push_back(d.id);
+		graph.ptrs.push_back(graph.edges.size());
+		graph.edges.push_back(-d.parent_id - 1);
+	}
+
+	// set graph functions
+	Zoltan_Set_HG_Size_CS_Fn(zz,
+	                         [](void *data, int *num_lists, int *num_pins, int *format, int *ierr) {
+		                         CompressedVertex &graph = *(CompressedVertex *) data;
+		                         *ierr                   = ZOLTAN_OK;
+		                         *num_lists              = graph.vertices.size();
+		                         *num_pins               = graph.edges.size();
+		                         *format                 = ZOLTAN_COMPRESSED_VERTEX;
+	                         },
+	                         &graph);
+	Zoltan_Set_HG_CS_Fn(zz,
+	                    [](void *data, int num_gid_entries, int num_vtx_edge, int num_pins,
+	                       int format, ZOLTAN_ID_PTR vtxedge_GID, int *vtxedge_ptr,
+	                       ZOLTAN_ID_PTR pin_GID, int *ierr) {
+		                    CompressedVertex &graph = *(CompressedVertex *) data;
+		                    *ierr                   = ZOLTAN_OK;
+		                    copy(graph.vertices.begin(), graph.vertices.end(), vtxedge_GID);
+		                    copy(graph.ptrs.begin(), graph.ptrs.end(), vtxedge_ptr);
+		                    copy(graph.edges.begin(), graph.edges.end(), pin_GID);
+	                    },
+	                    &graph);
+
+	Zoltan_Set_Obj_Size_Fn(zz,
+	                       [](void *data, int num_gid_entries, int num_lid_entries,
+	                          ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id, int *ierr) {
+		                       DomainCollection &dc = *(DomainCollection *) data;
+		                       *ierr                = ZOLTAN_OK;
+		                       return dc.domains.at(*global_id).serialize(nullptr);
+	                       },
+	                       this);
+
+	// fixed objects
+	Zoltan_Set_Num_Fixed_Obj_Fn(zz,
+	                            [](void *data, int *ierr) -> int {
+		                            Levels *levels = (Levels *) data;
+		                            *ierr          = ZOLTAN_OK;
+		                            return levels->lower->domains.size();
+	                            },
+	                            &levels);
+
+	Zoltan_Set_Fixed_Obj_List_Fn(zz,
+	                             [](void *data, int num_fixed_obj, int num_gid_entries,
+	                                ZOLTAN_ID_PTR fixed_gids, int *fixed_parts, int *ierr) {
+		                             Levels *levels = (Levels *) data;
+		                             *ierr          = ZOLTAN_OK;
+		                             int rank;
+		                             MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+		                             int pos = 0;
+		                             for (auto p : levels->lower->domains) {
+			                             fixed_gids[pos]  = p.first;
+			                             fixed_parts[pos] = rank;
+			                             pos++;
+		                             }
+	                             },
+	                             &levels);
+	// pack and unpack
+	// pack and unpack
+	Zoltan_Set_Pack_Obj_Fn(zz,
+	                       [](void *data, int num_gid_entries, int num_lid_entries,
+	                          ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id, int dest, int size,
+	                          char *buf, int *ierr) {
+		                       DomainCollection &dc = *(DomainCollection *) data;
+		                       *ierr                = ZOLTAN_OK;
+		                       dc.domains.at(*global_id).serialize(buf);
+		                       dc.domains.erase(*global_id);
+	                       },
+	                       this);
+	Zoltan_Set_Unpack_Obj_Fn(
+	zz,
+	[](void *data, int num_gid_entries, ZOLTAN_ID_PTR global_id, int size, char *buf, int *ierr) {
+		DomainCollection &dc   = *(DomainCollection *) data;
+		*ierr                  = ZOLTAN_OK;
+		dc.domains[*global_id] = Domain::deserialize(buf);
+	},
+	this);
+
+	////////////////////////////////////////////////////////////////
+	// Zoltan can now partition the objects in this collection.
+	// In this simple example, we assume the number of partitions is
+	// equal to the number of processes.  Process rank 0 will own
+	// partition 0, process rank 1 will own partition 1, and so on.
+	////////////////////////////////////////////////////////////////
+
+	int           changes;
+	int           numGidEntries;
+	int           numLidEntries;
+	int           numImport;
+	ZOLTAN_ID_PTR importGlobalIds;
+	ZOLTAN_ID_PTR importLocalIds;
+	int *         importProcs;
+	int *         importToPart;
+	int           numExport;
+	ZOLTAN_ID_PTR exportGlobalIds;
+	ZOLTAN_ID_PTR exportLocalIds;
+	int *         exportProcs;
+	int *         exportToPart;
+
+	int rc = Zoltan_LB_Partition(zz, &changes, &numGidEntries, &numLidEntries, &numImport,
+	                             &importGlobalIds, &importLocalIds, &importProcs, &importToPart,
+	                             &numExport, &exportGlobalIds, &exportLocalIds, &exportProcs,
+	                             &exportToPart);
+
+	// update ranks of neighbors before migrating
+	for (int i = 0; i < numExport; i++) {
+		int curr_id   = exportGlobalIds[i];
+		int dest_rank = exportProcs[i];
+		domains.at(curr_id).updateRank(dest_rank);
+	}
+
+	rc = Zoltan_Migrate(zz, numImport, importGlobalIds, importLocalIds, importProcs, importToPart,
+	                    numExport, exportGlobalIds, exportLocalIds, exportProcs, exportToPart);
+
+	if (rc != ZOLTAN_OK) {
+		cerr << "zoltan error\n";
+		Zoltan_Destroy(&zz);
+		exit(0);
+	}
+	Zoltan_Destroy(&zz);
+	cout << "I have " << domains.size() << " domains: ";
+
+#if DD_DEBUG
+	int  prev  = -100;
+	bool range = false;
+	for (auto &p : domains) {
+		int curr = p.second.id;
+		if (curr != prev + 1 && !range) {
+			cout << curr << "-";
+			range = true;
+		} else if (curr != prev + 1 && range) {
+			cout << prev << " " << curr << "-";
+		}
+		prev = curr;
+	}
+
+	cout << prev << "\n";
+#endif
+	cout << endl;
+
+	for (auto &p : domains) {
+		p.second.setPtrs(domains);
+	}
+	reIndex();
 }
 void DomainCollection::indexDomainsGlobal()
 {
@@ -291,11 +664,11 @@ void DomainCollection::indexDomainsGlobal()
 }
 void DomainCollection::indexDomainsLocal()
 {
-	int         curr_i = 0;
-	vector<int> map_vec;
-	vector<int> off_proc_map_vec;
+	int           curr_i = 0;
+	vector<int>   map_vec;
+	vector<int>   off_proc_map_vec;
 	map<int, int> rev_map;
-	set<int> offs;
+	set<int>      offs;
 	if (!domains.empty()) {
 		set<int> todo;
 		for (auto &p : domains) {

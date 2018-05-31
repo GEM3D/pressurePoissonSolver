@@ -63,6 +63,7 @@ class DomainCollection
 	 * @brief Balance the domains over processors using Zoltan
 	 */
 	void zoltanBalance();
+	void zoltanBalanceWithLower(DomainCollection& lower);
 	void divide();
 
 	void indexDomainsLocal();

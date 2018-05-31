@@ -1,5 +1,6 @@
 #ifndef IFACE_H
 #define IFACE_H
+#include "BufferWriter.h"
 #include "IfaceType.h"
 #include "Side.h"
 #include <bitset>
@@ -7,12 +8,13 @@
 #include <set>
 #include <vector>
 struct Iface {
-	IfaceType type;
-	Side      s;
+	IfaceType          type;
+	Side               s;
 	std::array<int, 6> ids       = {{-1, -1, -1, -1, -1, -1}};
 	std::array<int, 6> local_id  = {{-1, -1, -1, -1, -1, -1}};
 	std::array<int, 6> global_id = {{-1, -1, -1, -1, -1, -1}};
-	std::bitset<6> neumann;
+	std::bitset<6>     neumann;
+	Iface() = default;
 	Iface(std::array<int, 6> ids, IfaceType type, Side s, std::bitset<6> neumann)
 	{
 		this->ids     = ids;
@@ -31,22 +33,24 @@ struct IfaceSet {
 		std::set<int> retval;
 		for (const Iface &iface : ifaces) {
 			for (const int i : iface.ids) {
-				if (i != -1 && i != id) {
-					retval.insert(i);
-				}
+				if (i != -1 && i != id) { retval.insert(i); }
 			}
 		}
 		return retval;
 	}
 	void insert(Iface i) { ifaces.push_back(i); }
+	void insert(IfaceSet ifs)
+	{
+		for (Iface &i : ifs.ifaces) {
+			ifaces.push_back(i);
+		}
+	}
 	void setLocalIndexes(const std::map<int, int> &rev_map)
 	{
 		id_local = rev_map.at(id);
 		for (Iface &iface : ifaces) {
 			for (int i = 0; i < 6; i++) {
-				if (iface.ids[i] != -1) {
-					iface.local_id[i] = rev_map.at(iface.ids[i]);
-				}
+				if (iface.ids[i] != -1) { iface.local_id[i] = rev_map.at(iface.ids[i]); }
 			}
 		}
 	}
@@ -55,11 +59,36 @@ struct IfaceSet {
 		id_global = rev_map.at(id_local);
 		for (Iface &iface : ifaces) {
 			for (int i = 0; i < 6; i++) {
-				if (iface.local_id[i] != -1) {
-					iface.global_id[i] = rev_map.at(iface.local_id[i]);
-				}
+				if (iface.local_id[i] != -1) { iface.global_id[i] = rev_map.at(iface.local_id[i]); }
 			}
 		}
+	}
+	int serialize(char *buffer)
+	{
+		BufferWriter writer(buffer);
+		writer << id;
+		writer << id_local;
+		writer << id_global;
+		writer << ifaces.size();
+		for (Iface &i : ifaces) {
+			writer << i;
+		}
+		return writer.getPos();
+	}
+	static IfaceSet deserialize(char *buffer)
+	{
+		BufferReader reader(buffer);
+		IfaceSet     ifs;
+		reader >> ifs.id;
+		reader >> ifs.id_global;
+		int size = 0;
+		reader >> size;
+		for (int i = 0; i < size; i++) {
+			Iface iface;
+			reader >> iface;
+			ifs.ifaces.push_back(iface);
+		}
+		return ifs;
 	}
 };
 #endif

@@ -164,6 +164,7 @@ target_link_libraries(DomainCollection
 
 add_subdirectory(PatchSolvers)
 add_subdirectory(Writers)
+add_subdirectory(test)
 SET( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 IF( EXISTS "${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json" )
   EXECUTE_PROCESS( COMMAND ${CMAKE_COMMAND} -E copy_if_different

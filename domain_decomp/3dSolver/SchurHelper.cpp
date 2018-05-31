@@ -13,9 +13,57 @@ SchurHelper::SchurHelper(DomainCollection dc, shared_ptr<PatchSolver> solver,
 	for (auto &p : dc.domains) {
 		domains.push_back(p.second);
 	}
+	map<int, pair<int, IfaceSet>> off_proc_ifaces;
 	for (SchurDomain &sd : domains) {
-		sd.enumerateIfaces(ifaces);
+		sd.enumerateIfaces(ifaces, off_proc_ifaces);
 		solver->addDomain(sd);
+	}
+	{
+		// send info
+		deque<char *>        buffers;
+		deque<char *>        recv_buffers;
+		vector<MPI_Request> requests;
+		for (auto &p : off_proc_ifaces) {
+			int       dest   = p.second.first;
+			IfaceSet &iface  = p.second.second;
+			int       size   = iface.serialize(nullptr);
+			char *    buffer = new char[size];
+			buffers.push_back(buffer);
+			iface.serialize(buffer);
+			MPI_Request request;
+			MPI_Isend(buffer, size, MPI_CHAR, dest, 0, MPI_COMM_WORLD, &request);
+			requests.push_back(request);
+		}
+		MPI_Barrier(MPI_COMM_WORLD);
+		int        is_message;
+		MPI_Status status;
+		MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &is_message, &status);
+		// recv info
+		while (is_message) {
+			int size;
+			MPI_Get_count(&status, MPI_CHAR, &size);
+            char * buffer = new char[size];
+            recv_buffers.push_back(buffer);
+
+			MPI_Request request;
+            MPI_Irecv(buffer,size,MPI_CHAR,MPI_ANY_SOURCE,MPI_ANY_TAG,MPI_COMM_WORLD,&request);
+			MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &is_message, &status);
+            requests.push_back(request);
+		}
+        //wait for all
+        vector<MPI_Status> statuses(requests.size());
+        MPI_Waitall(requests.size(),&requests[0],&statuses[0]);
+        //delete send buffers
+        for(char * buffer : buffers){
+            delete[] buffer;
+        }
+        //process received objects
+        for(char * buffer : recv_buffers){
+            IfaceSet ifs = IfaceSet::deserialize(buffer);
+            ifaces[ifs.id].insert(ifs);
+            delete[] buffer;
+        }
+		MPI_Barrier(MPI_COMM_WORLD);
 	}
 	indexDomainIfacesLocal();
 	indexIfacesLocal();
@@ -29,8 +77,14 @@ SchurHelper::SchurHelper(DomainCollection dc, shared_ptr<PatchSolver> solver,
 	ISCreateBlock(MPI_COMM_WORLD, dc.n * dc.n, iface_dist_map_vec.size(), &iface_dist_map_vec[0],
 	              PETSC_COPY_VALUES, &dist_is);
 	VecScatterCreate(gamma, dist_is, local_gamma, nullptr, &scatter);
+
+    int num_ifaces = ifaces.size();
+	MPI_Allreduce(&num_ifaces, &num_global_ifaces, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    cerr << "Num Global All: " << num_global_ifaces<<endl;
+    cerr << "Num Local All: " << num_ifaces<<endl;
 }
 
+void SchurHelper::zoltanBalance() {}
 void SchurHelper::solveWithInterface(const Vec f, Vec u, const Vec gamma, Vec diff)
 {
 	// initilize our local variables
@@ -74,7 +128,7 @@ void SchurHelper::solveWithSolution(const Vec f, Vec u)
 	VecScale(local_gamma, 0);
 	VecScale(local_interp, 0);
 	for (SchurDomain &sd : domains) {
-	    interpolator->interpolate(sd, u, local_interp);
+		interpolator->interpolate(sd, u, local_interp);
 	}
 	VecScale(gamma, 0);
 	VecScatterBegin(scatter, local_interp, gamma, ADD_VALUES, SCATTER_REVERSE);
@@ -87,12 +141,12 @@ void SchurHelper::solveWithSolution(const Vec f, Vec u)
 		solver->solve(sd, f, u, local_gamma);
 	}
 }
-void SchurHelper::interpolateToInterface(const Vec f, Vec u,Vec gamma)
+void SchurHelper::interpolateToInterface(const Vec f, Vec u, Vec gamma)
 {
 	// initilize our local variables
 	VecScale(local_interp, 0);
 	for (SchurDomain &sd : domains) {
-	    interpolator->interpolate(sd, u, local_interp);
+		interpolator->interpolate(sd, u, local_interp);
 	}
 	VecScale(gamma, 0);
 	VecScatterBegin(scatter, local_interp, gamma, ADD_VALUES, SCATTER_REVERSE);
@@ -199,9 +253,7 @@ struct Block {
 			} else {
 				quad = rot_quad_lookup_right[auxRot()][quad];
 			}
-			if (auxFlipped()) {
-				quad = quad_flip_lookup[quad];
-			}
+			if (auxFlipped()) { quad = quad_flip_lookup[quad]; }
 			return quad;
 		};
 		switch (type) {
@@ -306,12 +358,12 @@ const vector<Rotation> Block::aux_rot_plan_neumann[16] = {{},
                                                           {Rotation::x_cw},
                                                           {Rotation::x_ccw},
                                                           {}};
-const char Block::rot_quad_lookup_left[4][4]
+const char             Block::rot_quad_lookup_left[4][4]
 = {{0, 1, 2, 3}, {1, 3, 0, 2}, {3, 2, 1, 0}, {2, 0, 3, 1}};
 const char Block::rot_quad_lookup_right[4][4]
 = {{0, 1, 2, 3}, {2, 0, 3, 1}, {3, 2, 1, 0}, {1, 3, 0, 2}};
 const char Block::quad_flip_lookup[4] = {1, 0, 3, 2};
-void SchurHelper::assembleMatrix(inserter insertBlock)
+void       SchurHelper::assembleMatrix(inserter insertBlock)
 {
 	set<Block> blocks;
 	for (auto &p : ifaces) {
@@ -437,7 +489,7 @@ PW_explicit<Mat> SchurHelper::formCRSMatrix()
 		int global_i = b->i * n * n;
 		int global_j = b->j * n * n;
 
-		valarray<double> &orig = *coeffs;
+		valarray<double> &            orig = *coeffs;
 		const function<int(int, int)> transforms_left[4]
 		= {[&](int xi, int yi) { return xi + yi * n; },
 		   [&](int xi, int yi) { return n - yi - 1 + xi * n; },
@@ -485,7 +537,7 @@ PW_explicit<Mat> SchurHelper::formCRSMatrix()
 			   return n - yi - 1 + xi * n;
 		   }};
 
-		valarray<double> copy(n * n * n * n);
+		valarray<double>        copy(n * n * n * n);
 		function<int(int, int)> col_trans, row_trans;
 		if (b->mainLeft()) {
 			if (b->mainFlipped()) {
@@ -540,91 +592,91 @@ PW_explicit<Mat> SchurHelper::formCRSMatrix()
 	MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
 	return A;
 }
-PBMatrix* SchurHelper::formPBMatrix()
+PBMatrix *SchurHelper::formPBMatrix()
 {
 	int local_size  = ifaces.size() * n * n;
 	int global_size = getSchurVecGlobalSize();
 
-	PBMatrix* APB=new PBMatrix(n, local_size, global_size);
-	auto insertBlock = [&](Block *b, shared_ptr<valarray<double>> coeffs) {
-		int global_i = b->i;
-		int global_j = b->j;
+	PBMatrix *APB         = new PBMatrix(n, local_size, global_size);
+	auto      insertBlock = [&](Block *b, shared_ptr<valarray<double>> coeffs) {
+        int global_i = b->i;
+        int global_j = b->j;
 
-		const function<int(int, int, int)> transforms_left[4]
-		= {[](int n, int xi, int yi) { return xi + yi * n; },
-		   [](int n, int xi, int yi) { return n - yi - 1 + xi * n; },
-		   [](int n, int xi, int yi) { return n - xi - 1 + (n - yi - 1) * n; },
-		   [](int n, int xi, int yi) { return yi + (n - xi - 1) * n; }};
+        const function<int(int, int, int)> transforms_left[4]
+        = {[](int n, int xi, int yi) { return xi + yi * n; },
+           [](int n, int xi, int yi) { return n - yi - 1 + xi * n; },
+           [](int n, int xi, int yi) { return n - xi - 1 + (n - yi - 1) * n; },
+           [](int n, int xi, int yi) { return yi + (n - xi - 1) * n; }};
 
-		const function<int(int, int, int)> transforms_right[4]
-		= {[](int n, int xi, int yi) { return xi + yi * n; },
-		   [](int n, int xi, int yi) { return yi + (n - xi - 1) * n; },
-		   [](int n, int xi, int yi) { return n - xi - 1 + (n - yi - 1) * n; },
-		   [](int n, int xi, int yi) { return n - yi - 1 + xi * n; }};
+        const function<int(int, int, int)> transforms_right[4]
+        = {[](int n, int xi, int yi) { return xi + yi * n; },
+           [](int n, int xi, int yi) { return yi + (n - xi - 1) * n; },
+           [](int n, int xi, int yi) { return n - xi - 1 + (n - yi - 1) * n; },
+           [](int n, int xi, int yi) { return n - yi - 1 + xi * n; }};
 
-		const function<int(int, int, int)> transforms_left_inv[4]
-		= {[](int n, int xi, int yi) {
-			   xi = n - xi - 1;
-			   return xi + yi * n;
-		   },
-		   [](int n, int xi, int yi) {
-			   xi = n - xi - 1;
-			   return n - yi - 1 + xi * n;
-		   },
-		   [](int n, int xi, int yi) {
-			   xi = n - xi - 1;
-			   return n - xi - 1 + (n - yi - 1) * n;
-		   },
-		   [](int n, int xi, int yi) {
-			   xi = n - xi - 1;
-			   return yi + (n - xi - 1) * n;
-		   }};
-		const function<int(int, int, int)> transforms_right_inv[4]
-		= {[](int n, int xi, int yi) {
-			   xi = n - xi - 1;
-			   return xi + yi * n;
-		   },
-		   [](int n, int xi, int yi) {
-			   xi = n - xi - 1;
-			   return yi + (n - xi - 1) * n;
-		   },
-		   [](int n, int xi, int yi) {
-			   xi = n - xi - 1;
-			   return n - xi - 1 + (n - yi - 1) * n;
-		   },
-		   [](int n, int xi, int yi) {
-			   xi = n - xi - 1;
-			   return n - yi - 1 + xi * n;
-		   }};
+        const function<int(int, int, int)> transforms_left_inv[4]
+        = {[](int n, int xi, int yi) {
+               xi = n - xi - 1;
+               return xi + yi * n;
+           },
+           [](int n, int xi, int yi) {
+               xi = n - xi - 1;
+               return n - yi - 1 + xi * n;
+           },
+           [](int n, int xi, int yi) {
+               xi = n - xi - 1;
+               return n - xi - 1 + (n - yi - 1) * n;
+           },
+           [](int n, int xi, int yi) {
+               xi = n - xi - 1;
+               return yi + (n - xi - 1) * n;
+           }};
+        const function<int(int, int, int)> transforms_right_inv[4]
+        = {[](int n, int xi, int yi) {
+               xi = n - xi - 1;
+               return xi + yi * n;
+           },
+           [](int n, int xi, int yi) {
+               xi = n - xi - 1;
+               return yi + (n - xi - 1) * n;
+           },
+           [](int n, int xi, int yi) {
+               xi = n - xi - 1;
+               return n - xi - 1 + (n - yi - 1) * n;
+           },
+           [](int n, int xi, int yi) {
+               xi = n - xi - 1;
+               return n - yi - 1 + xi * n;
+           }};
 
-		function<int(int, int, int)> col_trans, row_trans;
-		if (b->mainLeft()) {
-			if (b->mainFlipped()) {
-				col_trans = transforms_left_inv[b->mainRot()];
-			} else {
-				col_trans = transforms_left[b->mainRot()];
-			}
-		} else {
-			if (b->mainFlipped()) {
-				col_trans = transforms_right_inv[b->mainRot()];
-			} else {
-				col_trans = transforms_right[b->mainRot()];
-			}
-		}
-		if (b->auxLeft()) {
-			if (b->auxFlipped()) {
-				row_trans = transforms_left_inv[b->auxRot()];
-			} else {
-				row_trans = transforms_left[b->auxRot()];
-			}
-		} else {
-			if (b->auxFlipped()) {
-				row_trans = transforms_right_inv[b->auxRot()];
-			} else {
-				row_trans = transforms_right[b->auxRot()];
-			}
-		}
-		APB->insertBlock(global_i, global_j, coeffs, col_trans, row_trans);
+        function<int(int, int, int)> col_trans, row_trans;
+        if (b->mainLeft()) {
+            if (b->mainFlipped()) {
+                col_trans = transforms_left_inv[b->mainRot()];
+            } else {
+                col_trans = transforms_left[b->mainRot()];
+            }
+        } else {
+            if (b->mainFlipped()) {
+                col_trans = transforms_right_inv[b->mainRot()];
+            } else {
+                col_trans = transforms_right[b->mainRot()];
+            }
+        }
+        if (b->auxLeft()) {
+            if (b->auxFlipped()) {
+                row_trans = transforms_left_inv[b->auxRot()];
+            } else {
+                row_trans = transforms_left[b->auxRot()];
+            }
+        } else {
+            if (b->auxFlipped()) {
+                row_trans = transforms_right_inv[b->auxRot()];
+            } else {
+                row_trans = transforms_right[b->auxRot()];
+            }
+        }
+        APB->insertBlock(global_i, global_j, coeffs, col_trans, row_trans);
 	};
 
 	assembleMatrix(insertBlock);
@@ -632,18 +684,12 @@ PBMatrix* SchurHelper::formPBMatrix()
 
 	return APB;
 }
-PW_explicit<Mat> SchurHelper::getPBMatrix(){
-	return formPBMatrix()->getMatrix();
-}
-PW_explicit<Mat> SchurHelper::getPBDiagInv(){
-	return formPBMatrix()->getDiagInv()->getMatrix();
-}
-void SchurHelper::getPBDiagInv(PC p){
-	formPBMatrix()->getDiagInv()->getPrec(p);
-}
-void SchurHelper::indexDomainIfacesLocal()
+PW_explicit<Mat> SchurHelper::getPBMatrix() { return formPBMatrix()->getMatrix(); }
+PW_explicit<Mat> SchurHelper::getPBDiagInv() { return formPBMatrix()->getDiagInv()->getMatrix(); }
+void             SchurHelper::getPBDiagInv(PC p) { formPBMatrix()->getDiagInv()->getPrec(p); }
+void             SchurHelper::indexDomainIfacesLocal()
 {
-	vector<int> map_vec;
+	vector<int>   map_vec;
 	map<int, int> rev_map;
 	if (!domains.empty()) {
 		int curr_i = 0;
@@ -664,10 +710,10 @@ void SchurHelper::indexDomainIfacesLocal()
 }
 void SchurHelper::indexIfacesLocal()
 {
-	int         curr_i = 0;
-	vector<int> map_vec;
-	vector<int> off_proc_map_vec;
-	vector<int> off_proc_map_vec_send;
+	int           curr_i = 0;
+	vector<int>   map_vec;
+	vector<int>   off_proc_map_vec;
+	vector<int>   off_proc_map_vec_send;
 	map<int, int> rev_map;
 	if (!ifaces.empty()) {
 		set<int> todo;

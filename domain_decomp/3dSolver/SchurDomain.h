@@ -9,9 +9,10 @@ class IfaceInfo
 	int          id;
 	int          local_index;
 	int          global_index;
+	bool         own;
 	virtual void getIds(std::vector<int> &ids) = 0;
 	virtual void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types,
-	                            std::deque<Side> &sides, Side s)
+	                            std::deque<Side> &sides, std::deque<int> &ranks, Side s)
 	= 0;
 	virtual void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType> &types) = 0;
 	virtual void setLocalIndexes(const std::map<int, int> &rev_map)                 = 0;
@@ -20,6 +21,7 @@ class IfaceInfo
 class NormalIfaceInfo : public IfaceInfo
 {
 	public:
+	NormalNbrInfo nbr_info;
 	NormalIfaceInfo()
 	{
 		id           = 0;
@@ -28,6 +30,8 @@ class NormalIfaceInfo : public IfaceInfo
 	}
 	NormalIfaceInfo(Domain &d, Side s)
 	{
+		nbr_info = d.getNormalNbrInfo(s);
+		own      = d.getNormalNbrInfo(s).ptr != nullptr;
 		switch (s) {
 			case Side::west:
 			case Side::south:
@@ -37,16 +41,18 @@ class NormalIfaceInfo : public IfaceInfo
 			case Side::east:
 			case Side::north:
 			case Side::top:
-				id = d.getNormalNbrInfo(s).id ^ ~s;
+				id  = d.getNormalNbrInfo(s).id ^ ~s;
+				own = true;
 		}
 	}
 	void getIds(std::vector<int> &ids) { ids.push_back(id); }
 	void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types, std::deque<Side> &sides,
-	                    Side s)
+	                    std::deque<int> &ranks, Side s)
 	{
 		ids.push_back(id);
 		types.push_back(IfaceType::normal);
 		sides.push_back(s);
+            ranks.push_back(nbr_info.rank);
 	}
 	void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType> &types)
 	{
@@ -62,19 +68,22 @@ class NormalIfaceInfo : public IfaceInfo
 class CoarseIfaceInfo : public IfaceInfo
 {
 	public:
-	int quad_on_coarse;
-	int coarse_id;
-	int coarse_local_index;
-	int coarse_global_index;
+	CoarseNbrInfo nbr_info;
+	int           quad_on_coarse;
+	int           coarse_id;
+	int           coarse_local_index;
+	int           coarse_global_index;
 	CoarseIfaceInfo(Domain &d, Side s)
 	{
+		nbr_info                = d.getCoarseNbrInfo(s);
 		id                      = d.id ^ s;
 		CoarseNbrInfo &nbr_info = d.getCoarseNbrInfo(s);
 		quad_on_coarse          = nbr_info.quad_on_coarse;
 		coarse_id               = nbr_info.id ^ ~s;
+		own                     = true;
 	}
 	void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types, std::deque<Side> &sides,
-	                    Side s)
+	                    std::deque<int> &ranks, Side s)
 	{
 		ids.push_back(id);
 		ids.push_back(coarse_id);
@@ -82,6 +91,8 @@ class CoarseIfaceInfo : public IfaceInfo
 		types.push_back(IfaceType::fine_to_coarse_0 + quad_on_coarse);
 		sides.push_back(s);
 		sides.push_back(s);
+            ranks.push_back(nbr_info.rank);
+            ranks.push_back(nbr_info.rank);
 	}
 	void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType> &types)
 	{
@@ -109,19 +120,22 @@ class CoarseIfaceInfo : public IfaceInfo
 class FineIfaceInfo : public IfaceInfo
 {
 	public:
+	FineNbrInfo        nbr_info;
 	std::array<int, 4> fine_ids;
 	std::array<int, 4> fine_local_indexes;
 	std::array<int, 4> fine_global_indexes;
 	FineIfaceInfo(Domain &d, Side s)
 	{
+		nbr_info              = d.getFineNbrInfo(s);
 		id                    = d.id ^ s;
 		FineNbrInfo &nbr_info = d.getFineNbrInfo(s);
 		for (int i = 0; i < 4; i++) {
 			fine_ids[i] = nbr_info.ids[i] ^ ~s;
 		}
+		own = true;
 	}
 	void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types, std::deque<Side> &sides,
-	                    Side s)
+	                    std::deque<int> &ranks, Side s)
 	{
 		ids.push_back(id);
 		types.push_back(IfaceType::coarse_to_coarse);
@@ -130,6 +144,7 @@ class FineIfaceInfo : public IfaceInfo
 			ids.push_back(fine_ids[i]);
 			types.push_back(IfaceType::coarse_to_fine_0 + i);
 			sides.push_back(s);
+            ranks.push_back(nbr_info.ranks[i]);
 		}
 	}
 	void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType> &types)
@@ -164,18 +179,20 @@ class FineIfaceInfo : public IfaceInfo
 	}
 };
 struct SchurDomain {
-	int            local_index = 0;
-	int            n;
-	double         x_length;
-	double         y_length;
-	double         z_length;
-	std::bitset<6> neumann;
+	Domain                     domain;
+	int                        local_index = 0;
+	int                        n;
+	double                     x_length;
+	double                     y_length;
+	double                     z_length;
+	std::bitset<6>             neumann;
 	std::array<IfaceInfo *, 6> iface_info
 	= {{nullptr, nullptr, nullptr, nullptr, nullptr, nullptr}};
 	std::vector<int> nbr_ids;
 	SchurDomain() = default;
 	SchurDomain(Domain &d)
 	{
+		domain      = d;
 		local_index = d.id_local;
 		n           = d.n;
 		x_length    = d.x_length;
@@ -200,13 +217,14 @@ struct SchurDomain {
 			}
 		}
 	}
-	IfaceInfo *&getIfaceInfoPtr(Side s) { return iface_info[static_cast<int>(s)]; }
+	IfaceInfo *&     getIfaceInfoPtr(Side s) { return iface_info[static_cast<int>(s)]; }
 	NormalIfaceInfo &getNormalIfaceInfo(Side s)
 	{
 		return *(NormalIfaceInfo *) iface_info[static_cast<int>(s)];
 	}
 	bool hasNbr(Side s) { return iface_info[static_cast<int>(s)] != nullptr; }
-	void enumerateIfaces(std::map<int, IfaceSet> &ifaces)
+	void enumerateIfaces(std::map<int, IfaceSet> &             ifaces,
+	                     std::map<int,std::pair<int, IfaceSet>> &off_proc_ifaces)
 	{
 		std::array<int, 6> ids;
 		for (Side s : getSideValues()) {
@@ -219,47 +237,56 @@ struct SchurDomain {
 		std::deque<int>       iface_ids;
 		std::deque<IfaceType> iface_types;
 		std::deque<Side>      iface_sides;
+		std::deque<bool>      iface_own;
+		std::deque<int>       iface_ranks;
 		for (Side s : getSideValues()) {
 			if (hasNbr(s)) {
-				getIfaceInfoPtr(s)->getIdsAndTypes(iface_ids, iface_types, iface_sides, s);
+				int num_added = iface_ids.size();
+				getIfaceInfoPtr(s)->getIdsAndTypes(iface_ids, iface_types, iface_sides,iface_ranks, s);
+				num_added = iface_ids.size() - num_added;
+				for (int i = 0; i < num_added; i++) {
+					iface_own.push_back(getIfaceInfoPtr(s)->own);
+				}
 			}
 		}
 		for (size_t i = 0; i < iface_ids.size(); i++) {
 			int       id   = iface_ids[i];
 			IfaceType type = iface_types[i];
 			Side      s    = iface_sides[i];
-			IfaceSet &ifs  = ifaces[id];
-			ifs.id         = id;
-			ifs.insert(Iface(ids, type, s, neumann));
+			int       rank = iface_ranks[i];
+			if (iface_own[i]) {
+				IfaceSet &ifs = ifaces[id];
+				ifs.id        = id;
+				ifs.insert(Iface(ids, type, s, neumann));
+			} else {
+				IfaceSet &ifs             = off_proc_ifaces[id].second;
+				off_proc_ifaces[id].first = rank;
+				ifs.id                    = id;
+				ifs.insert(Iface(ids, type, s, neumann));
+			}
 		}
 	}
 	std::vector<int> getIds()
 	{
 		std::vector<int> retval;
 		for (Side s : getSideValues()) {
-			if (hasNbr(s)) {
-				getIfaceInfoPtr(s)->getIds(retval);
-			}
+			if (hasNbr(s)) { getIfaceInfoPtr(s)->getIds(retval); }
 		}
 		return retval;
 	}
 	void setLocalIndexes(const std::map<int, int> &rev_map)
 	{
 		for (Side s : getSideValues()) {
-			if (hasNbr(s)) {
-				getIfaceInfoPtr(s)->setLocalIndexes(rev_map);
-			}
+			if (hasNbr(s)) { getIfaceInfoPtr(s)->setLocalIndexes(rev_map); }
 		}
 	}
 	void setGlobalIndexes(const std::map<int, int> &rev_map)
 	{
 		for (Side s : getSideValues()) {
-			if (hasNbr(s)) {
-				getIfaceInfoPtr(s)->setGlobalIndexes(rev_map);
-			}
+			if (hasNbr(s)) { getIfaceInfoPtr(s)->setGlobalIndexes(rev_map); }
 		}
 	}
 	bool isNeumann(Side s) { return neumann[static_cast<int>(s)]; }
-	int getIfaceLocalIndex(Side s) { return iface_info[static_cast<int>(s)]->local_index; }
+	int  getIfaceLocalIndex(Side s) { return iface_info[static_cast<int>(s)]->local_index; }
 };
 #endif

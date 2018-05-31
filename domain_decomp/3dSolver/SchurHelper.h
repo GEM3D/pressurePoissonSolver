@@ -59,6 +59,9 @@ class SchurHelper
 	void             indexIfacesLocal();
 	void             indexDomainIfacesLocal();
 	void             indexIfacesGlobal();
+	void             zoltanBalance();
+
+	int num_global_ifaces = 0;
 
 	public:
 	SchurHelper() = default;
@@ -82,7 +85,7 @@ class SchurHelper
 	void solveWithInterface(const Vec f, Vec u, const Vec gamma, Vec diff);
 	void solveAndInterpolateWithInterface(const Vec f, Vec u, const Vec gamma, Vec interp);
 	void solveWithSolution(const Vec f, Vec u);
-	void interpolateToInterface(const Vec f, Vec u,Vec gamma);
+	void interpolateToInterface(const Vec f, Vec u, Vec gamma);
 
 	/**
 	 * @brief Apply patch operator with a given set of interface values
@@ -101,14 +104,14 @@ class SchurHelper
 	 */
 	PW_explicit<Mat> formCRSMatrix();
 	PBMatrix *       formPBMatrix();
-	void getPBDiagInv(PC p);
+	void             getPBDiagInv(PC p);
 	PW_explicit<Mat> getPBMatrix();
 	PW_explicit<Mat> getPBDiagInv();
 	PW_explicit<Vec> getNewSchurVec();
 	PW_explicit<Vec> getNewSchurDistVec();
 
 	int getSchurVecLocalSize() { return iface_map_vec.size() * n * n; }
-	int getSchurVecGlobalSize() { return iface_map_vec.size() * n * n; }
+	int getSchurVecGlobalSize() { return num_global_ifaces * n * n; }
 	// getters
 	std::shared_ptr<Interpolator>  getInterpolator() { return interpolator; }
 	std::shared_ptr<PatchOperator> getOp() { return op; }

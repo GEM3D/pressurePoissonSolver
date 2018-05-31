@@ -33,6 +33,7 @@ inline std::array<Oct, 4> getOctsOnSide(Side s)
 	}
 	return retval;
 }
+inline bool isENT(Side s) { return static_cast<int>(s)%2==1; }
 inline Side operator++(Side &s, int i)
 {
 	s = static_cast<Side>((static_cast<char>(s) + 1) % 6);

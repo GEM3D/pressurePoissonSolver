@@ -11,13 +11,15 @@ using namespace std::chrono;
 class Timer
 {
 	private:
-	vector<string> order;
+	bool                                  verbose = false;
+	vector<string>                        order;
 	map<string, vector<double>>           times;
 	map<string, steady_clock::time_point> starts;
 
 	public:
 	void start(string name)
 	{
+		if (verbose) { cout << "Starting " << name << endl; }
 		MPI_Barrier(MPI_COMM_WORLD);
 		starts[name] = steady_clock::now();
 	}
@@ -26,9 +28,8 @@ class Timer
 		MPI_Barrier(MPI_COMM_WORLD);
 		duration<double> time = steady_clock::now() - starts[name];
 		times[name].push_back(time.count());
-		if (std::find(order.begin(), order.end(), name) == order.end()) {
-			order.push_back(name);
-		}
+		if (std::find(order.begin(), order.end(), name) == order.end()) { order.push_back(name); }
+		if (verbose) { cout << "Stopped " << name << endl; }
 	}
 	friend ostream &operator<<(ostream &os, const Timer &timer)
 	{
@@ -65,5 +66,5 @@ class Timer
 		return os;
 	}
 };
-}
+} // namespace Tools
 #endif
