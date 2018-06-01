@@ -3,6 +3,7 @@
 #include "DomainCollection.h"
 #include "MatrixHelper.h"
 #include "SchurHelper.h"
+#include "GMGRestrictor.h"
 #include <petscpc.h>
 class GMGHelper
 {
@@ -14,8 +15,8 @@ class GMGHelper
 	std::vector<PW<Vec>>          u_vectors;
 	std::vector<PW<Vec>>          f_vectors;
 	std::vector<PW<Vec>>          r_vectors;
+    std::vector<GMGRestrictor*>  restrictors;
 
-	void restrictForLevel(int level);
 	void prolongateFromLevel(int level);
 	void apply(Vec f, Vec u);
 	public:
