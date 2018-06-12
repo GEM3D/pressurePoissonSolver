@@ -2,7 +2,7 @@
 #include "GMGAvgRstr.h"
 #include "GMGDrctIntp.h"
 using namespace std;
-GMGHelper::GMGHelper(int n, OctTree t, DomainCollection &dc, SchurHelper &sh)
+GMGHelper::GMGHelper(int n, OctTree t, std::shared_ptr<DomainCollection> dc, SchurHelper &sh)
 {
 	num_levels = t.num_levels;
 	top_level  = t.num_levels - 1;
@@ -10,18 +10,14 @@ GMGHelper::GMGHelper(int n, OctTree t, DomainCollection &dc, SchurHelper &sh)
 	levels.resize(num_levels);
 	levels[top_level] = dc;
 	for (int i = 0; i < top_level; i++) {
-		levels[i]   = DomainCollection(t, i + 1);
-		levels[i].n = n;
-		for (auto &p : levels[i].domains) {
-			p.second.n = n;
-		}
+		levels[i].reset(new DomainCollection(t, i + 1,n));
 	}
 	// rebalance
 	int size;
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	if (size > 1) {
 		for (int i = top_level - 1; i >= 0; i--) {
-			levels[i].zoltanBalanceWithLower(levels[i + 1]);
+			levels[i]->zoltanBalanceWithLower(*levels[i + 1]);
 		}
 	}
 	shs.resize(num_levels);
@@ -30,15 +26,17 @@ GMGHelper::GMGHelper(int n, OctTree t, DomainCollection &dc, SchurHelper &sh)
 	r_vectors.resize(num_levels);
 	restrictors.resize(num_levels - 1);
 	interpolators.resize(num_levels - 1);
+	comms.resize(num_levels - 1);
 	shs[top_level]       = sh;
-	r_vectors[top_level] = dc.getNewDomainVec();
+	r_vectors[top_level] = dc->getNewDomainVec();
 	for (int i = 0; i < top_level; i++) {
-		restrictors[i]   = new GMGAvgRstr(levels[i], levels[i + 1]);
-		interpolators[i] = new GMGDrctIntp(levels[i], levels[i + 1]);
-		shs[i]           = SchurHelper(levels[i], sh.getSolver(), sh.getOp(), sh.getInterpolator());
-		f_vectors[i]     = levels[i].getNewDomainVec();
-		u_vectors[i]     = levels[i].getNewDomainVec();
-		r_vectors[i]     = levels[i].getNewDomainVec();
+		comms[i].reset(new InterLevelComm(levels[i], levels[i + 1]));
+		restrictors[i].reset(new GMGAvgRstr(levels[i], levels[i + 1], comms[i]));
+		interpolators[i].reset(new GMGDrctIntp(levels[i], levels[i + 1], comms[i]));
+		shs[i]       = SchurHelper(*levels[i], sh.getSolver(), sh.getOp(), sh.getInterpolator());
+		f_vectors[i] = levels[i]->getNewDomainVec();
+		u_vectors[i] = levels[i]->getNewDomainVec();
+		r_vectors[i] = levels[i]->getNewDomainVec();
 	}
 }
 void GMGHelper::apply(Vec f, Vec u)
@@ -71,7 +69,7 @@ void GMGHelper::apply(Vec f, Vec u)
 	for (int i = 1; i <= num_levels - 2; i++) {
 		// smooth
 		shs[i].solveWithSolution(f_vectors[i], u_vectors[i]);
-	    interpolators[i]->interpolate(u_vectors[i], u_vectors[i+1]);
+		interpolators[i]->interpolate(u_vectors[i], u_vectors[i + 1]);
 	}
 	// finest level
 	// smooth

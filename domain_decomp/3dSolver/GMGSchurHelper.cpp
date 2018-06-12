@@ -19,20 +19,14 @@ GMGSchurHelper::GMGSchurHelper(int n, OctTree t, DomainCollection &dc, SchurHelp
 	r_vectors[top_level] = dc.getNewDomainVec();
 	jacobis[top_level]   = shs[top_level].formPBMatrix()->getBlockJacobiSmoother();
 	for (int i = 0; i < top_level; i++) {
-		levels[i]   = DomainCollection(t, i + 1);
-		levels[i].n = n;
-		for (auto &p : levels[i].domains) {
-			p.second.n = n;
-		}
+		levels[i]   = DomainCollection(t, i + 1,n);
 		shs[i]       = SchurHelper(levels[i], sh.getSolver(), sh.getOp(), sh.getInterpolator());
 		f_vectors[i] = levels[i].getNewDomainVec();
 		u_vectors[i] = levels[i].getNewDomainVec();
 		r_vectors[i] = levels[i].getNewDomainVec();
 		b_vectors[i] = shs[i].getNewSchurVec();
 		g_vectors[i] = shs[i].getNewSchurVec();
-		if (i != 0) {
-			jacobis[i] = shs[i].formPBMatrix()->getBlockJacobiSmoother();
-		}
+		if (i != 0) { jacobis[i] = shs[i].formPBMatrix()->getBlockJacobiSmoother(); }
 	}
 }
 void GMGSchurHelper::restrictForLevel(int level)
@@ -46,38 +40,38 @@ void GMGSchurHelper::restrictForLevel(int level)
 	VecGetArray(r_vectors[level + 1], &r_fine);
 	VecGetArray(f_vectors[level], &f_coarse);
 	for (auto p : coarse_dc.domains) {
-		Domain &d          = p.second;
-		int     n          = d.n;
-		int     coarse_idx = d.id_local * n * n * n;
-		const function<double &(int, int, int)> f_to_c[8] = {
-		[&](int xi, int yi, int zi) -> double & {
-			return f_coarse[coarse_idx + ((xi) / 2) + ((yi) / 2) * n + ((zi) / 2) * n * n];
-		},
-		[&](int xi, int yi, int zi) -> double & {
-			return f_coarse[coarse_idx + ((xi + n) / 2) + ((yi) / 2) * n + ((zi) / 2) * n * n];
-		},
-		[&](int xi, int yi, int zi) -> double & {
-			return f_coarse[coarse_idx + ((xi) / 2) + ((yi + n) / 2) * n + ((zi) / 2) * n * n];
-		},
-		[&](int xi, int yi, int zi) -> double & {
-			return f_coarse[coarse_idx + ((xi + n) / 2) + ((yi + n) / 2) * n + ((zi) / 2) * n * n];
-		},
-		[&](int xi, int yi, int zi) -> double & {
-			return f_coarse[coarse_idx + ((xi) / 2) + ((yi) / 2) * n + ((zi + n) / 2) * n * n];
-		},
-		[&](int xi, int yi, int zi) -> double & {
-			return f_coarse[coarse_idx + ((xi + n) / 2) + ((yi) / 2) * n + ((zi + n) / 2) * n * n];
-		},
-		[&](int xi, int yi, int zi) -> double & {
-			return f_coarse[coarse_idx + ((xi) / 2) + ((yi + n) / 2) * n + ((zi + n) / 2) * n * n];
-		},
-		[&](int xi, int yi, int zi) -> double & {
-			return f_coarse[coarse_idx + ((xi + n) / 2) + ((yi + n) / 2) * n
-			                + ((zi + n) / 2) * n * n];
-		}};
+		Domain &                                d          = *p.second;
+		int                                     n          = d.n;
+		int                                     coarse_idx = d.id_local * n * n * n;
+		const function<double &(int, int, int)> f_to_c[8]  = {
+        [&](int xi, int yi, int zi) -> double & {
+            return f_coarse[coarse_idx + ((xi) / 2) + ((yi) / 2) * n + ((zi) / 2) * n * n];
+        },
+        [&](int xi, int yi, int zi) -> double & {
+            return f_coarse[coarse_idx + ((xi + n) / 2) + ((yi) / 2) * n + ((zi) / 2) * n * n];
+        },
+        [&](int xi, int yi, int zi) -> double & {
+            return f_coarse[coarse_idx + ((xi) / 2) + ((yi + n) / 2) * n + ((zi) / 2) * n * n];
+        },
+        [&](int xi, int yi, int zi) -> double & {
+            return f_coarse[coarse_idx + ((xi + n) / 2) + ((yi + n) / 2) * n + ((zi) / 2) * n * n];
+        },
+        [&](int xi, int yi, int zi) -> double & {
+            return f_coarse[coarse_idx + ((xi) / 2) + ((yi) / 2) * n + ((zi + n) / 2) * n * n];
+        },
+        [&](int xi, int yi, int zi) -> double & {
+            return f_coarse[coarse_idx + ((xi + n) / 2) + ((yi) / 2) * n + ((zi + n) / 2) * n * n];
+        },
+        [&](int xi, int yi, int zi) -> double & {
+            return f_coarse[coarse_idx + ((xi) / 2) + ((yi + n) / 2) * n + ((zi + n) / 2) * n * n];
+        },
+        [&](int xi, int yi, int zi) -> double & {
+            return f_coarse[coarse_idx + ((xi + n) / 2) + ((yi + n) / 2) * n
+                            + ((zi + n) / 2) * n * n];
+        }};
 
 		for (int oct = 0; oct < 8; oct++) {
-			int fine_idx = fine_dc.domains.at(d.child_id[oct]).id_local * n * n * n;
+			int fine_idx = fine_dc.domains.at(d.child_id[oct])->id_local * n * n * n;
 			for (int zi = 0; zi < n; zi++) {
 				for (int yi = 0; yi < n; yi++) {
 					for (int xi = 0; xi < n; xi++) {
@@ -100,37 +94,37 @@ void GMGSchurHelper::prolongateFromLevel(int level)
 	VecGetArray(u_vectors[level + 1], &u_fine);
 	VecGetArray(u_vectors[level], &u_coarse);
 	for (auto p : coarse_dc.domains) {
-		Domain &d          = p.second;
-		int     n          = d.n;
-		int     coarse_idx = d.id_local * n * n * n;
-		const function<double &(int, int, int)> f_to_c[8] = {
-		[&](int xi, int yi, int zi) -> double & {
-			return u_coarse[coarse_idx + ((xi) / 2) + ((yi) / 2) * n + ((zi) / 2) * n * n];
-		},
-		[&](int xi, int yi, int zi) -> double & {
-			return u_coarse[coarse_idx + ((xi + n) / 2) + ((yi) / 2) * n + ((zi) / 2) * n * n];
-		},
-		[&](int xi, int yi, int zi) -> double & {
-			return u_coarse[coarse_idx + ((xi) / 2) + ((yi + n) / 2) * n + ((zi) / 2) * n * n];
-		},
-		[&](int xi, int yi, int zi) -> double & {
-			return u_coarse[coarse_idx + ((xi + n) / 2) + ((yi + n) / 2) * n + ((zi) / 2) * n * n];
-		},
-		[&](int xi, int yi, int zi) -> double & {
-			return u_coarse[coarse_idx + ((xi) / 2) + ((yi) / 2) * n + ((zi + n) / 2) * n * n];
-		},
-		[&](int xi, int yi, int zi) -> double & {
-			return u_coarse[coarse_idx + ((xi + n) / 2) + ((yi) / 2) * n + ((zi + n) / 2) * n * n];
-		},
-		[&](int xi, int yi, int zi) -> double & {
-			return u_coarse[coarse_idx + ((xi) / 2) + ((yi + n) / 2) * n + ((zi + n) / 2) * n * n];
-		},
-		[&](int xi, int yi, int zi) -> double & {
-			return u_coarse[coarse_idx + ((xi + n) / 2) + ((yi + n) / 2) * n
-			                + ((zi + n) / 2) * n * n];
-		}};
+		Domain &                                d          = *p.second;
+		int                                     n          = d.n;
+		int                                     coarse_idx = d.id_local * n * n * n;
+		const function<double &(int, int, int)> f_to_c[8]  = {
+        [&](int xi, int yi, int zi) -> double & {
+            return u_coarse[coarse_idx + ((xi) / 2) + ((yi) / 2) * n + ((zi) / 2) * n * n];
+        },
+        [&](int xi, int yi, int zi) -> double & {
+            return u_coarse[coarse_idx + ((xi + n) / 2) + ((yi) / 2) * n + ((zi) / 2) * n * n];
+        },
+        [&](int xi, int yi, int zi) -> double & {
+            return u_coarse[coarse_idx + ((xi) / 2) + ((yi + n) / 2) * n + ((zi) / 2) * n * n];
+        },
+        [&](int xi, int yi, int zi) -> double & {
+            return u_coarse[coarse_idx + ((xi + n) / 2) + ((yi + n) / 2) * n + ((zi) / 2) * n * n];
+        },
+        [&](int xi, int yi, int zi) -> double & {
+            return u_coarse[coarse_idx + ((xi) / 2) + ((yi) / 2) * n + ((zi + n) / 2) * n * n];
+        },
+        [&](int xi, int yi, int zi) -> double & {
+            return u_coarse[coarse_idx + ((xi + n) / 2) + ((yi) / 2) * n + ((zi + n) / 2) * n * n];
+        },
+        [&](int xi, int yi, int zi) -> double & {
+            return u_coarse[coarse_idx + ((xi) / 2) + ((yi + n) / 2) * n + ((zi + n) / 2) * n * n];
+        },
+        [&](int xi, int yi, int zi) -> double & {
+            return u_coarse[coarse_idx + ((xi + n) / 2) + ((yi + n) / 2) * n
+                            + ((zi + n) / 2) * n * n];
+        }};
 		for (int oct = 0; oct < 8; oct++) {
-			int fine_idx = fine_dc.domains.at(d.child_id[oct]).id_local * n * n * n;
+			int fine_idx = fine_dc.domains.at(d.child_id[oct])->id_local * n * n * n;
 			for (int zi = 0; zi < n; zi++) {
 				for (int yi = 0; yi < n; yi++) {
 					for (int xi = 0; xi < n; xi++) {

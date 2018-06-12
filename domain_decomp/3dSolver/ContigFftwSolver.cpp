@@ -157,12 +157,12 @@ ContigFftwSolver::ContigFftwSolver(DomainCollection &dc)
 	eigs_vec = dc.getNewDomainVec();
 	double *eigs;
 	VecGetArray(eigs_vec, &eigs);
-	set<Domain> todo;
+	set<shared_ptr<Domain>> todo;
 	for (auto p : dc.domains) {
 		todo.insert(p.second);
 	}
 	auto getNbrId = [&](int id, Side s) {
-		Domain &d      = dc.domains[id];
+		Domain &d      = *dc.domains[id];
 		int     retval = -1;
 		if (d.hasNbr(s)) {
 			retval = d.getNormalNbrInfo(s).id;
@@ -170,19 +170,19 @@ ContigFftwSolver::ContigFftwSolver(DomainCollection &dc)
 		return retval;
 	};
 	while (!todo.empty()) {
-		Domain     d = *todo.begin();
+		Domain     d = **todo.begin();
 		FftwChunkX chunk;
 		// east nbrs
 		for (int id = d.id; id != -1; id = getNbrId(id, Side::east)) {
-			Domain nbr = dc.domains[id];
-			chunk.domains.push_back(nbr);
+			shared_ptr<Domain> nbr = dc.domains[id];
+			chunk.domains.push_back(*nbr);
 			todo.erase(nbr);
 		}
 		// west nbrs
 		if (d.hasNbr(Side::west)) {
 			for (int id = getNbrId(d.id, Side::west); id != -1; id = getNbrId(id, Side::west)) {
-				Domain nbr = dc.domains[id];
-				chunk.domains.push_front(nbr);
+				shared_ptr<Domain> nbr = dc.domains[id];
+				chunk.domains.push_front(*nbr);
 				todo.erase(nbr);
 			}
 		}
@@ -193,19 +193,19 @@ ContigFftwSolver::ContigFftwSolver(DomainCollection &dc)
 		todo.insert(p.second);
 	}
 	while (!todo.empty()) {
-		Domain     d = *todo.begin();
+		Domain     d = **todo.begin();
 		FftwChunkY chunk;
 		// north nbrs
 		for (int id = d.id; id != -1; id = getNbrId(id, Side::north)) {
-			Domain nbr = dc.domains[id];
-			chunk.domains.push_back(nbr);
+			shared_ptr<Domain> nbr = dc.domains[id];
+			chunk.domains.push_back(*nbr);
 			todo.erase(nbr);
 		}
 		// south nbrs
 		if (d.hasNbr(Side::south)) {
 			for (int id = getNbrId(d.id, Side::south); id != -1; id = getNbrId(id, Side::south)) {
-				Domain nbr = dc.domains[id];
-				chunk.domains.push_front(nbr);
+				shared_ptr<Domain> nbr = dc.domains[id];
+				chunk.domains.push_front(*nbr);
 				todo.erase(nbr);
 			}
 		}
@@ -216,20 +216,20 @@ ContigFftwSolver::ContigFftwSolver(DomainCollection &dc)
 		todo.insert(p.second);
 	}
 	while (!todo.empty()) {
-		Domain     d = *todo.begin();
+		Domain     d = **todo.begin();
 		FftwChunkZ chunk;
 		chunk.n = d.n;
 		// top nbrs
 		for (int id = d.id; id != -1; id = getNbrId(id, Side::top)) {
-			Domain nbr = dc.domains[id];
-			chunk.domains.push_back(nbr);
+			shared_ptr<Domain> nbr = dc.domains[id];
+			chunk.domains.push_back(*nbr);
 			todo.erase(nbr);
 		}
 		// bottom nbrs
 		if (d.hasNbr(Side::bottom)) {
 			for (int id = getNbrId(d.id, Side::bottom); id != -1; id = getNbrId(id, Side::bottom)) {
-				Domain nbr = dc.domains[id];
-				chunk.domains.push_front(nbr);
+				shared_ptr<Domain> nbr = dc.domains[id];
+				chunk.domains.push_front(*nbr);
 				todo.erase(nbr);
 			}
 		}

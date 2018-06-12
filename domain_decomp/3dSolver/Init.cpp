@@ -48,7 +48,7 @@ void Init::initNeumann(DomainCollection &dc, int n, Vec f, Vec exact,
 	double *exact_ptr;
 	VecGetArray(exact, &exact_ptr);
 	for (auto &p : dc.domains) {
-		Domain &d = p.second;
+		Domain &d = *p.second;
 
 		double *f_vals     = f_ptr + d.id_local * n * n * n;
 		double *exact_vals = exact_ptr + d.id_local * n * n * n;
@@ -142,7 +142,7 @@ void Init::initDirichlet(DomainCollection &dc, int n, Vec f, Vec exact,
 	double *exact_ptr;
 	VecGetArray(exact, &exact_ptr);
 	for (auto &p : dc.domains) {
-		Domain &d = p.second;
+		Domain &d = *p.second;
 
 		double *f_vals     = f_ptr + d.id_local * n * n*n;
 		double *exact_vals = exact_ptr + d.id_local * n * n*n;

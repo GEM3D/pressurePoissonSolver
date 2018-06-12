@@ -1,12 +1,69 @@
 #include "../Domain.h"
 #include "catch.hpp"
+using namespace std;
 TEST_CASE("NormalNbrInfo getNbrType works", "[Domain]")
 {
 	NbrInfo *info = new NormalNbrInfo();
 	REQUIRE(info->getNbrType() == NbrType::Normal);
-    delete info;
+	delete info;
 }
 
+TEST_CASE("NormalNbrInfo Serialization/Deserialization", "[Domain]")
+{
+	NormalNbrInfo info;
+	info.id   = 5;
+	info.rank = 1;
+	// serialize and then deserialize
+	char *buff = new char[info.serialize(nullptr)];
+	info.serialize(buff);
+	NormalNbrInfo out;
+	out.deserialize(buff);
+	delete[] buff;
+	REQUIRE(out.id == 5);
+	REQUIRE(out.rank == 1);
+}
+TEST_CASE("CoarseNbrInfo Serialization/Deserialization", "[Domain]")
+{
+	CoarseNbrInfo info;
+	info.id             = 5;
+	info.rank           = 1;
+	info.quad_on_coarse = 2;
+	// serialize and then deserialize
+	char *buff = new char[info.serialize(nullptr)];
+	info.serialize(buff);
+	CoarseNbrInfo out;
+	out.deserialize(buff);
+	delete[] buff;
+	REQUIRE(out.id == 5);
+	REQUIRE(out.rank == 1);
+	REQUIRE(out.quad_on_coarse == 2);
+}
+TEST_CASE("FineNbrInfo Serialization/Deserialization", "[Domain]")
+{
+	FineNbrInfo info;
+	info.ids[0]   = 1;
+	info.ids[1]   = 2;
+	info.ids[2]   = 3;
+	info.ids[3]   = 4;
+	info.ranks[0] = 9;
+	info.ranks[1] = 8;
+	info.ranks[2] = 7;
+	info.ranks[3] = 6;
+	// serialize and then deserialize
+	char *buff = new char[info.serialize(nullptr)];
+	info.serialize(buff);
+	FineNbrInfo out;
+	out.deserialize(buff);
+	delete[] buff;
+	REQUIRE(out.ids[0] == 1);
+	REQUIRE(out.ids[1] == 2);
+	REQUIRE(out.ids[2] == 3);
+	REQUIRE(out.ids[3] == 4);
+	REQUIRE(out.ranks[0] == 9);
+	REQUIRE(out.ranks[1] == 8);
+	REQUIRE(out.ranks[2] == 7);
+	REQUIRE(out.ranks[3] == 6);
+}
 TEST_CASE("Domain Serialization/Deserialization", "[Domain]")
 {
 	Domain *d_ptr                = new Domain;
@@ -20,8 +77,9 @@ TEST_CASE("Domain Serialization/Deserialization", "[Domain]")
 	char *buff = new char[d.serialize(nullptr)];
 	d.serialize(buff);
 	delete d_ptr;
-	Domain out = Domain::deserialize(buff);
-    delete[] buff;
+	Domain out;
+	out.deserialize(buff);
+	delete[] buff;
 
 	// check that deserialized version has the same information
 	REQUIRE(out.id == 0);

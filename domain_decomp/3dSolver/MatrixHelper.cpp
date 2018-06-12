@@ -14,7 +14,7 @@ PW_explicit<Mat> MatrixHelper::formCRSMatrix(double lambda)
 	MatMPIAIJSetPreallocation(A, 19, nullptr, 19, nullptr);
 
 	for (auto &p : dc.domains) {
-		Domain &d     = p.second;
+		Domain &d     = *p.second;
 		int     n     = d.n;
 		double  h_x   = d.x_length / n;
 		double  h_y   = d.y_length / n;

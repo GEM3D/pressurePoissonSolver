@@ -11,7 +11,7 @@ SchurHelper::SchurHelper(DomainCollection dc, shared_ptr<PatchSolver> solver,
 {
 	this->n = dc.n;
 	for (auto &p : dc.domains) {
-		domains.push_back(p.second);
+		domains.push_back(*p.second);
 	}
 	map<int, pair<int, IfaceSet>> off_proc_ifaces;
 	for (SchurDomain &sd : domains) {

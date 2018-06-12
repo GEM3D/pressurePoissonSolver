@@ -7,6 +7,7 @@
 #include "MatrixHelper.h"
 #include "OctTree.h"
 #include "PatchSolvers/FftwPatchSolver.h"
+#include "PolyChebPrec.h"
 #include "SchurHelper.h"
 #include "SevenPtPatchOperator.h"
 #include "Timer.h"
@@ -14,7 +15,6 @@
 #include "Writers/ClawWriter.h"
 #include "Writers/MMWriter.h"
 #include "args.h"
-#include "PolyChebPrec.h"
 #ifdef ENABLE_AMGX
 #include "AmgxWrapper.h"
 #endif
@@ -83,11 +83,12 @@ int main(int argc, char *argv[])
 	// mesh options
 	args::ValueFlag<string> f_mesh(parser, "file_name", "read in a mesh", {"mesh"});
 	args::ValueFlag<int>    f_cube(parser, "num_domains", "create a num_domains^3 cube of grids",
-	                            {"cube"});
-	args::ValueFlag<int> f_amr(parser, "num_domains", "create a num_domains x num_domains square "
-	                                                  "of grids, and a num_domains*2 x "
-	                                                  "num_domains*2 refined square next to it",
-	                           {"amr"});
+                                {"cube"});
+	args::ValueFlag<int>    f_amr(parser, "num_domains",
+                               "create a num_domains x num_domains square "
+                               "of grids, and a num_domains*2 x "
+                               "num_domains*2 refined square next to it",
+                               {"amr"});
 
 	// output options
 	args::Flag f_outclaw(parser, "outclaw", "output amrclaw ascii file", {"outclaw"});
@@ -172,14 +173,10 @@ int main(int argc, char *argv[])
 	int n = args::get(f_n);
 
 	double tol = 1e-12;
-	if (f_t) {
-		tol = args::get(f_t);
-	}
+	if (f_t) { tol = args::get(f_t); }
 
 	int loop_count = 1;
-	if (f_l) {
-		loop_count = args::get(f_l);
-	}
+	if (f_l) { loop_count = args::get(f_l); }
 	/***********
 	 * Input parsing done
 	 **********/
@@ -187,38 +184,34 @@ int main(int argc, char *argv[])
 	///////////////
 	// Create Mesh
 	///////////////
-	DomainCollection dc;
-	OctTree          t;
+	shared_ptr<DomainCollection> dc;
+	OctTree                      t;
 	if (f_mesh) {
 		string d = args::get(f_mesh);
 		t        = OctTree(d);
-		dc       = DomainCollection(t);
+		dc.reset(new DomainCollection(t));
 	} else {
 		int d = args::get(f_cube);
-		dc    = DomainCollection(d, d, d);
+		dc.reset(new DomainCollection(d, d, d));
 	}
 	if (f_div) {
 		for (int i = 0; i < args::get(f_div); i++) {
-			dc.divide();
+			dc->divide();
 		}
 	}
-	if (f_neumann) {
-		dc.setNeumann();
-	}
-	dc.n = n;
-	for (auto &p : dc.domains) {
-		p.second.n = n;
+	if (f_neumann) { dc->setNeumann(); }
+	dc->n = n;
+	for (auto &p : dc->domains) {
+		p.second->n = n;
 	}
 
-	if (dc.num_global_domains < num_procs) {
+	if (dc->num_global_domains < num_procs) {
 		std::cerr << "number of domains must be greater than or equal to the "
 		             "number of processes\n";
 		return 1;
 	}
 	// partition domains if running in parallel
-	if (num_procs > 1) {
-		dc.zoltanBalance();
-	}
+	if (num_procs > 1) { dc->zoltanBalance(); }
 
 	// the functions that we are using
 	function<double(double, double, double)> ffun;
@@ -271,7 +264,7 @@ int main(int argc, char *argv[])
 
 	// set the patch solver
 	shared_ptr<PatchSolver> p_solver;
-	p_solver.reset(new FftwPatchSolver(dc));
+	p_solver.reset(new FftwPatchSolver(*dc));
 
 	// patch operator
 	shared_ptr<PatchOperator> p_operator(new SevenPtPatchOperator());
@@ -281,44 +274,40 @@ int main(int argc, char *argv[])
 
 #ifdef ENABLE_AMGX
 	AmgxWrapper *amgxsolver = nullptr;
-	if (f_amgx) {
-		amgxsolver = new AmgxWrapper(args::get(f_amgx));
-	}
+	if (f_amgx) { amgxsolver = new AmgxWrapper(args::get(f_amgx)); }
 #endif
 
 #ifdef ENABLE_MUELU_CUDA
-	if (f_meulucuda) {
-		MueLuCudaWrapper::initialize();
-	}
+	if (f_meulucuda) { MueLuCudaWrapper::initialize(); }
 #endif
 	Tools::Timer timer;
 	for (int loop = 0; loop < loop_count; loop++) {
 		timer.start("Domain Initialization");
 
-		SchurHelper  sch(dc, p_solver, p_operator, p_interp);
-		MatrixHelper mh(dc);
+		SchurHelper  sch(*dc, p_solver, p_operator, p_interp);
+		MatrixHelper mh(*dc);
 
-		PW<Vec> u     = dc.getNewDomainVec();
-		PW<Vec> exact = dc.getNewDomainVec();
-		PW<Vec> f     = dc.getNewDomainVec();
+		PW<Vec> u     = dc->getNewDomainVec();
+		PW<Vec> exact = dc->getNewDomainVec();
+		PW<Vec> f     = dc->getNewDomainVec();
 
 		if (f_neumann) {
-			Init::initNeumann(dc, n, f, exact, ffun, gfun, nfunx, nfuny, nfunz);
+			Init::initNeumann(*dc, n, f, exact, ffun, gfun, nfunx, nfuny, nfunz);
 		} else {
-			Init::initDirichlet(dc, n, f, exact, ffun, gfun);
+			Init::initDirichlet(*dc, n, f, exact, ffun, gfun);
 		}
 
 		timer.stop("Domain Initialization");
 
 		// Create the gamma and diff vectors
-		PW<Vec>                 gamma = sch.getNewSchurVec();
-		PW<Vec>                 diff  = sch.getNewSchurVec();
-		PW<Vec>                 b     = sch.getNewSchurVec();
-		PW<Mat>                 A;
-		shared_ptr<FuncWrap>    w;
-		shared_ptr<SchwarzPrec> sp;
-		shared_ptr<GMGHelper>   gh;
-		shared_ptr<GMGSchurHelper>   ghs;
+		PW<Vec>                    gamma = sch.getNewSchurVec();
+		PW<Vec>                    diff  = sch.getNewSchurVec();
+		PW<Vec>                    b     = sch.getNewSchurVec();
+		PW<Mat>                    A;
+		shared_ptr<FuncWrap>       w;
+		shared_ptr<SchwarzPrec>    sp;
+		shared_ptr<GMGHelper>      gh;
+		shared_ptr<GMGSchurHelper> ghs;
 
 		// Create linear problem for the Belos solver
 		PW<KSP> solver;
@@ -326,7 +315,7 @@ int main(int argc, char *argv[])
 		KSPSetFromOptions(solver);
 
 		if (f_neumann && !f_nozerof) {
-			double fdiff = dc.integrate(f) / dc.volume();
+			double fdiff = dc->integrate(f) / dc->volume();
 			if (my_global_rank == 0) cout << "Fdiff: " << fdiff << endl;
 			VecShift(f, -fdiff);
 		}
@@ -340,10 +329,10 @@ int main(int argc, char *argv[])
 		ContigFftwSolver cfftsolver;
 		if (f_cfft) {
 			timer.start("FFT Setup");
-			cfftsolver = ContigFftwSolver(dc);
+			cfftsolver = ContigFftwSolver(*dc);
 			timer.stop("FFT Setup");
 
-		} else if (f_noschur || dc.num_global_domains != 1) {
+		} else if (f_noschur || dc->num_global_domains != 1) {
 			// do iterative solve
 
 			if (!f_noschur) {
@@ -367,7 +356,7 @@ int main(int argc, char *argv[])
 			timer.start("Linear System Setup");
 
 			if (f_wrapper) {
-				w.reset(new FuncWrap(&sch, &dc));
+				w.reset(new FuncWrap(&sch, &*dc));
 				A = w->getMatrix();
 			} else {
 				timer.start("Matrix Formation");
@@ -417,29 +406,27 @@ int main(int argc, char *argv[])
 				timer.start("Petsc Setup");
 				KSPSetOperators(solver, A, A);
 				KSPSetUp(solver);
-					PC pc;
-					KSPGetPC(solver, &pc);
-					if (f_scharz) {
-						sp.reset(new SchwarzPrec(&sch, &dc));
-						sp->getPrec(pc);
-					}
-					if (f_gmg) {
-						gh.reset(new GMGHelper(n, t, dc, sch));
-						gh->getPrec(pc);
-					}
-					if (f_gmgs) {
-						ghs.reset(new GMGSchurHelper(n, t, dc, sch));
-						ghs->getPrec(pc);
-					}
-					if (f_ibd) {
-						sch.getPBDiagInv(pc);
-					}
-                if (f_cheb){
-                    PolyChebPrec * pcp = new PolyChebPrec(sch,dc);
-				    pcp->getPrec(pc);
+				PC pc;
+				KSPGetPC(solver, &pc);
+				if (f_scharz) {
+					sp.reset(new SchwarzPrec(&sch, &*dc));
+					sp->getPrec(pc);
+				}
+				if (f_gmg) {
+					gh.reset(new GMGHelper(n, t, dc, sch));
+					gh->getPrec(pc);
+				}
+				if (f_gmgs) {
+					ghs.reset(new GMGSchurHelper(n, t, *dc, sch));
+					ghs->getPrec(pc);
+				}
+				if (f_ibd) { sch.getPBDiagInv(pc); }
+				if (f_cheb) {
+					PolyChebPrec *pcp = new PolyChebPrec(sch, *dc);
+					pcp->getPrec(pc);
 					PCSetUp(pc);
 				}
-					PCSetUp(pc);
+				PCSetUp(pc);
 				timer.stop("Petsc Setup");
 			}
 			///////////////////
@@ -452,7 +439,7 @@ int main(int argc, char *argv[])
 		///////////////////
 		timer.start("Complete Solve");
 
-		if ((f_noschur || dc.num_global_domains != 1) && !f_cfft) {
+		if ((f_noschur || dc->num_global_domains != 1) && !f_cfft) {
 			timer.start("Linear Solve");
 			if (false) {
 #ifdef ENABLE_MUELU
@@ -491,9 +478,7 @@ int main(int argc, char *argv[])
 				}
 				int its;
 				KSPGetIterationNumber(solver, &its);
-				if (my_global_rank == 0) {
-					cout << "Iterations: " << its << endl;
-				}
+				if (my_global_rank == 0) { cout << "Iterations: " << its << endl; }
 			}
 			timer.stop("Linear Solve");
 		}
@@ -517,8 +502,8 @@ int main(int argc, char *argv[])
 		timer.stop("Complete Solve");
 
 		// residual
-		PW<Vec> resid = dc.getNewDomainVec();
-		PW<Vec> au    = dc.getNewDomainVec();
+		PW<Vec> resid = dc->getNewDomainVec();
+		PW<Vec> au    = dc->getNewDomainVec();
 		if (f_noschur) {
 			MatMult(A, u, au);
 		} else {
@@ -531,11 +516,11 @@ int main(int argc, char *argv[])
 		VecNorm(f, NORM_2, &fnorm);
 
 		// error
-		PW<Vec> error = dc.getNewDomainVec();
+		PW<Vec> error = dc->getNewDomainVec();
 		VecAXPBYPCZ(error, -1.0, 1.0, 0.0, exact, u);
 		if (f_neumann) {
-			double uavg = dc.integrate(u) / dc.volume();
-			double eavg = dc.integrate(exact) / dc.volume();
+			double uavg = dc->integrate(u) / dc->volume();
+			double eavg = dc->integrate(exact) / dc->volume();
 
 			if (my_global_rank == 0) {
 				cout << "Average of computed solution: " << uavg << endl;
@@ -551,8 +536,8 @@ int main(int argc, char *argv[])
 		double exact_norm;
 		VecNorm(exact, NORM_2, &exact_norm);
 
-		double ausum = dc.integrate(au);
-		double fsum  = dc.integrate(f);
+		double ausum = dc->integrate(au);
+		double fsum  = dc->integrate(f);
 		if (my_global_rank == 0) {
 			std::cout << std::scientific;
 			std::cout.precision(13);
@@ -561,28 +546,22 @@ int main(int argc, char *argv[])
 			std::cout << "Residual: " << residual / fnorm << endl;
 			std::cout << u8"ΣAu-Σf: " << ausum - fsum << endl;
 			cout.unsetf(std::ios_base::floatfield);
-			int total_cells = dc.getGlobalNumCells();
+			int total_cells = dc->getGlobalNumCells();
 			cout << "Total cells: " << total_cells << endl;
 		}
 
 		// output
-		MMWriter mmwriter(dc, f_amr);
-		if (f_s) {
-			mmwriter.write(u, args::get(f_s));
-		}
-		if (f_resid) {
-			mmwriter.write(resid, args::get(f_resid));
-		}
-		if (f_error) {
-			mmwriter.write(error, args::get(f_error));
-		}
+		MMWriter mmwriter(*dc, f_amr);
+		if (f_s) { mmwriter.write(u, args::get(f_s)); }
+		if (f_resid) { mmwriter.write(resid, args::get(f_resid)); }
+		if (f_error) { mmwriter.write(error, args::get(f_error)); }
 		if (f_g) {
 			PetscViewer viewer;
 			PetscViewerASCIIOpen(PETSC_COMM_WORLD, args::get(f_g).c_str(), &viewer);
 			VecView(gamma, viewer);
 		}
 		if (f_outclaw) {
-			ClawWriter writer(dc);
+			ClawWriter writer(*dc);
 			writer.write(u, resid);
 		}
 #ifdef HAVE_VTK
@@ -598,30 +577,20 @@ int main(int argc, char *argv[])
 #endif
 		cout.unsetf(std::ios_base::floatfield);
 #ifdef ENABLE_MUELU
-		if (meulusolver != nullptr) {
-			delete meulusolver;
-		}
+		if (meulusolver != nullptr) { delete meulusolver; }
 #endif
 #ifdef ENABLE_MUELU_CUDA
-		if (meulucudasolver != nullptr) {
-			delete meulucudasolver;
-		}
+		if (meulucudasolver != nullptr) { delete meulucudasolver; }
 #endif
 	}
 
 #ifdef ENABLE_AMGX
-	if (amgxsolver != nullptr) {
-		delete amgxsolver;
-	}
+	if (amgxsolver != nullptr) { delete amgxsolver; }
 #endif
 #ifdef ENABLE_MUELU_CUDA
-	if (f_meulucuda) {
-		MueLuCudaWrapper::finalize();
-	}
+	if (f_meulucuda) { MueLuCudaWrapper::finalize(); }
 #endif
-	if (my_global_rank == 0) {
-		cout << timer;
-	}
+	if (my_global_rank == 0) { cout << timer; }
 	PetscFinalize();
 	return 0;
 }

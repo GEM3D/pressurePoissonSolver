@@ -11,8 +11,9 @@
 #include <utility>
 #include <zoltan.h>
 using namespace std;
-DomainCollection::DomainCollection(OctTree t, int level)
+DomainCollection::DomainCollection(OctTree t, int level, int n)
 {
+    this->n =n;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	if (rank == 0) {
 		OctNode root  = t.nodes[t.root];
@@ -26,10 +27,12 @@ DomainCollection::DomainCollection(OctTree t, int level)
 		qed.insert(child.id);
 
 		while (!q.empty()) {
-			Domain  d;
-			OctNode n = t.nodes[q.front()];
+			shared_ptr<Domain> d_ptr(new Domain());
+			Domain &           d = *d_ptr;
+			OctNode            n = t.nodes[q.front()];
 			q.pop_front();
 
+            d.n = this->n;
 			d.id        = n.id;
 			d.x_length  = n.x_length;
 			d.y_length  = n.y_length;
@@ -39,6 +42,12 @@ DomainCollection::DomainCollection(OctTree t, int level)
 			d.z_start   = n.z_start;
 			d.child_id  = n.child_id;
 			d.parent_id = n.parent;
+			if (d.parent_id != -1) {
+				d.oct_on_parent = 0;
+				while (t.nodes[n.parent].child_id[d.oct_on_parent] != n.id) {
+					d.oct_on_parent++;
+				}
+			}
 
 			Side s = Side::west;
 			// set and enqueue nbrs
@@ -53,7 +62,7 @@ DomainCollection::DomainCollection(OctTree t, int level)
 				}
 				s++;
 			} while (s != Side::west);
-			domains[d.id] = d;
+			domains[d.id] = d_ptr;
 		}
 	}
 	int num_local_domains = domains.size();
@@ -62,84 +71,92 @@ DomainCollection::DomainCollection(OctTree t, int level)
 	reIndex();
 
 	for (auto &p : domains) {
-		p.second.setPtrs(domains);
+		p.second->setPtrs(domains);
 	}
 }
 DomainCollection::DomainCollection(OctTree t)
 {
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    if(rank==0){
-	OctNode root  = t.nodes[t.root];
-	OctNode child = root;
-	while (child.hasChildren()) {
-		child = t.nodes[child.child_id[0]];
-	}
-	deque<int> q;
-	set<int>   qed;
-	q.push_back(child.id);
-	qed.insert(child.id);
+	if (rank == 0) {
+		OctNode root  = t.nodes[t.root];
+		OctNode child = root;
+		while (child.hasChildren()) {
+			child = t.nodes[child.child_id[0]];
+		}
+		deque<int> q;
+		set<int>   qed;
+		q.push_back(child.id);
+		qed.insert(child.id);
 
-	while (!q.empty()) {
-		Domain  d;
-		OctNode n = t.nodes[q.front()];
-		q.pop_front();
+		while (!q.empty()) {
+			shared_ptr<Domain> d_ptr(new Domain());
+			Domain &           d = *d_ptr;
+			OctNode            n = t.nodes[q.front()];
+			q.pop_front();
 
-		d.id       = n.id;
-		d.x_length = n.x_length;
-		d.y_length = n.y_length;
-		d.z_length = n.z_length;
-		d.x_start  = n.x_start;
-		d.y_start  = n.y_start;
-		d.z_start  = n.z_start;
-
-		Side s = Side::west;
-		// set and enqueue nbrs
-		do {
-			if (n.nbr(s) == -1 && n.parent != -1 && t.nodes[n.parent].nbr(s) != -1) {
-				OctNode parent = t.nodes[n.parent];
-				OctNode nbr    = t.nodes[parent.nbr(s)];
-				auto    octs   = getOctsOnSide(s);
-				int     quad   = 0;
-				while (parent.child(octs[quad]) != n.id) {
-					quad++;
+			d.id        = n.id;
+			d.x_length  = n.x_length;
+			d.y_length  = n.y_length;
+			d.z_length  = n.z_length;
+			d.x_start   = n.x_start;
+			d.y_start   = n.y_start;
+			d.z_start   = n.z_start;
+			d.parent_id = n.parent;
+			if (d.parent_id != -1) {
+				d.oct_on_parent = 0;
+				while (t.nodes[d.parent_id].child_id[d.oct_on_parent] != d.id) {
+					d.oct_on_parent++;
 				}
-				d.getNbrInfoPtr(s) = new CoarseNbrInfo(nbr.id, quad);
-				if (!qed.count(nbr.id)) {
-					q.push_back(nbr.id);
-					qed.insert(nbr.id);
-				}
-			} else if (n.nbr(s) != -1 && t.nodes[n.nbr(s)].hasChildren()) {
-				OctNode       nbr  = t.nodes[n.nbr(s)];
-				auto          octs = getOctsOnSide(~s);
-				array<int, 4> nbr_ids;
-				for (int i = 0; i < 4; i++) {
-					int id     = nbr.child(octs[i]);
-					nbr_ids[i] = id;
+			}
+
+			Side s = Side::west;
+			// set and enqueue nbrs
+			do {
+				if (n.nbr(s) == -1 && n.parent != -1 && t.nodes[n.parent].nbr(s) != -1) {
+					OctNode parent = t.nodes[n.parent];
+					OctNode nbr    = t.nodes[parent.nbr(s)];
+					auto    octs   = getOctsOnSide(s);
+					int     quad   = 0;
+					while (parent.child(octs[quad]) != n.id) {
+						quad++;
+					}
+					d.getNbrInfoPtr(s) = new CoarseNbrInfo(nbr.id, quad);
+					if (!qed.count(nbr.id)) {
+						q.push_back(nbr.id);
+						qed.insert(nbr.id);
+					}
+				} else if (n.nbr(s) != -1 && t.nodes[n.nbr(s)].hasChildren()) {
+					OctNode       nbr  = t.nodes[n.nbr(s)];
+					auto          octs = getOctsOnSide(~s);
+					array<int, 4> nbr_ids;
+					for (int i = 0; i < 4; i++) {
+						int id     = nbr.child(octs[i]);
+						nbr_ids[i] = id;
+						if (!qed.count(id)) {
+							q.push_back(id);
+							qed.insert(id);
+						}
+					}
+					d.getNbrInfoPtr(s) = new FineNbrInfo(nbr_ids);
+				} else if (n.nbr(s) != -1) {
+					int id = n.nbr(s);
 					if (!qed.count(id)) {
 						q.push_back(id);
 						qed.insert(id);
 					}
+					d.getNbrInfoPtr(s) = new NormalNbrInfo(id);
 				}
-				d.getNbrInfoPtr(s) = new FineNbrInfo(nbr_ids);
-			} else if (n.nbr(s) != -1) {
-				int id = n.nbr(s);
-				if (!qed.count(id)) {
-					q.push_back(id);
-					qed.insert(id);
-				}
-				d.getNbrInfoPtr(s) = new NormalNbrInfo(id);
-			}
-			s++;
-		} while (s != Side::west);
-		domains[d.id] = d;
+				s++;
+			} while (s != Side::west);
+			domains[d.id] = d_ptr;
+		}
 	}
-    }
 	int num_local_domains = domains.size();
 	MPI_Allreduce(&num_local_domains, &num_global_domains, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 	reIndex();
 
 	for (auto &p : domains) {
-		p.second.setPtrs(domains);
+		p.second->setPtrs(domains);
 	}
 }
 DomainCollection::DomainCollection(int d_x, int d_y, int d_z)
@@ -151,9 +168,10 @@ DomainCollection::DomainCollection(int d_x, int d_y, int d_z)
 		for (int domain_z = 0; domain_z < d_z; domain_z++) {
 			for (int domain_y = 0; domain_y < d_y; domain_y++) {
 				for (int domain_x = 0; domain_x < d_x; domain_x++) {
-					Domain ds;
-					ds.id           = getID(domain_x, domain_y, domain_z);
-					ds.refine_level = 1;
+					shared_ptr<Domain> d_ptr(new Domain());
+					Domain &           ds = *d_ptr;
+					ds.id                 = getID(domain_x, domain_y, domain_z);
+					ds.refine_level       = 1;
 					if (domain_x != 0) {
 						ds.getNbrInfoPtr(Side::west)
 						= new NormalNbrInfo(getID(domain_x - 1, domain_y, domain_z));
@@ -184,7 +202,7 @@ DomainCollection::DomainCollection(int d_x, int d_y, int d_z)
 					ds.x_start     = 1.0 * domain_x / d_x;
 					ds.y_start     = 1.0 * domain_y / d_y;
 					ds.z_start     = 1.0 * domain_z / d_y;
-					domains[ds.id] = ds;
+					domains[ds.id] = d_ptr;
 				}
 			}
 		}
@@ -192,7 +210,7 @@ DomainCollection::DomainCollection(int d_x, int d_y, int d_z)
 	reIndex();
 
 	for (auto &p : domains) {
-		p.second.setPtrs(domains);
+		p.second->setPtrs(domains);
 	}
 }
 void DomainCollection::reIndex() { indexDomainsLocal(); }
@@ -201,7 +219,7 @@ void DomainCollection::zoltanBalance()
 {
 	zoltanBalanceDomains();
 	for (auto &p : domains) {
-		p.second.setPtrs(domains);
+		p.second->setPtrs(domains);
 	}
 	reIndex();
 }
@@ -248,7 +266,7 @@ void DomainCollection::zoltanBalanceDomains()
 	};
 	CompressedVertex graph;
 	for (auto &p : domains) {
-		Domain &d = p.second;
+		Domain &d = *p.second;
 		graph.vertices.push_back(d.id);
 		graph.ptrs.push_back(graph.edges.size());
 		for (Side s : getSideValues()) {
@@ -301,7 +319,7 @@ void DomainCollection::zoltanBalanceDomains()
 	                          ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id, int *ierr) {
 		                       DomainCollection &dc = *(DomainCollection *) data;
 		                       *ierr                = ZOLTAN_OK;
-		                       return dc.domains[*global_id].serialize(nullptr);
+		                       return dc.domains[*global_id]->serialize(nullptr);
 	                       },
 	                       this);
 	Zoltan_Set_Pack_Obj_Fn(zz,
@@ -310,16 +328,17 @@ void DomainCollection::zoltanBalanceDomains()
 	                          char *buf, int *ierr) {
 		                       DomainCollection &dc = *(DomainCollection *) data;
 		                       *ierr                = ZOLTAN_OK;
-		                       dc.domains[*global_id].serialize(buf);
+		                       dc.domains[*global_id]->serialize(buf);
 		                       dc.domains.erase(*global_id);
 	                       },
 	                       this);
 	Zoltan_Set_Unpack_Obj_Fn(
 	zz,
 	[](void *data, int num_gid_entries, ZOLTAN_ID_PTR global_id, int size, char *buf, int *ierr) {
-		DomainCollection &dc   = *(DomainCollection *) data;
-		*ierr                  = ZOLTAN_OK;
-		dc.domains[*global_id] = Domain::deserialize(buf);
+		DomainCollection &dc = *(DomainCollection *) data;
+		*ierr                = ZOLTAN_OK;
+		dc.domains[*global_id].reset(new Domain());
+		dc.domains[*global_id]->deserialize(buf);
 	},
 	this);
 	// Zoltan_Set_Obj_Size_Multi_Fn(zz, DomainZoltanHelper::object_sizes, this);
@@ -356,7 +375,7 @@ void DomainCollection::zoltanBalanceDomains()
 	for (int i = 0; i < numExport; i++) {
 		int curr_id   = exportGlobalIds[i];
 		int dest_rank = exportProcs[i];
-		domains[curr_id].updateRank(dest_rank);
+		domains[curr_id]->updateRank(dest_rank);
 	}
 
 	rc = Zoltan_Migrate(zz, numImport, importGlobalIds, importLocalIds, importProcs, importToPart,
@@ -446,7 +465,7 @@ void DomainCollection::zoltanBalanceWithLower(DomainCollection &lower)
 	CompressedVertex graph;
 	// process coarse level
 	for (auto &p : domains) {
-		Domain &d = p.second;
+		Domain &d = *p.second;
 		graph.vertices.push_back(d.id);
 		graph.ptrs.push_back(graph.edges.size());
 		// patch to patch communication
@@ -476,7 +495,7 @@ void DomainCollection::zoltanBalanceWithLower(DomainCollection &lower)
 	}
 	// process fine level
 	for (auto &p : lower.domains) {
-		Domain &d = p.second;
+		Domain &d = *p.second;
 		graph.vertices.push_back(d.id);
 		graph.ptrs.push_back(graph.edges.size());
 		graph.edges.push_back(-d.parent_id - 1);
@@ -509,7 +528,7 @@ void DomainCollection::zoltanBalanceWithLower(DomainCollection &lower)
 	                          ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id, int *ierr) {
 		                       DomainCollection &dc = *(DomainCollection *) data;
 		                       *ierr                = ZOLTAN_OK;
-		                       return dc.domains.at(*global_id).serialize(nullptr);
+		                       return dc.domains.at(*global_id)->serialize(nullptr);
 	                       },
 	                       this);
 
@@ -545,16 +564,17 @@ void DomainCollection::zoltanBalanceWithLower(DomainCollection &lower)
 	                          char *buf, int *ierr) {
 		                       DomainCollection &dc = *(DomainCollection *) data;
 		                       *ierr                = ZOLTAN_OK;
-		                       dc.domains.at(*global_id).serialize(buf);
+		                       dc.domains.at(*global_id)->serialize(buf);
 		                       dc.domains.erase(*global_id);
 	                       },
 	                       this);
 	Zoltan_Set_Unpack_Obj_Fn(
 	zz,
 	[](void *data, int num_gid_entries, ZOLTAN_ID_PTR global_id, int size, char *buf, int *ierr) {
-		DomainCollection &dc   = *(DomainCollection *) data;
-		*ierr                  = ZOLTAN_OK;
-		dc.domains[*global_id] = Domain::deserialize(buf);
+		DomainCollection &dc = *(DomainCollection *) data;
+		*ierr                = ZOLTAN_OK;
+		dc.domains[*global_id].reset(new Domain());
+		dc.domains[*global_id]->deserialize(buf);
 	},
 	this);
 
@@ -588,7 +608,7 @@ void DomainCollection::zoltanBalanceWithLower(DomainCollection &lower)
 	for (int i = 0; i < numExport; i++) {
 		int curr_id   = exportGlobalIds[i];
 		int dest_rank = exportProcs[i];
-		domains.at(curr_id).updateRank(dest_rank);
+		domains.at(curr_id)->updateRank(dest_rank);
 	}
 
 	rc = Zoltan_Migrate(zz, numImport, importGlobalIds, importLocalIds, importProcs, importToPart,
@@ -621,7 +641,7 @@ void DomainCollection::zoltanBalanceWithLower(DomainCollection &lower)
 	cout << endl;
 
 	for (auto &p : domains) {
-		p.second.setPtrs(domains);
+		p.second->setPtrs(domains);
 	}
 	reIndex();
 }
@@ -653,7 +673,7 @@ void DomainCollection::indexDomainsGlobal()
 	}
 
 	for (auto &p : domains) {
-		p.second.setGlobalNeighborIndexes(rev_map);
+		p.second->setGlobalNeighborIndexes(rev_map);
 	}
 	for (size_t i = 0; i < domain_map_vec.size(); i++) {
 		domain_map_vec[i] = inds[i];
@@ -684,7 +704,7 @@ void DomainCollection::indexDomainsLocal()
 				todo.erase(i);
 				queue.pop_front();
 				map_vec.push_back(i);
-				Domain &d  = domains[i];
+				Domain &d  = *domains[i];
 				rev_map[i] = curr_i;
 				d.id_local = curr_i;
 				curr_i++;
@@ -710,10 +730,11 @@ void DomainCollection::indexDomainsLocal()
 		curr_i++;
 	}
 	for (auto &p : domains) {
-		p.second.setLocalNeighborIndexes(rev_map);
+		p.second->setLocalNeighborIndexes(rev_map);
 	}
 	// domain_rev_map          = rev_map;
 	domain_map_vec          = map_vec;
+	domain_gid_map_vec      = map_vec;
 	domain_off_proc_map_vec = off_proc_map_vec;
 	indexDomainsGlobal();
 }
@@ -724,7 +745,7 @@ double DomainCollection::integrate(const Vec u)
 	VecGetArray(u, &u_view);
 
 	for (auto &p : domains) {
-		Domain &d     = p.second;
+		Domain &d     = *p.second;
 		int     start = d.n * d.n * d.n * d.id_local;
 
 		double patch_sum = 0;
@@ -745,7 +766,7 @@ double DomainCollection::volume()
 {
 	double sum = 0;
 	for (auto &p : domains) {
-		Domain &d = p.second;
+		Domain &d = *p.second;
 		sum += d.x_length * d.y_length * d.z_length;
 	}
 	double retval;

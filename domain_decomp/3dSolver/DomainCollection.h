@@ -39,8 +39,9 @@ class DomainCollection
 	/**
 	 * @brief A map that maps the id of a domain to its domain signature.
 	 */
-	std::map<int, Domain> domains;
+	std::map<int, std::shared_ptr<Domain>> domains;
 
+	std::vector<int> domain_gid_map_vec;
 	std::vector<int> domain_map_vec;
 	std::vector<int> domain_off_proc_map_vec;
 
@@ -50,7 +51,7 @@ class DomainCollection
 	DomainCollection() = default;
 
 	DomainCollection(OctTree t);
-	DomainCollection(OctTree t, int level);
+	DomainCollection(OctTree t, int level,int n);
 	/**
 	 * @brief Generate a grid of domains.
 	 *
@@ -75,7 +76,7 @@ class DomainCollection
 	{
         neumann=true;
 		for (auto &p : domains) {
-			p.second.setNeumann();
+			p.second->setNeumann();
 		}
 	}
 	PW_explicit<Vec> getNewDomainVec();

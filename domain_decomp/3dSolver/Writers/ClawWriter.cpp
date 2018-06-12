@@ -20,7 +20,7 @@ void ClawWriter::write(Vec u, Vec resid)
 	q_file.precision(10);
 	q_file << scientific;
 	for (auto &p : dc.domains) {
-		Domain &d = p.second;
+		Domain &d = *p.second;
 		writePatch(d, q_file, u_view, resid_view);
 	}
 	VecRestoreArray(u, &u_view);

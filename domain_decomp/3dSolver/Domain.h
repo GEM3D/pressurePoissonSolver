@@ -1,17 +1,19 @@
 #ifndef DOMAIN_H
 #define DOMAIN_H
 #include "BufferWriter.h"
+#include "Serializable.h"
 #include "Side.h"
 #include <array>
 #include <bitset>
 #include <map>
+#include <memory>
 #include <vector>
 enum class NbrType { Normal, Coarse, Fine };
 struct NbrInfo;
 struct NormalNbrInfo;
 struct CoarseNbrInfo;
 struct FineNbrInfo;
-struct Domain {
+struct Domain : public Serializable {
 	/**
 	 * @brief The domain's own id
 	 */
@@ -22,6 +24,7 @@ struct Domain {
 
 	int refine_level = 1;
 	int parent_id    = -1;
+	int oct_on_parent    = -1;
 
 	std::array<int, 8> child_id = {{-1, -1, -1, -1, -1, -1, -1, -1}};
 
@@ -50,42 +53,41 @@ struct Domain {
 	~Domain();
 	friend bool      operator<(const Domain &l, const Domain &r) { return l.id < r.id; }
 	NbrInfo *&       getNbrInfoPtr(Side s);
-	NbrType          getNbrType(Side s);
-	NormalNbrInfo &  getNormalNbrInfo(Side s);
-	CoarseNbrInfo &  getCoarseNbrInfo(Side s);
-	FineNbrInfo &    getFineNbrInfo(Side s);
+	NbrType          getNbrType(Side s) const;
+	NormalNbrInfo &  getNormalNbrInfo(Side s) const;
+	CoarseNbrInfo &  getCoarseNbrInfo(Side s) const;
+	FineNbrInfo &    getFineNbrInfo(Side s) const;
 	inline bool      hasNbr(Side s) const;
 	inline bool      isNeumann(Side s) const;
 	void             setLocalNeighborIndexes(std::map<int, int> &rev_map);
 	void             setGlobalNeighborIndexes(std::map<int, int> &rev_map);
 	void             setNeumann();
 	std::vector<int> getNbrIds();
-	int              serialize(char *buffer);
-	int              serializeSize();
-	static Domain    deserialize(char *buffer);
-	void             setPtrs(std::map<int, Domain> &domains);
+	int              serialize(char *buffer) const;
+	int              deserialize(char *buffer);
+	void             setPtrs(std::map<int, std::shared_ptr<Domain>> &domains);
 	void             updateRank(int rank);
 };
-class NbrInfo
+class NbrInfo : virtual public Serializable
 {
 	public:
-	virtual ~NbrInfo()                                            = default;
-	virtual NbrType getNbrType()                                  = 0;
-	virtual void    getNbrIds(std::vector<int> &nbr_ids)          = 0;
-	virtual void    setGlobalIndexes(std::map<int, int> &rev_map) = 0;
-	virtual void    setLocalIndexes(std::map<int, int> &rev_map)  = 0;
-	virtual void    setPtrs(std::map<int, Domain> &domains)       = 0;
-	virtual void    updateRank(int new_rank)                      = 0;
-	virtual void    updateRankOnNeighbors(int new_rank, Side s)   = 0;
+	virtual ~NbrInfo()                                                       = default;
+	virtual NbrType getNbrType()                                             = 0;
+	virtual void    getNbrIds(std::vector<int> &nbr_ids)                     = 0;
+	virtual void    setGlobalIndexes(std::map<int, int> &rev_map)            = 0;
+	virtual void    setLocalIndexes(std::map<int, int> &rev_map)             = 0;
+	virtual void    setPtrs(std::map<int, std::shared_ptr<Domain>> &domains) = 0;
+	virtual void    updateRank(int new_rank)                                 = 0;
+	virtual void    updateRankOnNeighbors(int new_rank, Side s)              = 0;
 };
 class NormalNbrInfo : public NbrInfo
 {
 	public:
-	Domain *ptr          = nullptr;
-	int     rank         = 0;
-	int     id           = 0;
-	int     local_index  = 0;
-	int     global_index = 0;
+	std::shared_ptr<Domain> ptr          = nullptr;
+	int                     rank         = 0;
+	int                     id           = 0;
+	int                     local_index  = 0;
+	int                     global_index = 0;
 	NormalNbrInfo() {}
 	~NormalNbrInfo() = default;
 	NormalNbrInfo(int id) { this->id = id; }
@@ -93,10 +95,10 @@ class NormalNbrInfo : public NbrInfo
 	void    getNbrIds(std::vector<int> &nbr_ids) { nbr_ids.push_back(id); };
 	void setGlobalIndexes(std::map<int, int> &rev_map) { global_index = rev_map.at(local_index); }
 	void setLocalIndexes(std::map<int, int> &rev_map) { local_index = rev_map.at(id); }
-	void setPtrs(std::map<int, Domain> &domains)
+	void setPtrs(std::map<int, std::shared_ptr<Domain>> &domains)
 	{
 		try {
-			ptr = &domains.at(id);
+			ptr = domains.at(id);
 		} catch (std::out_of_range) {
 			ptr = nullptr;
 		}
@@ -106,17 +108,31 @@ class NormalNbrInfo : public NbrInfo
 	{
 		ptr->getNbrInfoPtr(~s)->updateRank(new_rank);
 	}
+	int serialize(char *buffer) const
+	{
+		BufferWriter writer(buffer);
+		writer << rank;
+		writer << id;
+		return writer.getPos();
+	}
+	int deserialize(char *buffer)
+	{
+		BufferReader reader(buffer);
+		reader >> rank;
+		reader >> id;
+		return reader.getPos();
+	}
 };
 class CoarseNbrInfo : public NbrInfo
 {
 	public:
-	Domain *ptr  = nullptr;
-	int     rank = 0;
-	int     id;
-	int     local_index;
-	int     global_index;
-	int     quad_on_coarse;
-	CoarseNbrInfo() {}
+	std::shared_ptr<Domain> ptr  = nullptr;
+	int                     rank = 0;
+	int                     id;
+	int                     local_index;
+	int                     global_index;
+	int                     quad_on_coarse;
+	CoarseNbrInfo()  = default;
 	~CoarseNbrInfo() = default;
 	CoarseNbrInfo(int id, int quad_on_coarse)
 	{
@@ -127,10 +143,10 @@ class CoarseNbrInfo : public NbrInfo
 	void    getNbrIds(std::vector<int> &nbr_ids) { nbr_ids.push_back(id); };
 	void setGlobalIndexes(std::map<int, int> &rev_map) { global_index = rev_map.at(local_index); }
 	void setLocalIndexes(std::map<int, int> &rev_map) { local_index = rev_map.at(id); }
-	void setPtrs(std::map<int, Domain> &domains)
+	void setPtrs(std::map<int, std::shared_ptr<Domain>> &domains)
 	{
 		try {
-			ptr = &domains.at(id);
+			ptr = domains.at(id);
 		} catch (std::out_of_range) {
 			ptr = nullptr;
 		}
@@ -140,15 +156,31 @@ class CoarseNbrInfo : public NbrInfo
 	{
 		ptr->getNbrInfoPtr(~s)->updateRank(new_rank);
 	}
+	int serialize(char *buffer) const
+	{
+		BufferWriter writer(buffer);
+		writer << rank;
+		writer << id;
+		writer << quad_on_coarse;
+		return writer.getPos();
+	}
+	int deserialize(char *buffer)
+	{
+		BufferReader reader(buffer);
+		reader >> rank;
+		reader >> id;
+		reader >> quad_on_coarse;
+		return reader.getPos();
+	}
 };
 class FineNbrInfo : public NbrInfo
 {
 	public:
-	std::array<Domain *, 4> ptrs  = {nullptr, nullptr, nullptr, nullptr};
-	std::array<int, 4>      ranks = {0, 0, 0, 0};
-	std::array<int, 4>      ids;
-	std::array<int, 4>      global_indexes;
-	std::array<int, 4>      local_indexes;
+	std::array<std::shared_ptr<Domain>, 4> ptrs  = {{nullptr, nullptr, nullptr, nullptr}};
+	std::array<int, 4>                     ranks = {{0, 0, 0, 0}};
+	std::array<int, 4>                     ids;
+	std::array<int, 4>                     global_indexes;
+	std::array<int, 4>                     local_indexes;
 	FineNbrInfo() {}
 	~FineNbrInfo() = default;
 	FineNbrInfo(std::array<int, 4> ids) { this->ids = ids; }
@@ -171,11 +203,11 @@ class FineNbrInfo : public NbrInfo
 			local_indexes[i] = rev_map.at(ids[i]);
 		}
 	}
-	void setPtrs(std::map<int, Domain> &domains)
+	void setPtrs(std::map<int, std::shared_ptr<Domain>> &domains)
 	{
 		for (int i = 0; i < 4; i++) {
 			try {
-				ptrs[i] = &domains[ids[i]];
+				ptrs[i] = domains[ids[i]];
 			} catch (std::out_of_range) {
 				ptrs[i] = nullptr;
 			}
@@ -189,26 +221,43 @@ class FineNbrInfo : public NbrInfo
 			ptrs[i]->getNbrInfoPtr(~s)->updateRank(new_rank);
 		}
 	}
+	int serialize(char *buffer) const
+	{
+		BufferWriter writer(buffer);
+		writer << ranks;
+		writer << ids;
+		return writer.getPos();
+	}
+	int deserialize(char *buffer)
+	{
+		BufferReader reader(buffer);
+		reader >> ranks;
+		reader >> ids;
+		return reader.getPos();
+	}
 };
 inline Domain::~Domain()
 {
-    /*
+	/*
 	for (NbrInfo *info : nbr_info) {
-		delete info;
+	    delete info;
 	}
-    */
+	*/
 }
 inline NbrInfo *&Domain::getNbrInfoPtr(Side s) { return nbr_info[static_cast<int>(s)]; }
-inline NbrType   Domain::getNbrType(Side s) { return nbr_info[static_cast<int>(s)]->getNbrType(); }
-inline NormalNbrInfo &Domain::getNormalNbrInfo(Side s)
+inline NbrType   Domain::getNbrType(Side s) const
+{
+	return nbr_info[static_cast<int>(s)]->getNbrType();
+}
+inline NormalNbrInfo &Domain::getNormalNbrInfo(Side s) const
 {
 	return *(NormalNbrInfo *) nbr_info[static_cast<int>(s)];
 }
-inline CoarseNbrInfo &Domain::getCoarseNbrInfo(Side s)
+inline CoarseNbrInfo &Domain::getCoarseNbrInfo(Side s) const
 {
 	return *(CoarseNbrInfo *) nbr_info[static_cast<int>(s)];
 }
-inline FineNbrInfo &Domain::getFineNbrInfo(Side s)
+inline FineNbrInfo &Domain::getFineNbrInfo(Side s) const
 {
 	return *(FineNbrInfo *) nbr_info[static_cast<int>(s)];
 }
@@ -244,13 +293,14 @@ inline std::vector<int> Domain::getNbrIds()
 	return retval;
 }
 
-inline int Domain::serialize(char *buffer)
+inline int Domain::serialize(char *buffer) const
 {
 	BufferWriter writer(buffer);
 	writer << id;
 	writer << n;
 	writer << refine_level;
 	writer << parent_id;
+	writer << oct_on_parent;
 	writer << child_id;
 	writer << neumann;
 	writer << zero_patch;
@@ -270,37 +320,40 @@ inline int Domain::serialize(char *buffer)
 			NbrType type = getNbrType(s);
 			writer << type;
 			switch (type) {
-				case NbrType::Normal:
-					writer << getNormalNbrInfo(s);
-					break;
-				case NbrType::Fine:
-					writer << getFineNbrInfo(s);
-					break;
-				case NbrType::Coarse:
-					writer << getCoarseNbrInfo(s);
-					break;
+				case NbrType::Normal: {
+					NormalNbrInfo tmp = getNormalNbrInfo(s);
+					writer << tmp;
+				} break;
+				case NbrType::Fine: {
+					FineNbrInfo tmp = getFineNbrInfo(s);
+					writer << tmp;
+				} break;
+				case NbrType::Coarse: {
+					CoarseNbrInfo tmp = getCoarseNbrInfo(s);
+					writer << tmp;
+				} break;
 			}
 		}
 	}
 	return writer.getPos();
 }
-inline Domain Domain::deserialize(char *buffer)
+inline int Domain::deserialize(char *buffer)
 {
 	BufferReader reader(buffer);
-	Domain       d;
-	reader >> d.id;
-	reader >> d.n;
-	reader >> d.refine_level;
-	reader >> d.parent_id;
-	reader >> d.child_id;
-	reader >> d.neumann;
-	reader >> d.zero_patch;
-	reader >> d.x_start;
-	reader >> d.y_start;
-	reader >> d.z_start;
-	reader >> d.x_length;
-	reader >> d.y_length;
-	reader >> d.z_length;
+	reader >> id;
+	reader >> n;
+	reader >> refine_level;
+	reader >> parent_id;
+	reader >> oct_on_parent;
+	reader >> child_id;
+	reader >> neumann;
+	reader >> zero_patch;
+	reader >> x_start;
+	reader >> y_start;
+	reader >> z_start;
+	reader >> x_length;
+	reader >> y_length;
+	reader >> z_length;
 	std::bitset<6> has_nbr;
 	reader >> has_nbr;
 	for (int i = 0; i < 6; i++) {
@@ -322,12 +375,12 @@ inline Domain Domain::deserialize(char *buffer)
 					reader >> *(CoarseNbrInfo *) info;
 					break;
 			}
-			d.nbr_info[i] = info;
+			nbr_info[i] = info;
 		}
 	}
-	return d;
+	return reader.getPos();
 }
-inline void Domain::setPtrs(std::map<int, Domain> &domains)
+inline void Domain::setPtrs(std::map<int, std::shared_ptr<Domain>> &domains)
 {
 	for (Side s : getSideValues()) {
 		if (hasNbr(s)) { getNbrInfoPtr(s)->setPtrs(domains); }
