@@ -4,7 +4,7 @@ using namespace std;
 InterLevelComm::InterLevelComm(shared_ptr<DomainCollection> coarse_dc,
                                shared_ptr<DomainCollection> fine_dc)
 {
-	n                     = coarse_dc->n;
+	n = coarse_dc->getN();
 	set<int> parent_ids;
 	for (auto &p : fine_dc->domains) {
 		Domain &d = *p.second;
@@ -16,7 +16,8 @@ InterLevelComm::InterLevelComm(shared_ptr<DomainCollection> coarse_dc,
 	PW<AO> ao;
 	AOCreateMapping(MPI_COMM_WORLD, coarse_dc->domain_gid_map_vec.size(),
 	                &coarse_dc->domain_gid_map_vec[0], &coarse_dc->domain_map_vec[0], &ao);
-	AOApplicationToPetsc(ao, coarse_parent_global_index_map_vec.size(), &coarse_parent_global_index_map_vec[0]);
+	AOApplicationToPetsc(ao, coarse_parent_global_index_map_vec.size(),
+	                     &coarse_parent_global_index_map_vec[0]);
 
 	// set index info
 	map<int, int> gid_to_local;
@@ -35,15 +36,14 @@ InterLevelComm::InterLevelComm(shared_ptr<DomainCollection> coarse_dc,
 	}
 
 	PW<IS> dist_is;
-	ISCreateBlock(MPI_COMM_WORLD, n * n * n, coarse_parent_global_index_map_vec.size(),
+	ISCreateBlock(MPI_COMM_SELF, n * n * n, coarse_parent_global_index_map_vec.size(),
 	              &coarse_parent_global_index_map_vec[0], PETSC_COPY_VALUES, &dist_is);
 
-    local_vec_size = coarse_parent_global_index_map_vec.size()*n*n*n;
+	local_vec_size = coarse_parent_global_index_map_vec.size() * n * n * n;
 
-	PW<Vec> u_local       = getNewCoarseDistVec();
-	PW<Vec> u = coarse_dc->getNewDomainVec();
+	PW<Vec> u_local = getNewCoarseDistVec();
+	PW<Vec> u       = coarse_dc->getNewDomainVec();
 	VecScatterCreate(u, dist_is, u_local, nullptr, &scatter);
-
 }
 PW_explicit<Vec> InterLevelComm::getNewCoarseDistVec()
 {

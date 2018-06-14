@@ -8,7 +8,7 @@ inline int index(const int &n, const int &xi, const int &yi, const int &zi)
 }
 FftwPatchSolver::FftwPatchSolver(DomainCollection &dc, double lambda)
 {
-	n            = dc.n;
+	n            = dc.getN();
 	this->lambda = lambda;
 }
 void FftwPatchSolver::addDomain(SchurDomain &d)

@@ -22,10 +22,10 @@ class DomainCollection
 {
 	private:
 	void zoltanBalanceDomains();
+	int n = -1;
 
 	public:
 	int rank;
-	int n = 4;
 	int num_pins;
     bool neumann=false;
 	/**
@@ -45,12 +45,13 @@ class DomainCollection
 	std::vector<int> domain_map_vec;
 	std::vector<int> domain_off_proc_map_vec;
 
+    int getN(){return n;}
 	/**
 	 * @brief Default empty constructor.
 	 */
 	DomainCollection() = default;
 
-	DomainCollection(OctTree t);
+	DomainCollection(OctTree t, int n);
 	DomainCollection(OctTree t, int level,int n);
 	/**
 	 * @brief Generate a grid of domains.
@@ -59,7 +60,7 @@ class DomainCollection
 	 * @param d_y number of domains in the y direction.
 	 * @param rank the rank of the MPI process.
 	 */
-	DomainCollection(int d_x, int d_y, int d_z);
+	DomainCollection(int d_x, int d_y, int d_z, int n);
 	/**
 	 * @brief Balance the domains over processors using Zoltan
 	 */

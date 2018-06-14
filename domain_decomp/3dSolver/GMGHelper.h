@@ -17,6 +17,7 @@ class GMGHelper
 	std::vector<PW<Vec>>                           u_vectors;
 	std::vector<PW<Vec>>                           f_vectors;
 	std::vector<PW<Vec>>                           r_vectors;
+	std::vector<PW<Mat>>                           mats;
 	std::vector<std::shared_ptr<GMGRestrictor>>    restrictors;
 	std::vector<std::shared_ptr<GMGInterpolator>>  interpolators;
 	std::vector<std::shared_ptr<InterLevelComm>>   comms;

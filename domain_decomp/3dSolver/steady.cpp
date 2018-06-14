@@ -189,10 +189,10 @@ int main(int argc, char *argv[])
 	if (f_mesh) {
 		string d = args::get(f_mesh);
 		t        = OctTree(d);
-		dc.reset(new DomainCollection(t));
+		dc.reset(new DomainCollection(t,n));
 	} else {
 		int d = args::get(f_cube);
-		dc.reset(new DomainCollection(d, d, d));
+		dc.reset(new DomainCollection(d, d, d,n));
 	}
 	if (f_div) {
 		for (int i = 0; i < args::get(f_div); i++) {
@@ -200,16 +200,7 @@ int main(int argc, char *argv[])
 		}
 	}
 	if (f_neumann) { dc->setNeumann(); }
-	dc->n = n;
-	for (auto &p : dc->domains) {
-		p.second->n = n;
-	}
 
-	if (dc->num_global_domains < num_procs) {
-		std::cerr << "number of domains must be greater than or equal to the "
-		             "number of processes\n";
-		return 1;
-	}
 	// partition domains if running in parallel
 	if (num_procs > 1) { dc->zoltanBalance(); }
 

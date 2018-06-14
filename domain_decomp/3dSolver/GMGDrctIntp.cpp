@@ -16,8 +16,8 @@ void GMGDrctIntp::interpolate(PW<Vec> coarse, PW<Vec> fine)
 	PW<Vec> coarse_tmp = ilc->getNewCoarseDistVec();
 	// scatter
 	PW<VecScatter> scatter = ilc->getScatter();
-	VecScatterBegin(scatter, coarse, coarse_tmp, ADD_VALUES, SCATTER_FORWARD);
-	VecScatterEnd(scatter, coarse, coarse_tmp, ADD_VALUES, SCATTER_FORWARD);
+	VecScatterBegin(scatter, coarse, coarse_tmp, INSERT_VALUES, SCATTER_FORWARD);
+	VecScatterEnd(scatter, coarse, coarse_tmp, INSERT_VALUES, SCATTER_FORWARD);
 
 	VecGetArray(fine, &u_fine);
 	VecGetArray(coarse_tmp, &u_coarse);

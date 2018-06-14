@@ -12,8 +12,8 @@ void FftwChunk::setup(double *eigs)
 	fftw_r2r_kind    transform_inv = FFTW_RODFT01;
 	int              num           = n * size;
 
-	plan = fftw_plan_many_r2r(1, &num, n * n, &in[0], nullptr, 1, n * size, &out[0], nullptr, 1,
-	                          n * size, &transform, FFTW_MEASURE | FFTW_DESTROY_INPUT);
+	plan     = fftw_plan_many_r2r(1, &num, n * n, &in[0], nullptr, 1, n * size, &out[0], nullptr, 1,
+                              n * size, &transform, FFTW_MEASURE | FFTW_DESTROY_INPUT);
 	plan_inv = fftw_plan_many_r2r(1, &num, n * n, &in[0], nullptr, 1, n * size, &out[0], nullptr, 1,
 	                              n * size, &transform_inv, FFTW_MEASURE | FFTW_DESTROY_INPUT);
 
@@ -164,9 +164,7 @@ ContigFftwSolver::ContigFftwSolver(DomainCollection &dc)
 	auto getNbrId = [&](int id, Side s) {
 		Domain &d      = *dc.domains[id];
 		int     retval = -1;
-		if (d.hasNbr(s)) {
-			retval = d.getNormalNbrInfo(s).id;
-		}
+		if (d.hasNbr(s)) { retval = d.getNormalNbrInfo(s).id; }
 		return retval;
 	};
 	while (!todo.empty()) {
@@ -237,7 +235,8 @@ ContigFftwSolver::ContigFftwSolver(DomainCollection &dc)
 		z_chunks.push_back(chunk);
 	}
 	VecRestoreArray(eigs_vec, &eigs);
-	num_cells = dc.domains.size() * dc.n * dc.n * dc.n;
+	int n     = dc.getN();
+	num_cells = dc.domains.size() * n * n * n;
 }
 void ContigFftwSolver::solve(Vec f, Vec u)
 {

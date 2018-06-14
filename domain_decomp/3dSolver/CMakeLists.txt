@@ -28,7 +28,7 @@ set (CMAKE_CXX_FLAGS "-Wall --std=c++11 -O3 -march=native ${CMAKE_CXX_FLAGS}")
 if(NUM_GPU)
     set (CMAKE_CXX_FLAGS "-DNUM_GPU=${NUM_GPU} ${CMAKE_CXX_FLAGS}")
 endif()
-set (CMAKE_CXX_FLAGS_DEBUG  "-Wall --std=c++11 -g -O3 ")
+set (CMAKE_CXX_FLAGS_DEBUG  "-Wall --std=c++11 -g -O3  -DDD_DEBUG")
   MESSAGE("Setting CXX compiler.")
   SET(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
 

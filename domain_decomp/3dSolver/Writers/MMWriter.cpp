@@ -8,7 +8,7 @@ MMWriter::MMWriter(DomainCollection &dc, bool amr)
 }
 void MMWriter::write(const Vec u, string filename)
 {
-	int      n = dc.n;
+	int      n = dc.getN();
 	ofstream os(filename);
 	int      num_i, num_j, d_x;
 	if (amr) {

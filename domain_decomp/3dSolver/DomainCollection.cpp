@@ -13,7 +13,7 @@
 using namespace std;
 DomainCollection::DomainCollection(OctTree t, int level, int n)
 {
-    this->n =n;
+	this->n = n;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	if (rank == 0) {
 		OctNode root  = t.nodes[t.root];
@@ -32,7 +32,7 @@ DomainCollection::DomainCollection(OctTree t, int level, int n)
 			OctNode            n = t.nodes[q.front()];
 			q.pop_front();
 
-            d.n = this->n;
+			d.n         = this->n;
 			d.id        = n.id;
 			d.x_length  = n.x_length;
 			d.y_length  = n.y_length;
@@ -74,8 +74,9 @@ DomainCollection::DomainCollection(OctTree t, int level, int n)
 		p.second->setPtrs(domains);
 	}
 }
-DomainCollection::DomainCollection(OctTree t)
+DomainCollection::DomainCollection(OctTree t, int n)
 {
+	this->n = n;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	if (rank == 0) {
 		OctNode root  = t.nodes[t.root];
@@ -95,6 +96,7 @@ DomainCollection::DomainCollection(OctTree t)
 			q.pop_front();
 
 			d.id        = n.id;
+			d.n         = this->n;
 			d.x_length  = n.x_length;
 			d.y_length  = n.y_length;
 			d.z_length  = n.z_length;
@@ -159,8 +161,9 @@ DomainCollection::DomainCollection(OctTree t)
 		p.second->setPtrs(domains);
 	}
 }
-DomainCollection::DomainCollection(int d_x, int d_y, int d_z)
+DomainCollection::DomainCollection(int d_x, int d_y, int d_z, int n)
 {
+	this->n    = n;
 	auto getID = [&](int x, int y, int z) { return x + y * d_y + z * d_z * d_z; };
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	num_global_domains = d_x * d_y * d_z;
@@ -170,6 +173,7 @@ DomainCollection::DomainCollection(int d_x, int d_y, int d_z)
 				for (int domain_x = 0; domain_x < d_x; domain_x++) {
 					shared_ptr<Domain> d_ptr(new Domain());
 					Domain &           ds = *d_ptr;
+					ds.n                  = n;
 					ds.id                 = getID(domain_x, domain_y, domain_z);
 					ds.refine_level       = 1;
 					if (domain_x != 0) {
@@ -234,6 +238,7 @@ void DomainCollection::zoltanBalanceDomains()
 	Zoltan_Set_Param(zz, "NUM_LID_ENTRIES", "0");     /* don't use local IDs */
 	Zoltan_Set_Param(zz, "OBJ_WEIGHT_DIM", "0");      /* we omit object weights */
 	Zoltan_Set_Param(zz, "AUTO_MIGRATE", "FALSE");    /* we omit object weights */
+	Zoltan_Set_Param(zz, "DEBUG_LEVEL", "0");         /* we omit object weights */
 
 	// Query functions
 	// Number of Vertices
@@ -387,13 +392,13 @@ void DomainCollection::zoltanBalanceDomains()
 		exit(0);
 	}
 	Zoltan_Destroy(&zz);
+#if DD_DEBUG
 	cout << "I have " << domains.size() << " domains: ";
 
-#if DD_DEBUG
 	int  prev  = -100;
 	bool range = false;
 	for (auto &p : domains) {
-		int curr = p.second.id;
+		int curr = p.second->id;
 		if (curr != prev + 1 && !range) {
 			cout << curr << "-";
 			range = true;
@@ -419,6 +424,7 @@ void DomainCollection::zoltanBalanceWithLower(DomainCollection &lower)
 	Zoltan_Set_Param(zz, "OBJ_WEIGHT_DIM", "1");      /* we omit object weights */
 	Zoltan_Set_Param(zz, "EDGE_WEIGHT_DIM", "0");     /* we omit object weights */
 	Zoltan_Set_Param(zz, "AUTO_MIGRATE", "FALSE");    /* we omit object weights */
+	Zoltan_Set_Param(zz, "DEBUG_LEVEL", "0");         /* we omit object weights */
 
 	// Query functions
 	// Number of Vertices
@@ -620,13 +626,13 @@ void DomainCollection::zoltanBalanceWithLower(DomainCollection &lower)
 		exit(0);
 	}
 	Zoltan_Destroy(&zz);
+#if DD_DEBUG
 	cout << "I have " << domains.size() << " domains: ";
 
-#if DD_DEBUG
 	int  prev  = -100;
 	bool range = false;
 	for (auto &p : domains) {
-		int curr = p.second.id;
+		int curr = p.second->id;
 		if (curr != prev + 1 && !range) {
 			cout << curr << "-";
 			range = true;

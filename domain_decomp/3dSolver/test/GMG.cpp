@@ -3,14 +3,99 @@
 #include "../InterLevelComm.h"
 #include "catch.hpp"
 using namespace std;
-const int n = 2;
+const int n = 8;
 // generate 2 level simple test
 void generateTwoLevel(shared_ptr<DomainCollection> &coarse, shared_ptr<DomainCollection> &fine)
 {
 	// generate simple tree
 	OctTree t("3uni.bin");
-	coarse.reset(new DomainCollection(t, 2, 2));
-	fine.reset(new DomainCollection(t, 3, 2));
+	coarse.reset(new DomainCollection(t, 2, n));
+	fine.reset(new DomainCollection(t, n));
+	fine->zoltanBalance();
+	coarse->zoltanBalanceWithLower(*fine);
+}
+void octFill(double *vec, int oct, double val)
+{
+	switch (oct) {
+		case 0:
+			for (int zi = 0; zi < n / 2; zi++) {
+				for (int yi = 0; yi < n / 2; yi++) {
+					for (int xi = 0; xi < n / 2; xi++) {
+						vec[(xi) + (yi) *n + (zi) *n * n] = val + xi + yi * n + zi * n * n;
+					}
+				}
+			}
+			break;
+		case 1:
+			for (int zi = 0; zi < n / 2; zi++) {
+				for (int yi = 0; yi < n / 2; yi++) {
+					for (int xi = 0; xi < n / 2; xi++) {
+						vec[(xi + n / 2) + (yi) *n + (zi) *n * n] = val + xi + yi * n + zi * n * n;
+					}
+				}
+			}
+			break;
+		case 2:
+			for (int zi = 0; zi < n / 2; zi++) {
+				for (int yi = 0; yi < n / 2; yi++) {
+					for (int xi = 0; xi < n / 2; xi++) {
+						vec[(xi) + (yi + n / 2) * n + (zi) *n * n] = val + xi + yi * n + zi * n * n;
+					}
+				}
+			}
+			break;
+		case 3:
+			for (int zi = 0; zi < n / 2; zi++) {
+				for (int yi = 0; yi < n / 2; yi++) {
+					for (int xi = 0; xi < n / 2; xi++) {
+						vec[(xi + n / 2) + (yi + n / 2) * n + (zi) *n * n]
+						= val + xi + yi * n + zi * n * n;
+					}
+				}
+			}
+			break;
+		case 4:
+			for (int zi = 0; zi < n / 2; zi++) {
+				for (int yi = 0; yi < n / 2; yi++) {
+					for (int xi = 0; xi < n / 2; xi++) {
+						vec[(xi) + (yi) *n + (zi + n / 2) * n * n] = val + xi + yi * n + zi * n * n;
+					}
+				}
+			}
+			break;
+		case 5:
+			for (int zi = 0; zi < n / 2; zi++) {
+				for (int yi = 0; yi < n / 2; yi++) {
+					for (int xi = 0; xi < n / 2; xi++) {
+						vec[(xi + n / 2) + (yi) *n + (zi + n / 2) * n * n]
+						= val + xi + yi * n + zi * n * n;
+					}
+				}
+			}
+			break;
+		case 6:
+			for (int zi = 0; zi < n / 2; zi++) {
+				for (int yi = 0; yi < n / 2; yi++) {
+					for (int xi = 0; xi < n / 2; xi++) {
+						vec[(xi) + (yi + n / 2) * n + (zi + n / 2) * n * n]
+						= val + xi + yi * n + zi * n * n;
+					}
+				}
+			}
+			break;
+		case 7:
+			for (int zi = 0; zi < n / 2; zi++) {
+				for (int yi = 0; yi < n / 2; yi++) {
+					for (int xi = 0; xi < n / 2; xi++) {
+						vec[(xi + n / 2) + (yi + n / 2) * n + (zi + n / 2) * n * n]
+						= val + xi + yi * n + zi * n * n;
+					}
+				}
+			}
+			break;
+		default:
+			break;
+	}
 }
 TEST_CASE("InterLevelComm scatter works", "[GMG]")
 {
@@ -27,7 +112,7 @@ TEST_CASE("InterLevelComm scatter works", "[GMG]")
 		for (auto p : coarse->domains) {
 			Domain &d = *p.second;
 			for (int i = 0; i < n * n * n; i++) {
-				ce_vec[d.id_local * n * n * n + i] = d.id;
+				ce_vec[d.id_local * n * n * n + i] = d.id + i;
 			}
 		}
 		VecRestoreArray(coarse_expected, &ce_vec);
@@ -38,7 +123,7 @@ TEST_CASE("InterLevelComm scatter works", "[GMG]")
 		for (auto data : comm->getFineDomains()) {
 			Domain &d = *data.d;
 			for (int i = 0; i < n * n * n; i++) {
-				ce_vec[data.local_index * n * n * n + i] = d.parent_id;
+				ce_vec[data.local_index * n * n * n + i] = d.parent_id + i;
 			}
 		}
 		VecRestoreArray(coarse_local_expected, &ce_vec);
@@ -61,8 +146,10 @@ TEST_CASE("InterLevelComm scatter works", "[GMG]")
 
 		// check that reverse scatter works as expected
 		PW<Vec> coarse_result = coarse->getNewDomainVec();
-		VecScatterBegin(scatter, coarse_local_expected, coarse_result, ADD_VALUES, SCATTER_REVERSE);
-		VecScatterEnd(scatter, coarse_local_expected, coarse_result, ADD_VALUES, SCATTER_REVERSE);
+		VecScatterBegin(scatter, coarse_local_expected, coarse_result, INSERT_VALUES,
+		                SCATTER_REVERSE);
+		VecScatterEnd(scatter, coarse_local_expected, coarse_result, INSERT_VALUES,
+		              SCATTER_REVERSE);
 
 		PetscBool vec_scatter_reverse_works;
 		VecEqual(coarse_result, coarse_expected, &vec_scatter_reverse_works);
@@ -88,8 +175,8 @@ TEST_CASE("GMGAvgRstr works", "[GMG]")
 		VecGetArray(coarse_expected, &ce_vec);
 		for (auto p : coarse->domains) {
 			Domain &d = *p.second;
-			for (int i = 0; i < n * n * n; i++) {
-				ce_vec[d.id_local * n * n * n + i] = d.id;
+			for (int oct = 0; oct < 8; oct++) {
+				octFill(ce_vec + d.id_local * n * n * n, oct, d.child_id[oct]);
 			}
 		}
 		VecRestoreArray(coarse_expected, &ce_vec);
@@ -99,15 +186,20 @@ TEST_CASE("GMGAvgRstr works", "[GMG]")
 		VecGetArray(fine_start, &ce_vec);
 		for (auto data : fine->domains) {
 			Domain &d = *data.second;
-			for (int i = 0; i < n * n * n; i++) {
-				ce_vec[d.id_local * n * n * n + i] = d.parent_id;
+			for (int zi = 0; zi < n; zi++) {
+				for (int yi = 0; yi < n; yi++) {
+					for (int xi = 0; xi < n; xi++) {
+						ce_vec[d.id_local * n * n * n + xi + yi * n + zi * n * n]
+						= d.id + xi / 2 + yi / 2 * n + zi / 2 * n * n;
+					}
+				}
 			}
 		}
 		VecRestoreArray(fine_start, &ce_vec);
 
 		// check that restrictor works
 		PW<Vec> coarse_result = coarse->getNewDomainVec();
-        op->restrict(coarse_result,fine_start);
+		op->restrict(coarse_result, fine_start);
 
 		PetscBool restrictor_works;
 		VecEqual(coarse_result, coarse_expected, &restrictor_works);
@@ -119,22 +211,23 @@ TEST_CASE("GMGAvgRstr works", "[GMG]")
 		REQUIRE(coarse_result_norm != 0);
 	}
 }
-TEST_CASE("GMGDrctIntp works", "[GMG]") {
+TEST_CASE("GMGDrctIntp works", "[GMG]")
+{
 	PetscInitialize(nullptr, nullptr, nullptr, nullptr);
 	{
 		shared_ptr<DomainCollection> coarse;
 		shared_ptr<DomainCollection> fine;
 		generateTwoLevel(coarse, fine);
-		shared_ptr<InterLevelComm> comm(new InterLevelComm(coarse, fine));
-		shared_ptr<GMGInterpolator>  op(new GMGDrctIntp(coarse, fine, comm));
-		PW<Vec>                    coarse_start = coarse->getNewDomainVec();
-		PW<Vec>                    fine_expected      = fine->getNewDomainVec();
-		double *                   ce_vec;
+		shared_ptr<InterLevelComm>  comm(new InterLevelComm(coarse, fine));
+		shared_ptr<GMGInterpolator> op(new GMGDrctIntp(coarse, fine, comm));
+		PW<Vec>                     coarse_start  = coarse->getNewDomainVec();
+		PW<Vec>                     fine_expected = fine->getNewDomainVec();
+		double *                    ce_vec;
 		VecGetArray(coarse_start, &ce_vec);
 		for (auto p : coarse->domains) {
 			Domain &d = *p.second;
-			for (int i = 0; i < n * n * n; i++) {
-				ce_vec[d.id_local * n * n * n + i] = d.id;
+			for (int oct = 0; oct < 8; oct++) {
+				octFill(ce_vec + d.id_local * n * n * n, oct, d.child_id[oct]);
 			}
 		}
 		VecRestoreArray(coarse_start, &ce_vec);
@@ -142,17 +235,22 @@ TEST_CASE("GMGDrctIntp works", "[GMG]") {
 		VecGetArray(fine_expected, &ce_vec);
 		for (auto data : fine->domains) {
 			Domain &d = *data.second;
-			for (int i = 0; i < n * n * n; i++) {
-				ce_vec[d.id_local * n * n * n + i] = d.parent_id;
+			for (int zi = 0; zi < n; zi++) {
+				for (int yi = 0; yi < n; yi++) {
+					for (int xi = 0; xi < n; xi++) {
+						ce_vec[d.id_local * n * n * n + xi + yi * n + zi * n * n]
+						= d.id + xi / 2 + yi / 2 * n + zi / 2 * n * n;
+					}
+				}
 			}
 		}
 		VecRestoreArray(fine_expected, &ce_vec);
 		double fine_expected_norm;
 		VecNorm(fine_expected, NORM_2, &fine_expected_norm);
 
-		// check that restrictor works
+		// check that interpolator works
 		PW<Vec> fine_result = fine->getNewDomainVec();
-        op->interpolate(coarse_start,fine_result);
+		op->interpolate(coarse_start, fine_result);
 
 		PetscBool restrictor_works;
 		VecEqual(fine_result, fine_expected, &restrictor_works);

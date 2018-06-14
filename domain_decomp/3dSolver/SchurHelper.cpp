@@ -9,7 +9,7 @@ using namespace std;
 SchurHelper::SchurHelper(DomainCollection dc, shared_ptr<PatchSolver> solver,
                          shared_ptr<PatchOperator> op, shared_ptr<Interpolator> interpolator)
 {
-	this->n = dc.n;
+	this->n = dc.getN();
 	for (auto &p : dc.domains) {
 		domains.push_back(*p.second);
 	}
@@ -20,8 +20,8 @@ SchurHelper::SchurHelper(DomainCollection dc, shared_ptr<PatchSolver> solver,
 	}
 	{
 		// send info
-		deque<char *>        buffers;
-		deque<char *>        recv_buffers;
+		deque<char *>       buffers;
+		deque<char *>       recv_buffers;
 		vector<MPI_Request> requests;
 		for (auto &p : off_proc_ifaces) {
 			int       dest   = p.second.first;
@@ -42,27 +42,28 @@ SchurHelper::SchurHelper(DomainCollection dc, shared_ptr<PatchSolver> solver,
 		while (is_message) {
 			int size;
 			MPI_Get_count(&status, MPI_CHAR, &size);
-            char * buffer = new char[size];
-            recv_buffers.push_back(buffer);
+			char *buffer = new char[size];
+			recv_buffers.push_back(buffer);
 
 			MPI_Request request;
-            MPI_Irecv(buffer,size,MPI_CHAR,MPI_ANY_SOURCE,MPI_ANY_TAG,MPI_COMM_WORLD,&request);
+			MPI_Irecv(buffer, size, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD,
+			          &request);
 			MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &is_message, &status);
-            requests.push_back(request);
+			requests.push_back(request);
 		}
-        //wait for all
-        vector<MPI_Status> statuses(requests.size());
-        MPI_Waitall(requests.size(),&requests[0],&statuses[0]);
-        //delete send buffers
-        for(char * buffer : buffers){
-            delete[] buffer;
-        }
-        //process received objects
-        for(char * buffer : recv_buffers){
-            IfaceSet ifs = IfaceSet::deserialize(buffer);
-            ifaces[ifs.id].insert(ifs);
-            delete[] buffer;
-        }
+		// wait for all
+		vector<MPI_Status> statuses(requests.size());
+		MPI_Waitall(requests.size(), &requests[0], &statuses[0]);
+		// delete send buffers
+		for (char *buffer : buffers) {
+			delete[] buffer;
+		}
+		// process received objects
+		for (char *buffer : recv_buffers) {
+			IfaceSet ifs = IfaceSet::deserialize(buffer);
+			ifaces[ifs.id].insert(ifs);
+			delete[] buffer;
+		}
 		MPI_Barrier(MPI_COMM_WORLD);
 	}
 	indexDomainIfacesLocal();
@@ -74,14 +75,14 @@ SchurHelper::SchurHelper(DomainCollection dc, shared_ptr<PatchSolver> solver,
 	local_interp       = getNewSchurDistVec();
 	gamma              = getNewSchurVec();
 	PW<IS> dist_is;
-	ISCreateBlock(MPI_COMM_WORLD, dc.n * dc.n, iface_dist_map_vec.size(), &iface_dist_map_vec[0],
+	ISCreateBlock(MPI_COMM_SELF, n * n, iface_dist_map_vec.size(), &iface_dist_map_vec[0],
 	              PETSC_COPY_VALUES, &dist_is);
 	VecScatterCreate(gamma, dist_is, local_gamma, nullptr, &scatter);
 
-    int num_ifaces = ifaces.size();
+	int num_ifaces = ifaces.size();
 	MPI_Allreduce(&num_ifaces, &num_global_ifaces, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-    cerr << "Num Global All: " << num_global_ifaces<<endl;
-    cerr << "Num Local All: " << num_ifaces<<endl;
+	cerr << "Num Global All: " << num_global_ifaces << endl;
+	cerr << "Num Local All: " << num_ifaces << endl;
 }
 
 void SchurHelper::zoltanBalance() {}

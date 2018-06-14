@@ -11,11 +11,12 @@ GMGAvgRstr::GMGAvgRstr(shared_ptr<DomainCollection> coarse_dc, shared_ptr<Domain
 void GMGAvgRstr::restrict(PW<Vec> coarse, PW<Vec> fine)
 {
 	// get vectors
-	VecScale(coarse, 0);
+	VecSet(coarse, 0);
 	double *r_fine;
 	double *f_coarse;
 	// store in tmp vector for fine level
 	PW<Vec> coarse_tmp = ilc->getNewCoarseDistVec();
+    VecSet(coarse_tmp,0);
 	VecGetArray(fine, &r_fine);
 	VecGetArray(coarse_tmp, &f_coarse);
 	for (ILCFineToCoarseMetadata data : ilc->getFineDomains()) {
