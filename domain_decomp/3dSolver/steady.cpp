@@ -1,8 +1,7 @@
 #include "ContigFftwSolver.h"
 #include "DomainCollection.h"
 #include "FunctionWrapper.h"
-#include "GMGHelper.h"
-#include "GMGSchurHelper.h"
+#include "GMG/Helper.h"
 #include "Init.h"
 #include "MatrixHelper.h"
 #include "OctTree.h"
@@ -275,7 +274,7 @@ int main(int argc, char *argv[])
 	for (int loop = 0; loop < loop_count; loop++) {
 		timer.start("Domain Initialization");
 
-		SchurHelper  sch(*dc, p_solver, p_operator, p_interp);
+		shared_ptr<SchurHelper>  sch(new SchurHelper(*dc, p_solver, p_operator, p_interp));
 		MatrixHelper mh(*dc);
 
 		PW<Vec> u     = dc->getNewDomainVec();
@@ -291,14 +290,13 @@ int main(int argc, char *argv[])
 		timer.stop("Domain Initialization");
 
 		// Create the gamma and diff vectors
-		PW<Vec>                    gamma = sch.getNewSchurVec();
-		PW<Vec>                    diff  = sch.getNewSchurVec();
-		PW<Vec>                    b     = sch.getNewSchurVec();
+		PW<Vec>                    gamma = sch->getNewSchurVec();
+		PW<Vec>                    diff  = sch->getNewSchurVec();
+		PW<Vec>                    b     = sch->getNewSchurVec();
 		PW<Mat>                    A;
 		shared_ptr<FuncWrap>       w;
 		shared_ptr<SchwarzPrec>    sp;
-		shared_ptr<GMGHelper>      gh;
-		shared_ptr<GMGSchurHelper> ghs;
+		shared_ptr<GMG::Helper>      gh;
 
 		// Create linear problem for the Belos solver
 		PW<KSP> solver;
@@ -329,7 +327,7 @@ int main(int argc, char *argv[])
 			if (!f_noschur) {
 				// Get the b vector
 				VecScale(gamma, 0);
-				sch.solveWithInterface(f, u, gamma, b);
+				sch->solveWithInterface(f, u, gamma, b);
 				VecScale(b, -1.0);
 
 				if (f_rhs) {
@@ -347,7 +345,7 @@ int main(int argc, char *argv[])
 			timer.start("Linear System Setup");
 
 			if (f_wrapper) {
-				w.reset(new FuncWrap(&sch, &*dc));
+				w.reset(new FuncWrap(sch.get(), &*dc));
 				A = w->getMatrix();
 			} else {
 				timer.start("Matrix Formation");
@@ -356,9 +354,9 @@ int main(int argc, char *argv[])
 					A = mh.formCRSMatrix();
 				} else {
 					if (f_pbm) {
-						A = sch.getPBMatrix();
+						A = sch->getPBMatrix();
 					} else {
-						A = sch.formCRSMatrix();
+						A = sch->formCRSMatrix();
 					}
 				}
 
@@ -400,20 +398,16 @@ int main(int argc, char *argv[])
 				PC pc;
 				KSPGetPC(solver, &pc);
 				if (f_scharz) {
-					sp.reset(new SchwarzPrec(&sch, &*dc));
+					sp.reset(new SchwarzPrec(sch.get(), &*dc));
 					sp->getPrec(pc);
 				}
 				if (f_gmg) {
-					gh.reset(new GMGHelper(n, t, dc, sch));
+					gh.reset(new GMG::Helper(n, t, dc, sch));
 					gh->getPrec(pc);
 				}
-				if (f_gmgs) {
-					ghs.reset(new GMGSchurHelper(n, t, *dc, sch));
-					ghs->getPrec(pc);
-				}
-				if (f_ibd) { sch.getPBDiagInv(pc); }
+				if (f_ibd) { sch->getPBDiagInv(pc); }
 				if (f_cheb) {
-					PolyChebPrec *pcp = new PolyChebPrec(sch, *dc);
+					PolyChebPrec *pcp = new PolyChebPrec(*sch, *dc);
 					pcp->getPrec(pc);
 					PCSetUp(pc);
 				}
@@ -482,7 +476,7 @@ int main(int argc, char *argv[])
 			// Do one last solve
 			timer.start("Patch Solve");
 
-			sch.solveWithInterface(f, u, gamma, diff);
+			sch->solveWithInterface(f, u, gamma, diff);
 
 			timer.stop("Patch Solve");
 		}
@@ -498,7 +492,7 @@ int main(int argc, char *argv[])
 		if (f_noschur) {
 			MatMult(A, u, au);
 		} else {
-			sch.applyWithInterface(u, gamma, au);
+			sch->applyWithInterface(u, gamma, au);
 		}
 		VecAXPBYPCZ(resid, -1.0, 1.0, 0.0, au, f);
 		double residual;

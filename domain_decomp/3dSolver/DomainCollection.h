@@ -22,12 +22,12 @@ class DomainCollection
 {
 	private:
 	void zoltanBalanceDomains();
-	int n = -1;
+	int  n = -1;
 
 	public:
-	int rank;
-	int num_pins;
-    bool neumann=false;
+	int  rank;
+	int  num_pins;
+	bool neumann = false;
 	/**
 	 * @brief Number of total domains.
 	 */
@@ -45,14 +45,14 @@ class DomainCollection
 	std::vector<int> domain_map_vec;
 	std::vector<int> domain_off_proc_map_vec;
 
-    int getN(){return n;}
+	int getN() { return n; }
 	/**
 	 * @brief Default empty constructor.
 	 */
 	DomainCollection() = default;
 
 	DomainCollection(OctTree t, int n);
-	DomainCollection(OctTree t, int level,int n);
+	DomainCollection(OctTree t, int level, int n);
 	/**
 	 * @brief Generate a grid of domains.
 	 *
@@ -65,7 +65,7 @@ class DomainCollection
 	 * @brief Balance the domains over processors using Zoltan
 	 */
 	void zoltanBalance();
-	void zoltanBalanceWithLower(DomainCollection& lower);
+	void zoltanBalanceWithLower(DomainCollection &lower);
 	void divide();
 
 	void indexDomainsLocal();
@@ -75,12 +75,12 @@ class DomainCollection
 
 	void setNeumann()
 	{
-        neumann=true;
+		neumann = true;
 		for (auto &p : domains) {
 			p.second->setNeumann();
 		}
 	}
-	PW_explicit<Vec> getNewDomainVec();
+	PW_explicit<Vec> getNewDomainVec() const;
 
 	int    getGlobalNumCells() { return num_global_domains * n * n * n; }
 	double integrate(const Vec u);

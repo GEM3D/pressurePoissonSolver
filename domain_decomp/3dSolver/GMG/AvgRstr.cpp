@@ -1,14 +1,15 @@
-#include "GMGAvgRstr.h"
+#include "AvgRstr.h"
 #include <functional>
 using namespace std;
-GMGAvgRstr::GMGAvgRstr(shared_ptr<DomainCollection> coarse_dc, shared_ptr<DomainCollection> fine_dc,
-                       shared_ptr<InterLevelComm> ilc)
+using namespace GMG;
+AvgRstr::AvgRstr(shared_ptr<DomainCollection> coarse_dc, shared_ptr<DomainCollection> fine_dc,
+                 shared_ptr<InterLevelComm> ilc)
 {
 	this->coarse_dc = coarse_dc;
 	this->fine_dc   = fine_dc;
 	this->ilc       = ilc;
 }
-void GMGAvgRstr::restrict(PW<Vec> coarse, PW<Vec> fine)
+void AvgRstr::restrict(PW<Vec> coarse, PW<Vec> fine) const
 {
 	// get vectors
 	VecSet(coarse, 0);
@@ -16,7 +17,7 @@ void GMGAvgRstr::restrict(PW<Vec> coarse, PW<Vec> fine)
 	double *f_coarse;
 	// store in tmp vector for fine level
 	PW<Vec> coarse_tmp = ilc->getNewCoarseDistVec();
-    VecSet(coarse_tmp,0);
+	VecSet(coarse_tmp, 0);
 	VecGetArray(fine, &r_fine);
 	VecGetArray(coarse_tmp, &f_coarse);
 	for (ILCFineToCoarseMetadata data : ilc->getFineDomains()) {
