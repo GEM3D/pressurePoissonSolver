@@ -105,8 +105,6 @@ add_library(MatrixHelper MatrixHelper.cpp)
 add_library(DomainCollection DomainCollection.cpp OctTree.cpp)
 add_library(Interpolators TriLinInterp.cpp)
 add_library(Init Init.cpp)
-add_library(GMGHelper GMGHelper.cpp GMGSchurHelper.cpp GMGAvgRstr.cpp GMGDrctIntp.cpp
-    InterLevelComm.cpp)
 add_library(ContigFftwSolver ContigFftwSolver.cpp)
 add_library(PBMatrix PBMatrix.cpp)
 add_library(PolyPrecs PolyChebPrec.cpp)
@@ -122,7 +120,7 @@ target_link_libraries(steady
     DomainCollection
     Init
     MatrixHelper
-    GMGHelper
+    GMG
     FftwPatchSolver
     Interpolators
     MMWriter
@@ -166,6 +164,7 @@ target_link_libraries(DomainCollection
 add_subdirectory(PatchSolvers)
 add_subdirectory(Writers)
 add_subdirectory(test)
+add_subdirectory(GMG)
 SET( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 IF( EXISTS "${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json" )
   EXECUTE_PROCESS( COMMAND ${CMAKE_COMMAND} -E copy_if_different

@@ -1,6 +1,7 @@
 #include "InterLevelComm.h"
 #include <petscao.h>
 using namespace std;
+using namespace GMG;
 InterLevelComm::InterLevelComm(shared_ptr<DomainCollection> coarse_dc,
                                shared_ptr<DomainCollection> fine_dc)
 {

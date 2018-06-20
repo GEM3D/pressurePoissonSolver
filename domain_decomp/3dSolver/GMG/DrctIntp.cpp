@@ -1,14 +1,15 @@
-#include "GMGDrctIntp.h"
+#include "DrctIntp.h"
 #include <functional>
 using namespace std;
-GMGDrctIntp::GMGDrctIntp(shared_ptr<DomainCollection> coarse_dc,
-                         shared_ptr<DomainCollection> fine_dc, shared_ptr<InterLevelComm> ilc)
+using namespace GMG;
+DrctIntp::DrctIntp(shared_ptr<DomainCollection> coarse_dc, shared_ptr<DomainCollection> fine_dc,
+                   shared_ptr<InterLevelComm> ilc)
 {
 	this->coarse_dc = coarse_dc;
 	this->fine_dc   = fine_dc;
 	this->ilc       = ilc;
 }
-void GMGDrctIntp::interpolate(PW<Vec> coarse, PW<Vec> fine)
+void DrctIntp::interpolate(PW<Vec> coarse, PW<Vec> fine) const
 {
 	// get vectors
 	double *u_fine;

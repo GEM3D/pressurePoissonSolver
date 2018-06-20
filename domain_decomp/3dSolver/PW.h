@@ -12,17 +12,17 @@ template <typename X> class PW
 		if (ref_count != nullptr) {
 			--(*ref_count);
 			if (*ref_count == 0) {
-				if (obj != nullptr && owns) {
-					PetscObjectDestroy((PetscObject *) &obj);
-				}
+				if (obj != nullptr && owns) { PetscObjectDestroy((PetscObject *) &obj); }
 				delete ref_count;
 			}
 		}
 	}
 
 	public:
-	PW()
+	explicit PW(X obj=nullptr, bool owns=true)
 	{
+        this->obj=obj;
+        this->owns=owns;
 		ref_count  = new size_t;
 		*ref_count = 1;
 	}
@@ -30,6 +30,7 @@ template <typename X> class PW
 	{
 		ref_count = other.ref_count;
 		obj       = other.obj;
+		owns      = other.owns;
 		++(*ref_count);
 	}
 	~PW() { decrement(); }
@@ -41,16 +42,26 @@ template <typename X> class PW
 		++(*ref_count);
 		return *this;
 	}
-	PW &operator=(const X &other)
+	void reset(const X &obj, bool owns)
 	{
 		decrement();
-		ref_count    = new size_t;
-		obj          = other;
-		owns         = false;
-		(*ref_count) = 1;
-		return *this;
+		this->obj  = obj;
+		this->owns = owns;
+		ref_count  = new size_t;
+		*ref_count = 1;
 	}
-	operator X() { return obj; }
+	/*
+	PW &operator=(const X &other)
+	{
+	    decrement();
+	    ref_count    = new size_t;
+	    obj          = other;
+	    owns         = false;
+	    (*ref_count) = 1;
+	    return *this;
+	}
+	*/
+	   operator X() const { return obj; }
 	X *operator&() { return &obj; }
 };
 template <typename X> class PW_explicit : public PW<X>

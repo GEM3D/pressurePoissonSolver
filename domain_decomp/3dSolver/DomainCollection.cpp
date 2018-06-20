@@ -779,7 +779,7 @@ double DomainCollection::volume()
 	MPI_Allreduce(&sum, &retval, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 	return retval;
 }
-PW_explicit<Vec> DomainCollection::getNewDomainVec()
+PW_explicit<Vec> DomainCollection::getNewDomainVec() const
 {
 	PW<Vec> u;
 	VecCreateMPI(MPI_COMM_WORLD, domains.size() * n * n * n, PETSC_DETERMINE, &u);

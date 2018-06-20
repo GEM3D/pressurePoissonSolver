@@ -1,6 +1,6 @@
-#include "../GMGAvgRstr.h"
-#include "../GMGDrctIntp.h"
-#include "../InterLevelComm.h"
+#include "../GMG/AvgRstr.h"
+#include "../GMG/DrctIntp.h"
+#include "../GMG/InterLevelComm.h"
 #include "catch.hpp"
 using namespace std;
 const int n = 8;
@@ -104,7 +104,7 @@ TEST_CASE("InterLevelComm scatter works", "[GMG]")
 		shared_ptr<DomainCollection> coarse;
 		shared_ptr<DomainCollection> fine;
 		generateTwoLevel(coarse, fine);
-		shared_ptr<InterLevelComm> comm(new InterLevelComm(coarse, fine));
+		shared_ptr<GMG::InterLevelComm> comm(new GMG::InterLevelComm(coarse, fine));
 		PW<Vec>                    coarse_expected       = coarse->getNewDomainVec();
 		PW<Vec>                    coarse_local_expected = comm->getNewCoarseDistVec();
 		double *                   ce_vec;
@@ -167,11 +167,11 @@ TEST_CASE("GMGAvgRstr works", "[GMG]")
 		shared_ptr<DomainCollection> coarse;
 		shared_ptr<DomainCollection> fine;
 		generateTwoLevel(coarse, fine);
-		shared_ptr<InterLevelComm> comm(new InterLevelComm(coarse, fine));
-		shared_ptr<GMGRestrictor>  op(new GMGAvgRstr(coarse, fine, comm));
-		PW<Vec>                    coarse_expected = coarse->getNewDomainVec();
-		PW<Vec>                    fine_start      = fine->getNewDomainVec();
-		double *                   ce_vec;
+		shared_ptr<GMG::InterLevelComm>  comm(new GMG::InterLevelComm(coarse, fine));
+		shared_ptr<GMG::Restrictor> op(new GMG::AvgRstr(coarse, fine, comm));
+		PW<Vec>                     coarse_expected = coarse->getNewDomainVec();
+		PW<Vec>                     fine_start      = fine->getNewDomainVec();
+		double *                    ce_vec;
 		VecGetArray(coarse_expected, &ce_vec);
 		for (auto p : coarse->domains) {
 			Domain &d = *p.second;
@@ -218,11 +218,11 @@ TEST_CASE("GMGDrctIntp works", "[GMG]")
 		shared_ptr<DomainCollection> coarse;
 		shared_ptr<DomainCollection> fine;
 		generateTwoLevel(coarse, fine);
-		shared_ptr<InterLevelComm>  comm(new InterLevelComm(coarse, fine));
-		shared_ptr<GMGInterpolator> op(new GMGDrctIntp(coarse, fine, comm));
-		PW<Vec>                     coarse_start  = coarse->getNewDomainVec();
-		PW<Vec>                     fine_expected = fine->getNewDomainVec();
-		double *                    ce_vec;
+		shared_ptr<GMG::InterLevelComm>    comm(new GMG::InterLevelComm(coarse, fine));
+		shared_ptr<GMG::Interpolator> op(new GMG::DrctIntp(coarse, fine, comm));
+		PW<Vec>                       coarse_start  = coarse->getNewDomainVec();
+		PW<Vec>                       fine_expected = fine->getNewDomainVec();
+		double *                      ce_vec;
 		VecGetArray(coarse_start, &ce_vec);
 		for (auto p : coarse->domains) {
 			Domain &d = *p.second;
