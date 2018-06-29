@@ -21,8 +21,11 @@
 class DomainCollection
 {
 	private:
-	void zoltanBalanceDomains();
 	int  n = -1;
+	void indexDomainsLocal();
+	void indexDomainsGlobal();
+	void zoltanBalanceDomains();
+	void reIndex();
 
 	public:
 	int  rank;
@@ -66,12 +69,7 @@ class DomainCollection
 	 */
 	void zoltanBalance();
 	void zoltanBalanceWithLower(DomainCollection &lower);
-	void divide();
 
-	void indexDomainsLocal();
-	void indexDomainsGlobal();
-
-	void reIndex();
 
 	void setNeumann()
 	{

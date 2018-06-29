@@ -188,15 +188,15 @@ int main(int argc, char *argv[])
 	if (f_mesh) {
 		string d = args::get(f_mesh);
 		t        = OctTree(d);
-		dc.reset(new DomainCollection(t,n));
+		if (f_div) {
+			for (int i = 0; i < args::get(f_div); i++) {
+				t.refineLeaves();
+			}
+		}
+		dc.reset(new DomainCollection(t, n));
 	} else {
 		int d = args::get(f_cube);
-		dc.reset(new DomainCollection(d, d, d,n));
-	}
-	if (f_div) {
-		for (int i = 0; i < args::get(f_div); i++) {
-			dc->divide();
-		}
+		dc.reset(new DomainCollection(d, d, d, n));
 	}
 	if (f_neumann) { dc->setNeumann(); }
 
@@ -274,8 +274,8 @@ int main(int argc, char *argv[])
 	for (int loop = 0; loop < loop_count; loop++) {
 		timer.start("Domain Initialization");
 
-		shared_ptr<SchurHelper>  sch(new SchurHelper(*dc, p_solver, p_operator, p_interp));
-		MatrixHelper mh(*dc);
+		shared_ptr<SchurHelper> sch(new SchurHelper(*dc, p_solver, p_operator, p_interp));
+		MatrixHelper            mh(*dc);
 
 		PW<Vec> u     = dc->getNewDomainVec();
 		PW<Vec> exact = dc->getNewDomainVec();
@@ -290,13 +290,13 @@ int main(int argc, char *argv[])
 		timer.stop("Domain Initialization");
 
 		// Create the gamma and diff vectors
-		PW<Vec>                    gamma = sch->getNewSchurVec();
-		PW<Vec>                    diff  = sch->getNewSchurVec();
-		PW<Vec>                    b     = sch->getNewSchurVec();
-		PW<Mat>                    A;
-		shared_ptr<FuncWrap>       w;
-		shared_ptr<SchwarzPrec>    sp;
-		shared_ptr<GMG::Helper>      gh;
+		PW<Vec>                 gamma = sch->getNewSchurVec();
+		PW<Vec>                 diff  = sch->getNewSchurVec();
+		PW<Vec>                 b     = sch->getNewSchurVec();
+		PW<Mat>                 A;
+		shared_ptr<FuncWrap>    w;
+		shared_ptr<SchwarzPrec> sp;
+		shared_ptr<GMG::Helper> gh;
 
 		// Create linear problem for the Belos solver
 		PW<KSP> solver;

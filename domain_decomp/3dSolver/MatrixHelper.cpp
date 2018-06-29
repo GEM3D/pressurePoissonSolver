@@ -2,7 +2,10 @@
 #include "StencilHelper.h"
 #include <iostream>
 using namespace std;
-MatrixHelper::MatrixHelper(DomainCollection dc) { this->dc = dc; }
+MatrixHelper::MatrixHelper(DomainCollection dc)
+{
+	this->dc = dc;
+}
 PW_explicit<Mat> MatrixHelper::formCRSMatrix(double lambda)
 {
 	PW<Mat> A;
@@ -97,8 +100,7 @@ PW_explicit<Mat> MatrixHelper::formCRSMatrix(double lambda)
 		}
 
 		// boundaries
-		Side s = Side::west;
-		do {
+		for (Side s : Side::getValues()) {
 			StencilHelper *sh = getStencilHelper(d, s);
 			for (int yi = 0; yi < n; yi++) {
 				for (int xi = 0; xi < n; xi++) {
@@ -110,8 +112,7 @@ PW_explicit<Mat> MatrixHelper::formCRSMatrix(double lambda)
 				}
 			}
 			delete sh;
-			s++;
-		} while (s != Side::west);
+		}
 	}
 	MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
 	MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);

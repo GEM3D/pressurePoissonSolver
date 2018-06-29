@@ -3,6 +3,7 @@
 #include "Cycle.h"
 #include "DomainCollection.h"
 #include "SchurHelper.h"
+#include "tpl/json.hpp"
 #include <petscpc.h>
 namespace GMG
 {

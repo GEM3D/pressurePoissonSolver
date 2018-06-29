@@ -6,10 +6,10 @@ class StencilHelper
 {
 	public:
 	virtual ~StencilHelper() {}
-	virtual int row(int xi, int yi)        = 0;
-	virtual int size(int xi, int yi)       = 0;
+	virtual int     row(int xi, int yi)    = 0;
+	virtual int     size(int xi, int yi)   = 0;
 	virtual double *coeffs(int xi, int yi) = 0;
-	virtual int *cols(int xi, int yi)      = 0;
+	virtual int *   cols(int xi, int yi)   = 0;
 };
 class DirichletSH : public StencilHelper
 {
@@ -25,7 +25,7 @@ class DirichletSH : public StencilHelper
 	{
 		double h   = 0;
 		int    idx = d.id_global * d.n * d.n * d.n;
-		switch (s) {
+		switch (s.toInt()) {
 			case Side::west:
 				h       = d.x_length / d.n;
 				start   = idx;
@@ -65,9 +65,18 @@ class DirichletSH : public StencilHelper
 		}
 		coeff = -1.0 / (h * h);
 	}
-	int row(int xi, int yi) { return start + stridex * xi + stridey * yi; }
-	int size(int xi, int yi) { return 1; }
-	double *coeffs(int xi, int yi) { return &coeff; }
+	int row(int xi, int yi)
+	{
+		return start + stridex * xi + stridey * yi;
+	}
+	int size(int xi, int yi)
+	{
+		return 1;
+	}
+	double *coeffs(int xi, int yi)
+	{
+		return &coeff;
+	}
 	int *cols(int xi, int yi)
 	{
 		col = start + stridex * xi + stridey * yi;
@@ -88,7 +97,7 @@ class NeumannSH : public StencilHelper
 	{
 		double h   = 0;
 		int    idx = d.id_global * d.n * d.n * d.n;
-		switch (s) {
+		switch (s.toInt()) {
 			case Side::west:
 				h       = d.x_length / d.n;
 				start   = idx;
@@ -128,9 +137,18 @@ class NeumannSH : public StencilHelper
 		}
 		coeff = 1.0 / (h * h);
 	}
-	int row(int xi, int yi) { return start + stridex * xi + stridey * yi; }
-	int size(int xi, int yi) { return 1; }
-	double *coeffs(int xi, int yi) { return &coeff; }
+	int row(int xi, int yi)
+	{
+		return start + stridex * xi + stridey * yi;
+	}
+	int size(int xi, int yi)
+	{
+		return 1;
+	}
+	double *coeffs(int xi, int yi)
+	{
+		return &coeff;
+	}
 	int *cols(int xi, int yi)
 	{
 		col = start + stridex * xi + stridey * yi;
@@ -154,7 +172,7 @@ class NormalSH : public StencilHelper
 		double         h        = 0;
 		int            idx      = d.id_global * d.n * d.n * d.n;
 		int            nbr_idx  = nbr_info.global_index * d.n * d.n * d.n;
-		switch (s) {
+		switch (s.toInt()) {
 			case Side::west:
 				h         = d.x_length / d.n;
 				start     = idx;
@@ -200,9 +218,18 @@ class NormalSH : public StencilHelper
 		}
 		coeff = 1.0 / (h * h);
 	}
-	int row(int xi, int yi) { return start + stridex * xi + stridey * yi; }
-	int size(int xi, int yi) { return 1; }
-	double *coeffs(int xi, int yi) { return &coeff; }
+	int row(int xi, int yi)
+	{
+		return start + stridex * xi + stridey * yi;
+	}
+	int size(int xi, int yi)
+	{
+		return 1;
+	}
+	double *coeffs(int xi, int yi)
+	{
+		return &coeff;
+	}
 	int *cols(int xi, int yi)
 	{
 		col = nbr_start + stridex * xi + stridey * yi;
@@ -230,7 +257,7 @@ class CoarseSH : public StencilHelper
 		int idx                 = d.id_global * d.n * d.n * d.n;
 		int nbr_idx             = nbr_info.global_index * d.n * d.n * d.n;
 		quad                    = nbr_info.quad_on_coarse;
-		switch (s) {
+		switch (s.toInt()) {
 			case Side::west:
 				h         = d.x_length / d.n;
 				start     = idx;
@@ -276,9 +303,18 @@ class CoarseSH : public StencilHelper
 		}
 		coeff /= (h * h);
 	}
-	int row(int xi, int yi) { return start + stridex * xi + stridey * yi; }
-	int size(int xi, int yi) { return coeff.size(); }
-	double *coeffs(int xi, int yi) { return &coeff[0]; }
+	int row(int xi, int yi)
+	{
+		return start + stridex * xi + stridey * yi;
+	}
+	int size(int xi, int yi)
+	{
+		return coeff.size();
+	}
+	double *coeffs(int xi, int yi)
+	{
+		return &coeff[0];
+	}
 	int *cols(int xi, int yi)
 	{
 		switch (quad) {
@@ -338,7 +374,7 @@ class FineSH : public StencilHelper
 		for (int i = 0; i < 4; i++) {
 			nbr_idx[i] = nbr_info.global_indexes[i] * d.n * d.n * d.n;
 		}
-		switch (s) {
+		switch (s.toInt()) {
 			case Side::west:
 				h     = d.x_length / d.n;
 				start = idx;
@@ -396,9 +432,18 @@ class FineSH : public StencilHelper
 		}
 		coeff /= (h * h);
 	}
-	int row(int xi, int yi) { return start + stridex * xi + stridey * yi; }
-	int size(int xi, int yi) { return coeff.size(); }
-	double *coeffs(int xi, int yi) { return &coeff[0]; }
+	int row(int xi, int yi)
+	{
+		return start + stridex * xi + stridey * yi;
+	}
+	int size(int xi, int yi)
+	{
+		return coeff.size();
+	}
+	double *coeffs(int xi, int yi)
+	{
+		return &coeff[0];
+	}
 	int *cols(int xi, int yi)
 	{
 		colz[0]  = start + stridex * xi + stridey * yi;

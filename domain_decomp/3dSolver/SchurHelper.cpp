@@ -178,10 +178,6 @@ void SchurHelper::apply(const Vec u, Vec f)
 	}
 }
 enum class Rotation : char { x_cw, x_ccw, y_cw, y_ccw, z_cw, z_ccw };
-constexpr bool sideIsLeft(const Side s)
-{
-	return (s == Side::north || s == Side::west || s == Side::bottom);
-}
 struct Block {
 	static const Side             side_table[6][6];
 	static const char             rots_table[6][6];
@@ -207,10 +203,8 @@ struct Block {
 		this->neumann = neumann;
 		this->type    = type;
 		data          = 0;
-		bool left     = sideIsLeft(main);
-		data |= left << 7;
-		left = sideIsLeft(aux);
-		data |= left << 3;
+		data |= main.isLowerOnAxis() << 7;
+		data |= aux.isLowerOnAxis() << 3;
 		rotate();
 	}
 	void applyRotation(const Rotation rot)
@@ -218,28 +212,28 @@ struct Block {
 		char r;
 		// main rotation
 		r = (data & ~(~0u << 2) << 4) >> 4;
-		r = (r + rots_table[static_cast<int>(rot)][static_cast<int>(main)]) & 0b11;
+		r = (r + rots_table[static_cast<int>(rot)][main.toInt()]) & 0b11;
 		data &= ~(~(~0u << 2) << 4);
 		data |= r << 4;
 		// aux rotation
 		r = data & ~(~0u << 2);
-		r = (r + rots_table[static_cast<int>(rot)][static_cast<int>(aux)]) & 0b11;
+		r = (r + rots_table[static_cast<int>(rot)][aux.toInt()]) & 0b11;
 		data &= ~0u << 2;
 		data |= r;
-		main                  = side_table[static_cast<int>(rot)][static_cast<int>(main)];
-		aux                   = side_table[static_cast<int>(rot)][static_cast<int>(aux)];
+		main                  = side_table[static_cast<int>(rot)][main.toInt()];
+		aux                   = side_table[static_cast<int>(rot)][aux.toInt()];
 		bitset<6> old_neumann = neumann;
 		for (int i = 0; i < 6; i++) {
-			neumann[(int) side_table[(int) rot][i]] = old_neumann[i];
+			neumann[side_table[(int) rot][i].toInt()] = old_neumann[i];
 		}
 	}
 	void rotate()
 	{
-		for (Rotation rot : main_rot_plan[static_cast<int>(main)]) {
+		for (Rotation rot : main_rot_plan[main.toInt()]) {
 			applyRotation(rot);
 		}
 		if (neumann.to_ulong() == 0) {
-			for (Rotation rot : aux_rot_plan_dirichlet[static_cast<int>(aux)]) {
+			for (Rotation rot : aux_rot_plan_dirichlet[aux.toInt()]) {
 				applyRotation(rot);
 			}
 		} else {
@@ -290,25 +284,43 @@ struct Block {
 	{
 		return std::tie(i, j, data) < std::tie(b.i, b.j, b.data);
 	}
-	bool operator==(const Block &b) const { return neumann.to_ulong() == b.neumann.to_ulong(); }
+	bool operator==(const Block &b) const
+	{
+		return neumann.to_ulong() == b.neumann.to_ulong();
+	}
 	//
-	bool mainLeft() { return sideIsLeft(main); }
+	bool mainLeft()
+	{
+		return main.isLowerOnAxis();
+	}
 	bool mainFlipped()
 	{
-		bool left      = sideIsLeft(main);
+		bool left      = main.isLowerOnAxis();
 		bool orig_left = (data >> 7) & 0b1;
 		return left != orig_left;
 	}
-	int  mainRot() { return (data >> 4) & 0b11; }
-	bool auxOrigLeft() { return (data >> 3) & 0b1; }
-	bool auxLeft() { return sideIsLeft(aux); }
+	int mainRot()
+	{
+		return (data >> 4) & 0b11;
+	}
+	bool auxOrigLeft()
+	{
+		return (data >> 3) & 0b1;
+	}
+	bool auxLeft()
+	{
+		return aux.isLowerOnAxis();
+	}
 	bool auxFlipped()
 	{
-		bool left      = sideIsLeft(aux);
+		bool left      = aux.isLowerOnAxis();
 		bool orig_left = (data >> 3) & 0b1;
 		return left != orig_left;
 	}
-	int auxRot() { return data & 0b11; }
+	int auxRot()
+	{
+		return data & 0b11;
+	}
 };
 struct BlockKey {
 	IfaceType type;
@@ -685,10 +697,19 @@ PBMatrix *SchurHelper::formPBMatrix()
 
 	return APB;
 }
-PW_explicit<Mat> SchurHelper::getPBMatrix() { return formPBMatrix()->getMatrix(); }
-PW_explicit<Mat> SchurHelper::getPBDiagInv() { return formPBMatrix()->getDiagInv()->getMatrix(); }
-void             SchurHelper::getPBDiagInv(PC p) { formPBMatrix()->getDiagInv()->getPrec(p); }
-void             SchurHelper::indexDomainIfacesLocal()
+PW_explicit<Mat> SchurHelper::getPBMatrix()
+{
+	return formPBMatrix()->getMatrix();
+}
+PW_explicit<Mat> SchurHelper::getPBDiagInv()
+{
+	return formPBMatrix()->getDiagInv()->getMatrix();
+}
+void SchurHelper::getPBDiagInv(PC p)
+{
+	formPBMatrix()->getDiagInv()->getPrec(p);
+}
+void SchurHelper::indexDomainIfacesLocal()
 {
 	vector<int>   map_vec;
 	map<int, int> rev_map;

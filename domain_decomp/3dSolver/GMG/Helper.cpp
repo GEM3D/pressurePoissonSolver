@@ -10,7 +10,7 @@ using namespace GMG;
 Helper::Helper(int n, OctTree t, std::shared_ptr<DomainCollection> dc,
                std::shared_ptr<SchurHelper> sh)
 {
-	int num_levels = 3;
+	int num_levels = t.num_levels;
 	int top_level  = num_levels - 1;
 	// generate and balance domain collections
 	vector<shared_ptr<DomainCollection>> dcs(num_levels);

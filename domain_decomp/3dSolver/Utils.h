@@ -27,7 +27,7 @@ class Slice
 inline Slice getSlice(double *u_view, int n, Side s)
 {
 	Slice retval;
-	switch (s) {
+	switch (s.toInt()) {
 		case Side::west:
 			retval = Slice(&u_view[0], n, n * n);
 			break;

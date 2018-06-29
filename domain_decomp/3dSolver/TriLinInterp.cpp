@@ -3,7 +3,7 @@
 using namespace Utils;
 void TriLinInterp::interpolate(SchurDomain &d, const Vec u, Vec interp)
 {
-	for (Side s : getSideValues()) {
+	for (Side s : Side::getValues()) {
 		if (d.hasNbr(s)) {
 			std::deque<int>       idx;
 			std::deque<IfaceType> types;

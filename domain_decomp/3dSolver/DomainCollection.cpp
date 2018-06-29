@@ -49,19 +49,17 @@ DomainCollection::DomainCollection(OctTree t, int level, int n)
 				}
 			}
 
-			Side s = Side::west;
 			// set and enqueue nbrs
-			do {
-				if (n.nbr(s) != -1) {
-					int id = n.nbr(s);
+			for (Side s : Side::getValues()) {
+				if (n.nbrId(s) != -1) {
+					int id = n.nbrId(s);
 					if (!qed.count(id)) {
 						q.push_back(id);
 						qed.insert(id);
 					}
 					d.getNbrInfoPtr(s) = new NormalNbrInfo(id);
 				}
-				s++;
-			} while (s != Side::west);
+			}
 			domains[d.id] = d_ptr;
 		}
 	}
@@ -111,15 +109,14 @@ DomainCollection::DomainCollection(OctTree t, int n)
 				}
 			}
 
-			Side s = Side::west;
 			// set and enqueue nbrs
-			do {
-				if (n.nbr(s) == -1 && n.parent != -1 && t.nodes[n.parent].nbr(s) != -1) {
+			for (Side s : Side::getValues()) {
+				if (n.nbrId(s) == -1 && n.parent != -1 && t.nodes[n.parent].nbrId(s) != -1) {
 					OctNode parent = t.nodes[n.parent];
-					OctNode nbr    = t.nodes[parent.nbr(s)];
-					auto    octs   = getOctsOnSide(s);
+					OctNode nbr    = t.nodes[parent.nbrId(s)];
+					auto    octs   = Octant::getValuesOnSide(s);
 					int     quad   = 0;
-					while (parent.child(octs[quad]) != n.id) {
+					while (parent.childId(octs[quad]) != n.id) {
 						quad++;
 					}
 					d.getNbrInfoPtr(s) = new CoarseNbrInfo(nbr.id, quad);
@@ -127,12 +124,12 @@ DomainCollection::DomainCollection(OctTree t, int n)
 						q.push_back(nbr.id);
 						qed.insert(nbr.id);
 					}
-				} else if (n.nbr(s) != -1 && t.nodes[n.nbr(s)].hasChildren()) {
-					OctNode       nbr  = t.nodes[n.nbr(s)];
-					auto          octs = getOctsOnSide(~s);
+				} else if (n.nbrId(s) != -1 && t.nodes[n.nbrId(s)].hasChildren()) {
+					OctNode       nbr  = t.nodes[n.nbrId(s)];
+					auto          octs = Octant::getValuesOnSide(s);
 					array<int, 4> nbr_ids;
 					for (int i = 0; i < 4; i++) {
-						int id     = nbr.child(octs[i]);
+						int id     = nbr.childId(octs[i]);
 						nbr_ids[i] = id;
 						if (!qed.count(id)) {
 							q.push_back(id);
@@ -140,16 +137,15 @@ DomainCollection::DomainCollection(OctTree t, int n)
 						}
 					}
 					d.getNbrInfoPtr(s) = new FineNbrInfo(nbr_ids);
-				} else if (n.nbr(s) != -1) {
-					int id = n.nbr(s);
+				} else if (n.nbrId(s) != -1) {
+					int id = n.nbrId(s);
 					if (!qed.count(id)) {
 						q.push_back(id);
 						qed.insert(id);
 					}
 					d.getNbrInfoPtr(s) = new NormalNbrInfo(id);
 				}
-				s++;
-			} while (s != Side::west);
+			}
 			domains[d.id] = d_ptr;
 		}
 	}
@@ -217,8 +213,10 @@ DomainCollection::DomainCollection(int d_x, int d_y, int d_z, int n)
 		p.second->setPtrs(domains);
 	}
 }
-void DomainCollection::reIndex() { indexDomainsLocal(); }
-void DomainCollection::divide() {}
+void DomainCollection::reIndex()
+{
+	indexDomainsLocal();
+}
 void DomainCollection::zoltanBalance()
 {
 	zoltanBalanceDomains();
@@ -274,15 +272,15 @@ void DomainCollection::zoltanBalanceDomains()
 		Domain &d = *p.second;
 		graph.vertices.push_back(d.id);
 		graph.ptrs.push_back(graph.edges.size());
-		for (Side s : getSideValues()) {
+		for (Side s : Side::getValues()) {
 			int edge_id = -1;
 			if (d.hasNbr(s)) {
 				switch (d.getNbrType(s)) {
 					case NbrType::Normal:
-						if (isENT(s)) {
-							edge_id = d.id;
-						} else {
+						if (s.isLowerOnAxis()) {
 							edge_id = d.getNormalNbrInfo(s).id;
+						} else {
+							edge_id = d.id;
 						}
 						break;
 					case NbrType::Fine:
@@ -293,7 +291,7 @@ void DomainCollection::zoltanBalanceDomains()
 						break;
 				}
 			}
-			graph.edges.push_back(edge_id ^ s);
+			graph.edges.push_back(edge_id * 6 + s.toInt());
 		}
 	}
 
@@ -475,15 +473,15 @@ void DomainCollection::zoltanBalanceWithLower(DomainCollection &lower)
 		graph.vertices.push_back(d.id);
 		graph.ptrs.push_back(graph.edges.size());
 		// patch to patch communication
-		for (Side s : getSideValues()) {
+		for (Side s : Side::getValues()) {
 			int edge_id = -1;
 			if (d.hasNbr(s)) {
 				switch (d.getNbrType(s)) {
 					case NbrType::Normal:
-						if (isENT(s)) {
-							edge_id = d.id;
-						} else {
+						if (s.isLowerOnAxis()) {
 							edge_id = d.getNormalNbrInfo(s).id;
+						} else {
+							edge_id = d.id;
 						}
 						break;
 					case NbrType::Fine:
@@ -494,7 +492,7 @@ void DomainCollection::zoltanBalanceWithLower(DomainCollection &lower)
 						break;
 				}
 			}
-			graph.edges.push_back(edge_id ^ s);
+			graph.edges.push_back(edge_id * 6 + s.toInt());
 		}
 		// level to level communication
 		graph.edges.push_back(-d.id - 1);

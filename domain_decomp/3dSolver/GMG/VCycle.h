@@ -9,7 +9,7 @@ class VCycle : public Cycle
 {
 	protected:
 	/**
-	 * @brief Implements V-cycle. Pre-smooth, visit coarser cycle and then post-smooth.
+	 * @brief Implements V-cycle. Pre-smooth, visit coarser level and then post-smooth.
 	 *
 	 * @param level the current level that is being visited.
 	 */

@@ -153,25 +153,25 @@ FftwPatchSolver::~FftwPatchSolver()
 }
 void FftwPatchSolver::solve(SchurDomain &d, const Vec f, Vec u, const Vec gamma)
 {
-	double h_x      = d.x_length / n;
-	double h_y      = d.x_length / n;
-	double h_z      = d.x_length / n;
-	auto getSpacing = [=](Side s) {
-		double retval = 0;
-		switch (s) {
-			case Side::east:
-			case Side::west:
-				retval = h_x;
-				break;
-			case Side::south:
-			case Side::north:
-				retval = h_y;
-				break;
-			case Side::bottom:
-			case Side::top:
-				retval = h_z;
-		}
-		return retval;
+	double h_x        = d.x_length / n;
+	double h_y        = d.x_length / n;
+	double h_z        = d.x_length / n;
+	auto   getSpacing = [=](Side s) {
+        double retval = 0;
+        switch (s.toInt()) {
+            case Side::east:
+            case Side::west:
+                retval = h_x;
+                break;
+            case Side::south:
+            case Side::north:
+                retval = h_y;
+                break;
+            case Side::bottom:
+            case Side::top:
+                retval = h_z;
+        }
+        return retval;
 	};
 
 	const double *f_view, *gamma_view;
@@ -183,7 +183,7 @@ void FftwPatchSolver::solve(SchurDomain &d, const Vec f, Vec u, const Vec gamma)
 		f_copy[i] = f_view[start + i];
 	}
 
-	for (Side s : getSideValues()) {
+	for (Side s : Side::getValues()) {
 		if (d.hasNbr(s)) {
 			int    idx = n * n * d.getIfaceLocalIndex(s);
 			Slice  sl  = getSlice(&f_copy[0], n, s);
@@ -200,9 +200,7 @@ void FftwPatchSolver::solve(SchurDomain &d, const Vec f, Vec u, const Vec gamma)
 
 	tmp /= denoms[d];
 
-	if (d.neumann.all()) {
-		tmp[0] = 0;
-	}
+	if (d.neumann.all()) { tmp[0] = 0; }
 
 	fftw_execute(plan2[d]);
 

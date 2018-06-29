@@ -22,9 +22,9 @@ struct Domain : public Serializable {
 	int id_global = 0;
 	int n         = 10;
 
-	int refine_level = 1;
-	int parent_id    = -1;
-	int oct_on_parent    = -1;
+	int refine_level  = 1;
+	int parent_id     = -1;
+	int oct_on_parent = -1;
 
 	std::array<int, 8> child_id = {{-1, -1, -1, -1, -1, -1, -1, -1}};
 
@@ -51,7 +51,10 @@ struct Domain : public Serializable {
 	std::array<NbrInfo *, 6> nbr_info = {{nullptr, nullptr, nullptr, nullptr, nullptr, nullptr}};
 
 	~Domain();
-	friend bool      operator<(const Domain &l, const Domain &r) { return l.id < r.id; }
+	friend bool operator<(const Domain &l, const Domain &r)
+	{
+		return l.id < r.id;
+	}
 	NbrInfo *&       getNbrInfoPtr(Side s);
 	NbrType          getNbrType(Side s) const;
 	NormalNbrInfo &  getNormalNbrInfo(Side s) const;
@@ -90,11 +93,26 @@ class NormalNbrInfo : public NbrInfo
 	int                     global_index = 0;
 	NormalNbrInfo() {}
 	~NormalNbrInfo() = default;
-	NormalNbrInfo(int id) { this->id = id; }
-	NbrType getNbrType() { return NbrType::Normal; }
-	void    getNbrIds(std::vector<int> &nbr_ids) { nbr_ids.push_back(id); };
-	void setGlobalIndexes(std::map<int, int> &rev_map) { global_index = rev_map.at(local_index); }
-	void setLocalIndexes(std::map<int, int> &rev_map) { local_index = rev_map.at(id); }
+	NormalNbrInfo(int id)
+	{
+		this->id = id;
+	}
+	NbrType getNbrType()
+	{
+		return NbrType::Normal;
+	}
+	void getNbrIds(std::vector<int> &nbr_ids)
+	{
+		nbr_ids.push_back(id);
+	};
+	void setGlobalIndexes(std::map<int, int> &rev_map)
+	{
+		global_index = rev_map.at(local_index);
+	}
+	void setLocalIndexes(std::map<int, int> &rev_map)
+	{
+		local_index = rev_map.at(id);
+	}
 	void setPtrs(std::map<int, std::shared_ptr<Domain>> &domains)
 	{
 		try {
@@ -103,10 +121,13 @@ class NormalNbrInfo : public NbrInfo
 			ptr = nullptr;
 		}
 	}
-	void updateRank(int new_rank) { rank = new_rank; }
+	void updateRank(int new_rank)
+	{
+		rank = new_rank;
+	}
 	void updateRankOnNeighbors(int new_rank, Side s)
 	{
-		ptr->getNbrInfoPtr(~s)->updateRank(new_rank);
+		ptr->getNbrInfoPtr(s.opposite())->updateRank(new_rank);
 	}
 	int serialize(char *buffer) const
 	{
@@ -139,10 +160,22 @@ class CoarseNbrInfo : public NbrInfo
 		this->id             = id;
 		this->quad_on_coarse = quad_on_coarse;
 	}
-	NbrType getNbrType() { return NbrType::Coarse; }
-	void    getNbrIds(std::vector<int> &nbr_ids) { nbr_ids.push_back(id); };
-	void setGlobalIndexes(std::map<int, int> &rev_map) { global_index = rev_map.at(local_index); }
-	void setLocalIndexes(std::map<int, int> &rev_map) { local_index = rev_map.at(id); }
+	NbrType getNbrType()
+	{
+		return NbrType::Coarse;
+	}
+	void getNbrIds(std::vector<int> &nbr_ids)
+	{
+		nbr_ids.push_back(id);
+	};
+	void setGlobalIndexes(std::map<int, int> &rev_map)
+	{
+		global_index = rev_map.at(local_index);
+	}
+	void setLocalIndexes(std::map<int, int> &rev_map)
+	{
+		local_index = rev_map.at(id);
+	}
 	void setPtrs(std::map<int, std::shared_ptr<Domain>> &domains)
 	{
 		try {
@@ -151,10 +184,13 @@ class CoarseNbrInfo : public NbrInfo
 			ptr = nullptr;
 		}
 	}
-	void updateRank(int new_rank) { rank = new_rank; }
+	void updateRank(int new_rank)
+	{
+		rank = new_rank;
+	}
 	void updateRankOnNeighbors(int new_rank, Side s)
 	{
-		ptr->getNbrInfoPtr(~s)->updateRank(new_rank);
+		ptr->getNbrInfoPtr(s.opposite())->updateRank(new_rank);
 	}
 	int serialize(char *buffer) const
 	{
@@ -183,9 +219,15 @@ class FineNbrInfo : public NbrInfo
 	std::array<int, 4>                     local_indexes;
 	FineNbrInfo() {}
 	~FineNbrInfo() = default;
-	FineNbrInfo(std::array<int, 4> ids) { this->ids = ids; }
-	NbrType getNbrType() { return NbrType::Fine; }
-	void    getNbrIds(std::vector<int> &nbr_ids)
+	FineNbrInfo(std::array<int, 4> ids)
+	{
+		this->ids = ids;
+	}
+	NbrType getNbrType()
+	{
+		return NbrType::Fine;
+	}
+	void getNbrIds(std::vector<int> &nbr_ids)
 	{
 		for (int i = 0; i < 4; i++) {
 			nbr_ids.push_back(ids[i]);
@@ -213,12 +255,15 @@ class FineNbrInfo : public NbrInfo
 			}
 		}
 	}
-	void updateRank(int new_rank) { ranks.fill(new_rank); }
+	void updateRank(int new_rank)
+	{
+		ranks.fill(new_rank);
+	}
 
 	void updateRankOnNeighbors(int new_rank, Side s)
 	{
 		for (int i = 0; i < 4; i++) {
-			ptrs[i]->getNbrInfoPtr(~s)->updateRank(new_rank);
+			ptrs[i]->getNbrInfoPtr(s.opposite())->updateRank(new_rank);
 		}
 	}
 	int serialize(char *buffer) const
@@ -244,29 +289,38 @@ inline Domain::~Domain()
 	}
 	*/
 }
-inline NbrInfo *&Domain::getNbrInfoPtr(Side s) { return nbr_info[static_cast<int>(s)]; }
-inline NbrType   Domain::getNbrType(Side s) const
+inline NbrInfo *&Domain::getNbrInfoPtr(Side s)
 {
-	return nbr_info[static_cast<int>(s)]->getNbrType();
+	return nbr_info[s.toInt()];
+}
+inline NbrType Domain::getNbrType(Side s) const
+{
+	return nbr_info[s.toInt()]->getNbrType();
 }
 inline NormalNbrInfo &Domain::getNormalNbrInfo(Side s) const
 {
-	return *(NormalNbrInfo *) nbr_info[static_cast<int>(s)];
+	return *(NormalNbrInfo *) nbr_info[s.toInt()];
 }
 inline CoarseNbrInfo &Domain::getCoarseNbrInfo(Side s) const
 {
-	return *(CoarseNbrInfo *) nbr_info[static_cast<int>(s)];
+	return *(CoarseNbrInfo *) nbr_info[s.toInt()];
 }
 inline FineNbrInfo &Domain::getFineNbrInfo(Side s) const
 {
-	return *(FineNbrInfo *) nbr_info[static_cast<int>(s)];
+	return *(FineNbrInfo *) nbr_info[s.toInt()];
 }
-inline bool Domain::hasNbr(Side s) const { return nbr_info[static_cast<int>(s)] != nullptr; }
-inline bool Domain::isNeumann(Side s) const { return neumann[static_cast<int>(s)]; }
+inline bool Domain::hasNbr(Side s) const
+{
+	return nbr_info[s.toInt()] != nullptr;
+}
+inline bool Domain::isNeumann(Side s) const
+{
+	return neumann[s.toInt()];
+}
 inline void Domain::setLocalNeighborIndexes(std::map<int, int> &rev_map)
 {
 	id_local = rev_map.at(id);
-	for (Side s : getSideValues()) {
+	for (Side s : Side::getValues()) {
 		if (hasNbr(s)) { getNbrInfoPtr(s)->setLocalIndexes(rev_map); }
 	}
 }
@@ -274,7 +328,7 @@ inline void Domain::setLocalNeighborIndexes(std::map<int, int> &rev_map)
 inline void Domain::setGlobalNeighborIndexes(std::map<int, int> &rev_map)
 {
 	id_global = rev_map.at(id_local);
-	for (Side s : getSideValues()) {
+	for (Side s : Side::getValues()) {
 		if (hasNbr(s)) { getNbrInfoPtr(s)->setGlobalIndexes(rev_map); }
 	}
 }
@@ -287,7 +341,7 @@ inline void Domain::setNeumann()
 inline std::vector<int> Domain::getNbrIds()
 {
 	std::vector<int> retval;
-	for (Side s : getSideValues()) {
+	for (Side s : Side::getValues()) {
 		if (hasNbr(s)) { getNbrInfoPtr(s)->getNbrIds(retval); }
 	}
 	return retval;
@@ -315,7 +369,7 @@ inline int Domain::serialize(char *buffer) const
 		has_nbr[i] = nbr_info[i] != nullptr;
 	}
 	writer << has_nbr;
-	for (Side s : getSideValues()) {
+	for (Side s : Side::getValues()) {
 		if (hasNbr(s)) {
 			NbrType type = getNbrType(s);
 			writer << type;
@@ -382,13 +436,13 @@ inline int Domain::deserialize(char *buffer)
 }
 inline void Domain::setPtrs(std::map<int, std::shared_ptr<Domain>> &domains)
 {
-	for (Side s : getSideValues()) {
+	for (Side s : Side::getValues()) {
 		if (hasNbr(s)) { getNbrInfoPtr(s)->setPtrs(domains); }
 	}
 }
 inline void Domain::updateRank(int rank)
 {
-	for (Side s : getSideValues()) {
+	for (Side s : Side::getValues()) {
 		if (hasNbr(s)) { getNbrInfoPtr(s)->updateRankOnNeighbors(rank, s); }
 	}
 }
