@@ -1,5 +1,7 @@
 #ifndef GMGVCycle_H
 #define GMGVCycle_H
+#include "GMG/Cycle.h"
+#include "tpl/json.hpp"
 namespace GMG
 {
 /**
@@ -7,6 +9,11 @@ namespace GMG
  */
 class VCycle : public Cycle
 {
+	private:
+	int num_pre_sweeps    = 1;
+	int num_post_sweeps   = 1;
+	int num_coarse_sweeps = 1;
+
 	protected:
 	/**
 	 * @brief Implements V-cycle. Pre-smooth, visit coarser level and then post-smooth.
@@ -16,23 +23,43 @@ class VCycle : public Cycle
 	void visit(const Level &level)
 	{
 		if (level.coarsest()) {
-			smooth(level);
+			for (int i = 0; i < num_coarse_sweeps; i++) {
+				smooth(level);
+			}
 		} else {
-			smooth(level);
+			for (int i = 0; i < num_pre_sweeps; i++) {
+				smooth(level);
+			}
 			prepCoarser(level);
 			visit(level.getCoarser());
-			smooth(level);
+			for (int i = 0; i < num_post_sweeps; i++) {
+				smooth(level);
+			}
 		}
 		if (!level.finest()) { prepFiner(level); }
 	}
 
 	public:
-    /**
-     * @brief Create new V-cycle
-     *
-     * @param finest_level a pointer to the finest level
-     */
-	VCycle(std::shared_ptr<Level> finest_level) : Cycle(finest_level) {}
+	/**
+	 * @brief Create new V-cycle
+	 *
+	 * @param finest_level a pointer to the finest level
+	 */
+	VCycle(std::shared_ptr<Level> finest_level, nlohmann::json config_j) : Cycle(finest_level)
+	{
+		try {
+			num_pre_sweeps = config_j.at("pre_sweeps");
+		} catch (nlohmann::detail::out_of_range oor) {
+		}
+		try {
+			num_post_sweeps = config_j.at("post_sweeps");
+		} catch (nlohmann::detail::out_of_range oor) {
+		}
+		try {
+			num_coarse_sweeps = config_j.at("coarse_sweeps");
+		} catch (nlohmann::detail::out_of_range oor) {
+		}
+	}
 };
 } // namespace GMG
 #endif

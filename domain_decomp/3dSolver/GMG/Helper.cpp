@@ -3,15 +3,26 @@
 #include "DrctIntp.h"
 #include "FFTBlockJacobiSmoother.h"
 #include "MatOp.h"
-#include "VCycle.h"
 #include "MatrixHelper.h"
+#include "VCycle.h"
+#include <fstream>
 using namespace std;
 using namespace GMG;
+using nlohmann::json;
 Helper::Helper(int n, OctTree t, std::shared_ptr<DomainCollection> dc,
-               std::shared_ptr<SchurHelper> sh)
+               std::shared_ptr<SchurHelper> sh, std::string config_file)
 {
-	int num_levels = t.num_levels;
-	int top_level  = num_levels - 1;
+	ifstream config_stream(config_file);
+	json     config_j;
+	config_stream >> config_j;
+	config_stream.close();
+	int num_levels;
+    try{
+        num_levels = config_j.at("max_levels");
+    }catch(nlohmann::detail::out_of_range oor){
+        num_levels = 0;
+    }
+	if (num_levels <= 0 || num_levels > t.num_levels) { num_levels = t.num_levels; }
 	// generate and balance domain collections
 	vector<shared_ptr<DomainCollection>> dcs(num_levels);
 	dcs[0] = dc;
@@ -67,7 +78,8 @@ Helper::Helper(int n, OctTree t, std::shared_ptr<DomainCollection> dc,
 		levels[i]->setFiner(levels[i - 1]);
 	}
 	levels[num_levels - 1]->setFiner(levels[num_levels - 2]);
-    cycle.reset(new VCycle(levels[0]));
+
+	cycle.reset(new VCycle(levels[0],config_j));
 }
 void Helper::apply(Vec f, Vec u)
 {

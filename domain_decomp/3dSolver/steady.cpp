@@ -402,7 +402,7 @@ int main(int argc, char *argv[])
 					sp->getPrec(pc);
 				}
 				if (f_gmg) {
-					gh.reset(new GMG::Helper(n, t, dc, sch));
+					gh.reset(new GMG::Helper(n, t, dc, sch, "gmg.json"));
 					gh->getPrec(pc);
 				}
 				if (f_ibd) { sch->getPBDiagInv(pc); }
