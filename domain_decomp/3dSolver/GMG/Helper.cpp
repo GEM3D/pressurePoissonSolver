@@ -6,6 +6,7 @@
 #include "MatOp.h"
 #include "MatrixHelper.h"
 #include "VCycle.h"
+#include "WCycle.h"
 #include <fstream>
 using namespace std;
 using namespace GMG;
@@ -107,7 +108,7 @@ Helper::Helper(int n, OctTree t, std::shared_ptr<DomainCollection> dc,
 	if (cycle_type == "V") {
 		cycle.reset(new VCycle(levels[0], config_j));
 	} else if (cycle_type == "W") {
-		// TODO
+		cycle.reset(new WCycle(levels[0], config_j));
 	} else {
 		// TODO throw error
 	}

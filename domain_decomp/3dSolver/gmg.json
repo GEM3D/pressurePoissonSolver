@@ -3,5 +3,6 @@
     "pre_sweeps": 1,
     "post_sweeps": 1,
     "coarse_sweeps": 1,
+    "cycle_type": "V",
     "interpolator": "trilinear"
 }
