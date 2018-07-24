@@ -1,6 +1,7 @@
 #include "Helper.h"
 #include "AvgRstr.h"
 #include "DrctIntp.h"
+#include "TriLinIntp.h"
 #include "FFTBlockJacobiSmoother.h"
 #include "MatOp.h"
 #include "MatrixHelper.h"
@@ -17,11 +18,11 @@ Helper::Helper(int n, OctTree t, std::shared_ptr<DomainCollection> dc,
 	config_stream >> config_j;
 	config_stream.close();
 	int num_levels;
-    try{
-        num_levels = config_j.at("max_levels");
-    }catch(nlohmann::detail::out_of_range oor){
-        num_levels = 0;
-    }
+	try {
+		num_levels = config_j.at("max_levels");
+	} catch (nlohmann::detail::out_of_range oor) {
+		num_levels = 0;
+	}
 	if (num_levels <= 0 || num_levels > t.num_levels) { num_levels = t.num_levels; }
 	// generate and balance domain collections
 	vector<shared_ptr<DomainCollection>> dcs(num_levels);
@@ -54,7 +55,6 @@ Helper::Helper(int n, OctTree t, std::shared_ptr<DomainCollection> dc,
 	for (int i = 0; i < num_levels - 1; i++) {
 		comms[i].reset(new InterLevelComm(dcs[i + 1], dcs[i]));
 		restrictors[i].reset(new AvgRstr(dcs[i + 1], dcs[i], comms[i]));
-		interpolators[i].reset(new DrctIntp(dcs[i + 1], dcs[i], comms[i]));
 	}
 
 	// create  level objects
@@ -66,9 +66,27 @@ Helper::Helper(int n, OctTree t, std::shared_ptr<DomainCollection> dc,
 	}
 
 	// set restrictors and interpolators
+	string interpolator;
+	try {
+		interpolator = config_j.at("interpolator");
+	} catch (nlohmann::detail::out_of_range oor) {
+		interpolator = "trilinear";
+	}
 	for (int i = 0; i < num_levels - 1; i++) {
 		levels[i]->setRestrictor(restrictors[i]);
-		levels[i + 1]->setInterpolator(interpolators[i]);
+	}
+	if (interpolator == "constant") {
+		for (int i = 0; i < num_levels - 1; i++) {
+			levels[i + 1]->setInterpolator(
+			shared_ptr<Interpolator>(new DrctIntp(dcs[i + 1], dcs[i], comms[i])));
+		}
+	} else if (interpolator == "trilinear") {
+		for (int i = 0; i < num_levels - 1; i++) {
+			levels[i + 1]->setInterpolator(
+			shared_ptr<Interpolator>(new TriLinIntp(dcs[i + 1], dcs[i], comms[i])));
+		}
+	} else {
+		// TODO throw error
 	}
 
 	// link levels to each other
@@ -79,7 +97,20 @@ Helper::Helper(int n, OctTree t, std::shared_ptr<DomainCollection> dc,
 	}
 	levels[num_levels - 1]->setFiner(levels[num_levels - 2]);
 
-	cycle.reset(new VCycle(levels[0],config_j));
+	string cycle_type;
+	try {
+		cycle_type = config_j.at("cycle_type");
+	} catch (nlohmann::detail::out_of_range oor) {
+		cycle_type = "V";
+	}
+
+	if (cycle_type == "V") {
+		cycle.reset(new VCycle(levels[0], config_j));
+	} else if (cycle_type == "W") {
+		// TODO
+	} else {
+		// TODO throw error
+	}
 }
 void Helper::apply(Vec f, Vec u)
 {

@@ -25,9 +25,7 @@ VtkWriter::VtkWriter(DomainCollection &dc, string file_name)
 	writer->SetNumberOfPieces(1);
 	writer->SetStartPiece(0);
 	writer->SetInputData(block);
-	if (rank == 0) {
-		writer->SetWriteMetaFile(1);
-	}
+	if (rank == 0) { writer->SetWriteMetaFile(1); }
 }
 void VtkWriter::add(Vec u, string name)
 {
@@ -37,12 +35,12 @@ void VtkWriter::add(Vec u, string name)
 	VecGetArray(u, &u_view);
 
 	for (auto &p : dc.domains) {
-		Domain &d     = p.second;
+		Domain &d     = *p.second;
 		int     n     = d.n;
 		double  h_x   = d.x_length / n;
 		double  h_y   = d.y_length / n;
 		double  h_z   = d.z_length / n;
-		int     start = d.id_local * n * n*n;
+		int     start = d.id_local * n * n * n;
 
 		// create image object
 		vtkSmartPointer<vtkImageData> image = images[d.id];
@@ -52,9 +50,9 @@ void VtkWriter::add(Vec u, string name)
 			image->SetOrigin(d.x_start, d.y_start, d.z_start);
 			image->SetSpacing(h_x, h_y, h_z);
 			image->SetExtent(d.x_start, d.x_start + d.x_length, d.y_start, d.y_start + d.y_length,
-			                 d.z_start, d.z_start+d.z_length);
+			                 d.z_start, d.z_start + d.z_length);
 			image->PrepareForNewData();
-			image->SetDimensions(n + 1, n + 1, n+1);
+			image->SetDimensions(n + 1, n + 1, n + 1);
 			// add image to dataset
 			data->SetPiece(d.id_global, image);
 		}
@@ -62,9 +60,9 @@ void VtkWriter::add(Vec u, string name)
 		// create solution vector
 		vtkSmartPointer<vtkDoubleArray> solution = vtkSmartPointer<vtkDoubleArray>::New();
 		solution->SetNumberOfComponents(1);
-		solution->SetNumberOfValues(n * n*n);
+		solution->SetNumberOfValues(n * n * n);
 		solution->SetName(name.c_str());
-		for (int i = 0; i < n * n*n; i++) {
+		for (int i = 0; i < n * n * n; i++) {
 			solution->SetValue(i, u_view[start + i]);
 		}
 		image->GetCellData()->AddArray(solution);

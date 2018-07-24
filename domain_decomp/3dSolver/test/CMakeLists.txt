@@ -5,3 +5,6 @@ target_link_libraries(test
     DomainCollection
     GMG
     )
+if(VTK_FOUND)
+    target_link_libraries(test VtkWriter)
+endif(VTK_FOUND)

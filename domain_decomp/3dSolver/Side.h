@@ -3,6 +3,7 @@
 #include <array>
 #include <iostream>
 #include <vector>
+enum class Axis { x, y, z };
 /**
  * @brief An enum-style class that represents the sides of a cube.
  *
@@ -60,6 +61,12 @@ class Side
 	 * @return The array.
 	 */
 	static std::array<Side, 6> getValues();
+	/**
+	 * @brief Get an array of all pairs of sides that touch.
+	 *
+	 * @return The array.
+	 */
+	static std::array<std::array<Side, 2>, 12> getPairValues();
 	/**
 	 * @brief Return whether or not the side of the cube is lower on the axis that is orthogonal to
 	 * it.
@@ -120,6 +127,21 @@ inline std::array<Side, 6> Side::getValues()
 {
 	return std::array<Side, 6>(
 	{{Side::west, Side::east, Side::south, Side::north, Side::bottom, Side::top}});
+}
+inline std::array<std::array<Side, 2>, 12> Side::getPairValues()
+{
+	return std::array<std::array<Side, 2>, 12>({{{{Side::west, Side::south}},
+	                                             {{Side::west, Side::north}},
+	                                             {{Side::west, Side::bottom}},
+	                                             {{Side::west, Side::top}},
+	                                             {{Side::east, Side::south}},
+	                                             {{Side::east, Side::north}},
+	                                             {{Side::east, Side::bottom}},
+	                                             {{Side::east, Side::top}},
+	                                             {{Side::south, Side::bottom}},
+	                                             {{Side::south, Side::top}},
+	                                             {{Side::north, Side::bottom}},
+	                                             {{Side::north, Side::top}}}});
 }
 inline Side Side::opposite() const
 {
@@ -264,7 +286,7 @@ class Octant
 	/**
 	 * @brief Get an array of all Octant values that lie on a particular side of the cube.
 	 *
-	 * When the two axis that the side lie on are arranged in the following way, the octants are
+	 * When the two axis that the side lies on are arranged in the following way, the octants are
 	 * returned in the following order:
 	 *
 	 *   ^

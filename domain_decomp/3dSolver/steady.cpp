@@ -551,7 +551,7 @@ int main(int argc, char *argv[])
 		}
 #ifdef HAVE_VTK
 		if (f_outvtk) {
-			VtkWriter writer(dc, args::get(f_outvtk));
+			VtkWriter writer(*dc, args::get(f_outvtk));
 			writer.add(u, "Solution");
 			writer.add(error, "Error");
 			writer.add(exact, "Exact");

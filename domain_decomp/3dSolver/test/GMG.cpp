@@ -1,7 +1,11 @@
 #include "../GMG/AvgRstr.h"
 #include "../GMG/DrctIntp.h"
 #include "../GMG/InterLevelComm.h"
+#include "../GMG/TriLinIntp.h"
 #include "catch.hpp"
+#ifdef HAVE_VTK
+#include "../Writers/VtkWriter.h"
+#endif
 using namespace std;
 const int n = 8;
 // generate 2 level simple test
@@ -105,9 +109,9 @@ TEST_CASE("InterLevelComm scatter works", "[GMG]")
 		shared_ptr<DomainCollection> fine;
 		generateTwoLevel(coarse, fine);
 		shared_ptr<GMG::InterLevelComm> comm(new GMG::InterLevelComm(coarse, fine));
-		PW<Vec>                    coarse_expected       = coarse->getNewDomainVec();
-		PW<Vec>                    coarse_local_expected = comm->getNewCoarseDistVec();
-		double *                   ce_vec;
+		PW<Vec>                         coarse_expected       = coarse->getNewDomainVec();
+		PW<Vec>                         coarse_local_expected = comm->getNewCoarseDistVec();
+		double *                        ce_vec;
 		VecGetArray(coarse_expected, &ce_vec);
 		for (auto p : coarse->domains) {
 			Domain &d = *p.second;
@@ -167,11 +171,11 @@ TEST_CASE("GMGAvgRstr works", "[GMG]")
 		shared_ptr<DomainCollection> coarse;
 		shared_ptr<DomainCollection> fine;
 		generateTwoLevel(coarse, fine);
-		shared_ptr<GMG::InterLevelComm>  comm(new GMG::InterLevelComm(coarse, fine));
-		shared_ptr<GMG::Restrictor> op(new GMG::AvgRstr(coarse, fine, comm));
-		PW<Vec>                     coarse_expected = coarse->getNewDomainVec();
-		PW<Vec>                     fine_start      = fine->getNewDomainVec();
-		double *                    ce_vec;
+		shared_ptr<GMG::InterLevelComm> comm(new GMG::InterLevelComm(coarse, fine));
+		shared_ptr<GMG::Restrictor>     op(new GMG::AvgRstr(coarse, fine, comm));
+		PW<Vec>                         coarse_expected = coarse->getNewDomainVec();
+		PW<Vec>                         fine_start      = fine->getNewDomainVec();
+		double *                        ce_vec;
 		VecGetArray(coarse_expected, &ce_vec);
 		for (auto p : coarse->domains) {
 			Domain &d = *p.second;
@@ -218,11 +222,11 @@ TEST_CASE("GMGDrctIntp works", "[GMG]")
 		shared_ptr<DomainCollection> coarse;
 		shared_ptr<DomainCollection> fine;
 		generateTwoLevel(coarse, fine);
-		shared_ptr<GMG::InterLevelComm>    comm(new GMG::InterLevelComm(coarse, fine));
-		shared_ptr<GMG::Interpolator> op(new GMG::DrctIntp(coarse, fine, comm));
-		PW<Vec>                       coarse_start  = coarse->getNewDomainVec();
-		PW<Vec>                       fine_expected = fine->getNewDomainVec();
-		double *                      ce_vec;
+		shared_ptr<GMG::InterLevelComm> comm(new GMG::InterLevelComm(coarse, fine));
+		shared_ptr<GMG::Interpolator>   op(new GMG::DrctIntp(coarse, fine, comm));
+		PW<Vec>                         coarse_start  = coarse->getNewDomainVec();
+		PW<Vec>                         fine_expected = fine->getNewDomainVec();
+		double *                        ce_vec;
 		VecGetArray(coarse_start, &ce_vec);
 		for (auto p : coarse->domains) {
 			Domain &d = *p.second;
@@ -260,6 +264,104 @@ TEST_CASE("GMGDrctIntp works", "[GMG]")
 		VecNorm(fine_result, NORM_2, &fine_result_norm);
 		REQUIRE(fine_result_norm == fine_expected_norm);
 		REQUIRE(fine_result_norm != 0);
+	}
+}
+void getXYZ(const Domain &d, const int &xi, const int &yi, const int &zi, double &x, double &y,
+            double &z)
+{
+	const int &n   = d.n;
+	double     h_x = d.x_length / n;
+	double     h_y = d.y_length / n;
+	double     h_z = d.z_length / n;
+	if (xi == -1) {
+		x = d.x_start;
+	} else if (xi == n) {
+		x = d.x_start + d.x_length;
+	} else {
+		x = d.x_start + h_x / 2.0 + d.x_length * xi / n;
+	}
+	if (yi == -1) {
+		y = d.y_start;
+	} else if (yi == n) {
+		y = d.y_start + d.y_length;
+	} else {
+		y = d.y_start + h_y / 2.0 + d.y_length * yi / n;
+	}
+	if (zi == -1) {
+		z = d.z_start;
+	} else if (zi == n) {
+		z = d.z_start + d.z_length;
+	} else {
+		z = d.z_start + h_z / 2.0 + d.z_length * zi / n;
+	}
+}
+TEST_CASE("GMGTriLinIntp works", "[GMG]")
+{
+	PetscInitialize(nullptr, nullptr, nullptr, nullptr);
+	{
+		shared_ptr<DomainCollection> coarse;
+		shared_ptr<DomainCollection> fine;
+		generateTwoLevel(coarse, fine);
+		shared_ptr<GMG::InterLevelComm> comm(new GMG::InterLevelComm(coarse, fine));
+		shared_ptr<GMG::Interpolator>   op(new GMG::TriLinIntp(coarse, fine, comm));
+		PW<Vec>                         coarse_start  = coarse->getNewDomainVec();
+		PW<Vec>                         fine_expected = fine->getNewDomainVec();
+		double *                        ce_vec;
+		VecGetArray(coarse_start, &ce_vec);
+		for (auto p : coarse->domains) {
+			Domain &d = *p.second;
+			for (int zi = 0; zi < n; zi++) {
+				for (int yi = 0; yi < n; yi++) {
+					for (int xi = 0; xi < n; xi++) {
+						double x, y, z;
+						getXYZ(d, xi, yi, zi, x, y, z);
+						ce_vec[d.id_local * n * n * n + xi + yi * n + zi * n * n] = x + 0.5 * y - z;
+					}
+				}
+			}
+		}
+		VecRestoreArray(coarse_start, &ce_vec);
+
+		VecGetArray(fine_expected, &ce_vec);
+		for (auto data : fine->domains) {
+			Domain &d = *data.second;
+			for (int zi = 0; zi < n; zi++) {
+				for (int yi = 0; yi < n; yi++) {
+					for (int xi = 0; xi < n; xi++) {
+						double x, y, z;
+						getXYZ(d, xi, yi, zi, x, y, z);
+						ce_vec[d.id_local * n * n * n + xi + yi * n + zi * n * n] = x + 0.5 * y - z;
+					}
+				}
+			}
+		}
+		VecRestoreArray(fine_expected, &ce_vec);
+
+		// check that interpolator works
+		PW<Vec> fine_result = fine->getNewDomainVec();
+		op->interpolate(coarse_start, fine_result);
+
+#ifdef HAVE_VTK
+		// print?
+		VtkWriter writer(*fine, "fine_domain");
+		writer.add(fine_expected, "Expected");
+		writer.add(fine_result, "Result");
+        writer.write();
+#endif
+
+		double expected_sum;
+		VecSum(fine_expected, &expected_sum);
+		VecAYPX(fine_result, -1, fine_expected);
+
+		double two_norm;
+		VecNorm(fine_result, NORM_2, &two_norm);
+		two_norm /= expected_sum;
+		REQUIRE(two_norm < 1e-10);
+
+		double inf_norm;
+		VecNorm(fine_result, NORM_INFINITY, &inf_norm);
+		inf_norm /= expected_sum;
+		REQUIRE(inf_norm < 1e-10);
 	}
 	PetscFinalize();
 }
