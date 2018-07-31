@@ -363,5 +363,4 @@ TEST_CASE("GMGTriLinIntp works", "[GMG]")
 		inf_norm /= expected_sum;
 		REQUIRE(inf_norm < 1e-10);
 	}
-	PetscFinalize();
 }
