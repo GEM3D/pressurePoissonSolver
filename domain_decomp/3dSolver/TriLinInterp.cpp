@@ -87,7 +87,7 @@ void TriLinInterp::interpolate(SchurDomain &d, Side s, int local_index, IfaceTyp
 			Slice sl = getSlice(d, u_view, s);
 			for (int yi = 0; yi < n; yi++) {
 				for (int xi = 0; xi < n; xi++) {
-					interp_view[idx + xi + yi * n] += 2.0 / 6 * sl(xi, yi);
+					interp_view[idx + xi + yi * n] += 2.0/6.0 * sl(xi, yi);
 				}
 			}
 		} break;
@@ -95,7 +95,7 @@ void TriLinInterp::interpolate(SchurDomain &d, Side s, int local_index, IfaceTyp
 			Slice sl = getSlice(d, u_view, s);
 			for (int yi = 0; yi < n; yi++) {
 				for (int xi = 0; xi < n; xi++) {
-					interp_view[idx + (xi) / 2 + (yi) / 2 * n] += 1.0 / 6 * sl(xi, yi);
+					interp_view[idx + (xi) / 2 + (yi) / 2 * n] += 1.0/6.0 * sl(xi, yi);
 				}
 			}
 		} break;
@@ -103,7 +103,7 @@ void TriLinInterp::interpolate(SchurDomain &d, Side s, int local_index, IfaceTyp
 			Slice sl = getSlice(d, u_view, s);
 			for (int yi = 0; yi < n; yi++) {
 				for (int xi = 0; xi < n; xi++) {
-					interp_view[idx + (xi + n) / 2 + (yi) / 2 * n] += 1.0 / 6 * sl(xi, yi);
+					interp_view[idx + (xi + n) / 2 + (yi) / 2 * n] += 1.0/6.0 * sl(xi, yi);
 				}
 			}
 		} break;
@@ -111,7 +111,7 @@ void TriLinInterp::interpolate(SchurDomain &d, Side s, int local_index, IfaceTyp
 			Slice sl = getSlice(d, u_view, s);
 			for (int yi = 0; yi < n; yi++) {
 				for (int xi = 0; xi < n; xi++) {
-					interp_view[idx + (xi) / 2 + (yi + n) / 2 * n] += 1.0 / 6 * sl(xi, yi);
+					interp_view[idx + (xi) / 2 + (yi + n) / 2 * n] += 1.0/6.0 * sl(xi, yi);
 				}
 			}
 		} break;
@@ -119,7 +119,7 @@ void TriLinInterp::interpolate(SchurDomain &d, Side s, int local_index, IfaceTyp
 			Slice sl = getSlice(d, u_view, s);
 			for (int yi = 0; yi < n; yi++) {
 				for (int xi = 0; xi < n; xi++) {
-					interp_view[idx + (xi + n) / 2 + (yi + n) / 2 * n] += 1.0 / 6 * sl(xi, yi);
+					interp_view[idx + (xi + n) / 2 + (yi + n) / 2 * n] += 1.0/6.0 * sl(xi, yi);
 				}
 			}
 		} break;

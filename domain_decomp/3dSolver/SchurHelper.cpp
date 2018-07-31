@@ -174,7 +174,7 @@ void SchurHelper::apply(const Vec u, Vec f)
 	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 
 	for (SchurDomain &sd : domains) {
-		op->apply(sd, u, local_interp, f);
+		op->apply(sd, u, local_gamma, f);
 	}
 }
 enum class Rotation : char { x_cw, x_ccw, y_cw, y_ccw, z_cw, z_ccw };

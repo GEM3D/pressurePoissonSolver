@@ -236,19 +236,19 @@ int main(int argc, char *argv[])
 		nfunz = [](double x, double y, double z) { return 0; };
 	} else {
 		ffun = [](double x, double y, double z) {
-			return -9 * M_PI * M_PI * sin(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
+			return -77.0/36 * M_PI * M_PI * sin(M_PI * x) * cos(2.0/3 * M_PI * y) * sin(5.0/6 * M_PI * z);
 		};
 		gfun = [](double x, double y, double z) {
-			return sin(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
+			return sin(M_PI * x) * cos(2.0/3 * M_PI * y) * sin(5.0/6 * M_PI * z);
 		};
 		nfunx = [](double x, double y, double z) {
-			return M_PI * cos(M_PI * x) * cos(2 * M_PI * y) * sin(2 * M_PI * z);
+			return M_PI * cos(M_PI * x) * cos(2 * M_PI * y) * sin(5.0/6 * M_PI * z);
 		};
 		nfuny = [](double x, double y, double z) {
-			return -2 * M_PI * sin(M_PI * x) * sin(2 * M_PI * y) * sin(2 * M_PI * z);
+			return -2.0/3 * M_PI * sin(M_PI * x) * sin(2.0/3 * M_PI * y) * sin(5.0/6 * M_PI * z);
 		};
 		nfunz = [](double x, double y, double z) {
-			return 2 * M_PI * sin(M_PI * x) * cos(2 * M_PI * y) * cos(2 * M_PI * z);
+			return 2 * M_PI * sin(M_PI * x) * cos(2 * M_PI * y) * cos(5.0/6 * M_PI * z);
 		};
 	}
 

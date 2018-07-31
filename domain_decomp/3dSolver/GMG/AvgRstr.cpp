@@ -53,10 +53,21 @@ void AvgRstr::restrict(PW<Vec> coarse, PW<Vec> fine) const
 
 		int fine_idx = d.id_local * n * n * n;
 		int oct      = d.oct_on_parent;
-		for (int zi = 0; zi < n; zi++) {
-			for (int yi = 0; yi < n; yi++) {
-				for (int xi = 0; xi < n; xi++) {
-					f_to_c[oct](xi, yi, zi) += r_fine[fine_idx + xi + yi * n + zi * n * n] / 8;
+		if (d.id != d.parent_id) {
+			for (int zi = 0; zi < n; zi++) {
+				for (int yi = 0; yi < n; yi++) {
+					for (int xi = 0; xi < n; xi++) {
+						f_to_c[oct](xi, yi, zi) += r_fine[fine_idx + xi + yi * n + zi * n * n] / 8;
+					}
+				}
+			}
+		} else {
+			for (int zi = 0; zi < n; zi++) {
+				for (int yi = 0; yi < n; yi++) {
+					for (int xi = 0; xi < n; xi++) {
+						f_coarse[coarse_idx + xi + yi * n + zi * n * n]
+						+= r_fine[fine_idx + xi + yi * n + zi * n * n];
+					}
 				}
 			}
 		}

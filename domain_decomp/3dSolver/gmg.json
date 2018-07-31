@@ -1,5 +1,5 @@
 {
-    "max_levels": 2,
+    "max_levels": 0,
     "pre_sweeps": 1,
     "post_sweeps": 1,
     "coarse_sweeps": 1,

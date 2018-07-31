@@ -32,16 +32,20 @@ DomainCollection::DomainCollection(OctTree t, int level, int n)
 			OctNode            n = t.nodes[q.front()];
 			q.pop_front();
 
-			d.n         = this->n;
-			d.id        = n.id;
-			d.x_length  = n.x_length;
-			d.y_length  = n.y_length;
-			d.z_length  = n.z_length;
-			d.x_start   = n.x_start;
-			d.y_start   = n.y_start;
-			d.z_start   = n.z_start;
-			d.child_id  = n.child_id;
-			d.parent_id = n.parent;
+			d.n        = this->n;
+			d.id       = n.id;
+			d.x_length = n.x_length;
+			d.y_length = n.y_length;
+			d.z_length = n.z_length;
+			d.x_start  = n.x_start;
+			d.y_start  = n.y_start;
+			d.z_start  = n.z_start;
+			d.child_id = n.child_id;
+			if (n.level < level) {
+				d.parent_id = n.id;
+			} else {
+				d.parent_id = n.parent;
+			}
 			if (d.parent_id != -1) {
 				d.oct_on_parent = 0;
 				while (t.nodes[n.parent].child_id[d.oct_on_parent] != n.id) {
@@ -50,8 +54,46 @@ DomainCollection::DomainCollection(OctTree t, int level, int n)
 			}
 
 			// set and enqueue nbrs
+			/*for (Side s : Side::getValues()) {
+			    if (n.nbrId(s) != -1) {
+			        int id = n.nbrId(s);
+			        if (!qed.count(id)) {
+			            q.push_back(id);
+			            qed.insert(id);
+			        }
+			        d.getNbrInfoPtr(s) = new NormalNbrInfo(id);
+			    }
+			}*/
+			// set and enqueue nbrs
 			for (Side s : Side::getValues()) {
-				if (n.nbrId(s) != -1) {
+				if (n.nbrId(s) == -1 && n.parent != -1 && t.nodes[n.parent].nbrId(s) != -1) {
+					OctNode parent = t.nodes[n.parent];
+					OctNode nbr    = t.nodes[parent.nbrId(s)];
+					auto    octs   = Octant::getValuesOnSide(s);
+					int     quad   = 0;
+					while (parent.childId(octs[quad]) != n.id) {
+						quad++;
+					}
+					d.getNbrInfoPtr(s) = new CoarseNbrInfo(nbr.id, quad);
+					if (!qed.count(nbr.id)) {
+						q.push_back(nbr.id);
+						qed.insert(nbr.id);
+					}
+				} else if (n.level < level && n.nbrId(s) != -1
+				           && t.nodes[n.nbrId(s)].hasChildren()) {
+					OctNode       nbr  = t.nodes[n.nbrId(s)];
+					auto          octs = Octant::getValuesOnSide(s.opposite());
+					array<int, 4> nbr_ids;
+					for (int i = 0; i < 4; i++) {
+						int id     = nbr.childId(octs[i]);
+						nbr_ids[i] = id;
+						if (!qed.count(id)) {
+							q.push_back(id);
+							qed.insert(id);
+						}
+					}
+					d.getNbrInfoPtr(s) = new FineNbrInfo(nbr_ids);
+				} else if (n.nbrId(s) != -1) {
 					int id = n.nbrId(s);
 					if (!qed.count(id)) {
 						q.push_back(id);
@@ -126,7 +168,7 @@ DomainCollection::DomainCollection(OctTree t, int n)
 					}
 				} else if (n.nbrId(s) != -1 && t.nodes[n.nbrId(s)].hasChildren()) {
 					OctNode       nbr  = t.nodes[n.nbrId(s)];
-					auto          octs = Octant::getValuesOnSide(s);
+					auto          octs = Octant::getValuesOnSide(s.opposite());
 					array<int, 4> nbr_ids;
 					for (int i = 0; i < 4; i++) {
 						int id     = nbr.childId(octs[i]);
