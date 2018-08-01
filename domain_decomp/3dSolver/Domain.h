@@ -70,6 +70,7 @@ struct Domain : public Serializable {
 	int              deserialize(char *buffer);
 	void             setPtrs(std::map<int, std::shared_ptr<Domain>> &domains);
 	void             updateRank(int rank);
+    inline bool hasChildren(){return child_id[0]!=-1;}
 };
 class NbrInfo : virtual public Serializable
 {

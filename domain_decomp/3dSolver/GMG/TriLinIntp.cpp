@@ -593,30 +593,41 @@ void TriLinIntp::interpolate(PW<Vec> coarse, PW<Vec> fine) const
 		Octant oct      = d.oct_on_parent;
 		int    fine_idx = d.id_local * n * n * n;
 
-		OctInfo info(oct, n);
-		// interior points
-		{
-			InteriorHelper helper(info);
-			helper.apply(u_fine + fine_idx, u_coarse + coarse_idx);
-		}
-		// faces
-		for (Side s : Side::getValues()) {
-			if (oct.isOnSide(s)) {
-				ExtFaceHelper helper(info, s);
-				helper.apply(u_fine + fine_idx, u_coarse + coarse_idx);
-			} else {
-				IntFaceHelper helper(info, s);
+		if (d.id == d.parent_id) {
+			for (int zi = 0; zi < n; zi++) {
+				for (int yi = 0; yi < n; yi++) {
+					for (int xi = 0; xi < n; xi++) {
+						u_fine[fine_idx + xi + yi * n + zi * n * n]
+						+= u_coarse[coarse_idx + xi + yi * n + zi * n * n];
+					}
+				}
+			}
+		} else {
+			OctInfo info(oct, n);
+			// interior points
+			{
+				InteriorHelper helper(info);
 				helper.apply(u_fine + fine_idx, u_coarse + coarse_idx);
 			}
-		}
-		// edges
-		for (std::array<Side, 2> sides : Side::getPairValues()) {
-			EdgeHelper helper(n, oct, sides);
-			helper.apply(u_fine + fine_idx, u_coarse + coarse_idx);
-		}
-		for (Octant o : Octant::getValues()) {
-			CornerHelper helper(n, oct, o);
-			helper.apply(u_fine + fine_idx, u_coarse + coarse_idx);
+			// faces
+			for (Side s : Side::getValues()) {
+				if (oct.isOnSide(s)) {
+					ExtFaceHelper helper(info, s);
+					helper.apply(u_fine + fine_idx, u_coarse + coarse_idx);
+				} else {
+					IntFaceHelper helper(info, s);
+					helper.apply(u_fine + fine_idx, u_coarse + coarse_idx);
+				}
+			}
+			// edges
+			for (std::array<Side, 2> sides : Side::getPairValues()) {
+				EdgeHelper helper(n, oct, sides);
+				helper.apply(u_fine + fine_idx, u_coarse + coarse_idx);
+			}
+			for (Octant o : Octant::getValues()) {
+				CornerHelper helper(n, oct, o);
+				helper.apply(u_fine + fine_idx, u_coarse + coarse_idx);
+			}
 		}
 	}
 	VecRestoreArray(fine, &u_fine);

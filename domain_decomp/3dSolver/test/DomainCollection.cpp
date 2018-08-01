@@ -78,9 +78,12 @@ TEST_CASE("DomainCollection constructors work", "[DomainCollection]")
 		// generate simple tree
 		DomainCollection dc(refined, 3, 10);
 		auto             domains = dc.getDomainMap();
-		// check that neighbor info makes sense
 		for (auto &p : domains) {
 			Domain &d = *p.second;
+			if (d.refine_level < 3) {
+                REQUIRE(d.id==d.parent_id);
+            }
+			// check that neighbor info makes sense
 			for (Side s : Side::getValues()) {
 				if (d.hasNbr(s)) {
 					switch (d.getNbrType(s)) {

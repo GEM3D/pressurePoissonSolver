@@ -16,11 +16,7 @@ DomainCollection::DomainCollection(OctTree t, int level, int n)
 	this->n = n;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	if (rank == 0) {
-		OctNode root  = t.nodes[t.root];
-		OctNode child = root;
-		for (int i = 1; i < level; i++) {
-			child = t.nodes[child.child_id[0]];
-		}
+		OctNode    child = *t.levels[level];
 		deque<int> q;
 		set<int>   qed;
 		q.push_back(child.id);
@@ -32,15 +28,16 @@ DomainCollection::DomainCollection(OctTree t, int level, int n)
 			OctNode            n = t.nodes[q.front()];
 			q.pop_front();
 
-			d.n        = this->n;
-			d.id       = n.id;
-			d.x_length = n.x_length;
-			d.y_length = n.y_length;
-			d.z_length = n.z_length;
-			d.x_start  = n.x_start;
-			d.y_start  = n.y_start;
-			d.z_start  = n.z_start;
-			d.child_id = n.child_id;
+			d.n            = this->n;
+			d.id           = n.id;
+			d.x_length     = n.x_length;
+			d.y_length     = n.y_length;
+			d.z_length     = n.z_length;
+			d.x_start      = n.x_start;
+			d.y_start      = n.y_start;
+			d.z_start      = n.z_start;
+			d.child_id     = n.child_id;
+			d.refine_level = n.level;
 			if (n.level < level) {
 				d.parent_id = n.id;
 			} else {
@@ -108,91 +105,6 @@ DomainCollection::DomainCollection(OctTree t, int level, int n)
 	int num_local_domains = domains.size();
 	MPI_Allreduce(&num_local_domains, &num_global_domains, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
-	reIndex();
-
-	for (auto &p : domains) {
-		p.second->setPtrs(domains);
-	}
-}
-DomainCollection::DomainCollection(OctTree t, int n)
-{
-	this->n = n;
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	if (rank == 0) {
-		OctNode root  = t.nodes[t.root];
-		OctNode child = root;
-		while (child.hasChildren()) {
-			child = t.nodes[child.child_id[0]];
-		}
-		deque<int> q;
-		set<int>   qed;
-		q.push_back(child.id);
-		qed.insert(child.id);
-
-		while (!q.empty()) {
-			shared_ptr<Domain> d_ptr(new Domain());
-			Domain &           d = *d_ptr;
-			OctNode            n = t.nodes[q.front()];
-			q.pop_front();
-
-			d.id        = n.id;
-			d.n         = this->n;
-			d.x_length  = n.x_length;
-			d.y_length  = n.y_length;
-			d.z_length  = n.z_length;
-			d.x_start   = n.x_start;
-			d.y_start   = n.y_start;
-			d.z_start   = n.z_start;
-			d.parent_id = n.parent;
-			if (d.parent_id != -1) {
-				d.oct_on_parent = 0;
-				while (t.nodes[d.parent_id].child_id[d.oct_on_parent] != d.id) {
-					d.oct_on_parent++;
-				}
-			}
-
-			// set and enqueue nbrs
-			for (Side s : Side::getValues()) {
-				if (n.nbrId(s) == -1 && n.parent != -1 && t.nodes[n.parent].nbrId(s) != -1) {
-					OctNode parent = t.nodes[n.parent];
-					OctNode nbr    = t.nodes[parent.nbrId(s)];
-					auto    octs   = Octant::getValuesOnSide(s);
-					int     quad   = 0;
-					while (parent.childId(octs[quad]) != n.id) {
-						quad++;
-					}
-					d.getNbrInfoPtr(s) = new CoarseNbrInfo(nbr.id, quad);
-					if (!qed.count(nbr.id)) {
-						q.push_back(nbr.id);
-						qed.insert(nbr.id);
-					}
-				} else if (n.nbrId(s) != -1 && t.nodes[n.nbrId(s)].hasChildren()) {
-					OctNode       nbr  = t.nodes[n.nbrId(s)];
-					auto          octs = Octant::getValuesOnSide(s.opposite());
-					array<int, 4> nbr_ids;
-					for (int i = 0; i < 4; i++) {
-						int id     = nbr.childId(octs[i]);
-						nbr_ids[i] = id;
-						if (!qed.count(id)) {
-							q.push_back(id);
-							qed.insert(id);
-						}
-					}
-					d.getNbrInfoPtr(s) = new FineNbrInfo(nbr_ids);
-				} else if (n.nbrId(s) != -1) {
-					int id = n.nbrId(s);
-					if (!qed.count(id)) {
-						q.push_back(id);
-						qed.insert(id);
-					}
-					d.getNbrInfoPtr(s) = new NormalNbrInfo(id);
-				}
-			}
-			domains[d.id] = d_ptr;
-		}
-	}
-	int num_local_domains = domains.size();
-	MPI_Allreduce(&num_local_domains, &num_global_domains, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 	reIndex();
 
 	for (auto &p : domains) {

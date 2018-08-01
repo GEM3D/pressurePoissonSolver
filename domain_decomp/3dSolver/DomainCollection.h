@@ -42,21 +42,27 @@ class DomainCollection
 	/**
 	 * @brief A map that maps the id of a domain to its domain signature.
 	 */
-	std::map<int, std::shared_ptr<Domain>> domains;
-    const std::map<int, std::shared_ptr<Domain>>& getDomainMap(){return domains;}
+	std::map<int, std::shared_ptr<Domain>>        domains;
+	const std::map<int, std::shared_ptr<Domain>> &getDomainMap()
+	{
+		return domains;
+	}
 
 	std::vector<int> domain_gid_map_vec;
 	std::vector<int> domain_map_vec;
 	std::vector<int> domain_off_proc_map_vec;
 
-	int getN() { return n; }
+	int getN()
+	{
+		return n;
+	}
 	/**
 	 * @brief Default empty constructor.
 	 */
 	DomainCollection() = default;
 
-	DomainCollection(OctTree t, int n);
 	DomainCollection(OctTree t, int level, int n);
+	DomainCollection(OctTree t, int n) : DomainCollection(t, t.num_levels, n){};
 	/**
 	 * @brief Generate a grid of domains.
 	 *
@@ -71,7 +77,6 @@ class DomainCollection
 	void zoltanBalance();
 	void zoltanBalanceWithLower(DomainCollection &lower);
 
-
 	void setNeumann()
 	{
 		neumann = true;
@@ -81,7 +86,10 @@ class DomainCollection
 	}
 	PW_explicit<Vec> getNewDomainVec() const;
 
-	int    getGlobalNumCells() { return num_global_domains * n * n * n; }
+	int getGlobalNumCells()
+	{
+		return num_global_domains * n * n * n;
+	}
 	double integrate(const Vec u);
 	double volume();
 };
