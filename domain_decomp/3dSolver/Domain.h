@@ -70,7 +70,10 @@ struct Domain : public Serializable {
 	int              deserialize(char *buffer);
 	void             setPtrs(std::map<int, std::shared_ptr<Domain>> &domains);
 	void             updateRank(int rank);
-    inline bool hasChildren(){return child_id[0]!=-1;}
+	inline bool      hasChildren()
+	{
+		return child_id[0] != -1;
+	}
 };
 class NbrInfo : virtual public Serializable
 {
@@ -250,7 +253,7 @@ class FineNbrInfo : public NbrInfo
 	{
 		for (int i = 0; i < 4; i++) {
 			try {
-				ptrs[i] = domains[ids[i]];
+				ptrs[i] = domains.at(ids[i]);
 			} catch (std::out_of_range) {
 				ptrs[i] = nullptr;
 			}
