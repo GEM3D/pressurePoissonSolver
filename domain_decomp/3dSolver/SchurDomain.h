@@ -12,7 +12,8 @@ class IfaceInfo
 	bool         own;
 	virtual void getIds(std::vector<int> &ids) = 0;
 	virtual void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types,
-	                            std::deque<Side> &sides, std::deque<int> &ranks, Side s)
+	                            std::deque<Side> &sides, std::deque<int> &ranks,
+	                            std::deque<bool> &own, Side s)
 	= 0;
 	virtual void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType> &types) = 0;
 	virtual void setLocalIndexes(const std::map<int, int> &rev_map)                 = 0;
@@ -31,7 +32,6 @@ class NormalIfaceInfo : public IfaceInfo
 	NormalIfaceInfo(Domain &d, Side s)
 	{
 		nbr_info = d.getNormalNbrInfo(s);
-		own      = d.getNormalNbrInfo(s).ptr != nullptr;
 		switch (s.toInt()) {
 			case Side::west:
 			case Side::south:
@@ -50,12 +50,13 @@ class NormalIfaceInfo : public IfaceInfo
 		ids.push_back(id);
 	}
 	void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types, std::deque<Side> &sides,
-	                    std::deque<int> &ranks, Side s)
+	                    std::deque<int> &ranks, std::deque<bool> &own, Side s)
 	{
 		ids.push_back(id);
 		types.push_back(IfaceType::normal);
 		sides.push_back(s);
 		ranks.push_back(nbr_info.rank);
+		own.push_back((s.toInt() & 0x1) || nbr_info.ptr != nullptr);
 	}
 	void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType> &types)
 	{
@@ -86,10 +87,9 @@ class CoarseIfaceInfo : public IfaceInfo
 		CoarseNbrInfo &nbr_info = d.getCoarseNbrInfo(s);
 		quad_on_coarse          = nbr_info.quad_on_coarse;
 		coarse_id               = nbr_info.id * 6 + s.opposite().toInt();
-		own                     = true;
 	}
 	void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types, std::deque<Side> &sides,
-	                    std::deque<int> &ranks, Side s)
+	                    std::deque<int> &ranks, std::deque<bool> &own, Side s)
 	{
 		ids.push_back(id);
 		ids.push_back(coarse_id);
@@ -99,6 +99,8 @@ class CoarseIfaceInfo : public IfaceInfo
 		sides.push_back(s);
 		ranks.push_back(nbr_info.rank);
 		ranks.push_back(nbr_info.rank);
+		own.push_back(true);
+		own.push_back(nbr_info.ptr!=nullptr);
 	}
 	void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType> &types)
 	{
@@ -138,19 +140,21 @@ class FineIfaceInfo : public IfaceInfo
 		for (int i = 0; i < 4; i++) {
 			fine_ids[i] = nbr_info.ids[i] * 6 + s.opposite().toInt();
 		}
-		own = true;
 	}
 	void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types, std::deque<Side> &sides,
-	                    std::deque<int> &ranks, Side s)
+	                    std::deque<int> &ranks, std::deque<bool> &own, Side s)
 	{
 		ids.push_back(id);
 		types.push_back(IfaceType::coarse_to_coarse);
 		sides.push_back(s);
+		ranks.push_back(-1);
+		own.push_back(true);
 		for (int i = 0; i < 4; i++) {
 			ids.push_back(fine_ids[i]);
 			types.push_back(IfaceType::coarse_to_fine_0 + i);
 			sides.push_back(s);
 			ranks.push_back(nbr_info.ranks[i]);
+			own.push_back(nbr_info.ptrs[i]!=nullptr);
 		}
 	}
 	void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType> &types)
@@ -253,13 +257,8 @@ struct SchurDomain {
 		std::deque<int>       iface_ranks;
 		for (Side s : Side::getValues()) {
 			if (hasNbr(s)) {
-				int num_added = iface_ids.size();
 				getIfaceInfoPtr(s)->getIdsAndTypes(iface_ids, iface_types, iface_sides, iface_ranks,
-				                                   s);
-				num_added = iface_ids.size() - num_added;
-				for (int i = 0; i < num_added; i++) {
-					iface_own.push_back(getIfaceInfoPtr(s)->own);
-				}
+				                                   iface_own, s);
 			}
 		}
 		for (size_t i = 0; i < iface_ids.size(); i++) {

@@ -54,13 +54,15 @@ SchurHelper::SchurHelper(DomainCollection dc, shared_ptr<PatchSolver> solver,
 		// wait for all
 		vector<MPI_Status> statuses(requests.size());
 		MPI_Waitall(requests.size(), &requests[0], &statuses[0]);
+		MPI_Barrier(MPI_COMM_WORLD);
 		// delete send buffers
 		for (char *buffer : buffers) {
 			delete[] buffer;
 		}
 		// process received objects
 		for (char *buffer : recv_buffers) {
-			IfaceSet ifs = IfaceSet::deserialize(buffer);
+			IfaceSet ifs;
+			ifs.deserialize(buffer);
 			ifaces[ifs.id].insert(ifs);
 			delete[] buffer;
 		}

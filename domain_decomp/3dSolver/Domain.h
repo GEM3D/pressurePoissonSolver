@@ -84,7 +84,6 @@ class NbrInfo : virtual public Serializable
 	virtual void    setGlobalIndexes(std::map<int, int> &rev_map)            = 0;
 	virtual void    setLocalIndexes(std::map<int, int> &rev_map)             = 0;
 	virtual void    setPtrs(std::map<int, std::shared_ptr<Domain>> &domains) = 0;
-	virtual void    updateRank(int new_rank)                                 = 0;
 	virtual void    updateRankOnNeighbors(int new_rank, Side s)              = 0;
 };
 class NormalNbrInfo : public NbrInfo
@@ -131,7 +130,7 @@ class NormalNbrInfo : public NbrInfo
 	}
 	void updateRankOnNeighbors(int new_rank, Side s)
 	{
-		ptr->getNbrInfoPtr(s.opposite())->updateRank(new_rank);
+		ptr->getNormalNbrInfo(s.opposite()).updateRank(new_rank);
 	}
 	int serialize(char *buffer) const
 	{
@@ -192,10 +191,7 @@ class CoarseNbrInfo : public NbrInfo
 	{
 		rank = new_rank;
 	}
-	void updateRankOnNeighbors(int new_rank, Side s)
-	{
-		ptr->getNbrInfoPtr(s.opposite())->updateRank(new_rank);
-	}
+	void updateRankOnNeighbors(int new_rank, Side s);
 	int serialize(char *buffer) const
 	{
 		BufferWriter writer(buffer);
@@ -259,15 +255,15 @@ class FineNbrInfo : public NbrInfo
 			}
 		}
 	}
-	void updateRank(int new_rank)
+	void updateRank(int new_rank, int quad_on_coarse)
 	{
-		ranks.fill(new_rank);
+		ranks[quad_on_coarse] = new_rank;
 	}
 
 	void updateRankOnNeighbors(int new_rank, Side s)
 	{
 		for (int i = 0; i < 4; i++) {
-			ptrs[i]->getNbrInfoPtr(s.opposite())->updateRank(new_rank);
+			ptrs[i]->getCoarseNbrInfo(s.opposite()).updateRank(new_rank);
 		}
 	}
 	int serialize(char *buffer) const
@@ -285,6 +281,10 @@ class FineNbrInfo : public NbrInfo
 		return reader.getPos();
 	}
 };
+inline void CoarseNbrInfo::updateRankOnNeighbors(int new_rank, Side s)
+{
+	ptr->getFineNbrInfo(s.opposite()).updateRank(new_rank, quad_on_coarse);
+}
 inline Domain::~Domain()
 {
 	/*

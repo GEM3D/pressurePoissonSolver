@@ -23,7 +23,7 @@ struct Iface {
 		this->neumann = neumann;
 	}
 };
-struct IfaceSet {
+struct IfaceSet : public Serializable {
 	int                id        = -1;
 	int                id_local  = -1;
 	int                id_global = -1;
@@ -38,15 +38,20 @@ struct IfaceSet {
 		}
 		return retval;
 	}
-	void insert(Iface i) { ifaces.push_back(i); }
+	void insert(Iface i)
+	{
+		ifaces.push_back(i);
+	}
 	void insert(IfaceSet ifs)
 	{
+        id = ifs.id;
 		for (Iface &i : ifs.ifaces) {
 			ifaces.push_back(i);
 		}
 	}
 	void setLocalIndexes(const std::map<int, int> &rev_map)
 	{
+        std::cerr<< "ID "<<id <<std::endl;
 		id_local = rev_map.at(id);
 		for (Iface &iface : ifaces) {
 			for (int i = 0; i < 6; i++) {
@@ -63,32 +68,30 @@ struct IfaceSet {
 			}
 		}
 	}
-	int serialize(char *buffer)
+	int serialize(char *buffer) const
 	{
 		BufferWriter writer(buffer);
 		writer << id;
-		writer << id_local;
 		writer << id_global;
 		writer << ifaces.size();
-		for (Iface &i : ifaces) {
+		for (const Iface &i : ifaces) {
 			writer << i;
 		}
 		return writer.getPos();
 	}
-	static IfaceSet deserialize(char *buffer)
+	int deserialize(char *buffer)
 	{
 		BufferReader reader(buffer);
-		IfaceSet     ifs;
-		reader >> ifs.id;
-		reader >> ifs.id_global;
+		reader >> id;
+		reader >> id_global;
 		int size = 0;
 		reader >> size;
 		for (int i = 0; i < size; i++) {
 			Iface iface;
 			reader >> iface;
-			ifs.ifaces.push_back(iface);
+			ifaces.push_back(iface);
 		}
-		return ifs;
+		return reader.getPos();
 	}
 };
 #endif
