@@ -12,11 +12,12 @@ class SevenPtPatchOperator : public PatchOperator
 		double  h_x   = d.x_length / n;
 		double  h_y   = d.y_length / n;
 		int     start = n * n * n * d.local_index;
-		double *u_view, *f_view, *gamma_view;
-		VecGetArray(u, &u_view);
+		const double *u_view;
+		double *f_view, *gamma_view;
+		VecGetArrayRead(u, &u_view);
 		VecGetArray(f, &f_view);
 		double *f_ptr = f_view + start;
-		double *u_ptr = u_view + start;
+		const double *u_ptr = u_view + start;
 		VecGetArray(gamma, &gamma_view);
 
 		const double *boundary_west = nullptr;
@@ -185,7 +186,7 @@ class SevenPtPatchOperator : public PatchOperator
 			}
 		}
 		VecRestoreArray(gamma, &gamma_view);
-		VecRestoreArray(u, &u_view);
+		VecRestoreArrayRead(u, &u_view);
 		VecRestoreArray(f, &f_view);
 	}
 };
