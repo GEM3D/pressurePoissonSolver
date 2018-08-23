@@ -345,8 +345,12 @@ int main(int argc, char *argv[])
 			timer.start("Linear System Setup");
 
 			if (f_wrapper) {
+                if(f_noschur){
+				A = FullFuncWrap::getMatrix(sch.get(),dc.get());
+                }else{
 				w.reset(new FuncWrap(sch.get(), &*dc));
 				A = w->getMatrix();
+                }
 			} else {
 				timer.start("Matrix Formation");
 

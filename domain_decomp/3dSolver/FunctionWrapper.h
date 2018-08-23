@@ -35,6 +35,34 @@ class FuncWrap
 		return A;
 	}
 };
+class FullFuncWrap
+{
+	public:
+	SchurHelper *     sh = nullptr;
+	DomainCollection *dc = nullptr;
+	FullFuncWrap(SchurHelper *sh, DomainCollection *dc)
+	{
+		this->sh = sh;
+		this->dc = dc;
+	}
+	static int multiply(Mat A, Vec x, Vec y)
+	{
+		FullFuncWrap *w = nullptr;
+		MatShellGetContext(A, &w);
+		w->sh->apply(x, y);
+		return 0;
+	}
+	static PW_explicit<Mat> getMatrix(SchurHelper *sh, DomainCollection *dc)
+	{
+		PW<Mat> A;
+		int     M = dc->getGlobalNumCells();
+		int     m = dc->getLocalNumCells();
+        FullFuncWrap wrapper(sh,dc);
+		MatCreateShell(MPI_COMM_WORLD, m, m, M, M, &wrapper, &A);
+		MatShellSetOperation(A, MATOP_MULT, (void (*)(void)) multiply);
+		return A;
+	}
+};
 class SchwarzPrec
 {
 	public:

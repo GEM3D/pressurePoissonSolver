@@ -4,5 +4,6 @@
     "post_sweeps": 1,
     "coarse_sweeps": 1,
     "cycle_type": "V",
+    "op_type": "matrix_free",
     "interpolator": "trilinear"
 }

@@ -51,7 +51,6 @@ struct IfaceSet : public Serializable {
 	}
 	void setLocalIndexes(const std::map<int, int> &rev_map)
 	{
-        std::cerr<< "ID "<<id <<std::endl;
 		id_local = rev_map.at(id);
 		for (Iface &iface : ifaces) {
 			for (int i = 0; i < 6; i++) {
@@ -73,7 +72,8 @@ struct IfaceSet : public Serializable {
 		BufferWriter writer(buffer);
 		writer << id;
 		writer << id_global;
-		writer << ifaces.size();
+        int size = ifaces.size();
+		writer << size;
 		for (const Iface &i : ifaces) {
 			writer << i;
 		}
