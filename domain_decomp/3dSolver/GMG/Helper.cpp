@@ -33,6 +33,7 @@ Helper::Helper(int n, OctTree t, std::shared_ptr<DomainCollection> dc,
 	helpers[0] = sh;
 	for (int i = 1; i < num_levels; i++) {
 		dcs[i].reset(new DomainCollection(t, t.num_levels - i, n));
+        if(dc->neumann){dcs[i]->setNeumann();}
 		dcs[i]->zoltanBalanceWithLower(*dcs[i - 1]);
 		helpers[i].reset(
 		new SchurHelper(*dcs[i], sh->getSolver(), sh->getOp(), sh->getInterpolator()));
