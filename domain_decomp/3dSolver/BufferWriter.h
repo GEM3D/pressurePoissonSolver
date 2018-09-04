@@ -15,6 +15,7 @@ class BufferWriter
 	int   pos    = 0;
 
 	public:
+    BufferWriter()=default;
 	BufferWriter(char *buffer) { this->buffer = buffer; }
 	int           getPos() { return pos; }
 	BufferWriter &operator<<(const Serializable &obj)
@@ -37,6 +38,7 @@ class BufferReader
 	int   pos    = 0;
 
 	public:
+    BufferReader()=default;
 	BufferReader(char *buffer) { this->buffer = buffer; }
 	int           getPos() { return pos; }
 	BufferReader &operator>>(Serializable &obj)

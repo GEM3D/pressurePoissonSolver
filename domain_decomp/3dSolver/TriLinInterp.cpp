@@ -21,7 +21,9 @@ void TriLinInterp::interpolate(SchurDomain &d, Side s, int local_index, IfaceTyp
 	double *interp_view;
 	VecGetArray(interp, &interp_view);
 	double *u_view;
-	VecGetArray(u, &u_view);
+	const double *const_u_view;
+	VecGetArrayRead(u, &const_u_view);
+    u_view=const_cast<double *>(const_u_view);
 	int idx = local_index * n * n;
 	switch (itype) {
 		case IfaceType::normal: {
@@ -125,5 +127,5 @@ void TriLinInterp::interpolate(SchurDomain &d, Side s, int local_index, IfaceTyp
 		} break;
 	}
 	VecRestoreArray(interp, &interp_view);
-	VecRestoreArray(u, &u_view);
+	VecRestoreArrayRead(u, &const_u_view);
 }

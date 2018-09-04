@@ -90,6 +90,10 @@ class DomainCollection
 	{
 		return num_global_domains * n * n * n;
 	}
+	int getLocalNumCells()
+	{
+		return domains.size() * n * n * n;
+	}
 	double integrate(const Vec u);
 	double volume();
 };

@@ -18,11 +18,13 @@ SchurHelper::SchurHelper(DomainCollection dc, shared_ptr<PatchSolver> solver,
 		sd.enumerateIfaces(ifaces, off_proc_ifaces);
 		solver->addDomain(sd);
 	}
+    /*
 	{
 		// send info
 		deque<char *>       buffers;
 		deque<char *>       recv_buffers;
 		vector<MPI_Request> requests;
+		vector<MPI_Request> send_requests;
 		for (auto &p : off_proc_ifaces) {
 			int       dest   = p.second.first;
 			IfaceSet &iface  = p.second.second;
@@ -32,12 +34,12 @@ SchurHelper::SchurHelper(DomainCollection dc, shared_ptr<PatchSolver> solver,
 			iface.serialize(buffer);
 			MPI_Request request;
 			MPI_Isend(buffer, size, MPI_CHAR, dest, 0, MPI_COMM_WORLD, &request);
-			requests.push_back(request);
+			send_requests.push_back(request);
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
 		int        is_message;
 		MPI_Status status;
-		MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &is_message, &status);
+		MPI_Iprobe(MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &is_message, &status);
 		// recv info
 		while (is_message) {
 			int size;
@@ -46,26 +48,31 @@ SchurHelper::SchurHelper(DomainCollection dc, shared_ptr<PatchSolver> solver,
 			recv_buffers.push_back(buffer);
 
 			MPI_Request request;
-			MPI_Irecv(buffer, size, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD,
+			MPI_Irecv(buffer, size, MPI_CHAR, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD,
 			          &request);
-			MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &is_message, &status);
+			MPI_Iprobe(MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &is_message, &status);
 			requests.push_back(request);
 		}
 		// wait for all
-		vector<MPI_Status> statuses(requests.size());
-		MPI_Waitall(requests.size(), &requests[0], &statuses[0]);
+		MPI_Barrier(MPI_COMM_WORLD);
+		MPI_Startall(send_requests.size(), &send_requests[0]);
+		MPI_Startall(requests.size(), &requests[0]);
+		MPI_Waitall(requests.size(), &requests[0], MPI_STATUSES_IGNORE);
+		MPI_Barrier(MPI_COMM_WORLD);
 		// delete send buffers
 		for (char *buffer : buffers) {
 			delete[] buffer;
 		}
 		// process received objects
 		for (char *buffer : recv_buffers) {
-			IfaceSet ifs = IfaceSet::deserialize(buffer);
+			IfaceSet ifs;
+			ifs.deserialize(buffer);
 			ifaces[ifs.id].insert(ifs);
 			delete[] buffer;
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
 	}
+    */
 	indexDomainIfacesLocal();
 	indexIfacesLocal();
 	this->solver       = solver;
@@ -81,8 +88,6 @@ SchurHelper::SchurHelper(DomainCollection dc, shared_ptr<PatchSolver> solver,
 
 	int num_ifaces = ifaces.size();
 	MPI_Allreduce(&num_ifaces, &num_global_ifaces, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-	cerr << "Num Global All: " << num_global_ifaces << endl;
-	cerr << "Num Local All: " << num_ifaces << endl;
 }
 
 void SchurHelper::zoltanBalance() {}

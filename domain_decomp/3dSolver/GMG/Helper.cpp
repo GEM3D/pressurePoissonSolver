@@ -1,12 +1,13 @@
 #include "Helper.h"
 #include "AvgRstr.h"
 #include "DrctIntp.h"
-#include "TriLinIntp.h"
 #include "FFTBlockJacobiSmoother.h"
 #include "MatOp.h"
 #include "MatrixHelper.h"
+#include "TriLinIntp.h"
 #include "VCycle.h"
 #include "WCycle.h"
+#include "WrapOp.h"
 #include <fstream>
 using namespace std;
 using namespace GMG;
@@ -27,26 +28,39 @@ Helper::Helper(int n, OctTree t, std::shared_ptr<DomainCollection> dc,
 	if (num_levels <= 0 || num_levels > t.num_levels) { num_levels = t.num_levels; }
 	// generate and balance domain collections
 	vector<shared_ptr<DomainCollection>> dcs(num_levels);
+	vector<shared_ptr<SchurHelper>>      helpers(num_levels);
 	dcs[0] = dc;
+	helpers[0] = sh;
 	for (int i = 1; i < num_levels; i++) {
 		dcs[i].reset(new DomainCollection(t, t.num_levels - i, n));
+        if(dc->neumann){dcs[i]->setNeumann();}
 		dcs[i]->zoltanBalanceWithLower(*dcs[i - 1]);
+		helpers[i].reset(
+		new SchurHelper(*dcs[i], sh->getSolver(), sh->getOp(), sh->getInterpolator()));
 	}
 
 	// generate operators
+	string op_type;
+	try {
+		op_type = config_j.at("op_type");
+	} catch (nlohmann::detail::out_of_range oor) {
+		op_type = "crs_matrix";
+	}
 	vector<shared_ptr<Operator>> ops(num_levels);
 	for (int i = 0; i < num_levels; i++) {
-		MatrixHelper mh(*dcs[i]);
-		ops[i].reset(new MatOp(mh.formCRSMatrix()));
+		if (op_type == "crs_matrix") {
+			MatrixHelper mh(*dcs[i]);
+			ops[i].reset(new MatOp(mh.formCRSMatrix()));
+		} else if (op_type == "matrix_free") {
+			ops[i].reset(new WrapOp(helpers[i]));
+		}
 	}
 
 	// generate smoothers
 	vector<shared_ptr<Smoother>> smoothers(num_levels);
 	smoothers[0].reset(new FFTBlockJacobiSmoother(sh));
 	for (int i = 1; i < num_levels; i++) {
-		shared_ptr<SchurHelper> sh2(
-		new SchurHelper(*dcs[i], sh->getSolver(), sh->getOp(), sh->getInterpolator()));
-		smoothers[i].reset(new FFTBlockJacobiSmoother(sh2));
+		smoothers[i].reset(new FFTBlockJacobiSmoother(helpers[i]));
 	}
 
 	// generate inter-level comms, restrictors, interpolators

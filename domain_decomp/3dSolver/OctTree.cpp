@@ -62,6 +62,7 @@ void OctTree::refineLeaves()
 	q.push_back(make_pair(level, child.id));
 	qed.insert(make_pair(level, child.id));
 
+    cerr<< "start" <<endl;
 	while (!q.empty()) {
 		pair<int, int> p     = q.front();
 		OctNode        n     = nodes[p.second];
@@ -74,7 +75,7 @@ void OctTree::refineLeaves()
 			if (n.nbrId(s) == -1 && n.parent != -1 && nodes[n.parent].nbrId(s) != -1) {
 				OctNode        parent = nodes[n.parent];
 				OctNode        nbr    = nodes[parent.nbrId(s)];
-				pair<int, int> p(level - 1, nbr.id);
+				pair<int, int> p(level-1, nbr.id);
 				if (!qed.count(p)) {
 					q.push_back(p);
 					qed.insert(p);
@@ -85,7 +86,7 @@ void OctTree::refineLeaves()
 				auto    octs = Octant::getValuesOnSide(s.opposite());
 				for (int i = 0; i < 4; i++) {
 					int            id = nbr.childId(octs[i]);
-					pair<int, int> p(level + 1, id);
+					pair<int, int> p(level+1, id);
 					if (!qed.count(p)) {
 						q.push_back(p);
 						qed.insert(p);
@@ -102,10 +103,11 @@ void OctTree::refineLeaves()
 			}
 		}
 	}
+    cerr<< "end" <<endl;
 	for (auto p : qed) {
 		refineNode(nodes[p.second]);
 	}
-	levels[num_levels] = &nodes[levels[num_levels-1]->child_id[0]];
+	levels[num_levels+1] = &nodes[levels[num_levels]->child_id[0]];
 	this->num_levels++;
 }
 void OctTree::refineNode(OctNode &n)

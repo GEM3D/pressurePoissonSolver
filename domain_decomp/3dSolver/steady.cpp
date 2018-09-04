@@ -242,13 +242,13 @@ int main(int argc, char *argv[])
 			return sin(M_PI * x) * cos(2.0/3 * M_PI * y) * sin(5.0/6 * M_PI * z);
 		};
 		nfunx = [](double x, double y, double z) {
-			return M_PI * cos(M_PI * x) * cos(2 * M_PI * y) * sin(5.0/6 * M_PI * z);
+			return M_PI * cos(M_PI * x) * cos(2.0/3 * M_PI * y) * sin(5.0/6 * M_PI * z);
 		};
 		nfuny = [](double x, double y, double z) {
 			return -2.0/3 * M_PI * sin(M_PI * x) * sin(2.0/3 * M_PI * y) * sin(5.0/6 * M_PI * z);
 		};
 		nfunz = [](double x, double y, double z) {
-			return 2 * M_PI * sin(M_PI * x) * cos(2 * M_PI * y) * cos(5.0/6 * M_PI * z);
+			return 5.0/6 * M_PI * sin(M_PI * x) * cos(2.0/3 * M_PI * y) * cos(5.0/6 * M_PI * z);
 		};
 	}
 
@@ -345,8 +345,12 @@ int main(int argc, char *argv[])
 			timer.start("Linear System Setup");
 
 			if (f_wrapper) {
+                if(f_noschur){
+				A = FullFuncWrap::getMatrix(sch.get(),dc.get());
+                }else{
 				w.reset(new FuncWrap(sch.get(), &*dc));
 				A = w->getMatrix();
+                }
 			} else {
 				timer.start("Matrix Formation");
 
