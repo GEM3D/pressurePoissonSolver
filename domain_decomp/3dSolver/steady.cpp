@@ -218,13 +218,16 @@ int main(int argc, char *argv[])
 		nfunz = [](double x, double y, double z) { return 0; };
 	} else if (f_gauss) {
 		gfun = [](double x, double y, double z) {
-			return exp(cos(10 * M_PI * x)) - exp(cos(11 * M_PI * y));
+			return exp(cos(10 * M_PI * x)) - exp(cos(11 * M_PI * y)) + exp(cos(12 * M_PI * z));
 		};
 		ffun = [](double x, double y, double z) {
-			return 100 * M_PI * M_PI * (pow(sin(10 * M_PI * x), 2) - cos(10 * M_PI * x))
-			       * exp(cos(10 * M_PI * x))
-			       + 121 * M_PI * M_PI * (cos(11 * M_PI * y) - pow(sin(11 * M_PI * y), 2))
-			         * exp(cos(11 * M_PI * y));
+			return -M_PI * M_PI
+			       * (100 * exp(cos(10 * M_PI * x)) * cos(10 * M_PI * x)
+			          - 121 * exp(cos(11 * M_PI * y)) * cos(11 * M_PI * y)
+			          + 144 * exp(cos(12 * M_PI * z)) * cos(12 * M_PI * z)
+			          - 100 * exp(cos(10 * M_PI * x)) * pow(sin(10 * M_PI * x), 2)
+			          + 121 * exp(cos(11 * M_PI * y)) * pow(sin(11 * M_PI * y), 2)
+			          - 144 * exp(cos(12 * M_PI * z)) * pow(sin(12 * M_PI * z), 2));
 		};
 		nfunx = [](double x, double y, double z) {
 			return -10 * M_PI * sin(10 * M_PI * x) * exp(cos(10 * M_PI * x));
@@ -233,22 +236,27 @@ int main(int argc, char *argv[])
 		nfuny = [](double x, double y, double z) {
 			return 11 * M_PI * sin(11 * M_PI * y) * exp(cos(11 * M_PI * y));
 		};
-		nfunz = [](double x, double y, double z) { return 0; };
+		nfunz = [](double x, double y, double z) {
+			return -12 * M_PI * sin(12 * M_PI * z) * exp(cos(12 * M_PI * z));
+		};
 	} else {
 		ffun = [](double x, double y, double z) {
-			return -77.0/36 * M_PI * M_PI * sin(M_PI * x) * cos(2.0/3 * M_PI * y) * sin(5.0/6 * M_PI * z);
+			return -77.0 / 36 * M_PI * M_PI * sin(M_PI * x) * cos(2.0 / 3 * M_PI * y)
+			       * sin(5.0 / 6 * M_PI * z);
 		};
 		gfun = [](double x, double y, double z) {
-			return sin(M_PI * x) * cos(2.0/3 * M_PI * y) * sin(5.0/6 * M_PI * z);
+			return sin(M_PI * x) * cos(2.0 / 3 * M_PI * y) * sin(5.0 / 6 * M_PI * z);
 		};
 		nfunx = [](double x, double y, double z) {
-			return M_PI * cos(M_PI * x) * cos(2.0/3 * M_PI * y) * sin(5.0/6 * M_PI * z);
+			return M_PI * cos(M_PI * x) * cos(2.0 / 3 * M_PI * y) * sin(5.0 / 6 * M_PI * z);
 		};
 		nfuny = [](double x, double y, double z) {
-			return -2.0/3 * M_PI * sin(M_PI * x) * sin(2.0/3 * M_PI * y) * sin(5.0/6 * M_PI * z);
+			return -2.0 / 3 * M_PI * sin(M_PI * x) * sin(2.0 / 3 * M_PI * y)
+			       * sin(5.0 / 6 * M_PI * z);
 		};
 		nfunz = [](double x, double y, double z) {
-			return 5.0/6 * M_PI * sin(M_PI * x) * cos(2.0/3 * M_PI * y) * cos(5.0/6 * M_PI * z);
+			return 5.0 / 6 * M_PI * sin(M_PI * x) * cos(2.0 / 3 * M_PI * y)
+			       * cos(5.0 / 6 * M_PI * z);
 		};
 	}
 
@@ -345,12 +353,12 @@ int main(int argc, char *argv[])
 			timer.start("Linear System Setup");
 
 			if (f_wrapper) {
-                if(f_noschur){
-				A = FullFuncWrap::getMatrix(sch.get(),dc.get());
-                }else{
-				w.reset(new FuncWrap(sch.get(), &*dc));
-				A = w->getMatrix();
-                }
+				if (f_noschur) {
+					A = FullFuncWrap::getMatrix(sch.get(), dc.get());
+				} else {
+					w.reset(new FuncWrap(sch.get(), &*dc));
+					A = w->getMatrix();
+				}
 			} else {
 				timer.start("Matrix Formation");
 
