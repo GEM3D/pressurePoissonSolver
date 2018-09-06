@@ -545,6 +545,7 @@ int main(int argc, char *argv[])
 			cout.unsetf(std::ios_base::floatfield);
 			int total_cells = dc->getGlobalNumCells();
 			cout << "Total cells: " << total_cells << endl;
+			cout << "Cores: " << num_procs << endl;
 		}
 
 		// output
