@@ -99,10 +99,7 @@ void SchurHelper::solveWithInterface(const Vec f, Vec u, const Vec gamma, Vec di
 
 	VecScale(local_interp, 0);
 	// solve over domains on this proc
-	for (SchurDomain &sd : domains) {
-		solver->solve(sd, f, u, local_gamma);
-		interpolator->interpolate(sd, u, local_interp);
-	}
+	solver->domainSolve(domains, f, u, local_gamma);
 
 	// export diff vector
 	VecScale(diff, 0);
@@ -118,8 +115,8 @@ void SchurHelper::solveAndInterpolateWithInterface(const Vec f, Vec u, const Vec
 
 	VecScale(local_interp, 0);
 	// solve over domains on this proc
+	solver->domainSolve(domains, f, u, local_gamma);
 	for (SchurDomain &sd : domains) {
-		solver->solve(sd, f, u, local_gamma);
 		interpolator->interpolate(sd, u, local_interp);
 	}
 
@@ -143,9 +140,7 @@ void SchurHelper::solveWithSolution(const Vec f, Vec u)
 	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 
 	// solve over domains on this proc
-	for (SchurDomain &sd : domains) {
-		solver->solve(sd, f, u, local_gamma);
-	}
+	solver->domainSolve(domains, f, u, local_gamma);
 }
 void SchurHelper::interpolateToInterface(const Vec f, Vec u, Vec gamma)
 {
@@ -434,6 +429,8 @@ void       SchurHelper::assembleMatrix(inserter insertBlock)
 		sd.neumann                     = curr_type.neumann;
 		sd.getIfaceInfoPtr(Side::west) = new NormalIfaceInfo();
 		solver->addDomain(sd);
+        std::deque<SchurDomain> single_domain;
+        single_domain.push_back(sd);
 
 		map<BlockKey, shared_ptr<valarray<double>>> coeffs;
 		// allocate blocks of coefficients
@@ -446,7 +443,7 @@ void       SchurHelper::assembleMatrix(inserter insertBlock)
 
 		for (int j = 0; j < n * n; j++) {
 			gamma_view[j] = 1;
-			solver->solve(sd, f, u, gamma);
+			solver->domainSolve(single_domain, f, u, gamma);
 			gamma_view[j] = 0;
 
 			// fill the blocks

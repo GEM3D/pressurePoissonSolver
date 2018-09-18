@@ -6,6 +6,7 @@
 #include "MatrixHelper.h"
 #include "OctTree.h"
 #include "PatchSolvers/FftwPatchSolver.h"
+#include "PatchSolvers/DftPatchSolver.h"
 #include "PolyChebPrec.h"
 #include "SchurHelper.h"
 #include "SevenPtPatchOperator.h"
@@ -139,6 +140,7 @@ int main(int argc, char *argv[])
 	args::Flag f_pbm(parser, "", "use GMG preconditioner", {"pbm"});
 	args::Flag f_ibd(parser, "", "use GMG preconditioner", {"ibd"});
 	args::Flag f_cheb(parser, "", "cheb preconditioner", {"cheb"});
+	args::Flag f_dft(parser, "", "dft", {"dft"});
 
 	int num_procs;
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
@@ -262,7 +264,11 @@ int main(int argc, char *argv[])
 
 	// set the patch solver
 	shared_ptr<PatchSolver> p_solver;
-	p_solver.reset(new FftwPatchSolver(*dc));
+	if (f_dft) {
+		p_solver.reset(new DftPatchSolver(*dc));
+	} else {
+		p_solver.reset(new FftwPatchSolver(*dc));
+	}
 
 	// patch operator
 	shared_ptr<PatchOperator> p_operator(new SevenPtPatchOperator());

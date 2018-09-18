@@ -6,6 +6,8 @@
 #include <fftw3.h>
 #include <map>
 #include <valarray>
+#ifndef DOMAINK
+#define DOMAINK
 struct DomainK {
 	ulong  neumann = 0;
 	double h_x     = 0;
@@ -23,6 +25,7 @@ struct DomainK {
 		return std::tie(l.neumann, l.h_x, l.h_y) < std::tie(r.neumann, r.h_x, r.h_y);
 	}
 };
+#endif
 
 class FftwPatchSolver : public PatchSolver
 {
@@ -42,6 +45,11 @@ class FftwPatchSolver : public PatchSolver
 	FftwPatchSolver(DomainCollection &dsc,double lambda=0);
 	~FftwPatchSolver();
 	void solve(SchurDomain &d, const Vec f, Vec u, const Vec gamma);
+	void domainSolve(std::deque<SchurDomain> &domains, const Vec f, Vec u, const Vec gamma){
+        for(SchurDomain &d:domains){
+            solve(d,f,u,gamma);
+        }
+    }
 	void addDomain(SchurDomain &d);
 };
 #endif
