@@ -134,8 +134,7 @@ int main(int argc, char *argv[])
 	                                    {"muelucuda"});
 #endif
 	args::Flag f_scharz(parser, "", "use schwarz preconditioner", {"schwarz"});
-	args::Flag f_gmg(parser, "", "use GMG preconditioner", {"gmg"});
-	args::Flag f_gmgs(parser, "", "use GMG preconditioner", {"gmgs"});
+	args::ValueFlag<string> f_gmg(parser, "config_file", "use GMG preconditioner", {"gmg"});
 	args::Flag f_cfft(parser, "", "use GMG preconditioner", {"cfft"});
 	args::Flag f_pbm(parser, "", "use GMG preconditioner", {"pbm"});
 	args::Flag f_ibd(parser, "", "use GMG preconditioner", {"ibd"});
@@ -420,7 +419,7 @@ int main(int argc, char *argv[])
 					sp->getPrec(pc);
 				}
 				if (f_gmg) {
-					gh.reset(new GMG::Helper(n, t, dc, sch, "gmg.json"));
+					gh.reset(new GMG::Helper(n, t, dc, sch, args::get(f_gmg)));
 					gh->getPrec(pc);
 				}
 				if (f_ibd) { sch->getPBDiagInv(pc); }

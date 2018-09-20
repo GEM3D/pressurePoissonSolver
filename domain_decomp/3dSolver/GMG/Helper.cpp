@@ -19,21 +19,33 @@ Helper::Helper(int n, OctTree t, std::shared_ptr<DomainCollection> dc,
 	json     config_j;
 	config_stream >> config_j;
 	config_stream.close();
+	int size;
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	int num_levels;
 	try {
 		num_levels = config_j.at("max_levels");
 	} catch (nlohmann::detail::out_of_range oor) {
 		num_levels = 0;
 	}
+	double patches_per_proc;
+	try {
+		patches_per_proc = config_j.at("patches_per_proc");
+	} catch (nlohmann::detail::out_of_range oor) {
+		patches_per_proc = 0;
+	}
 	if (num_levels <= 0 || num_levels > t.num_levels) { num_levels = t.num_levels; }
 	// generate and balance domain collections
 	vector<shared_ptr<DomainCollection>> dcs(num_levels);
 	vector<shared_ptr<SchurHelper>>      helpers(num_levels);
-	dcs[0] = dc;
+	dcs[0]     = dc;
 	helpers[0] = sh;
 	for (int i = 1; i < num_levels; i++) {
 		dcs[i].reset(new DomainCollection(t, t.num_levels - i, n));
-        if(dc->neumann){dcs[i]->setNeumann();}
+		if ((dcs[i]->getGlobalNumDomains() + 0.0) / size < patches_per_proc) { 
+            num_levels = i; 
+            break;
+        }
+		if (dc->neumann) { dcs[i]->setNeumann(); }
 		dcs[i]->zoltanBalanceWithLower(*dcs[i - 1]);
 		helpers[i].reset(
 		new SchurHelper(*dcs[i], sh->getSolver(), sh->getOp(), sh->getInterpolator()));

@@ -86,6 +86,9 @@ class DomainCollection
 	}
 	PW_explicit<Vec> getNewDomainVec() const;
 
+	int getGlobalNumDomains(){
+        return num_global_domains;
+    }
 	int getGlobalNumCells()
 	{
 		return num_global_domains * n * n * n;
