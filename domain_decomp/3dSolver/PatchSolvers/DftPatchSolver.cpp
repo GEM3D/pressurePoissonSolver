@@ -2,6 +2,9 @@
 #include "Utils.h"
 using namespace std;
 using namespace Utils;
+
+extern "C" void dgemv_(char &, int &, int &, double &, double *, int &, double *, int &, double &, double *,
+           int &);
 inline int index(const int &n, const int &xi, const int &yi, const int &zi)
 {
 	return xi + yi * n + zi * n * n;
@@ -308,13 +311,21 @@ void DftPatchSolver::execute_plan(std::array<std::shared_ptr<std::valarray<doubl
 		}
 		for (int y = 0; y < n; y++) {
 			for (int x = 0; x < n; x++) {
+#if 1
+				char T = 'T';
+                double one =1;
+                int ione =1;
+				dgemv_(T, n, n, one, &matrix[0], n, &prev_result[y * y_stride + x * x_stride],
+				      dft_stride, one, &new_result[y * y_stride + x * x_stride], dft_stride);
+#else
 				for (int i = 0; i < n; i++) {
-					for (int j = 0; j < n; j++) {
-						new_result[y * y_stride + x * x_stride + i * dft_stride]
-						+= matrix[i * n + j]
-						   * prev_result[y * y_stride + x * x_stride + j * dft_stride];
-					}
+				    for (int j = 0; j < n; j++) {
+				        new_result[y * y_stride + x * x_stride + i * dft_stride]
+				        += matrix[i * n + j]
+				           * prev_result[y * y_stride + x * x_stride + j * dft_stride];
+				    }
 				}
+#endif
 			}
 		}
 		if (dim != 0) { delete[] prev_result; }
