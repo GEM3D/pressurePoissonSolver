@@ -10,7 +10,7 @@ struct ILCFineToCoarseMetadata {
 	/**
 	 * @brief The domain that this meta-data corresponds to.
 	 */
-	std::shared_ptr<Domain> d;
+	std::shared_ptr<Domain<3>> d;
 	/**
 	 * @brief the local block-index of the parent domain in the scattered coarse vector.
 	 */

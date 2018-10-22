@@ -6,8 +6,8 @@ class PatchSolver
 {
 	public:
 	virtual ~PatchSolver() {}
-	virtual void addDomain(SchurDomain &d) = 0;
-	virtual void domainSolve(std::deque<SchurDomain> &domains, const Vec f, Vec u, const Vec gamma)
+	virtual void addDomain(SchurDomain<3> &d) = 0;
+	virtual void domainSolve(std::deque<SchurDomain<3>> &domains, const Vec f, Vec u, const Vec gamma)
 	= 0;
 };
 #endif

@@ -5,7 +5,7 @@ class ClawWriter
 {
 	private:
 	DomainCollection dc;
-	void writePatch(Domain &d, std::ostream &os, double *u_view, double *resid_view);
+	void writePatch(Domain<3> &d, std::ostream &os, double *u_view, double *resid_view);
 
 	public:
 	ClawWriter(DomainCollection &dc);

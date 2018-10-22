@@ -15,7 +15,7 @@ struct DomainK {
 	double h_y     = 0;
 
 	DomainK() {}
-	DomainK(const SchurDomain &d)
+	DomainK(const SchurDomain<3> &d)
 	{
 		this->neumann = d.neumann.to_ulong();
 		this->h_x     = d.x_length;
@@ -52,12 +52,12 @@ class DftPatchSolver : public PatchSolver
 
 	public:
 	DftPatchSolver(DomainCollection &dsc, double lambda = 0);
-	void solve(SchurDomain &d, const Vec f, Vec u, const Vec gamma);
-	void domainSolve(std::deque<SchurDomain> &domains, const Vec f, Vec u, const Vec gamma){
-        for(SchurDomain &d:domains){
+	void solve(SchurDomain<3> &d, const Vec f, Vec u, const Vec gamma);
+	void domainSolve(std::deque<SchurDomain<3>> &domains, const Vec f, Vec u, const Vec gamma){
+        for(SchurDomain<3> &d:domains){
             solve(d,f,u,gamma);
         }
     }
-	void addDomain(SchurDomain &d);
+	void addDomain(SchurDomain<3> &d);
 };
 #endif

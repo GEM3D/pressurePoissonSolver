@@ -14,7 +14,7 @@ struct DomainK {
 	double h_y     = 0;
 
 	DomainK() {}
-	DomainK(const SchurDomain &d)
+	DomainK(const SchurDomain<3> &d)
 	{
 		this->neumann = d.neumann.to_ulong();
 		this->h_x     = d.x_length;
@@ -30,26 +30,27 @@ struct DomainK {
 class FftwPatchSolver : public PatchSolver
 {
 	private:
-	int         n;
-	bool        initialized = false;
-	static bool compareDomains();
-    double lambda;
-	std::map<DomainK, fftw_plan> plan1;
-	std::map<DomainK, fftw_plan> plan2;
-	std::valarray<double> f_copy;
-	std::valarray<double> tmp;
-	std::valarray<double> sol;
+	int                                      n;
+	bool                                     initialized = false;
+	static bool                              compareDomains();
+	double                                   lambda;
+	std::map<DomainK, fftw_plan>             plan1;
+	std::map<DomainK, fftw_plan>             plan2;
+	std::valarray<double>                    f_copy;
+	std::valarray<double>                    tmp;
+	std::valarray<double>                    sol;
 	std::map<DomainK, std::valarray<double>> denoms;
 
 	public:
-	FftwPatchSolver(DomainCollection &dsc,double lambda=0);
+	FftwPatchSolver(DomainCollection &dsc, double lambda = 0);
 	~FftwPatchSolver();
-	void solve(SchurDomain &d, const Vec f, Vec u, const Vec gamma);
-	void domainSolve(std::deque<SchurDomain> &domains, const Vec f, Vec u, const Vec gamma){
-        for(SchurDomain &d:domains){
-            solve(d,f,u,gamma);
-        }
-    }
-	void addDomain(SchurDomain &d);
+	void solve(SchurDomain<3> &d, const Vec f, Vec u, const Vec gamma);
+	void domainSolve(std::deque<SchurDomain<3>> &domains, const Vec f, Vec u, const Vec gamma)
+	{
+		for (SchurDomain<3> &d : domains) {
+			solve(d, f, u, gamma);
+		}
+	}
+	void addDomain(SchurDomain<3> &d);
 };
 #endif

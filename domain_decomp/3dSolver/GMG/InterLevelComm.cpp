@@ -8,7 +8,7 @@ InterLevelComm::InterLevelComm(shared_ptr<DomainCollection> coarse_dc,
 	n = coarse_dc->getN();
 	set<int> parent_ids;
 	for (auto &p : fine_dc->domains) {
-		Domain &d = *p.second;
+		Domain<3> &d = *p.second;
 		parent_ids.insert(d.parent_id);
 	}
 	vector<int> coarse_parent_global_index_map_vec(parent_ids.begin(), parent_ids.end());
@@ -30,7 +30,7 @@ InterLevelComm::InterLevelComm(shared_ptr<DomainCollection> coarse_dc,
 		gid_to_global[gid] = coarse_parent_global_index_map_vec[i];
 	}
 	for (auto &p : fine_dc->domains) {
-		Domain &                d    = *p.second;
+		Domain<3> &             d    = *p.second;
 		int                     gid  = d.parent_id;
 		ILCFineToCoarseMetadata data = {p.second, gid_to_local[gid], gid_to_global[gid]};
 		coarse_domains.insert(data);
@@ -52,4 +52,7 @@ PW_explicit<Vec> InterLevelComm::getNewCoarseDistVec()
 	VecCreateSeq(PETSC_COMM_SELF, local_vec_size, &u);
 	return u;
 }
-PW_explicit<VecScatter> InterLevelComm::getScatter() { return scatter; }
+PW_explicit<VecScatter> InterLevelComm::getScatter()
+{
+	return scatter;
+}

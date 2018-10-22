@@ -8,8 +8,8 @@ TEST_CASE("OctTree default constructor works", "[Side]")
 	REQUIRE(tree.nodes.size() == 1);
 	REQUIRE(tree.levels.size() == 1);
 	REQUIRE(tree.num_levels == 1);
-	REQUIRE(tree.levels[0] != nullptr);
-	REQUIRE(tree.levels[0]->id == 0);
+	REQUIRE(tree.levels[1] != nullptr);
+	REQUIRE(tree.levels[1]->id == 0);
 	REQUIRE(tree.root == 0);
 	REQUIRE(tree.max_id == 0);
 	// check the root node
@@ -37,9 +37,8 @@ TEST_CASE("OctTree refineLeaves() works on single starting node", "[Side]")
 	REQUIRE(tree.nodes.size() == 9);
 	REQUIRE(tree.levels.size() == 2);
 	REQUIRE(tree.num_levels == 2);
-	REQUIRE(tree.levels[0] != nullptr);
 	REQUIRE(tree.levels[1] != nullptr);
-	REQUIRE(tree.levels[1]->id > 0);
+	REQUIRE(tree.levels[1]->id >= 0);
 	REQUIRE(tree.root == 0);
 	REQUIRE(tree.max_id == 8);
 	// check the root node
@@ -91,16 +90,15 @@ TEST_CASE("OctTree refineLeaves() works on single starting node with two calls",
 	REQUIRE(tree.nodes.size() == 73);
 	REQUIRE(tree.levels.size() == 3);
 	REQUIRE(tree.num_levels == 3);
-	REQUIRE(tree.levels[0] != nullptr);
-	REQUIRE(tree.levels[1] != nullptr);
-	REQUIRE(tree.levels[1]->id > 0);
-	REQUIRE(tree.levels[1]->id < 9);
-	REQUIRE(tree.levels[2]->id > 8);
+	REQUIRE(tree.levels.at(1) != nullptr);
+	REQUIRE(tree.levels.at(1)->id >= 0);
+	REQUIRE(tree.levels.at(2)->id < 9);
+	REQUIRE(tree.levels.at(3)->id > 8);
 	REQUIRE(tree.root == 0);
 	REQUIRE(tree.max_id == 72);
 	// check the root node
 	{
-		OctNode n = tree.nodes[0];
+		OctNode n = tree.nodes.at(0);
 		REQUIRE(n.id == 0);
 		REQUIRE(n.level == 0);
 		REQUIRE(n.parent == -1);
@@ -122,9 +120,9 @@ TEST_CASE("OctTree refineLeaves() works on single starting node with two calls",
 	}
 	// check child nodes
 	{
-		array<int, 8> children = tree.nodes[0].child_id;
+		array<int, 8> children = tree.nodes.at(0).child_id;
 		for (Octant o : Octant::getValues()) {
-			OctNode child = tree.nodes[children[o.toInt()]];
+			OctNode child = tree.nodes.at(children[o.toInt()]);
 			REQUIRE(child.id == children[o.toInt()]);
 			for (Side s : o.getInteriorSides()) {
 				REQUIRE(child.hasNbr(s));
@@ -137,7 +135,7 @@ TEST_CASE("OctTree refineLeaves() works on single starting node with two calls",
 			for (int i = 0; i < 8; i++) {
 				Octant  child_o     = i;
 				int     id          = child.child_id[i];
-				OctNode child_child = tree.nodes[id];
+				OctNode child_child = tree.nodes.at(id);
 				REQUIRE(id > 8);
 				REQUIRE(id == child_child.id);
 
@@ -158,7 +156,7 @@ TEST_CASE("OctTree refineLeaves() works on single starting node with two calls",
 							Side s = child_o_ext[i];
 							REQUIRE(child_child.hasNbr(s));
 							REQUIRE(child_child.nbrId(s)
-							        == tree.nodes[children[o.getInteriorNbrOnSide(s).toInt()]]
+							        == tree.nodes.at(children[o.getInteriorNbrOnSide(s).toInt()])
 							           .child_id[child_o.getExteriorNbrOnSide(s).toInt()]);
 						}
 					}

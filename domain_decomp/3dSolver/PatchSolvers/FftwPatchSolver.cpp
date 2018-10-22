@@ -11,7 +11,7 @@ FftwPatchSolver::FftwPatchSolver(DomainCollection &dc, double lambda)
 	n            = dc.getN();
 	this->lambda = lambda;
 }
-void FftwPatchSolver::addDomain(SchurDomain &d)
+void FftwPatchSolver::addDomain(SchurDomain<3> &d)
 {
 	if (!initialized) {
 		initialized = true;
@@ -151,7 +151,7 @@ FftwPatchSolver::~FftwPatchSolver()
 		fftw_destroy_plan(p.second);
 	}
 }
-void FftwPatchSolver::solve(SchurDomain &d, const Vec f, Vec u, const Vec gamma)
+void FftwPatchSolver::solve(SchurDomain<3> &d, const Vec f, Vec u, const Vec gamma)
 {
 	double h_x        = d.x_length / n;
 	double h_y        = d.x_length / n;

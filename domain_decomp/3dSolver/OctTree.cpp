@@ -16,7 +16,7 @@ OctTree::OctTree()
 	new_root.z_start  = 0;
 	new_root.level    = 0;
 	nodes[0]          = new_root;
-	levels[0]         = &nodes[0];
+	levels[1]         = &nodes[0];
 	root              = 0;
 	max_id            = 0;
 	num_levels        = 1;
@@ -62,7 +62,6 @@ void OctTree::refineLeaves()
 	q.push_back(make_pair(level, child.id));
 	qed.insert(make_pair(level, child.id));
 
-    cerr<< "start" <<endl;
 	while (!q.empty()) {
 		pair<int, int> p     = q.front();
 		OctNode        n     = nodes[p.second];
@@ -103,11 +102,10 @@ void OctTree::refineLeaves()
 			}
 		}
 	}
-    cerr<< "end" <<endl;
 	for (auto p : qed) {
 		refineNode(nodes[p.second]);
 	}
-	levels[num_levels+1] = &nodes[levels[num_levels]->child_id[0]];
+	levels[num_levels+1] = &nodes.at(levels[num_levels]->child_id[0]);
 	this->num_levels++;
 }
 void OctTree::refineNode(OctNode &n)

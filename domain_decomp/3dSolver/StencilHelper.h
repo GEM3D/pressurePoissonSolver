@@ -21,7 +21,7 @@ class DirichletSH : public StencilHelper
 	int    stridey;
 
 	public:
-	DirichletSH(Domain &d, Side s)
+	DirichletSH(Domain<3> &d, Side s)
 	{
 		double h   = 0;
 		int    idx = d.id_global * d.n * d.n * d.n;
@@ -93,7 +93,7 @@ class NeumannSH : public StencilHelper
 	int    stridey;
 
 	public:
-	NeumannSH(Domain &d, Side s)
+	NeumannSH(Domain<3> &d, Side s)
 	{
 		double h   = 0;
 		int    idx = d.id_global * d.n * d.n * d.n;
@@ -166,12 +166,12 @@ class NormalSH : public StencilHelper
 	int    stridey;
 
 	public:
-	NormalSH(Domain &d, Side s)
+	NormalSH(Domain<3> &d, Side s)
 	{
-		NormalNbrInfo &nbr_info = d.getNormalNbrInfo(s);
-		double         h        = 0;
-		int            idx      = d.id_global * d.n * d.n * d.n;
-		int            nbr_idx  = nbr_info.global_index * d.n * d.n * d.n;
+		NormalNbrInfo<3> &nbr_info = d.getNormalNbrInfo(s);
+		double            h        = 0;
+		int               idx      = d.id_global * d.n * d.n * d.n;
+		int               nbr_idx  = nbr_info.global_index * d.n * d.n * d.n;
 		switch (s.toInt()) {
 			case Side::west:
 				h         = d.x_length / d.n;
@@ -249,14 +249,14 @@ class CoarseSH : public StencilHelper
 	int                   n;
 
 	public:
-	CoarseSH(Domain &d, Side s)
+	CoarseSH(Domain<3> &d, Side s)
 	{
-		CoarseNbrInfo &nbr_info = d.getCoarseNbrInfo(s);
-		double         h        = 0;
-		n                       = d.n;
-		int idx                 = d.id_global * d.n * d.n * d.n;
-		int nbr_idx             = nbr_info.global_index * d.n * d.n * d.n;
-		quad                    = nbr_info.quad_on_coarse;
+		CoarseNbrInfo<3> &nbr_info = d.getCoarseNbrInfo(s);
+		double            h        = 0;
+		n                          = d.n;
+		int idx                    = d.id_global * d.n * d.n * d.n;
+		int nbr_idx                = nbr_info.global_index * d.n * d.n * d.n;
+		quad                       = nbr_info.quad_on_coarse;
 		switch (s.toInt()) {
 			case Side::west:
 				h         = d.x_length / d.n;
@@ -364,12 +364,12 @@ class FineSH : public StencilHelper
 	int                   n;
 
 	public:
-	FineSH(Domain &d, Side s)
+	FineSH(Domain<3> &d, Side s)
 	{
-		FineNbrInfo &nbr_info = d.getFineNbrInfo(s);
-		double       h        = 0;
-		n                     = d.n;
-		int idx               = d.id_global * d.n * d.n * d.n;
+		FineNbrInfo<3> &nbr_info = d.getFineNbrInfo(s);
+		double          h        = 0;
+		n                        = d.n;
+		int idx                  = d.id_global * d.n * d.n * d.n;
 		int nbr_idx[4];
 		for (int i = 0; i < 4; i++) {
 			nbr_idx[i] = nbr_info.global_indexes[i] * d.n * d.n * d.n;
@@ -457,7 +457,7 @@ class FineSH : public StencilHelper
 		return colz;
 	}
 };
-StencilHelper *getStencilHelper(Domain &d, Side s)
+StencilHelper *getStencilHelper(Domain<3> &d, Side s)
 {
 	StencilHelper *retval = nullptr;
 	if (d.hasNbr(s)) {

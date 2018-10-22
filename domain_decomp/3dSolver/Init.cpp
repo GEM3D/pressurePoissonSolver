@@ -1,7 +1,7 @@
 #include "Init.h"
 #include <algorithm>
 using namespace std;
-void getXYZ(const Domain &d, const int &xi, const int &yi, const int &zi, double &x, double &y,
+void getXYZ(const Domain<3> &d, const int &xi, const int &yi, const int &zi, double &x, double &y,
             double &z)
 {
 	const int &n   = d.n;
@@ -30,7 +30,7 @@ void getXYZ(const Domain &d, const int &xi, const int &yi, const int &zi, double
 		z = d.z_start + h_z / 2.0 + d.z_length * zi / n;
 	}
 }
-inline int index(Domain &d, const int &xi, const int &yi, const int &zi)
+inline int index(Domain<3> &d, const int &xi, const int &yi, const int &zi)
 {
 	const int &n = d.n;
 	return xi + yi * n + zi * n * n;
@@ -48,7 +48,7 @@ void Init::initNeumann(DomainCollection &dc, int n, Vec f, Vec exact,
 	double *exact_ptr;
 	VecGetArray(exact, &exact_ptr);
 	for (auto &p : dc.domains) {
-		Domain &d = *p.second;
+		Domain<3> &d = *p.second;
 
 		double *f_vals     = f_ptr + d.id_local * n * n * n;
 		double *exact_vals = exact_ptr + d.id_local * n * n * n;
@@ -142,7 +142,7 @@ void Init::initDirichlet(DomainCollection &dc, int n, Vec f, Vec exact,
 	double *exact_ptr;
 	VecGetArray(exact, &exact_ptr);
 	for (auto &p : dc.domains) {
-		Domain &d = *p.second;
+		Domain<3> &d = *p.second;
 
 		double *f_vals     = f_ptr + d.id_local * n * n * n;
 		double *exact_vals = exact_ptr + d.id_local * n * n * n;

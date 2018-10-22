@@ -105,7 +105,6 @@ add_library(MatrixHelper MatrixHelper.cpp)
 add_library(DomainCollection DomainCollection.cpp OctTree.cpp)
 add_library(Interpolators TriLinInterp.cpp)
 add_library(Init Init.cpp)
-add_library(ContigFftwSolver ContigFftwSolver.cpp)
 add_library(PBMatrix PBMatrix.cpp)
 add_library(PolyPrecs PolyChebPrec.cpp)
 
@@ -125,7 +124,6 @@ target_link_libraries(steady
     Interpolators
     MMWriter
     ClawWriter
-    ContigFftwSolver
     PBMatrix
     PolyPrecs
   ${MPI_CXX_LIBRARIES} 

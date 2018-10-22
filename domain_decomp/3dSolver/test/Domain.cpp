@@ -3,20 +3,20 @@
 using namespace std;
 TEST_CASE("NormalNbrInfo getNbrType works", "[Domain]")
 {
-	NbrInfo *info = new NormalNbrInfo();
+	NbrInfo<3> *info = new NormalNbrInfo<3>();
 	REQUIRE(info->getNbrType() == NbrType::Normal);
 	delete info;
 }
 
 TEST_CASE("NormalNbrInfo Serialization/Deserialization", "[Domain]")
 {
-	NormalNbrInfo info;
+	NormalNbrInfo<3> info;
 	info.id   = 5;
 	info.rank = 1;
 	// serialize and then deserialize
 	char *buff = new char[info.serialize(nullptr)];
 	info.serialize(buff);
-	NormalNbrInfo out;
+	NormalNbrInfo<3> out;
 	out.deserialize(buff);
 	delete[] buff;
 	REQUIRE(out.id == 5);
@@ -24,14 +24,14 @@ TEST_CASE("NormalNbrInfo Serialization/Deserialization", "[Domain]")
 }
 TEST_CASE("CoarseNbrInfo Serialization/Deserialization", "[Domain]")
 {
-	CoarseNbrInfo info;
+	CoarseNbrInfo<3> info;
 	info.id             = 5;
 	info.rank           = 1;
 	info.quad_on_coarse = 2;
 	// serialize and then deserialize
 	char *buff = new char[info.serialize(nullptr)];
 	info.serialize(buff);
-	CoarseNbrInfo out;
+	CoarseNbrInfo<3> out;
 	out.deserialize(buff);
 	delete[] buff;
 	REQUIRE(out.id == 5);
@@ -40,7 +40,7 @@ TEST_CASE("CoarseNbrInfo Serialization/Deserialization", "[Domain]")
 }
 TEST_CASE("FineNbrInfo Serialization/Deserialization", "[Domain]")
 {
-	FineNbrInfo info;
+	FineNbrInfo<3> info;
 	info.ids[0]   = 1;
 	info.ids[1]   = 2;
 	info.ids[2]   = 3;
@@ -52,7 +52,7 @@ TEST_CASE("FineNbrInfo Serialization/Deserialization", "[Domain]")
 	// serialize and then deserialize
 	char *buff = new char[info.serialize(nullptr)];
 	info.serialize(buff);
-	FineNbrInfo out;
+	FineNbrInfo<3> out;
 	out.deserialize(buff);
 	delete[] buff;
 	REQUIRE(out.ids[0] == 1);
@@ -66,18 +66,18 @@ TEST_CASE("FineNbrInfo Serialization/Deserialization", "[Domain]")
 }
 TEST_CASE("Domain Serialization/Deserialization", "[Domain]")
 {
-	Domain *d_ptr                = new Domain;
-	Domain &d                    = *d_ptr;
+	Domain<3> *d_ptr             = new Domain<3>;
+	Domain<3> &d                 = *d_ptr;
 	d.id                         = 0;
-	d.getNbrInfoPtr(Side::north) = new NormalNbrInfo(1);
-	d.getNbrInfoPtr(Side::east)  = new CoarseNbrInfo(2, 3);
-	d.getNbrInfoPtr(Side::south) = new FineNbrInfo({3, 4, 5, 6});
+	d.getNbrInfoPtr(Side::north) = new NormalNbrInfo<3>(1);
+	d.getNbrInfoPtr(Side::east)  = new CoarseNbrInfo<3>(2, 3);
+	d.getNbrInfoPtr(Side::south) = new FineNbrInfo<3>({3, 4, 5, 6});
 
 	// serialize and then deserialize
 	char *buff = new char[d.serialize(nullptr)];
 	d.serialize(buff);
 	delete d_ptr;
-	Domain out;
+	Domain<3> out;
 	out.deserialize(buff);
 	delete[] buff;
 

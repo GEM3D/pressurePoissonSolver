@@ -3,9 +3,9 @@
 using namespace std;
 using namespace Utils;
 
-extern "C" void dgemv_(char &, int &, int &, double &, double *, int &, double *, int &, double &, double *,
-           int &);
-inline int index(const int &n, const int &xi, const int &yi, const int &zi)
+extern "C" void dgemv_(char &, int &, int &, double &, double *, int &, double *, int &, double &,
+                       double *, int &);
+inline int      index(const int &n, const int &xi, const int &yi, const int &zi)
 {
 	return xi + yi * n + zi * n * n;
 }
@@ -14,7 +14,7 @@ DftPatchSolver::DftPatchSolver(DomainCollection &dc, double lambda)
 	n            = dc.getN();
 	this->lambda = lambda;
 }
-void DftPatchSolver::addDomain(SchurDomain &d)
+void DftPatchSolver::addDomain(SchurDomain<3> &d)
 {
 	if (!initialized) {
 		initialized = true;
@@ -141,7 +141,7 @@ void DftPatchSolver::addDomain(SchurDomain &d)
 		eigen_val += lambda;
 	}
 }
-void DftPatchSolver::solve(SchurDomain &d, const Vec f, Vec u, const Vec gamma)
+void DftPatchSolver::solve(SchurDomain<3> &d, const Vec f, Vec u, const Vec gamma)
 {
 	double h_x        = d.x_length / n;
 	double h_y        = d.x_length / n;
@@ -312,18 +312,19 @@ void DftPatchSolver::execute_plan(std::array<std::shared_ptr<std::valarray<doubl
 		for (int y = 0; y < n; y++) {
 			for (int x = 0; x < n; x++) {
 #if 1
-				char T = 'T';
-                double one =1;
-                int ione =1;
-				dgemv_(T, n, n, one, &matrix[0], n, &prev_result[y * y_stride + x * x_stride],
-				      dft_stride, one, &new_result[y * y_stride + x * x_stride], dft_stride);
+				char   T    = 'T';
+				double one  = 1;
+				int    ione = 1;
+				int    n2   = n * n;
+				dgemv_(T, n, n, one, &matrix[0], n, &prev_result[y * n2 + x * n], ione, one,
+				       &new_result[y * y_stride + x * x_stride], n2);
 #else
 				for (int i = 0; i < n; i++) {
-				    for (int j = 0; j < n; j++) {
-				        new_result[y * y_stride + x * x_stride + i * dft_stride]
-				        += matrix[i * n + j]
-				           * prev_result[y * y_stride + x * x_stride + j * dft_stride];
-				    }
+					for (int j = 0; j < n; j++) {
+						new_result[y * y_stride + x * x_stride + i * dft_stride]
+						+= matrix[i * n + j]
+						   * prev_result[y * y_stride + x * x_stride + j * dft_stride];
+					}
 				}
 #endif
 			}

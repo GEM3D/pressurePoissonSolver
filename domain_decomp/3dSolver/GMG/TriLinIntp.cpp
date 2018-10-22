@@ -586,9 +586,9 @@ void TriLinIntp::interpolate(PW<Vec> coarse, PW<Vec> fine) const
 	VecGetArray(fine, &u_fine);
 	VecGetArray(coarse_tmp, &u_coarse);
 	for (auto p : ilc->getFineDomains()) {
-		Domain &d          = *p.d;
-		int     n          = d.n;
-		int     coarse_idx = p.local_index * n * n * n;
+		Domain<3> &d          = *p.d;
+		int        n          = d.n;
+		int        coarse_idx = p.local_index * n * n * n;
 
 		Octant oct      = d.oct_on_parent;
 		int    fine_idx = d.id_local * n * n * n;

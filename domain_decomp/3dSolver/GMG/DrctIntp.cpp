@@ -23,9 +23,9 @@ void DrctIntp::interpolate(PW<Vec> coarse, PW<Vec> fine) const
 	VecGetArray(fine, &u_fine);
 	VecGetArray(coarse_tmp, &u_coarse);
 	for (auto p : ilc->getFineDomains()) {
-		Domain &d          = *p.d;
-		int     n          = d.n;
-		int     coarse_idx = p.local_index * n * n * n;
+		Domain<3> &d          = *p.d;
+		int        n          = d.n;
+		int        coarse_idx = p.local_index * n * n * n;
 
 		const function<void(double *, int, double *, int)> f_to_c[8] = {
 		[&](double *u_fine, int fine_idx, double *u_coarse, int coarse_idx) -> void {

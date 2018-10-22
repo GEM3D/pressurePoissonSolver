@@ -21,7 +21,7 @@ void AvgRstr::restrict(PW<Vec> coarse, PW<Vec> fine) const
 	VecGetArray(fine, &r_fine);
 	VecGetArray(coarse_tmp, &f_coarse);
 	for (ILCFineToCoarseMetadata data : ilc->getFineDomains()) {
-		Domain &                                d          = *data.d;
+		Domain<3> &                             d          = *data.d;
 		int                                     n          = d.n;
 		int                                     coarse_idx = data.local_index * n * n * n;
 		const function<double &(int, int, int)> f_to_c[8]  = {

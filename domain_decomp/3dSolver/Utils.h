@@ -6,7 +6,10 @@ inline int index(const int &n, const int &xi, const int &yi, const int &zi)
 {
 	return xi + yi * n + zi * n * n;
 }
-inline int index(const int &n, const int &xi, const int &yi) { return xi + yi * n; }
+inline int index(const int &n, const int &xi, const int &yi)
+{
+	return xi + yi * n;
+}
 class Slice
 {
 	private:
@@ -22,7 +25,10 @@ class Slice
 		this->stridex = stridex;
 		this->stridey = stridey;
 	}
-	inline double &operator()(int ix, int iy) { return start[stridex * ix + stridey * iy]; }
+	inline double &operator()(int ix, int iy)
+	{
+		return start[stridex * ix + stridey * iy];
+	}
 };
 inline Slice getSlice(double *u_view, int n, Side s)
 {
@@ -49,10 +55,10 @@ inline Slice getSlice(double *u_view, int n, Side s)
 	}
 	return retval;
 }
-inline Slice getSlice(SchurDomain &d, double *u_view, Side s)
+template <size_t D> inline Slice getSlice(SchurDomain<D> &d, double *u_view, Side s)
 {
 	int start = d.local_index * d.n * d.n * d.n;
 	return getSlice(&u_view[start], d.n, s);
 }
-}
+} // namespace Utils
 #endif

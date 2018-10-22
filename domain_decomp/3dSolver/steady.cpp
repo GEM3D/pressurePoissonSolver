@@ -1,12 +1,11 @@
-#include "ContigFftwSolver.h"
 #include "DomainCollection.h"
 #include "FunctionWrapper.h"
 #include "GMG/Helper.h"
 #include "Init.h"
 #include "MatrixHelper.h"
 #include "OctTree.h"
-#include "PatchSolvers/FftwPatchSolver.h"
 #include "PatchSolvers/DftPatchSolver.h"
+#include "PatchSolvers/FftwPatchSolver.h"
 #include "PolyChebPrec.h"
 #include "SchurHelper.h"
 #include "SevenPtPatchOperator.h"
@@ -133,13 +132,13 @@ int main(int argc, char *argv[])
 	args::ValueFlag<string> f_meulucuda(parser, "", "solve schur compliment system with muelu",
 	                                    {"muelucuda"});
 #endif
-	args::Flag f_scharz(parser, "", "use schwarz preconditioner", {"schwarz"});
+	args::Flag              f_scharz(parser, "", "use schwarz preconditioner", {"schwarz"});
 	args::ValueFlag<string> f_gmg(parser, "config_file", "use GMG preconditioner", {"gmg"});
-	args::Flag f_cfft(parser, "", "use GMG preconditioner", {"cfft"});
-	args::Flag f_pbm(parser, "", "use GMG preconditioner", {"pbm"});
-	args::Flag f_ibd(parser, "", "use GMG preconditioner", {"ibd"});
-	args::Flag f_cheb(parser, "", "cheb preconditioner", {"cheb"});
-	args::Flag f_dft(parser, "", "dft", {"dft"});
+	args::Flag              f_cfft(parser, "", "use GMG preconditioner", {"cfft"});
+	args::Flag              f_pbm(parser, "", "use GMG preconditioner", {"pbm"});
+	args::Flag              f_ibd(parser, "", "use GMG preconditioner", {"ibd"});
+	args::Flag              f_cheb(parser, "", "cheb preconditioner", {"cheb"});
+	args::Flag              f_dft(parser, "", "dft", {"dft"});
 
 	int num_procs;
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
@@ -328,13 +327,7 @@ int main(int argc, char *argv[])
 #ifdef ENABLE_MUELU_CUDA
 		MueLuCudaWrapper *meulucudasolver = nullptr;
 #endif
-		ContigFftwSolver cfftsolver;
-		if (f_cfft) {
-			timer.start("FFT Setup");
-			cfftsolver = ContigFftwSolver(*dc);
-			timer.stop("FFT Setup");
-
-		} else if (f_noschur || dc->num_global_domains != 1) {
+		if (f_noschur || dc->num_global_domains != 1) {
 			// do iterative solve
 
 			if (!f_noschur) {
@@ -485,11 +478,7 @@ int main(int argc, char *argv[])
 			timer.stop("Linear Solve");
 		}
 
-		if (f_cfft) {
-			timer.start("FFT Solve");
-			cfftsolver.solve(f, u);
-			timer.stop("FFT Solve");
-		} else if (!f_noschur) {
+		if (!f_noschur) {
 			// Do one last solve
 			timer.start("Patch Solve");
 

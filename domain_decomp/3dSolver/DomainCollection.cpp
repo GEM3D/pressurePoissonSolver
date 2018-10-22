@@ -23,9 +23,9 @@ DomainCollection::DomainCollection(OctTree t, int level, int n)
 		qed.insert(child.id);
 
 		while (!q.empty()) {
-			shared_ptr<Domain> d_ptr(new Domain());
-			Domain &           d = *d_ptr;
-			OctNode            n = t.nodes[q.front()];
+			shared_ptr<Domain<3>> d_ptr(new Domain<3>());
+			Domain<3> &           d = *d_ptr;
+			OctNode               n = t.nodes[q.front()];
 			q.pop_front();
 
 			d.n            = this->n;
@@ -71,7 +71,7 @@ DomainCollection::DomainCollection(OctTree t, int level, int n)
 					while (parent.childId(octs[quad]) != n.id) {
 						quad++;
 					}
-					d.getNbrInfoPtr(s) = new CoarseNbrInfo(nbr.id, quad);
+					d.getNbrInfoPtr(s) = new CoarseNbrInfo<3>(nbr.id, quad);
 					if (!qed.count(nbr.id)) {
 						q.push_back(nbr.id);
 						qed.insert(nbr.id);
@@ -89,14 +89,14 @@ DomainCollection::DomainCollection(OctTree t, int level, int n)
 							qed.insert(id);
 						}
 					}
-					d.getNbrInfoPtr(s) = new FineNbrInfo(nbr_ids);
+					d.getNbrInfoPtr(s) = new FineNbrInfo<3>(nbr_ids);
 				} else if (n.nbrId(s) != -1) {
 					int id = n.nbrId(s);
 					if (!qed.count(id)) {
 						q.push_back(id);
 						qed.insert(id);
 					}
-					d.getNbrInfoPtr(s) = new NormalNbrInfo(id);
+					d.getNbrInfoPtr(s) = new NormalNbrInfo<3>(id);
 				}
 			}
 			domains[d.id] = d_ptr;
@@ -121,34 +121,34 @@ DomainCollection::DomainCollection(int d_x, int d_y, int d_z, int n)
 		for (int domain_z = 0; domain_z < d_z; domain_z++) {
 			for (int domain_y = 0; domain_y < d_y; domain_y++) {
 				for (int domain_x = 0; domain_x < d_x; domain_x++) {
-					shared_ptr<Domain> d_ptr(new Domain());
-					Domain &           ds = *d_ptr;
-					ds.n                  = n;
-					ds.id                 = getID(domain_x, domain_y, domain_z);
-					ds.refine_level       = 1;
+					shared_ptr<Domain<3>> d_ptr(new Domain<3>());
+					Domain<3> &           ds = *d_ptr;
+					ds.n                     = n;
+					ds.id                    = getID(domain_x, domain_y, domain_z);
+					ds.refine_level          = 1;
 					if (domain_x != 0) {
 						ds.getNbrInfoPtr(Side::west)
-						= new NormalNbrInfo(getID(domain_x - 1, domain_y, domain_z));
+						= new NormalNbrInfo<3>(getID(domain_x - 1, domain_y, domain_z));
 					}
 					if (domain_x != d_x - 1) {
 						ds.getNbrInfoPtr(Side::east)
-						= new NormalNbrInfo(getID(domain_x + 1, domain_y, domain_z));
+						= new NormalNbrInfo<3>(getID(domain_x + 1, domain_y, domain_z));
 					}
 					if (domain_y != 0) {
 						ds.getNbrInfoPtr(Side::south)
-						= new NormalNbrInfo(getID(domain_x, domain_y - 1, domain_z));
+						= new NormalNbrInfo<3>(getID(domain_x, domain_y - 1, domain_z));
 					}
 					if (domain_y != d_y - 1) {
 						ds.getNbrInfoPtr(Side::north)
-						= new NormalNbrInfo(getID(domain_x, domain_y + 1, domain_z));
+						= new NormalNbrInfo<3>(getID(domain_x, domain_y + 1, domain_z));
 					}
 					if (domain_z != 0) {
 						ds.getNbrInfoPtr(Side::bottom)
-						= new NormalNbrInfo(getID(domain_x, domain_y, domain_z - 1));
+						= new NormalNbrInfo<3>(getID(domain_x, domain_y, domain_z - 1));
 					}
 					if (domain_z != d_z - 1) {
 						ds.getNbrInfoPtr(Side::top)
-						= new NormalNbrInfo(getID(domain_x, domain_y, domain_z + 1));
+						= new NormalNbrInfo<3>(getID(domain_x, domain_y, domain_z + 1));
 					}
 					ds.x_length    = 1.0 / d_x;
 					ds.y_length    = 1.0 / d_y;
@@ -223,7 +223,7 @@ void DomainCollection::zoltanBalanceDomains()
 	};
 	CompressedVertex graph;
 	for (auto &p : domains) {
-		Domain &d = *p.second;
+		Domain<3> &d = *p.second;
 		graph.vertices.push_back(d.id);
 		graph.ptrs.push_back(graph.edges.size());
 		for (Side s : Side::getValues()) {
@@ -294,7 +294,7 @@ void DomainCollection::zoltanBalanceDomains()
 	[](void *data, int num_gid_entries, ZOLTAN_ID_PTR global_id, int size, char *buf, int *ierr) {
 		DomainCollection &dc = *(DomainCollection *) data;
 		*ierr                = ZOLTAN_OK;
-		dc.domains[*global_id].reset(new Domain());
+		dc.domains[*global_id].reset(new Domain<3>());
 		dc.domains[*global_id]->deserialize(buf);
 	},
 	this);
@@ -423,7 +423,7 @@ void DomainCollection::zoltanBalanceWithLower(DomainCollection &lower)
 	CompressedVertex graph;
 	// process coarse level
 	for (auto &p : domains) {
-		Domain &d = *p.second;
+		Domain<3> &d = *p.second;
 		graph.vertices.push_back(d.id);
 		graph.ptrs.push_back(graph.edges.size());
 		// patch to patch communication
@@ -453,7 +453,7 @@ void DomainCollection::zoltanBalanceWithLower(DomainCollection &lower)
 	}
 	// process fine level
 	for (auto &p : lower.domains) {
-		Domain &d = *p.second;
+		Domain<3> &d = *p.second;
 		graph.vertices.push_back(d.id);
 		graph.ptrs.push_back(graph.edges.size());
 		graph.edges.push_back(-d.parent_id - 1);
@@ -531,7 +531,7 @@ void DomainCollection::zoltanBalanceWithLower(DomainCollection &lower)
 	[](void *data, int num_gid_entries, ZOLTAN_ID_PTR global_id, int size, char *buf, int *ierr) {
 		DomainCollection &dc = *(DomainCollection *) data;
 		*ierr                = ZOLTAN_OK;
-		dc.domains[*global_id].reset(new Domain());
+		dc.domains[*global_id].reset(new Domain<3>());
 		dc.domains[*global_id]->deserialize(buf);
 	},
 	this);
@@ -662,9 +662,9 @@ void DomainCollection::indexDomainsLocal()
 				todo.erase(i);
 				queue.pop_front();
 				map_vec.push_back(i);
-				Domain &d  = *domains[i];
-				rev_map[i] = curr_i;
-				d.id_local = curr_i;
+				Domain<3> &d = *domains[i];
+				rev_map[i]   = curr_i;
+				d.id_local   = curr_i;
 				curr_i++;
 				for (int i : d.getNbrIds()) {
 					if (!enqueued.count(i)) {
@@ -703,8 +703,8 @@ double DomainCollection::integrate(const Vec u)
 	VecGetArray(u, &u_view);
 
 	for (auto &p : domains) {
-		Domain &d     = *p.second;
-		int     start = d.n * d.n * d.n * d.id_local;
+		Domain<3> &d     = *p.second;
+		int        start = d.n * d.n * d.n * d.id_local;
 
 		double patch_sum = 0;
 		for (int i = 0; i < d.n * d.n * d.n; i++) {
@@ -724,7 +724,7 @@ double DomainCollection::volume()
 {
 	double sum = 0;
 	for (auto &p : domains) {
-		Domain &d = *p.second;
+		Domain<3> &d = *p.second;
 		sum += d.x_length * d.y_length * d.z_length;
 	}
 	double retval;

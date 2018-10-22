@@ -125,7 +125,7 @@ TEST_CASE("InterLevelComm scatter works", "[GMG]")
 		double *                        ce_vec;
 		VecGetArray(coarse_expected, &ce_vec);
 		for (auto p : coarse->domains) {
-			Domain &d = *p.second;
+			Domain<3> &d = *p.second;
 			for (int i = 0; i < n * n * n; i++) {
 				ce_vec[d.id_local * n * n * n + i] = d.id + i;
 			}
@@ -136,7 +136,7 @@ TEST_CASE("InterLevelComm scatter works", "[GMG]")
 
 		VecGetArray(coarse_local_expected, &ce_vec);
 		for (auto data : comm->getFineDomains()) {
-			Domain &d = *data.d;
+			Domain<3> &d = *data.d;
 			for (int i = 0; i < n * n * n; i++) {
 				ce_vec[data.local_index * n * n * n + i] = d.parent_id + i;
 			}
@@ -185,7 +185,7 @@ TEST_CASE("InterLevelComm scatter works", "[GMG]")
 		double *                        ce_vec;
 		VecGetArray(coarse_expected, &ce_vec);
 		for (auto p : coarse->domains) {
-			Domain &d = *p.second;
+			Domain<3> &d = *p.second;
 			for (int i = 0; i < n * n * n; i++) {
 				ce_vec[d.id_local * n * n * n + i] = d.id + i;
 			}
@@ -198,7 +198,7 @@ TEST_CASE("InterLevelComm scatter works", "[GMG]")
 
 		VecGetArray(coarse_local_expected, &ce_vec);
 		for (auto data : comm->getFineDomains()) {
-			Domain &d = *data.d;
+			Domain<3> &d = *data.d;
 			for (int i = 0; i < n * n * n; i++) {
 				ce_vec[data.local_index * n * n * n + i] = d.parent_id + i;
 			}
@@ -272,7 +272,7 @@ TEST_CASE("GMGAvgRstr works", "[GMG]")
 		double *                        ce_vec;
 		VecGetArray(coarse_expected, &ce_vec);
 		for (auto p : coarse->domains) {
-			Domain &d = *p.second;
+			Domain<3> &d = *p.second;
 			for (int oct = 0; oct < 8; oct++) {
 				octFill(ce_vec + d.id_local * n * n * n, oct, d.child_id[oct]);
 			}
@@ -283,7 +283,7 @@ TEST_CASE("GMGAvgRstr works", "[GMG]")
 
 		VecGetArray(fine_start, &ce_vec);
 		for (auto data : fine->domains) {
-			Domain &d = *data.second;
+			Domain<3> &d = *data.second;
 			for (int zi = 0; zi < n; zi++) {
 				for (int yi = 0; yi < n; yi++) {
 					for (int xi = 0; xi < n; xi++) {
@@ -320,7 +320,7 @@ TEST_CASE("GMGAvgRstr works", "[GMG]")
 		double *                        ce_vec;
 		VecGetArray(coarse_expected, &ce_vec);
 		for (auto p : coarse->domains) {
-			Domain &d = *p.second;
+			Domain<3> &d = *p.second;
 			if (d.hasChildren()) {
 				for (int oct = 0; oct < 8; oct++) {
 					octFill(ce_vec + d.id_local * n * n * n, oct, d.child_id[oct]);
@@ -342,7 +342,7 @@ TEST_CASE("GMGAvgRstr works", "[GMG]")
 
 		VecGetArray(fine_start, &ce_vec);
 		for (auto data : fine->domains) {
-			Domain &d = *data.second;
+			Domain<3> &d = *data.second;
 			if (d.id != d.parent_id) {
 				for (int zi = 0; zi < n; zi++) {
 					for (int yi = 0; yi < n; yi++) {
@@ -395,7 +395,7 @@ TEST_CASE("GMGDrctIntp works", "[GMG]")
 		double *                        ce_vec;
 		VecGetArray(coarse_start, &ce_vec);
 		for (auto p : coarse->domains) {
-			Domain &d = *p.second;
+			Domain<3> &d = *p.second;
 			for (int oct = 0; oct < 8; oct++) {
 				octFill(ce_vec + d.id_local * n * n * n, oct, d.child_id[oct]);
 			}
@@ -404,7 +404,7 @@ TEST_CASE("GMGDrctIntp works", "[GMG]")
 
 		VecGetArray(fine_expected, &ce_vec);
 		for (auto data : fine->domains) {
-			Domain &d = *data.second;
+			Domain<3> &d = *data.second;
 			for (int zi = 0; zi < n; zi++) {
 				for (int yi = 0; yi < n; yi++) {
 					for (int xi = 0; xi < n; xi++) {
@@ -432,7 +432,7 @@ TEST_CASE("GMGDrctIntp works", "[GMG]")
 		REQUIRE(fine_result_norm != 0);
 	}
 }
-void getXYZ(const Domain &d, const int &xi, const int &yi, const int &zi, double &x, double &y,
+void getXYZ(const Domain<3> &d, const int &xi, const int &yi, const int &zi, double &x, double &y,
             double &z)
 {
 	const int &n   = d.n;
@@ -476,7 +476,7 @@ TEST_CASE("GMGTriLinIntp works", "[GMG]")
 		double *                        ce_vec;
 		VecGetArray(coarse_start, &ce_vec);
 		for (auto p : coarse->domains) {
-			Domain &d = *p.second;
+			Domain<3> &d = *p.second;
 			for (int zi = 0; zi < n; zi++) {
 				for (int yi = 0; yi < n; yi++) {
 					for (int xi = 0; xi < n; xi++) {
@@ -491,7 +491,7 @@ TEST_CASE("GMGTriLinIntp works", "[GMG]")
 
 		VecGetArray(fine_expected, &ce_vec);
 		for (auto data : fine->domains) {
-			Domain &d = *data.second;
+			Domain<3> &d = *data.second;
 			for (int zi = 0; zi < n; zi++) {
 				for (int yi = 0; yi < n; yi++) {
 					for (int xi = 0; xi < n; xi++) {
@@ -542,7 +542,7 @@ TEST_CASE("GMGTriLinIntp works", "[GMG]")
 		double *                        ce_vec;
 		VecGetArray(coarse_start, &ce_vec);
 		for (auto p : coarse->domains) {
-			Domain &d = *p.second;
+			Domain<3> &d = *p.second;
 			for (int zi = 0; zi < n; zi++) {
 				for (int yi = 0; yi < n; yi++) {
 					for (int xi = 0; xi < n; xi++) {
@@ -557,7 +557,7 @@ TEST_CASE("GMGTriLinIntp works", "[GMG]")
 
 		VecGetArray(fine_expected, &ce_vec);
 		for (auto data : fine->domains) {
-			Domain &d = *data.second;
+			Domain<3> &d = *data.second;
 			for (int zi = 0; zi < n; zi++) {
 				for (int yi = 0; yi < n; yi++) {
 					for (int xi = 0; xi < n; xi++) {

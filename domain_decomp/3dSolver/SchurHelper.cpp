@@ -14,7 +14,7 @@ SchurHelper::SchurHelper(DomainCollection dc, shared_ptr<PatchSolver> solver,
 		domains.push_back(*p.second);
 	}
 	map<int, pair<int, IfaceSet>> off_proc_ifaces;
-	for (SchurDomain &sd : domains) {
+	for (SchurDomain<3> &sd : domains) {
 		sd.enumerateIfaces(ifaces, off_proc_ifaces);
 		solver->addDomain(sd);
 	}
@@ -116,7 +116,7 @@ void SchurHelper::solveAndInterpolateWithInterface(const Vec f, Vec u, const Vec
 	VecScale(local_interp, 0);
 	// solve over domains on this proc
 	solver->domainSolve(domains, f, u, local_gamma);
-	for (SchurDomain &sd : domains) {
+	for (SchurDomain<3> &sd : domains) {
 		interpolator->interpolate(sd, u, local_interp);
 	}
 
@@ -130,7 +130,7 @@ void SchurHelper::solveWithSolution(const Vec f, Vec u)
 	// initilize our local variables
 	VecScale(local_gamma, 0);
 	VecScale(local_interp, 0);
-	for (SchurDomain &sd : domains) {
+	for (SchurDomain<3> &sd : domains) {
 		interpolator->interpolate(sd, u, local_interp);
 	}
 	VecScale(gamma, 0);
@@ -146,7 +146,7 @@ void SchurHelper::interpolateToInterface(const Vec f, Vec u, Vec gamma)
 {
 	// initilize our local variables
 	VecScale(local_interp, 0);
-	for (SchurDomain &sd : domains) {
+	for (SchurDomain<3> &sd : domains) {
 		interpolator->interpolate(sd, u, local_interp);
 	}
 	VecScale(gamma, 0);
@@ -157,14 +157,14 @@ void SchurHelper::applyWithInterface(const Vec u, const Vec gamma, Vec f)
 {
 	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
-	for (SchurDomain &sd : domains) {
+	for (SchurDomain<3> &sd : domains) {
 		op->apply(sd, u, local_gamma, f);
 	}
 }
 void SchurHelper::apply(const Vec u, Vec f)
 {
 	VecScale(local_interp, 0);
-	for (SchurDomain &sd : domains) {
+	for (SchurDomain<3> &sd : domains) {
 		interpolator->interpolate(sd, u, local_interp);
 	}
 	VecScale(gamma, 0);
@@ -173,7 +173,7 @@ void SchurHelper::apply(const Vec u, Vec f)
 	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 
-	for (SchurDomain &sd : domains) {
+	for (SchurDomain<3> &sd : domains) {
 		op->apply(sd, u, local_gamma, f);
 	}
 }
@@ -421,15 +421,15 @@ void       SchurHelper::assembleMatrix(inserter insertBlock)
 		}
 
 		// create domain representing curr_type
-		SchurDomain sd;
+		SchurDomain<3> sd;
 		sd.n                           = n;
 		sd.x_length                    = 1;
 		sd.y_length                    = 1;
 		sd.z_length                    = 1;
 		sd.neumann                     = curr_type.neumann;
-		sd.getIfaceInfoPtr(Side::west) = new NormalIfaceInfo();
+		sd.getIfaceInfoPtr(Side::west) = new NormalIfaceInfo<3>();
 		solver->addDomain(sd);
-        std::deque<SchurDomain> single_domain;
+        std::deque<SchurDomain<3>> single_domain;
         single_domain.push_back(sd);
 
 		map<BlockKey, shared_ptr<valarray<double>>> coeffs;
@@ -717,7 +717,7 @@ void SchurHelper::indexDomainIfacesLocal()
 	map<int, int> rev_map;
 	if (!domains.empty()) {
 		int curr_i = 0;
-		for (SchurDomain &sd : domains) {
+		for (SchurDomain<3> &sd : domains) {
 			for (int id : sd.getIds()) {
 				if (rev_map.count(id) == 0) {
 					rev_map[id] = curr_i;
@@ -726,7 +726,7 @@ void SchurHelper::indexDomainIfacesLocal()
 				}
 			}
 		}
-		for (SchurDomain &sd : domains) {
+		for (SchurDomain<3> &sd : domains) {
 			sd.setLocalIndexes(rev_map);
 		}
 	}
@@ -836,7 +836,7 @@ void SchurHelper::indexIfacesGlobal()
 		}
 
 		// set new global indices in domain objects
-		for (SchurDomain &sd : domains) {
+		for (SchurDomain<3> &sd : domains) {
 			sd.setGlobalIndexes(rev_map);
 		}
 		for (size_t i = 0; i < iface_dist_map_vec.size(); i++) {

@@ -50,7 +50,7 @@ class SchurHelper
 	typedef std::function<void(Block *, std::shared_ptr<std::valarray<double>>)> inserter;
 	void assembleMatrix(inserter insertBlock);
 
-	std::deque<SchurDomain> domains;
+	std::deque<SchurDomain<3>> domains;
 	std::map<int, IfaceSet> ifaces;
 
 	std::vector<int> iface_dist_map_vec;

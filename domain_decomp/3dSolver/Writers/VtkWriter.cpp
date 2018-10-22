@@ -35,7 +35,7 @@ void VtkWriter::add(Vec u, string name)
 	VecGetArray(u, &u_view);
 
 	for (auto &p : dc.domains) {
-		Domain &d     = *p.second;
+		Domain<3> &d     = *p.second;
 		int     n     = d.n;
 		double  h_x   = d.x_length / n;
 		double  h_y   = d.y_length / n;

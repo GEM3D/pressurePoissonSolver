@@ -42,8 +42,8 @@ class DomainCollection
 	/**
 	 * @brief A map that maps the id of a domain to its domain signature.
 	 */
-	std::map<int, std::shared_ptr<Domain>>        domains;
-	const std::map<int, std::shared_ptr<Domain>> &getDomainMap()
+	std::map<int, std::shared_ptr<Domain<3>>>        domains;
+	const std::map<int, std::shared_ptr<Domain<3>>> &getDomainMap()
 	{
 		return domains;
 	}
