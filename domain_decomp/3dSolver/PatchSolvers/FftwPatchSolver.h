@@ -17,8 +17,8 @@ struct DomainK {
 	DomainK(const SchurDomain<3> &d)
 	{
 		this->neumann = d.neumann.to_ulong();
-		this->h_x     = d.x_length;
-		this->h_y     = d.y_length;
+		this->h_x     = d.domain.lengths[0];
+		this->h_y     = d.domain.lengths[1];
 	}
 	friend bool operator<(const DomainK &l, const DomainK &r)
 	{

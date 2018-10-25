@@ -9,8 +9,8 @@ class SevenPtPatchOperator : public PatchOperator
 	{
 		using namespace Utils;
 		int           n     = d.n;
-		double        h_x   = d.x_length / n;
-		double        h_y   = d.y_length / n;
+		double        h_x   = d.domain.lengths[0] / n;
+		double        h_y   = d.domain.lengths[1] / n;
 		int           start = n * n * n * d.local_index;
 		const double *u_view;
 		double *      f_view, *gamma_view;

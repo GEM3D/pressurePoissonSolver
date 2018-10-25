@@ -436,29 +436,29 @@ void getXYZ(const Domain<3> &d, const int &xi, const int &yi, const int &zi, dou
             double &z)
 {
 	const int &n   = d.n;
-	double     h_x = d.x_length / n;
-	double     h_y = d.y_length / n;
-	double     h_z = d.z_length / n;
+	double     h_x = d.lengths[0] / n;
+	double     h_y = d.lengths[1] / n;
+	double     h_z = d.lengths[2] / n;
 	if (xi == -1) {
-		x = d.x_start;
+		x = d.starts[0];
 	} else if (xi == n) {
-		x = d.x_start + d.x_length;
+		x = d.starts[0] + d.lengths[0];
 	} else {
-		x = d.x_start + h_x / 2.0 + d.x_length * xi / n;
+		x = d.starts[0] + h_x / 2.0 + d.lengths[0] * xi / n;
 	}
 	if (yi == -1) {
-		y = d.y_start;
+		y = d.starts[1];
 	} else if (yi == n) {
-		y = d.y_start + d.y_length;
+		y = d.starts[1] + d.lengths[1];
 	} else {
-		y = d.y_start + h_y / 2.0 + d.y_length * yi / n;
+		y = d.starts[1] + h_y / 2.0 + d.lengths[2] * yi / n;
 	}
 	if (zi == -1) {
-		z = d.z_start;
+		z = d.starts[2];
 	} else if (zi == n) {
-		z = d.z_start + d.z_length;
+		z = d.starts[2] + d.lengths[2];
 	} else {
-		z = d.z_start + h_z / 2.0 + d.z_length * zi / n;
+		z = d.starts[2] + h_z / 2.0 + d.lengths[2] * zi / n;
 	}
 }
 TEST_CASE("GMGTriLinIntp works", "[GMG]")

@@ -39,11 +39,11 @@ void ClawWriter::writePatch(Domain<3> &d, std::ostream &os, double *u_view, doub
 	os << 0 << tab << "mpi_rank" << endl;
 	os << d.n << tab << "mx" << endl;
 	os << d.n << tab << "my" << endl;
-	os << d.x_start << tab << "xlow" << endl;
-	os << d.y_start << tab << "ylow" << endl;
+	os << d.starts[0] << tab << "xlow" << endl;
+	os << d.starts[1] << tab << "ylow" << endl;
 	int    n   = d.n;
-	double h_x = d.x_length / n;
-	double h_y = d.y_length / n;
+	double h_x = d.lengths[0] / n;
+	double h_y = d.lengths[1] / n;
 	os << h_x << tab << "dx" << endl;
 	os << h_y << tab << "dy" << endl;
 	os << endl;

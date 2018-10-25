@@ -1,6 +1,7 @@
 #include "DomainCollection.h"
 #include "ZoltanHelpers.h"
 #include <algorithm>
+#include <numeric>
 #include <deque>
 #include <fstream>
 #include <iostream>
@@ -30,12 +31,12 @@ DomainCollection::DomainCollection(OctTree t, int level, int n)
 
 			d.n            = this->n;
 			d.id           = n.id;
-			d.x_length     = n.x_length;
-			d.y_length     = n.y_length;
-			d.z_length     = n.z_length;
-			d.x_start      = n.x_start;
-			d.y_start      = n.y_start;
-			d.z_start      = n.z_start;
+			d.lengths[0]   = n.x_length;
+			d.lengths[1]   = n.y_length;
+			d.lengths[2]   = n.z_length;
+			d.starts[0]    = n.x_start;
+			d.starts[1]    = n.y_start;
+			d.starts[2]    = n.z_start;
 			d.child_id     = n.child_id;
 			d.refine_level = n.level;
 			if (n.level < level) {
@@ -150,12 +151,12 @@ DomainCollection::DomainCollection(int d_x, int d_y, int d_z, int n)
 						ds.getNbrInfoPtr(Side::top)
 						= new NormalNbrInfo<3>(getID(domain_x, domain_y, domain_z + 1));
 					}
-					ds.x_length    = 1.0 / d_x;
-					ds.y_length    = 1.0 / d_y;
-					ds.z_length    = 1.0 / d_z;
-					ds.x_start     = 1.0 * domain_x / d_x;
-					ds.y_start     = 1.0 * domain_y / d_y;
-					ds.z_start     = 1.0 * domain_z / d_y;
+					ds.lengths[0]  = 1.0 / d_x;
+					ds.lengths[1]  = 1.0 / d_y;
+					ds.lengths[2]  = 1.0 / d_z;
+					ds.starts[0]   = 1.0 * domain_x / d_x;
+					ds.starts[1]   = 1.0 * domain_y / d_y;
+					ds.starts[2]   = 1.0 * domain_z / d_y;
 					domains[ds.id] = d_ptr;
 				}
 			}
@@ -711,7 +712,8 @@ double DomainCollection::integrate(const Vec u)
 			patch_sum += u_view[start + i];
 		}
 
-		patch_sum *= d.x_length * d.y_length * d.z_length / (d.n * d.n * d.n);
+		patch_sum *= accumulate(d.lengths.begin(), d.lengths.end(), 1, std::multiplies<double>())
+		             / (d.n * d.n * d.n);
 
 		sum += patch_sum;
 	}
@@ -725,7 +727,7 @@ double DomainCollection::volume()
 	double sum = 0;
 	for (auto &p : domains) {
 		Domain<3> &d = *p.second;
-		sum += d.x_length * d.y_length * d.z_length;
+		sum += accumulate(d.lengths.begin(), d.lengths.end(), 1, std::multiplies<double>());
 	}
 	double retval;
 	MPI_Allreduce(&sum, &retval, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);

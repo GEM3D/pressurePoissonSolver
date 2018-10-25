@@ -3,8 +3,7 @@
 #include "Domain.h"
 #include "Iface.h"
 #include <deque>
-template <size_t D>
-class IfaceInfo
+template <size_t D> class IfaceInfo
 {
 	public:
 	int          id;
@@ -20,8 +19,7 @@ class IfaceInfo
 	virtual void setLocalIndexes(const std::map<int, int> &rev_map)                 = 0;
 	virtual void setGlobalIndexes(const std::map<int, int> &rev_map)                = 0;
 };
-template <size_t D>
-class NormalIfaceInfo : public IfaceInfo<D>
+template <size_t D> class NormalIfaceInfo : public IfaceInfo<D>
 {
 	public:
 	NormalNbrInfo<D> nbr_info;
@@ -34,17 +32,11 @@ class NormalIfaceInfo : public IfaceInfo<D>
 	NormalIfaceInfo(Domain<D> &d, Side s)
 	{
 		nbr_info = d.getNormalNbrInfo(s);
-		switch (s.toInt()) {
-			case Side::west:
-			case Side::south:
-			case Side::bottom:
-				this->id = d.id * 6 + s.toInt();
-				break;
-			case Side::east:
-			case Side::north:
-			case Side::top:
-				this->id  = d.getNormalNbrInfo(s).id * 6 + s.opposite().toInt();
-				this->own = true;
+		if (s.isLowerOnAxis()) {
+			this->id = d.id * Side::num_sides + s.toInt();
+		} else {
+			this->id  = d.getNormalNbrInfo(s).id * Side::num_sides + s.opposite().toInt();
+			this->own = true;
 		}
 	}
 	void getIds(std::vector<int> &ids)
@@ -74,22 +66,21 @@ class NormalIfaceInfo : public IfaceInfo<D>
 		this->global_index = rev_map.at(this->local_index);
 	}
 };
-template <size_t D>
-class CoarseIfaceInfo : public IfaceInfo<D>
+template <size_t D> class CoarseIfaceInfo : public IfaceInfo<D>
 {
 	public:
 	CoarseNbrInfo<D> nbr_info;
-	int           quad_on_coarse;
-	int           coarse_id;
-	int           coarse_local_index;
-	int           coarse_global_index;
+	int              quad_on_coarse;
+	int              coarse_id;
+	int              coarse_local_index;
+	int              coarse_global_index;
 	CoarseIfaceInfo(Domain<D> &d, Side s)
 	{
-		nbr_info                = d.getCoarseNbrInfo(s);
-		this->id                      = d.id * 6 + s.toInt();
-		nbr_info = d.getCoarseNbrInfo(s);
-		quad_on_coarse          = nbr_info.quad_on_coarse;
-		coarse_id               = nbr_info.id * 6 + s.opposite().toInt();
+		nbr_info       = d.getCoarseNbrInfo(s);
+		this->id       = d.id * Side::num_sides + s.toInt();
+		nbr_info       = d.getCoarseNbrInfo(s);
+		quad_on_coarse = nbr_info.quad_on_coarse;
+		coarse_id      = nbr_info.id * Side::num_sides + s.opposite().toInt();
 	}
 	void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types, std::deque<Side> &sides,
 	                    std::deque<int> &ranks, std::deque<bool> &own, Side s)
@@ -103,7 +94,7 @@ class CoarseIfaceInfo : public IfaceInfo<D>
 		ranks.push_back(nbr_info.rank);
 		ranks.push_back(nbr_info.rank);
 		own.push_back(true);
-		own.push_back(nbr_info.ptr!=nullptr);
+		own.push_back(nbr_info.ptr != nullptr);
 	}
 	void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType> &types)
 	{
@@ -119,29 +110,28 @@ class CoarseIfaceInfo : public IfaceInfo<D>
 	}
 	void setLocalIndexes(const std::map<int, int> &rev_map)
 	{
-		this->local_index        = rev_map.at(this->id);
+		this->local_index  = rev_map.at(this->id);
 		coarse_local_index = rev_map.at(coarse_id);
 	}
 	void setGlobalIndexes(const std::map<int, int> &rev_map)
 	{
-		this->global_index        = rev_map.at(this->local_index);
+		this->global_index  = rev_map.at(this->local_index);
 		coarse_global_index = rev_map.at(coarse_local_index);
 	}
 };
-template <size_t D>
-class FineIfaceInfo : public IfaceInfo<D>
+template <size_t D> class FineIfaceInfo : public IfaceInfo<D>
 {
 	public:
-	FineNbrInfo<D>        nbr_info;
-	std::array<int, 4> fine_ids;
-	std::array<int, 4> fine_local_indexes;
-	std::array<int, 4> fine_global_indexes;
+	FineNbrInfo<D>                                 nbr_info;
+	std::array<int, 1 << Octant::num_orthants / 2> fine_ids;
+	std::array<int, 1 << Octant::num_orthants / 2> fine_local_indexes;
+	std::array<int, 1 << Octant::num_orthants / 2> fine_global_indexes;
 	FineIfaceInfo(Domain<D> &d, Side s)
 	{
-		nbr_info              = d.getFineNbrInfo(s);
-		this->id                    = d.id * 6 + s.toInt();
-		for (int i = 0; i < 4; i++) {
-			fine_ids[i] = nbr_info.ids[i] * 6 + s.opposite().toInt();
+		nbr_info = d.getFineNbrInfo(s);
+		this->id = d.id * Side::num_sides + s.toInt();
+		for (size_t i = 0; i < fine_ids.size(); i++) {
+			fine_ids[i] = nbr_info.ids[i] * Side::num_sides + s.opposite().toInt();
 		}
 	}
 	void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types, std::deque<Side> &sides,
@@ -152,19 +142,19 @@ class FineIfaceInfo : public IfaceInfo<D>
 		sides.push_back(s);
 		ranks.push_back(-1);
 		own.push_back(true);
-		for (int i = 0; i < 4; i++) {
+		for (size_t i = 0; i < fine_ids.size(); i++) {
 			ids.push_back(fine_ids[i]);
 			types.push_back(IfaceType::coarse_to_fine_0 + i);
 			sides.push_back(s);
 			ranks.push_back(nbr_info.ranks[i]);
-			own.push_back(nbr_info.ptrs[i]!=nullptr);
+			own.push_back(nbr_info.ptrs[i] != nullptr);
 		}
 	}
 	void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType> &types)
 	{
 		idx.push_back(this->local_index);
 		types.push_back(IfaceType::coarse_to_coarse);
-		for (int i = 0; i < 4; i++) {
+		for (size_t i = 0; i < fine_local_indexes.size(); i++) {
 			idx.push_back(fine_local_indexes[i]);
 			types.push_back(IfaceType::coarse_to_fine_0 + i);
 		}
@@ -172,35 +162,31 @@ class FineIfaceInfo : public IfaceInfo<D>
 	void getIds(std::vector<int> &ids)
 	{
 		ids.push_back(this->id);
-		for (int i = 0; i < 4; i++) {
+		for (size_t i = 0; i < fine_ids.size(); i++) {
 			ids.push_back(fine_ids[i]);
 		}
 	}
 	void setLocalIndexes(const std::map<int, int> &rev_map)
 	{
 		this->local_index = rev_map.at(this->id);
-		for (int i = 0; i < 4; i++) {
+		for (size_t i = 0; i < fine_ids.size(); i++) {
 			fine_local_indexes[i] = rev_map.at(fine_ids[i]);
 		}
 	}
 	void setGlobalIndexes(const std::map<int, int> &rev_map)
 	{
 		this->global_index = rev_map.at(this->local_index);
-		for (int i = 0; i < 4; i++) {
+		for (size_t i = 0; i < fine_local_indexes.size(); i++) {
 			fine_global_indexes[i] = rev_map.at(fine_local_indexes[i]);
 		}
 	}
 };
-template <size_t D>
-struct SchurDomain {
-	Domain<D>                     domain;
-	int                        local_index = 0;
-	int                        n;
-	double                     x_length;
-	double                     y_length;
-	double                     z_length;
-	std::bitset<6>             neumann;
-	std::array<IfaceInfo<D> *, 6> iface_info
+template <size_t D> struct SchurDomain {
+	Domain<D>                                   domain;
+	int                                         local_index = 0;
+	int                                         n;
+	std::bitset<Side::num_sides>                neumann;
+	std::array<IfaceInfo<D> *, Side::num_sides> iface_info
 	= {{nullptr, nullptr, nullptr, nullptr, nullptr, nullptr}};
 	std::vector<int> nbr_ids;
 	SchurDomain() = default;
@@ -209,9 +195,6 @@ struct SchurDomain {
 		domain      = d;
 		local_index = d.id_local;
 		n           = d.n;
-		x_length    = d.x_length;
-		y_length    = d.y_length;
-		z_length    = d.z_length;
 		neumann     = d.neumann;
 
 		// create iface objects

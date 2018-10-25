@@ -69,9 +69,9 @@ void DftPatchSolver::addDomain(SchurDomain<3> &d)
 		plan2[d] = plan(x_transform_inv, y_transform_inv, z_transform_inv);
 	}
 
-	double h_x = d.x_length / n;
-	double h_y = d.y_length / n;
-	double h_z = d.z_length / n;
+	double h_x = d.domain.lengths[0] / n;
+	double h_y = d.domain.lengths[1] / n;
+	double h_z = d.domain.lengths[2] / n;
 	if (!eigen_vals.count(d)) {
 		valarray<double> &eigen_val = eigen_vals[d];
 		eigen_val.resize(n * n * n);
@@ -143,9 +143,9 @@ void DftPatchSolver::addDomain(SchurDomain<3> &d)
 }
 void DftPatchSolver::solve(SchurDomain<3> &d, const Vec f, Vec u, const Vec gamma)
 {
-	double h_x        = d.x_length / n;
-	double h_y        = d.x_length / n;
-	double h_z        = d.x_length / n;
+	double h_x        = d.domain.lengths[0] / n;
+	double h_y        = d.domain.lengths[1] / n;
+	double h_z        = d.domain.lengths[2] / n;
 	auto   getSpacing = [=](Side s) {
         double retval = 0;
         switch (s.toInt()) {
@@ -314,10 +314,8 @@ void DftPatchSolver::execute_plan(std::array<std::shared_ptr<std::valarray<doubl
 #if 1
 				char   T    = 'T';
 				double one  = 1;
-				int    ione = 1;
-				int    n2   = n * n;
-				dgemv_(T, n, n, one, &matrix[0], n, &prev_result[y * n2 + x * n], ione, one,
-				       &new_result[y * y_stride + x * x_stride], n2);
+				dgemv_(T, n, n, one, &matrix[0], n, &prev_result[y * y_stride + x * x_stride],
+				       dft_stride, one, &new_result[y * y_stride + x * x_stride], dft_stride);
 #else
 				for (int i = 0; i < n; i++) {
 					for (int j = 0; j < n; j++) {

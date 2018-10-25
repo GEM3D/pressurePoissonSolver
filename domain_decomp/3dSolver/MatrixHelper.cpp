@@ -20,9 +20,9 @@ PW_explicit<Mat> MatrixHelper::formCRSMatrix(double lambda)
 	for (auto &p : dc.domains) {
 		Domain<3> &d     = *p.second;
 		int        n     = d.n;
-		double     h_x   = d.x_length / n;
-		double     h_y   = d.y_length / n;
-		double     h_z   = d.z_length / n;
+		double     h_x   = d.lengths[0] / n;
+		double     h_y   = d.lengths[1] / n;
+		double     h_z   = d.lengths[2] / n;
 		int        start = n * n * n * d.id_global;
 
 		// center coeffs

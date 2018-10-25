@@ -423,9 +423,7 @@ void       SchurHelper::assembleMatrix(inserter insertBlock)
 		// create domain representing curr_type
 		SchurDomain<3> sd;
 		sd.n                           = n;
-		sd.x_length                    = 1;
-		sd.y_length                    = 1;
-		sd.z_length                    = 1;
+		sd.domain.lengths.fill(1);
 		sd.neumann                     = curr_type.neumann;
 		sd.getIfaceInfoPtr(Side::west) = new NormalIfaceInfo<3>();
 		solver->addDomain(sd);

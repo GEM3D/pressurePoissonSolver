@@ -33,6 +33,8 @@ class Side
 	static constexpr int bottom = 0b100;
 	static constexpr int top    = 0b101;
 
+	static constexpr int num_sides    = 6;
+
 	/**
 	 * @brief Default constructor that initializes the value to -1
 	 */
@@ -199,6 +201,7 @@ class Octant
 	 */
 	static constexpr int tne = 0b111;
 
+	static constexpr int num_orthants = 8;
 	/**
 	 * @brief Default constructor that initializes the value to -1.
 	 */

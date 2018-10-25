@@ -26,30 +26,23 @@ template <size_t D> struct Domain : public Serializable {
 	int parent_id     = -1;
 	int oct_on_parent = -1;
 
-	std::array<int, 8> child_id = {{-1, -1, -1, -1, -1, -1, -1, -1}};
+	std::array<int, Octant::num_orthants> child_id;
 
-	std::bitset<6> neumann;
-	bool           zero_patch = false;
-	/**
-	 * @brief The lower left x coordinate of domain
-	 */
-	double x_start = 0;
-	/**
-	 * @brief The lower left y coordinate of domain
-	 */
-	double y_start = 0;
-	double z_start = 0;
-	/**
-	 * @brief length of domain in x direction
-	 */
-	double x_length = 1;
-	/**
-	 * @brief length of domain in y direction
-	 */
-	double                      y_length = 1;
-	double                      z_length = 1;
-	std::array<NbrInfo<D> *, 6> nbr_info = {{nullptr, nullptr, nullptr, nullptr, nullptr, nullptr}};
+	std::bitset<2 * D> neumann;
+	bool               zero_patch = false;
 
+	std::array<double, D> starts;
+	std::array<double, D> lengths;
+
+	std::array<NbrInfo<D> *, Side::num_sides> nbr_info;
+
+	Domain()
+	{
+		starts.fill(0);
+		lengths.fill(1);
+		nbr_info.fill(nullptr);
+		child_id.fill(-1);
+	}
 	~Domain();
 	friend bool operator<(const Domain &l, const Domain &r)
 	{
@@ -212,14 +205,17 @@ template <size_t D> class CoarseNbrInfo : public NbrInfo<D>
 template <size_t D> class FineNbrInfo : public NbrInfo<D>
 {
 	public:
-	std::array<std::shared_ptr<Domain<D>>, 4> ptrs  = {{nullptr, nullptr, nullptr, nullptr}};
-	std::array<int, 4>                        ranks = {{0, 0, 0, 0}};
-	std::array<int, 4>                        ids;
-	std::array<int, 4>                        global_indexes;
-	std::array<int, 4>                        local_indexes;
-	FineNbrInfo() {}
+	std::array<std::shared_ptr<Domain<D>>, Octant::num_orthants/2> ptrs;
+	std::array<int, Octant::num_orthants/2> ranks;
+	std::array<int, Octant::num_orthants/2> ids;
+	std::array<int, Octant::num_orthants/2> global_indexes;
+	std::array<int, Octant::num_orthants/2> local_indexes;
+	FineNbrInfo() {
+        ptrs.fill(nullptr);
+        ranks.fill(0);
+    }
 	~FineNbrInfo() = default;
-	FineNbrInfo(std::array<int, 4> ids)
+	FineNbrInfo(std::array<int, Octant::num_orthants/2> ids)
 	{
 		this->ids = ids;
 	}
@@ -229,25 +225,25 @@ template <size_t D> class FineNbrInfo : public NbrInfo<D>
 	}
 	void getNbrIds(std::vector<int> &nbr_ids)
 	{
-		for (int i = 0; i < 4; i++) {
+		for (size_t i = 0; i < ids.size(); i++) {
 			nbr_ids.push_back(ids[i]);
 		}
 	};
 	void setGlobalIndexes(std::map<int, int> &rev_map)
 	{
-		for (int i = 0; i < 4; i++) {
+		for (size_t i = 0; i < global_indexes.size(); i++) {
 			global_indexes[i] = rev_map.at(local_indexes[i]);
 		}
 	}
 	void setLocalIndexes(std::map<int, int> &rev_map)
 	{
-		for (int i = 0; i < 4; i++) {
+		for (size_t i = 0; i < local_indexes.size(); i++) {
 			local_indexes[i] = rev_map.at(ids[i]);
 		}
 	}
 	void setPtrs(std::map<int, std::shared_ptr<Domain<D>>> &domains)
 	{
-		for (int i = 0; i < 4; i++) {
+		for (size_t i = 0; i < ids.size(); i++) {
 			try {
 				ptrs[i] = domains.at(ids[i]);
 			} catch (std::out_of_range) {
@@ -262,7 +258,7 @@ template <size_t D> class FineNbrInfo : public NbrInfo<D>
 
 	void updateRankOnNeighbors(int new_rank, Side s)
 	{
-		for (int i = 0; i < 4; i++) {
+		for (size_t i = 0; i < ptrs.size(); i++) {
 			ptrs[i]->getCoarseNbrInfo(s.opposite()).updateRank(new_rank);
 		}
 	}
@@ -337,7 +333,7 @@ template <size_t D> inline void Domain<D>::setGlobalNeighborIndexes(std::map<int
 }
 template <size_t D> inline void Domain<D>::setNeumann()
 {
-	for (int q = 0; q < 6; q++) {
+	for (size_t q = 0; q < neumann.size(); q++) {
 		neumann[q] = !hasNbr(static_cast<Side>(q));
 	}
 }
@@ -361,14 +357,10 @@ template <size_t D> inline int Domain<D>::serialize(char *buffer) const
 	writer << child_id;
 	writer << neumann;
 	writer << zero_patch;
-	writer << x_start;
-	writer << y_start;
-	writer << z_start;
-	writer << x_length;
-	writer << y_length;
-	writer << z_length;
-	std::bitset<6> has_nbr;
-	for (int i = 0; i < 6; i++) {
+	writer << starts;
+	writer << lengths;
+	std::bitset<Side::num_sides> has_nbr;
+	for (size_t i = 0; i < Side::num_sides; i++) {
 		has_nbr[i] = nbr_info[i] != nullptr;
 	}
 	writer << has_nbr;
@@ -405,15 +397,11 @@ template <size_t D> inline int Domain<D>::deserialize(char *buffer)
 	reader >> child_id;
 	reader >> neumann;
 	reader >> zero_patch;
-	reader >> x_start;
-	reader >> y_start;
-	reader >> z_start;
-	reader >> x_length;
-	reader >> y_length;
-	reader >> z_length;
-	std::bitset<6> has_nbr;
+	reader >> starts;
+	reader >> lengths;
+	std::bitset<Side::num_sides> has_nbr;
 	reader >> has_nbr;
-	for (int i = 0; i < 6; i++) {
+	for (size_t i = 0; i < Side::num_sides; i++) {
 		if (has_nbr[i]) {
 			NbrType type;
 			reader >> type;

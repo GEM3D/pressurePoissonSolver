@@ -70,9 +70,9 @@ void FftwPatchSolver::addDomain(SchurDomain<3> &d)
 		                            x_transform_inv, FFTW_MEASURE | FFTW_DESTROY_INPUT);
 	}
 
-	double h_x = d.x_length / n;
-	double h_y = d.y_length / n;
-	double h_z = d.z_length / n;
+	double h_x = d.domain.lengths[0] / n;
+	double h_y = d.domain.lengths[1] / n;
+	double h_z = d.domain.lengths[2] / n;
 	if (!denoms.count(d)) {
 		valarray<double> &denom = denoms[d];
 		denom.resize(n * n * n);
@@ -153,9 +153,9 @@ FftwPatchSolver::~FftwPatchSolver()
 }
 void FftwPatchSolver::solve(SchurDomain<3> &d, const Vec f, Vec u, const Vec gamma)
 {
-	double h_x        = d.x_length / n;
-	double h_y        = d.x_length / n;
-	double h_z        = d.x_length / n;
+	double h_x        = d.domain.lengths[0] / n;
+	double h_y        = d.domain.lengths[1] / n;
+	double h_z        = d.domain.lengths[2] / n;
 	auto   getSpacing = [=](Side s) {
         double retval = 0;
         switch (s.toInt()) {

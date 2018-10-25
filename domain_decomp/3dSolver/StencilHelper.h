@@ -27,37 +27,37 @@ class DirichletSH : public StencilHelper
 		int    idx = d.id_global * d.n * d.n * d.n;
 		switch (s.toInt()) {
 			case Side::west:
-				h       = d.x_length / d.n;
+				h       = d.lengths[0] / d.n;
 				start   = idx;
 				stridex = d.n;
 				stridey = d.n * d.n;
 				break;
 			case Side::east:
-				h       = d.x_length / d.n;
+				h       = d.lengths[0] / d.n;
 				start   = idx + (d.n - 1);
 				stridex = d.n;
 				stridey = d.n * d.n;
 				break;
 			case Side::south:
-				h       = d.y_length / d.n;
+				h       = d.lengths[1] / d.n;
 				start   = idx;
 				stridex = 1;
 				stridey = d.n * d.n;
 				break;
 			case Side::north:
-				h       = d.y_length / d.n;
+				h       = d.lengths[1] / d.n;
 				start   = idx + (d.n - 1) * d.n;
 				stridex = 1;
 				stridey = d.n * d.n;
 				break;
 			case Side::bottom:
-				h       = d.z_length / d.n;
+				h       = d.lengths[2] / d.n;
 				start   = idx;
 				stridex = 1;
 				stridey = d.n;
 				break;
 			case Side::top:
-				h       = d.z_length / d.n;
+				h       = d.lengths[2] / d.n;
 				start   = idx + (d.n - 1) * d.n * d.n;
 				stridex = 1;
 				stridey = d.n;
@@ -99,37 +99,37 @@ class NeumannSH : public StencilHelper
 		int    idx = d.id_global * d.n * d.n * d.n;
 		switch (s.toInt()) {
 			case Side::west:
-				h       = d.x_length / d.n;
+				h       = d.lengths[0] / d.n;
 				start   = idx;
 				stridex = d.n;
 				stridey = d.n * d.n;
 				break;
 			case Side::east:
-				h       = d.x_length / d.n;
+				h       = d.lengths[0] / d.n;
 				start   = idx + (d.n - 1);
 				stridex = d.n;
 				stridey = d.n * d.n;
 				break;
 			case Side::south:
-				h       = d.y_length / d.n;
+				h       = d.lengths[1] / d.n;
 				start   = idx;
 				stridex = 1;
 				stridey = d.n * d.n;
 				break;
 			case Side::north:
-				h       = d.y_length / d.n;
+				h       = d.lengths[1] / d.n;
 				start   = idx + (d.n - 1) * d.n;
 				stridex = 1;
 				stridey = d.n * d.n;
 				break;
 			case Side::bottom:
-				h       = d.z_length / d.n;
+				h       = d.lengths[2] / d.n;
 				start   = idx;
 				stridex = 1;
 				stridey = d.n;
 				break;
 			case Side::top:
-				h       = d.z_length / d.n;
+				h       = d.lengths[2] / d.n;
 				start   = idx + (d.n - 1) * d.n * d.n;
 				stridex = 1;
 				stridey = d.n;
@@ -174,42 +174,42 @@ class NormalSH : public StencilHelper
 		int               nbr_idx  = nbr_info.global_index * d.n * d.n * d.n;
 		switch (s.toInt()) {
 			case Side::west:
-				h         = d.x_length / d.n;
+				h         = d.lengths[0] / d.n;
 				start     = idx;
 				nbr_start = nbr_idx + (d.n - 1);
 				stridex   = d.n;
 				stridey   = d.n * d.n;
 				break;
 			case Side::east:
-				h         = d.x_length / d.n;
+				h         = d.lengths[0] / d.n;
 				start     = idx + (d.n - 1);
 				nbr_start = nbr_idx;
 				stridex   = d.n;
 				stridey   = d.n * d.n;
 				break;
 			case Side::south:
-				h         = d.y_length / d.n;
+				h         = d.lengths[1] / d.n;
 				start     = idx;
 				nbr_start = nbr_idx + (d.n - 1) * d.n;
 				stridex   = 1;
 				stridey   = d.n * d.n;
 				break;
 			case Side::north:
-				h         = d.y_length / d.n;
+				h         = d.lengths[1] / d.n;
 				start     = idx + (d.n - 1) * d.n;
 				nbr_start = nbr_idx;
 				stridex   = 1;
 				stridey   = d.n * d.n;
 				break;
 			case Side::bottom:
-				h         = d.z_length / d.n;
+				h         = d.lengths[2] / d.n;
 				start     = idx;
 				nbr_start = nbr_idx + (d.n - 1) * d.n * d.n;
 				stridex   = 1;
 				stridey   = d.n;
 				break;
 			case Side::top:
-				h         = d.z_length / d.n;
+				h         = d.lengths[2] / d.n;
 				start     = idx + (d.n - 1) * d.n * d.n;
 				nbr_start = nbr_idx;
 				stridex   = 1;
@@ -259,42 +259,42 @@ class CoarseSH : public StencilHelper
 		quad                       = nbr_info.quad_on_coarse;
 		switch (s.toInt()) {
 			case Side::west:
-				h         = d.x_length / d.n;
+				h         = d.lengths[0] / d.n;
 				start     = idx;
 				nbr_start = nbr_idx + (d.n - 1);
 				stridex   = d.n;
 				stridey   = d.n * d.n;
 				break;
 			case Side::east:
-				h         = d.x_length / d.n;
+				h         = d.lengths[0] / d.n;
 				start     = idx + (d.n - 1);
 				nbr_start = nbr_idx;
 				stridex   = d.n;
 				stridey   = d.n * d.n;
 				break;
 			case Side::south:
-				h         = d.y_length / d.n;
+				h         = d.lengths[1] / d.n;
 				start     = idx;
 				nbr_start = nbr_idx + (d.n - 1) * d.n;
 				stridex   = 1;
 				stridey   = d.n * d.n;
 				break;
 			case Side::north:
-				h         = d.y_length / d.n;
+				h         = d.lengths[1] / d.n;
 				start     = idx + (d.n - 1) * d.n;
 				nbr_start = nbr_idx;
 				stridex   = 1;
 				stridey   = d.n * d.n;
 				break;
 			case Side::bottom:
-				h         = d.z_length / d.n;
+				h         = d.lengths[2] / d.n;
 				start     = idx;
 				nbr_start = nbr_idx + (d.n - 1) * d.n * d.n;
 				stridex   = 1;
 				stridey   = d.n;
 				break;
 			case Side::top:
-				h         = d.z_length / d.n;
+				h         = d.lengths[2] / d.n;
 				start     = idx + (d.n - 1) * d.n * d.n;
 				nbr_start = nbr_idx;
 				stridex   = 1;
@@ -376,7 +376,7 @@ class FineSH : public StencilHelper
 		}
 		switch (s.toInt()) {
 			case Side::west:
-				h     = d.x_length / d.n;
+				h     = d.lengths[0] / d.n;
 				start = idx;
 				for (int i = 0; i < 4; i++) {
 					nbr_start[i] = nbr_idx[i] + (d.n - 1);
@@ -385,7 +385,7 @@ class FineSH : public StencilHelper
 				stridey = d.n * d.n;
 				break;
 			case Side::east:
-				h     = d.x_length / d.n;
+				h     = d.lengths[0] / d.n;
 				start = idx + (d.n - 1);
 				for (int i = 0; i < 4; i++) {
 					nbr_start[i] = nbr_idx[i];
@@ -394,7 +394,7 @@ class FineSH : public StencilHelper
 				stridey = d.n * d.n;
 				break;
 			case Side::south:
-				h     = d.y_length / d.n;
+				h     = d.lengths[1] / d.n;
 				start = idx;
 				for (int i = 0; i < 4; i++) {
 					nbr_start[i] = nbr_idx[i] + (d.n - 1) * d.n;
@@ -403,7 +403,7 @@ class FineSH : public StencilHelper
 				stridey = d.n * d.n;
 				break;
 			case Side::north:
-				h     = d.y_length / d.n;
+				h     = d.lengths[1] / d.n;
 				start = idx + (d.n - 1) * d.n;
 				for (int i = 0; i < 4; i++) {
 					nbr_start[i] = nbr_idx[i];
@@ -412,7 +412,7 @@ class FineSH : public StencilHelper
 				stridey = d.n * d.n;
 				break;
 			case Side::bottom:
-				h     = d.z_length / d.n;
+				h     = d.lengths[2] / d.n;
 				start = idx;
 				for (int i = 0; i < 4; i++) {
 					nbr_start[i] = nbr_idx[i] + (d.n - 1) * d.n * d.n;
@@ -421,7 +421,7 @@ class FineSH : public StencilHelper
 				stridey = d.n;
 				break;
 			case Side::top:
-				h     = d.z_length / d.n;
+				h     = d.lengths[2] / d.n;
 				start = idx + (d.n - 1) * d.n * d.n;
 				for (int i = 0; i < 4; i++) {
 					nbr_start[i] = nbr_idx[i];
