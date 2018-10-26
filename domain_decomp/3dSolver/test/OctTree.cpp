@@ -66,14 +66,14 @@ TEST_CASE("OctTree refineLeaves() works on single starting node", "[Side]")
 	// check child nodes
 	{
 		array<int, 8> children = tree.nodes[0].child_id;
-		for (Octant o : Octant::getValues()) {
+		for (Orthant<3> o : Orthant<3>::getValues()) {
 			OctNode child = tree.nodes[children[o.toInt()]];
 			REQUIRE(child.id == children[o.toInt()]);
-			for (Side s : o.getInteriorSides()) {
+			for (Side<3> s : o.getInteriorSides()) {
 				REQUIRE(child.hasNbr(s));
 				REQUIRE(child.nbrId(s) == children[o.getInteriorNbrOnSide(s).toInt()]);
 			}
-			for (Side s : o.getExteriorSides()) {
+			for (Side<3> s : o.getExteriorSides()) {
 				REQUIRE(!child.hasNbr(s));
 			}
 			for (int id : child.child_id) {
@@ -121,26 +121,26 @@ TEST_CASE("OctTree refineLeaves() works on single starting node with two calls",
 	// check child nodes
 	{
 		array<int, 8> children = tree.nodes.at(0).child_id;
-		for (Octant o : Octant::getValues()) {
+		for (Orthant<3> o : Orthant<3>::getValues()) {
 			OctNode child = tree.nodes.at(children[o.toInt()]);
 			REQUIRE(child.id == children[o.toInt()]);
-			for (Side s : o.getInteriorSides()) {
+			for (Side<3> s : o.getInteriorSides()) {
 				REQUIRE(child.hasNbr(s));
 				REQUIRE(child.nbrId(s) == children[o.getInteriorNbrOnSide(s).toInt()]);
 			}
-			for (Side s : o.getExteriorSides()) {
+			for (Side<3> s : o.getExteriorSides()) {
 				REQUIRE(!child.hasNbr(s));
 			}
 			// check the child's child nodes
 			for (int i = 0; i < 8; i++) {
-				Octant  child_o     = i;
-				int     id          = child.child_id[i];
-				OctNode child_child = tree.nodes.at(id);
+				Orthant<3> child_o     = i;
+				int        id          = child.child_id[i];
+				OctNode    child_child = tree.nodes.at(id);
 				REQUIRE(id > 8);
 				REQUIRE(id == child_child.id);
 
 				// check interior neighbors
-				for (Side s : child_o.getInteriorSides()) {
+				for (Side<3> s : child_o.getInteriorSides()) {
 					REQUIRE(child_child.hasNbr(s));
 					REQUIRE(child_child.nbrId(s)
 					        == child.child_id[child_o.getInteriorNbrOnSide(s).toInt()]);
@@ -153,7 +153,7 @@ TEST_CASE("OctTree refineLeaves() works on single starting node with two calls",
 						if (o_ext[i] == child_o_ext[i]) {
 							REQUIRE(!child.hasNbr(child_o_ext[i]));
 						} else {
-							Side s = child_o_ext[i];
+							Side<3> s = child_o_ext[i];
 							REQUIRE(child_child.hasNbr(s));
 							REQUIRE(child_child.nbrId(s)
 							        == tree.nodes.at(children[o.getInteriorNbrOnSide(s).toInt()])

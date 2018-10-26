@@ -3,6 +3,26 @@
 #include <functional>
 using namespace std;
 using namespace GMG;
+/*
+ * @brief Get an array of all pairs of sides that touch i.e. form a corner.
+ *
+ * @return The array.Cores: 1
+ */
+inline std::array<std::array<Side<3>, 2>, 12> getPairValues()
+{
+	return std::array<std::array<Side<3>, 2>, 12>({{{{Side<3>::west, Side<3>::south}},
+	                                                {{Side<3>::west, Side<3>::north}},
+	                                                {{Side<3>::west, Side<3>::bottom}},
+	                                                {{Side<3>::west, Side<3>::top}},
+	                                                {{Side<3>::east, Side<3>::south}},
+	                                                {{Side<3>::east, Side<3>::north}},
+	                                                {{Side<3>::east, Side<3>::bottom}},
+	                                                {{Side<3>::east, Side<3>::top}},
+	                                                {{Side<3>::south, Side<3>::bottom}},
+	                                                {{Side<3>::south, Side<3>::top}},
+	                                                {{Side<3>::north, Side<3>::bottom}},
+	                                                {{Side<3>::north, Side<3>::top}}}});
+}
 TriLinIntp::TriLinIntp(shared_ptr<DomainCollection> coarse_dc, shared_ptr<DomainCollection> fine_dc,
                        shared_ptr<InterLevelComm> ilc)
 {
@@ -11,18 +31,18 @@ TriLinIntp::TriLinIntp(shared_ptr<DomainCollection> coarse_dc, shared_ptr<Domain
 	this->ilc       = ilc;
 }
 struct OctInfo {
-	Octant oct;
-	int    n;
-	int    x_start;
-	int    y_start;
-	int    z_start;
-	OctInfo(Octant oct, int n)
+	Orthant<3> oct;
+	int        n;
+	int        x_start;
+	int        y_start;
+	int        z_start;
+	OctInfo(Orthant<3> oct, int n)
 	{
 		this->oct = oct;
 		this->n   = n;
-		x_start   = oct.isOnSide(Side::west) ? 0 : n / 2;
-		y_start   = oct.isOnSide(Side::south) ? 0 : n / 2;
-		z_start   = oct.isOnSide(Side::bottom) ? 0 : n / 2;
+		x_start   = oct.isOnSide(Side<3>::west) ? 0 : n / 2;
+		y_start   = oct.isOnSide(Side<3>::south) ? 0 : n / 2;
+		z_start   = oct.isOnSide(Side<3>::bottom) ? 0 : n / 2;
 	}
 	inline void getCube(const double *coarse_vec, const int coarse_idx, const int xi, const int yi,
 	                    const int zi, double *cube)
@@ -82,9 +102,9 @@ class InteriorHelper : public Helper
 	InteriorHelper(OctInfo info)
 	{
 		n       = info.n;
-		x_start = info.oct.isOnSide(Side::west) ? 0 : n / 2;
-		y_start = info.oct.isOnSide(Side::south) ? 0 : n / 2;
-		z_start = info.oct.isOnSide(Side::bottom) ? 0 : n / 2;
+		x_start = info.oct.isOnSide(Side<3>::west) ? 0 : n / 2;
+		y_start = info.oct.isOnSide(Side<3>::south) ? 0 : n / 2;
+		z_start = info.oct.isOnSide(Side<3>::bottom) ? 0 : n / 2;
 	}
 	void apply(double *u_fine, double *u_coarse)
 	{
@@ -153,14 +173,14 @@ class ExtFaceHelper : public Helper
 	int                  n;
 
 	public:
-	ExtFaceHelper(OctInfo info, Side s)
+	ExtFaceHelper(OctInfo info, Side<3> s)
 	{
 		n = info.n;
 		// set strides and starting indexes
-		if (s == Side::west || s == Side::east) {
+		if (s == Side<3>::west || s == Side<3>::east) {
 			stride_x = n;
 			stride_y = n * n;
-			if (s == Side::west) {
+			if (s == Side<3>::west) {
 				start        = info.x_start + info.y_start * n + info.z_start * n * n;
 				start_inner  = info.x_start + 1 + info.y_start * n + info.z_start * n * n;
 				start_coarse = 0;
@@ -171,10 +191,10 @@ class ExtFaceHelper : public Helper
 				start_coarse = n - 1;
 			}
 		}
-		if (s == Side::south || s == Side::north) {
+		if (s == Side<3>::south || s == Side<3>::north) {
 			stride_x = 1;
 			stride_y = n * n;
-			if (s == Side::south) {
+			if (s == Side<3>::south) {
 				start        = info.x_start + info.y_start * n + info.z_start * n * n;
 				start_inner  = info.x_start + (info.y_start + 1) * n + info.z_start * n * n;
 				start_coarse = 0;
@@ -185,10 +205,10 @@ class ExtFaceHelper : public Helper
 				start_coarse = (n - 1) * n;
 			}
 		}
-		if (s == Side::bottom || s == Side::top) {
+		if (s == Side<3>::bottom || s == Side<3>::top) {
 			stride_x = 1;
 			stride_y = n;
-			if (s == Side::bottom) {
+			if (s == Side<3>::bottom) {
 				start        = info.x_start + info.y_start * n + info.z_start * n * n;
 				start_inner  = info.x_start + info.y_start * n + (info.z_start + 1) * n * n;
 				start_coarse = 0;
@@ -249,14 +269,14 @@ class IntFaceHelper : public Helper
 	int                  n;
 
 	public:
-	IntFaceHelper(OctInfo info, Side s)
+	IntFaceHelper(OctInfo info, Side<3> s)
 	{
 		n = info.n;
 		// set strides and starting indexes
-		if (s == Side::west || s == Side::east) {
+		if (s == Side<3>::west || s == Side<3>::east) {
 			stride_x = n;
 			stride_y = n * n;
-			if (s == Side::west) {
+			if (s == Side<3>::west) {
 				start        = info.x_start + info.y_start * n + info.z_start * n * n;
 				start_outer  = info.x_start - 1 + info.y_start * n + info.z_start * n * n;
 				start_coarse = 0;
@@ -267,10 +287,10 @@ class IntFaceHelper : public Helper
 				start_coarse = n - 1;
 			}
 		}
-		if (s == Side::south || s == Side::north) {
+		if (s == Side<3>::south || s == Side<3>::north) {
 			stride_x = 1;
 			stride_y = n * n;
-			if (s == Side::south) {
+			if (s == Side<3>::south) {
 				start        = info.x_start + info.y_start * n + info.z_start * n * n;
 				start_outer  = info.x_start + (info.y_start - 1) * n + info.z_start * n * n;
 				start_coarse = 0;
@@ -281,10 +301,10 @@ class IntFaceHelper : public Helper
 				start_coarse = (n - 1) * n;
 			}
 		}
-		if (s == Side::bottom || s == Side::top) {
+		if (s == Side<3>::bottom || s == Side<3>::top) {
 			stride_x = 1;
 			stride_y = n;
-			if (s == Side::bottom) {
+			if (s == Side<3>::bottom) {
 				start        = info.x_start + info.y_start * n + info.z_start * n * n;
 				start_outer  = info.x_start + info.y_start * n + (info.z_start - 1) * n * n;
 				start_coarse = 0;
@@ -344,27 +364,27 @@ class EdgeHelper : public Helper
 	static constexpr int divisor = 64;
 
 	public:
-	EdgeHelper(int n, Octant o, std::array<Side, 2> sides)
+	EdgeHelper(int n, Orthant<3> o, std::array<Side<3>, 2> sides)
 	{
 		this->n = n;
 		num_int = 0;
-		for (Side s : sides) {
+		for (Side<3> s : sides) {
 			if (!o.isOnSide(s)) num_int++;
 		}
 		sort(sides.begin(), sides.end(),
-		     [=](Side s1, Side s2) { return o.isOnSide(s1) < o.isOnSide(s2); });
+		     [=](Side<3> s1, Side<3> s2) { return o.isOnSide(s1) < o.isOnSide(s2); });
 		// get axis
-		Side orth_side;
-		int  axis = (0x1 << (sides[0].toInt() / 2)) | (0x1 << (sides[1].toInt() / 2));
+		Side<3> orth_side;
+		int     axis = (0x1 << (sides[0].toInt() / 2)) | (0x1 << (sides[1].toInt() / 2));
 		switch (axis) {
 			case 0b110:
-				orth_side = Side::west;
+				orth_side = Side<3>::west;
 				break;
 			case 0b101:
-				orth_side = Side::south;
+				orth_side = Side<3>::south;
 				break;
 			case 0b011:
-				orth_side = Side::bottom;
+				orth_side = Side<3>::bottom;
 				break;
 		}
 		auto pow = [](int x, int n) {
@@ -471,16 +491,16 @@ class CornerHelper : public Helper
 	static constexpr int divisor      = 64;
 
 	public:
-	CornerHelper(int n, Octant o, Octant o_corner)
+	CornerHelper(int n, Orthant<3> o, Orthant<3> o_corner)
 	{
-		this->n              = n;
-		array<Side, 3> sides = o_corner.getExteriorSides();
-		num_int              = 0;
-		for (Side s : sides) {
+		this->n                 = n;
+		array<Side<3>, 3> sides = o_corner.getExteriorSides();
+		num_int                 = 0;
+		for (Side<3> s : sides) {
 			if (!o.isOnSide(s)) num_int++;
 		}
 		sort(sides.begin(), sides.end(),
-		     [=](Side s1, Side s2) { return o.isOnSide(s1) < o.isOnSide(s2); });
+		     [=](Side<3> s1, Side<3> s2) { return o.isOnSide(s1) < o.isOnSide(s2); });
 		auto pow = [](int x, int n) {
 			int retval = 1;
 			for (int i = 0; i < n; i++) {
@@ -590,8 +610,8 @@ void TriLinIntp::interpolate(PW<Vec> coarse, PW<Vec> fine) const
 		int        n          = d.n;
 		int        coarse_idx = p.local_index * n * n * n;
 
-		Octant oct      = d.oct_on_parent;
-		int    fine_idx = d.id_local * n * n * n;
+		Orthant<3> oct      = d.oct_on_parent;
+		int        fine_idx = d.id_local * n * n * n;
 
 		if (d.id == d.parent_id) {
 			for (int zi = 0; zi < n; zi++) {
@@ -610,7 +630,7 @@ void TriLinIntp::interpolate(PW<Vec> coarse, PW<Vec> fine) const
 				helper.apply(u_fine + fine_idx, u_coarse + coarse_idx);
 			}
 			// faces
-			for (Side s : Side::getValues()) {
+			for (Side<3> s : Side<3>::getValues()) {
 				if (oct.isOnSide(s)) {
 					ExtFaceHelper helper(info, s);
 					helper.apply(u_fine + fine_idx, u_coarse + coarse_idx);
@@ -620,11 +640,11 @@ void TriLinIntp::interpolate(PW<Vec> coarse, PW<Vec> fine) const
 				}
 			}
 			// edges
-			for (std::array<Side, 2> sides : Side::getPairValues()) {
+			for (std::array<Side<3>, 2> sides : getPairValues()) {
 				EdgeHelper helper(n, oct, sides);
 				helper.apply(u_fine + fine_idx, u_coarse + coarse_idx);
 			}
-			for (Octant o : Octant::getValues()) {
+			for (Orthant<3> o : Orthant<3>::getValues()) {
 				CornerHelper helper(n, oct, o);
 				helper.apply(u_fine + fine_idx, u_coarse + coarse_idx);
 			}

@@ -2,6 +2,7 @@
 #define SIDEENUM_H
 #include <array>
 #include <iostream>
+#include <numeric>
 #include <vector>
 enum class Axis { x, y, z };
 /**
@@ -16,7 +17,7 @@ enum class Axis { x, y, z };
  *  z-axis            | bottom        | top
  *
  */
-class Side
+template <size_t D> class Side
 {
 	private:
 	/**
@@ -33,7 +34,7 @@ class Side
 	static constexpr int bottom = 0b100;
 	static constexpr int top    = 0b101;
 
-	static constexpr int num_sides    = 6;
+	static constexpr int num_sides = 2 * D;
 
 	/**
 	 * @brief Default constructor that initializes the value to -1
@@ -62,13 +63,7 @@ class Side
 	 *
 	 * @return The array.
 	 */
-	static std::array<Side, 6> getValues();
-	/**
-	 * @brief Get an array of all pairs of sides that touch.
-	 *
-	 * @return The array.
-	 */
-	static std::array<std::array<Side, 2>, 12> getPairValues();
+	static std::array<Side<D>, num_sides> getValues();
 	/**
 	 * @brief Return whether or not the side of the cube is lower on the axis that is orthogonal to
 	 * it.
@@ -125,29 +120,15 @@ class Side
 		return val == other;
 	}
 };
-inline std::array<Side, 6> Side::getValues()
+template <size_t D> inline std::array<Side<D>, Side<D>::num_sides> Side<D>::getValues()
 {
-	return std::array<Side, 6>(
-	{{Side::west, Side::east, Side::south, Side::north, Side::bottom, Side::top}});
+	std::array<Side<D>, Side<D>::num_sides> retval;
+	std::iota(retval.begin(), retval.end(), 0);
+	return retval;
 }
-inline std::array<std::array<Side, 2>, 12> Side::getPairValues()
+template <size_t D> inline Side<D> Side<D>::opposite() const
 {
-	return std::array<std::array<Side, 2>, 12>({{{{Side::west, Side::south}},
-	                                             {{Side::west, Side::north}},
-	                                             {{Side::west, Side::bottom}},
-	                                             {{Side::west, Side::top}},
-	                                             {{Side::east, Side::south}},
-	                                             {{Side::east, Side::north}},
-	                                             {{Side::east, Side::bottom}},
-	                                             {{Side::east, Side::top}},
-	                                             {{Side::south, Side::bottom}},
-	                                             {{Side::south, Side::top}},
-	                                             {{Side::north, Side::bottom}},
-	                                             {{Side::north, Side::top}}}});
-}
-inline Side Side::opposite() const
-{
-	Side retval = *this;
+	Side<D> retval = *this;
 	retval.val ^= 0x1;
 	return retval;
 }
@@ -159,7 +140,7 @@ inline Side Side::opposite() const
  * bse means Bottom-South-West, which is in the corner of where the bottom, south, and west sides
  * meet.
  */
-class Octant
+template <size_t D> class Orthant
 {
 	private:
 	/**
@@ -201,17 +182,17 @@ class Octant
 	 */
 	static constexpr int tne = 0b111;
 
-	static constexpr int num_orthants = 8;
+	static constexpr int num_orthants = 1 << D;
 	/**
 	 * @brief Default constructor that initializes the value to -1.
 	 */
-	Octant() = default;
+	Orthant() = default;
 	/**
-	 * @brief Create new Octant with given value.
+	 * @brief Create new Orthant<D> with given value.
 	 *
 	 * @param val the value
 	 */
-	Octant(const int val)
+	Orthant(const int val)
 	{
 		this->val = val;
 	}
@@ -231,7 +212,7 @@ class Octant
 	 *
 	 * @return  The octant that neighbors on that side.
 	 */
-	Octant getInteriorNbrOnSide(Side s) const;
+	Orthant<D> getInteriorNbrOnSide(Side<D> s) const;
 	/**
 	 * @brief Return the octant that neighbors this octant on a particular side.
 	 *
@@ -239,18 +220,20 @@ class Octant
 	 *
 	 * @return  The octant that neighbors on that side.
 	 */
-	Octant getExteriorNbrOnSide(Side s) const;
+	Orthant<D> getExteriorNbrOnSide(Side<D> s) const;
 	/**
 	 * @brief Get the sides of the octant that are on the interior of the cube.
 	 *
 	 * @return The sides of the octant that are on the interior of the cube.
 	 */
-	inline std::array<Side, 3> getInteriorSides() const
+	inline std::array<Side<D>, D> getInteriorSides() const
 	{
-		std::array<Side, 3> retval;
-		retval[0] = val & 0b001 ? Side::west : Side::east;
-		retval[1] = val & 0b010 ? Side::south : Side::north;
-		retval[2] = val & 0b100 ? Side::bottom : Side::top;
+		std::array<Side<D>, D> retval;
+		for (size_t i = 0; i < D; i++) {
+			int side = 2 * i;
+			if (!((1 << i) & val)) { side |= 1; }
+			retval[i] = side;
+		}
 		return retval;
 	}
 	/**
@@ -258,12 +241,14 @@ class Octant
 	 *
 	 * @return The sides of the octant that are on the exterior of the cube.
 	 */
-	inline std::array<Side, 3> getExteriorSides() const
+	inline std::array<Side<D>, D> getExteriorSides() const
 	{
-		std::array<Side, 3> retval;
-		retval[0] = val & 0b001 ? Side::east : Side::west;
-		retval[1] = val & 0b010 ? Side::north : Side::south;
-		retval[2] = val & 0b100 ? Side::top : Side::bottom;
+		std::array<Side<D>, D> retval;
+		for (size_t i = 0; i < D; i++) {
+			int side = 2 * i;
+			if ((1 << i) & val) { side |= 1; }
+			retval[i] = side;
+        }
 		return retval;
 	}
 	/**
@@ -273,7 +258,7 @@ class Octant
 	 *
 	 * @return Whether or not it lies on that side.
 	 */
-	inline bool isOnSide(Side s) const
+	inline bool isOnSide(Side<D> s) const
 	{
 		int  idx        = s.toInt() / 2;
 		int  remainder  = s.toInt() % 2;
@@ -281,13 +266,13 @@ class Octant
 		return is_bit_set == remainder;
 	}
 	/**
-	 * @brief Get an array of all Octant values, in increasing order.
+	 * @brief Get an array of all Orthant<D> values, in increasing order.
 	 *
 	 * @return The array.
 	 */
-	static std::array<Octant, 8> getValues();
+	static std::array<Orthant, num_orthants> getValues();
 	/**
-	 * @brief Get an array of all Octant values that lie on a particular side of the cube.
+	 * @brief Get an array of all Orthant<D> values that lie on a particular side of the cube.
 	 *
 	 * When the two axis that the side lies on are arranged in the following way, the octants are
 	 * returned in the following order:
@@ -301,7 +286,7 @@ class Octant
 	 *
 	 * @return The array.
 	 */
-	static std::array<Octant, 4> getValuesOnSide(Side s);
+	static std::array<Orthant, num_orthants / 2> getValuesOnSide(Side<D> s);
 	/**
 	 * @brief Equals operator.
 	 *
@@ -309,57 +294,49 @@ class Octant
 	 *
 	 * @return Whether or not the value of this octant equals the value other octant.
 	 */
-	bool operator==(const Octant &other) const
+	bool operator==(const Orthant<D> &other) const
 	{
 		return val == other.val;
 	}
 };
 
 // function definitions
-inline Octant Octant::getInteriorNbrOnSide(Side s) const
+template <size_t D> inline Orthant<D> Orthant<D>::getInteriorNbrOnSide(Side<D> s) const
 {
-	Octant retval = *this;
+	Orthant<D> retval = *this;
 	// flip the bit for that side
 	retval.val ^= (0x1 << (s.toInt() / 2));
 	return retval;
 }
-inline Octant Octant::getExteriorNbrOnSide(Side s) const
+template <size_t D> inline Orthant<D> Orthant<D>::getExteriorNbrOnSide(Side<D> s) const
 {
-	Octant retval = *this;
+	Orthant<D> retval = *this;
 	// flip the bit for that side
 	retval.val ^= (0x1 << (s.toInt() / 2));
 	return retval;
 }
+template <size_t D>
+inline std::array<Orthant<D>, Orthant<D>::num_orthants / 2> Orthant<D>::getValuesOnSide(Side<D> s)
+{
+	size_t bit_to_insert = s.toInt() / 2;
+	size_t set_bit       = s.isLowerOnAxis() ? 0 : 1;
+	size_t lower_mask    = ~((~0x0) << bit_to_insert);
+	size_t upper_mask    = (~0x0) << (bit_to_insert + 1);
 
-inline std::array<Octant, 4> Octant::getValuesOnSide(Side s)
-{
-	std::array<Octant, 4> retval;
-	switch (s.toInt()) {
-		case Side::west:
-			retval = {{Octant::bsw, Octant::bnw, Octant::tsw, Octant::tnw}};
-			break;
-		case Side::east:
-			retval = {{Octant::bse, Octant::bne, Octant::tse, Octant::tne}};
-			break;
-		case Side::south:
-			retval = {{Octant::bsw, Octant::bse, Octant::tsw, Octant::tse}};
-			break;
-		case Side::north:
-			retval = {{Octant::bnw, Octant::bne, Octant::tnw, Octant::tne}};
-			break;
-		case Side::bottom:
-			retval = {{Octant::bsw, Octant::bse, Octant::bnw, Octant::bne}};
-			break;
-		case Side::top:
-			retval = {{Octant::tsw, Octant::tse, Octant::tnw, Octant::tne}};
-			break;
+	std::array<Orthant<D>, Orthant<D>::num_orthants / 2> retval;
+	for (size_t i = 0; i < Orthant<D>::num_orthants / 2; i++) {
+		size_t value = (i << 1) & upper_mask;
+		value |= i & lower_mask;
+		value |= set_bit << bit_to_insert;
+		retval[i] = value;
 	}
 	return retval;
 }
-inline std::array<Octant, 8> Octant::getValues()
+template <size_t D> inline std::array<Orthant<D>, Orthant<D>::num_orthants> Orthant<D>::getValues()
 {
-	return std::array<Octant, 8>({{Octant::bsw, Octant::bse, Octant::bnw, Octant::bne, Octant::tsw,
-	                               Octant::tse, Octant::tnw, Octant::tne}});
+	std::array<Orthant<D>, Orthant<D>::num_orthants> retval;
+	std::iota(retval.begin(), retval.end(), 0);
+	return retval;
 }
 
 /**
@@ -372,26 +349,66 @@ inline std::array<Octant, 8> Octant::getValues()
  *
  * @return  the ostream
  */
-inline std::ostream &operator<<(std::ostream &os, const Side &s)
+inline std::ostream &operator<<(std::ostream &os, const Side<3> &s)
 {
 	switch (s.toInt()) {
-		case Side::west:
+		case Side<3>::west:
 			os << "Side::west";
 			break;
-		case Side::east:
+		case Side<3>::east:
 			os << "Side::east";
 			break;
-		case Side::south:
+		case Side<3>::south:
 			os << "Side::south";
 			break;
-		case Side::north:
+		case Side<3>::north:
 			os << "Side::north";
 			break;
-		case Side::bottom:
+		case Side<3>::bottom:
 			os << "Side::bottom";
 			break;
-		case Side::top:
+		case Side<3>::top:
 			os << "Side::top";
+			break;
+	}
+	return os;
+}
+/**
+ * @brief ostream operator that prints a string representation of orthant enum.
+ *
+ * For example, Side::west will print out "Orthant::bsw".
+ *
+ * @param os the ostream
+ * @param s the side to print out.
+ *
+ * @return  the ostream
+ */
+inline std::ostream &operator<<(std::ostream &os, const Orthant<3> &o)
+{
+	switch (o.toInt()) {
+		case Orthant<3>::bsw:
+			os << "Orthant::bsw";
+			break;
+		case Orthant<3>::bse:
+			os << "Orthant::bse";
+			break;
+		case Orthant<3>::bnw:
+			os << "Orthant::bnw";
+			break;
+		case Orthant<3>::bne:
+			os << "Orthant::bne";
+			break;
+		case Orthant<3>::tsw:
+			os << "Orthant::tsw";
+			break;
+		case Orthant<3>::tse:
+			os << "Orthant::tse";
+			break;
+		case Orthant<3>::tnw:
+			os << "Orthant::tnw";
+			break;
+		case Orthant<3>::tne:
+			os << "Orthant::tne";
 			break;
 	}
 	return os;

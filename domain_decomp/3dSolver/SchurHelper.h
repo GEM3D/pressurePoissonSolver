@@ -51,7 +51,7 @@ class SchurHelper
 	void assembleMatrix(inserter insertBlock);
 
 	std::deque<SchurDomain<3>> domains;
-	std::map<int, IfaceSet> ifaces;
+	std::map<int, IfaceSet>    ifaces;
 
 	std::vector<int> iface_dist_map_vec;
 	std::vector<int> iface_map_vec;
@@ -110,11 +110,26 @@ class SchurHelper
 	PW_explicit<Vec> getNewSchurVec();
 	PW_explicit<Vec> getNewSchurDistVec();
 
-	int getSchurVecLocalSize() { return iface_map_vec.size() * n * n; }
-	int getSchurVecGlobalSize() { return num_global_ifaces * n * n; }
+	int getSchurVecLocalSize()
+	{
+		return iface_map_vec.size() * n * n;
+	}
+	int getSchurVecGlobalSize()
+	{
+		return num_global_ifaces * n * n;
+	}
 	// getters
-	std::shared_ptr<Interpolator>  getInterpolator() { return interpolator; }
-	std::shared_ptr<PatchOperator> getOp() { return op; }
-	std::shared_ptr<PatchSolver>   getSolver() { return solver; }
+	std::shared_ptr<Interpolator> getInterpolator()
+	{
+		return interpolator;
+	}
+	std::shared_ptr<PatchOperator> getOp()
+	{
+		return op;
+	}
+	std::shared_ptr<PatchSolver> getSolver()
+	{
+		return solver;
+	}
 };
 #endif

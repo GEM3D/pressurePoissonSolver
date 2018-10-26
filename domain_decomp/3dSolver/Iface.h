@@ -9,13 +9,13 @@
 #include <vector>
 struct Iface {
 	IfaceType          type;
-	Side               s;
+	Side<3>            s;
 	std::array<int, 6> ids       = {{-1, -1, -1, -1, -1, -1}};
 	std::array<int, 6> local_id  = {{-1, -1, -1, -1, -1, -1}};
 	std::array<int, 6> global_id = {{-1, -1, -1, -1, -1, -1}};
 	std::bitset<6>     neumann;
 	Iface() = default;
-	Iface(std::array<int, 6> ids, IfaceType type, Side s, std::bitset<6> neumann)
+	Iface(std::array<int, 6> ids, IfaceType type, Side<3> s, std::bitset<6> neumann)
 	{
 		this->ids     = ids;
 		this->type    = type;
@@ -44,7 +44,7 @@ struct IfaceSet : public Serializable {
 	}
 	void insert(IfaceSet ifs)
 	{
-        id = ifs.id;
+		id = ifs.id;
 		for (Iface &i : ifs.ifaces) {
 			ifaces.push_back(i);
 		}
@@ -72,7 +72,7 @@ struct IfaceSet : public Serializable {
 		BufferWriter writer(buffer);
 		writer << id;
 		writer << id_global;
-        int size = ifaces.size();
+		int size = ifaces.size();
 		writer << size;
 		for (const Iface &i : ifaces) {
 			writer << i;

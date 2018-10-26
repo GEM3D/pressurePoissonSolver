@@ -29,7 +29,7 @@ OctTree::OctTree(string file_name)
 	input.read((char *) &num_nodes, 4);
 	input.read((char *) &num_trees, 4);
 	num_levels = 0;
-	max_id = 0;
+	max_id     = 0;
 	for (int i = 0; i < num_nodes; i++) {
 		OctNode n;
 		// id level parent
@@ -69,12 +69,12 @@ void OctTree::refineLeaves()
 		q.pop_front();
 
 		// set and enqueue nbrs
-		for (Side s : Side::getValues()) {
+		for (Side<3> s : Side<3>::getValues()) {
 			// coarser
 			if (n.nbrId(s) == -1 && n.parent != -1 && nodes[n.parent].nbrId(s) != -1) {
 				OctNode        parent = nodes[n.parent];
 				OctNode        nbr    = nodes[parent.nbrId(s)];
-				pair<int, int> p(level-1, nbr.id);
+				pair<int, int> p(level - 1, nbr.id);
 				if (!qed.count(p)) {
 					q.push_back(p);
 					qed.insert(p);
@@ -82,10 +82,10 @@ void OctTree::refineLeaves()
 				// finer
 			} else if (n.nbrId(s) != -1 && nodes[n.nbrId(s)].hasChildren()) {
 				OctNode nbr  = nodes[n.nbrId(s)];
-				auto    octs = Octant::getValuesOnSide(s.opposite());
+				auto    octs = Orthant<3>::getValuesOnSide(s.opposite());
 				for (int i = 0; i < 4; i++) {
 					int            id = nbr.childId(octs[i]);
-					pair<int, int> p(level+1, id);
+					pair<int, int> p(level + 1, id);
 					if (!qed.count(p)) {
 						q.push_back(p);
 						qed.insert(p);
@@ -105,7 +105,7 @@ void OctTree::refineLeaves()
 	for (auto p : qed) {
 		refineNode(nodes[p.second]);
 	}
-	levels[num_levels+1] = &nodes.at(levels[num_levels]->child_id[0]);
+	levels[num_levels + 1] = &nodes.at(levels[num_levels]->child_id[0]);
 	this->num_levels++;
 }
 void OctTree::refineNode(OctNode &n)
@@ -119,17 +119,17 @@ void OctTree::refineNode(OctNode &n)
 		n.child_id[i] = max_id;
 	}
 	// set new neighbors
-	for (Octant o : Octant::getValues()) {
-		for (Side s : o.getInteriorSides()) {
+	for (Orthant<3> o : Orthant<3>::getValues()) {
+		for (Side<3> s : o.getInteriorSides()) {
 			new_children[o.toInt()].nbrId(s) = new_children[o.getInteriorNbrOnSide(s).toInt()].id;
 		}
 	}
 
 	// set outer neighbors
-	for (Side s : Side::getValues()) {
+	for (Side<3> s : Side<3>::getValues()) {
 		if (n.hasNbr(s) && nodes[n.nbrId(s)].hasChildren()) {
 			OctNode &nbr = nodes[n.nbrId(s)];
-			for (Octant o : Octant::getValuesOnSide(s)) {
+			for (Orthant<3> o : Orthant<3>::getValuesOnSide(s)) {
 				OctNode &child                = new_children[o.toInt()];
 				OctNode &nbr_child            = nodes[nbr.childId(o.getExteriorNbrOnSide(s))];
 				child.nbrId(s)                = nbr_child.id;

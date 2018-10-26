@@ -66,12 +66,12 @@ TEST_CASE("FineNbrInfo Serialization/Deserialization", "[Domain]")
 }
 TEST_CASE("Domain Serialization/Deserialization", "[Domain]")
 {
-	Domain<3> *d_ptr             = new Domain<3>;
-	Domain<3> &d                 = *d_ptr;
-	d.id                         = 0;
-	d.getNbrInfoPtr(Side::north) = new NormalNbrInfo<3>(1);
-	d.getNbrInfoPtr(Side::east)  = new CoarseNbrInfo<3>(2, 3);
-	d.getNbrInfoPtr(Side::south) = new FineNbrInfo<3>({3, 4, 5, 6});
+	Domain<3> *d_ptr                = new Domain<3>;
+	Domain<3> &d                    = *d_ptr;
+	d.id                            = 0;
+	d.getNbrInfoPtr(Side<3>::north) = new NormalNbrInfo<3>(1);
+	d.getNbrInfoPtr(Side<3>::east)  = new CoarseNbrInfo<3>(2, 3);
+	d.getNbrInfoPtr(Side<3>::south) = new FineNbrInfo<3>({3, 4, 5, 6});
 
 	// serialize and then deserialize
 	char *buff = new char[d.serialize(nullptr)];
@@ -84,24 +84,24 @@ TEST_CASE("Domain Serialization/Deserialization", "[Domain]")
 	// check that deserialized version has the same information
 	REQUIRE(out.id == 0);
 
-	REQUIRE(!out.hasNbr(Side::west));
+	REQUIRE(!out.hasNbr(Side<3>::west));
 
-	REQUIRE(out.hasNbr(Side::east));
-	REQUIRE(out.getNbrType(Side::east) == NbrType::Coarse);
-	REQUIRE(out.getCoarseNbrInfo(Side::east).id == 2);
-	REQUIRE(out.getCoarseNbrInfo(Side::east).quad_on_coarse == 3);
+	REQUIRE(out.hasNbr(Side<3>::east));
+	REQUIRE(out.getNbrType(Side<3>::east) == NbrType::Coarse);
+	REQUIRE(out.getCoarseNbrInfo(Side<3>::east).id == 2);
+	REQUIRE(out.getCoarseNbrInfo(Side<3>::east).quad_on_coarse == 3);
 
-	REQUIRE(out.hasNbr(Side::south));
-	REQUIRE(out.getNbrType(Side::south) == NbrType::Fine);
-	REQUIRE(out.getFineNbrInfo(Side::south).ids[0] == 3);
-	REQUIRE(out.getFineNbrInfo(Side::south).ids[1] == 4);
-	REQUIRE(out.getFineNbrInfo(Side::south).ids[2] == 5);
-	REQUIRE(out.getFineNbrInfo(Side::south).ids[3] == 6);
+	REQUIRE(out.hasNbr(Side<3>::south));
+	REQUIRE(out.getNbrType(Side<3>::south) == NbrType::Fine);
+	REQUIRE(out.getFineNbrInfo(Side<3>::south).ids[0] == 3);
+	REQUIRE(out.getFineNbrInfo(Side<3>::south).ids[1] == 4);
+	REQUIRE(out.getFineNbrInfo(Side<3>::south).ids[2] == 5);
+	REQUIRE(out.getFineNbrInfo(Side<3>::south).ids[3] == 6);
 
-	REQUIRE(out.hasNbr(Side::north));
-	REQUIRE(out.getNbrType(Side::north) == NbrType::Normal);
-	REQUIRE(out.getNormalNbrInfo(Side::north).id == 1);
+	REQUIRE(out.hasNbr(Side<3>::north));
+	REQUIRE(out.getNbrType(Side<3>::north) == NbrType::Normal);
+	REQUIRE(out.getNormalNbrInfo(Side<3>::north).id == 1);
 
-	REQUIRE(!out.hasNbr(Side::bottom));
-	REQUIRE(!out.hasNbr(Side::top));
+	REQUIRE(!out.hasNbr(Side<3>::bottom));
+	REQUIRE(!out.hasNbr(Side<3>::top));
 }

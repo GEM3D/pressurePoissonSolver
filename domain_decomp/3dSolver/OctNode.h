@@ -61,16 +61,16 @@ struct OctNode {
 	 * @param parent The parent of the new node.
 	 * @param o the octant of the parent that this node lies on.
 	 */
-	OctNode(OctNode parent, Octant o)
+	OctNode(OctNode parent, Orthant<3> o)
 	{
 		this->parent = parent.id;
 		level        = parent.level + 1;
 		x_length     = parent.x_length / 2;
 		y_length     = parent.y_length / 2;
 		z_length     = parent.z_length / 2;
-		x_start      = o.isOnSide(Side::west) ? parent.x_start : (parent.x_start + this->x_length);
-		y_start      = o.isOnSide(Side::south) ? parent.y_start : (parent.y_start + this->y_length);
-		z_start = o.isOnSide(Side::bottom) ? parent.z_start : (parent.z_start + this->z_length);
+		x_start = o.isOnSide(Side<3>::west) ? parent.x_start : (parent.x_start + this->x_length);
+		y_start = o.isOnSide(Side<3>::south) ? parent.y_start : (parent.y_start + this->y_length);
+		z_start = o.isOnSide(Side<3>::bottom) ? parent.z_start : (parent.z_start + this->z_length);
 	}
 	/**
 	 * @return Whether or not this node has any children.
@@ -86,7 +86,7 @@ struct OctNode {
 	 *
 	 * @return The result.
 	 */
-	bool hasNbr(Side s)
+	bool hasNbr(Side<3> s)
 	{
 		return nbr_id[s.toInt()] != -1;
 	}
@@ -97,7 +97,7 @@ struct OctNode {
 	 *
 	 * @return the child id.
 	 */
-	int &childId(Octant o)
+	int &childId(Orthant<3> o)
 	{
 		return child_id[o.toInt()];
 	}
@@ -108,7 +108,7 @@ struct OctNode {
 	 *
 	 * @return the neighbor id.
 	 */
-	int &nbrId(Side s)
+	int &nbrId(Side<3> s)
 	{
 		return nbr_id[s.toInt()];
 	}

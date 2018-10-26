@@ -3,27 +3,27 @@
 using namespace std;
 TEST_CASE("Default constructor works", "[Side]")
 {
-	Side s;
+	Side<3> s;
 	REQUIRE(s.toInt() == -1);
 }
 TEST_CASE("int constructor and toInt() works", "[Side]")
 {
 	{
-		Side s(5);
+		Side<3> s(5);
 		REQUIRE(s.toInt() == 5);
 	}
 	{
-		Side s(-8);
+		Side<3> s(-8);
 		REQUIRE(s.toInt() == -8);
 	}
 }
 TEST_CASE("== operator works", "[Side]")
 {
 	{
-		Side s(5);
-		Side other(5);
-		Side lower(4);
-		Side higher(6);
+		Side<3> s(5);
+		Side<3> other(5);
+		Side<3> lower(4);
+		Side<3> higher(6);
 		REQUIRE(!(s == 4));
 		REQUIRE(s == 5);
 		REQUIRE(!(s == 6));
@@ -32,10 +32,10 @@ TEST_CASE("== operator works", "[Side]")
 		REQUIRE(!(s == higher));
 	}
 	{
-		Side s(0);
-		Side other(0);
-		Side lower(-1);
-		Side higher(1);
+		Side<3> s(0);
+		Side<3> other(0);
+		Side<3> lower(-1);
+		Side<3> higher(1);
 		REQUIRE(!(s == -1));
 		REQUIRE(s == 0);
 		REQUIRE(!(s == 1));
@@ -47,114 +47,114 @@ TEST_CASE("== operator works", "[Side]")
 TEST_CASE("< operator works", "[Side]")
 {
 	{
-		Side s(5);
-		Side other(5);
-		Side lower(4);
-		Side higher(6);
+		Side<3> s(5);
+		Side<3> other(5);
+		Side<3> lower(4);
+		Side<3> higher(6);
 		REQUIRE(!(s < lower));
 		REQUIRE(!(s < other));
 		REQUIRE(s < higher);
 	}
 	{
-		Side s(0);
-		Side other(0);
-		Side lower(-1);
-		Side higher(1);
+		Side<3> s(0);
+		Side<3> other(0);
+		Side<3> lower(-1);
+		Side<3> higher(1);
 		REQUIRE(!(s < lower));
 		REQUIRE(!(s < other));
 		REQUIRE(s < higher);
 	}
 }
-TEST_CASE("Side values are as expected", "[Side]")
+TEST_CASE("Side<3> values are as expected", "[Side]")
 {
 	{
-		Side s(0);
-		int  expected = Side::west;
+		Side<3> s(0);
+		int     expected = Side<3>::west;
 		REQUIRE(s == expected);
 	}
 	{
-		Side s(1);
-		int  expected = Side::east;
+		Side<3> s(1);
+		int     expected = Side<3>::east;
 		REQUIRE(s == expected);
 	}
 	{
-		Side s(2);
-		int  expected = Side::south;
+		Side<3> s(2);
+		int     expected = Side<3>::south;
 		REQUIRE(s == expected);
 	}
 	{
-		Side s(3);
-		int  expected = Side::north;
+		Side<3> s(3);
+		int     expected = Side<3>::north;
 		REQUIRE(s == expected);
 	}
 	{
-		Side s(4);
-		int  expected = Side::bottom;
+		Side<3> s(4);
+		int     expected = Side<3>::bottom;
 		REQUIRE(s == expected);
 	}
 	{
-		Side s(5);
-		int  expected = Side::top;
+		Side<3> s(5);
+		int     expected = Side<3>::top;
 		REQUIRE(s == expected);
 	}
 }
 TEST_CASE("side.opposite() values are as expected", "[Side]")
 {
 	{
-		Side s        = Side::west;
-		Side expected = Side::east;
+		Side<3> s        = Side<3>::west;
+		Side<3> expected = Side<3>::east;
 		REQUIRE(s.opposite() == expected);
 	}
 	{
-		Side s        = Side::east;
-		Side expected = Side::west;
+		Side<3> s        = Side<3>::east;
+		Side<3> expected = Side<3>::west;
 		REQUIRE(s.opposite() == expected);
 	}
 	{
-		Side s        = Side::south;
-		Side expected = Side::north;
+		Side<3> s        = Side<3>::south;
+		Side<3> expected = Side<3>::north;
 		REQUIRE(s.opposite() == expected);
 	}
 	{
-		Side s        = Side::north;
-		Side expected = Side::south;
+		Side<3> s        = Side<3>::north;
+		Side<3> expected = Side<3>::south;
 		REQUIRE(s.opposite() == expected);
 	}
 	{
-		Side s        = Side::bottom;
-		Side expected = Side::top;
+		Side<3> s        = Side<3>::bottom;
+		Side<3> expected = Side<3>::top;
 		REQUIRE(s.opposite() == expected);
 	}
 	{
-		Side s        = Side::top;
-		Side expected = Side::bottom;
+		Side<3> s        = Side<3>::top;
+		Side<3> expected = Side<3>::bottom;
 		REQUIRE(s.opposite() == expected);
 	}
 }
 TEST_CASE("side.isOnLowerAxis() values are as expected", "[Side]")
 {
 	{
-		Side s = Side::west;
+		Side<3> s = Side<3>::west;
 		REQUIRE(s.isLowerOnAxis() == true);
 	}
 	{
-		Side s = Side::east;
+		Side<3> s = Side<3>::east;
 		REQUIRE(s.isLowerOnAxis() == false);
 	}
 	{
-		Side s = Side::south;
+		Side<3> s = Side<3>::south;
 		REQUIRE(s.isLowerOnAxis() == true);
 	}
 	{
-		Side s = Side::north;
+		Side<3> s = Side<3>::north;
 		REQUIRE(s.isLowerOnAxis() == false);
 	}
 	{
-		Side s = Side::bottom;
+		Side<3> s = Side<3>::bottom;
 		REQUIRE(s.isLowerOnAxis() == true);
 	}
 	{
-		Side s = Side::top;
+		Side<3> s = Side<3>::top;
 		REQUIRE(s.isLowerOnAxis() == false);
 	}
 }

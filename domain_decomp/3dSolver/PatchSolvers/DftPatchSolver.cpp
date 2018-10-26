@@ -31,35 +31,35 @@ void DftPatchSolver::addDomain(SchurDomain<3> &d)
 		DftType z_transform_inv = DftType::DST_III;
 		if (d.neumann.to_ulong()) {
 			// x direction
-			if (d.isNeumann(Side::east) && d.isNeumann(Side::west)) {
+			if (d.isNeumann(Side<3>::east) && d.isNeumann(Side<3>::west)) {
 				x_transform     = DftType::DCT_II;
 				x_transform_inv = DftType::DCT_III;
-			} else if (d.isNeumann(Side::west)) {
+			} else if (d.isNeumann(Side<3>::west)) {
 				x_transform     = DftType::DCT_IV;
 				x_transform_inv = DftType::DCT_IV;
-			} else if (d.isNeumann(Side::east)) {
+			} else if (d.isNeumann(Side<3>::east)) {
 				x_transform     = DftType::DST_IV;
 				x_transform_inv = DftType::DST_IV;
 			}
 			// y direction
-			if (d.isNeumann(Side::north) && d.isNeumann(Side::south)) {
+			if (d.isNeumann(Side<3>::north) && d.isNeumann(Side<3>::south)) {
 				y_transform     = DftType::DCT_II;
 				y_transform_inv = DftType::DCT_III;
-			} else if (d.isNeumann(Side::south)) {
+			} else if (d.isNeumann(Side<3>::south)) {
 				y_transform     = DftType::DCT_IV;
 				y_transform_inv = DftType::DCT_IV;
-			} else if (d.isNeumann(Side::north)) {
+			} else if (d.isNeumann(Side<3>::north)) {
 				y_transform     = DftType::DST_IV;
 				y_transform_inv = DftType::DST_IV;
 			}
 			// z direction
-			if (d.isNeumann(Side::bottom) && d.isNeumann(Side::top)) {
+			if (d.isNeumann(Side<3>::bottom) && d.isNeumann(Side<3>::top)) {
 				z_transform     = DftType::DCT_II;
 				z_transform_inv = DftType::DCT_III;
-			} else if (d.isNeumann(Side::bottom)) {
+			} else if (d.isNeumann(Side<3>::bottom)) {
 				z_transform     = DftType::DCT_IV;
 				z_transform_inv = DftType::DCT_IV;
-			} else if (d.isNeumann(Side::top)) {
+			} else if (d.isNeumann(Side<3>::top)) {
 				z_transform     = DftType::DST_IV;
 				z_transform_inv = DftType::DST_IV;
 			}
@@ -77,12 +77,12 @@ void DftPatchSolver::addDomain(SchurDomain<3> &d)
 		eigen_val.resize(n * n * n);
 		// create eigen_val vector
 		// z direction
-		if (d.isNeumann(Side::bottom) && d.isNeumann(Side::top)) {
+		if (d.isNeumann(Side<3>::bottom) && d.isNeumann(Side<3>::top)) {
 			for (int zi = 0; zi < n; zi++) {
 				eigen_val[slice(zi * n * n, n * n, 1)]
 				= -4 / (h_z * h_z) * pow(sin(zi * M_PI / (2 * n)), 2);
 			}
-		} else if (d.isNeumann(Side::bottom) || d.isNeumann(Side::top)) {
+		} else if (d.isNeumann(Side<3>::bottom) || d.isNeumann(Side<3>::top)) {
 			for (int zi = 0; zi < n; zi++) {
 				eigen_val[slice(zi * n * n, n * n, 1)]
 				= -4 / (h_z * h_z) * pow(sin((zi + 0.5) * M_PI / (2 * n)), 2);
@@ -102,12 +102,12 @@ void DftPatchSolver::addDomain(SchurDomain<3> &d)
 		valarray<size_t> strides(2);
 		strides[0] = n * n;
 		strides[1] = 1;
-		if (d.isNeumann(Side::south) && d.isNeumann(Side::north)) {
+		if (d.isNeumann(Side<3>::south) && d.isNeumann(Side<3>::north)) {
 			for (int yi = 0; yi < n; yi++) {
 				eigen_val[gslice(yi * n, sizes, strides)]
 				-= 4 / (h_y * h_y) * pow(sin(yi * M_PI / (2 * n)), 2) * ones;
 			}
-		} else if (d.isNeumann(Side::south) || d.isNeumann(Side::north)) {
+		} else if (d.isNeumann(Side<3>::south) || d.isNeumann(Side<3>::north)) {
 			for (int yi = 0; yi < n; yi++) {
 				eigen_val[gslice(yi * n, sizes, strides)]
 				-= 4 / (h_y * h_y) * pow(sin((yi + 0.5) * M_PI / (2 * n)), 2) * ones;
@@ -122,12 +122,12 @@ void DftPatchSolver::addDomain(SchurDomain<3> &d)
 		// x direction
 		strides[0] = n * n;
 		strides[1] = n;
-		if (d.isNeumann(Side::west) && d.isNeumann(Side::east)) {
+		if (d.isNeumann(Side<3>::west) && d.isNeumann(Side<3>::east)) {
 			for (int xi = 0; xi < n; xi++) {
 				eigen_val[gslice(xi, sizes, strides)]
 				-= 4 / (h_x * h_x) * pow(sin(xi * M_PI / (2 * n)), 2) * ones;
 			}
-		} else if (d.isNeumann(Side::west) || d.isNeumann(Side::east)) {
+		} else if (d.isNeumann(Side<3>::west) || d.isNeumann(Side<3>::east)) {
 			for (int xi = 0; xi < n; xi++) {
 				eigen_val[gslice(xi, sizes, strides)]
 				-= 4 / (h_x * h_x) * pow(sin((xi + 0.5) * M_PI / (2 * n)), 2) * ones;
@@ -146,19 +146,19 @@ void DftPatchSolver::solve(SchurDomain<3> &d, const Vec f, Vec u, const Vec gamm
 	double h_x        = d.domain.lengths[0] / n;
 	double h_y        = d.domain.lengths[1] / n;
 	double h_z        = d.domain.lengths[2] / n;
-	auto   getSpacing = [=](Side s) {
+	auto   getSpacing = [=](Side<3> s) {
         double retval = 0;
         switch (s.toInt()) {
-            case Side::east:
-            case Side::west:
+            case Side<3>::east:
+            case Side<3>::west:
                 retval = h_x;
                 break;
-            case Side::south:
-            case Side::north:
+            case Side<3>::south:
+            case Side<3>::north:
                 retval = h_y;
                 break;
-            case Side::bottom:
-            case Side::top:
+            case Side<3>::bottom:
+            case Side<3>::top:
                 retval = h_z;
         }
         return retval;
@@ -173,7 +173,7 @@ void DftPatchSolver::solve(SchurDomain<3> &d, const Vec f, Vec u, const Vec gamm
 		f_copy[i] = f_view[start + i];
 	}
 
-	for (Side s : Side::getValues()) {
+	for (Side<3> s : Side<3>::getValues()) {
 		if (d.hasNbr(s)) {
 			int    idx = n * n * d.getIfaceLocalIndex(s);
 			Slice  sl  = getSlice(&f_copy[0], n, s);
@@ -312,8 +312,8 @@ void DftPatchSolver::execute_plan(std::array<std::shared_ptr<std::valarray<doubl
 		for (int y = 0; y < n; y++) {
 			for (int x = 0; x < n; x++) {
 #if 1
-				char   T    = 'T';
-				double one  = 1;
+				char   T   = 'T';
+				double one = 1;
 				dgemv_(T, n, n, one, &matrix[0], n, &prev_result[y * y_stride + x * x_stride],
 				       dft_stride, one, &new_result[y * y_stride + x * x_stride], dft_stride);
 #else

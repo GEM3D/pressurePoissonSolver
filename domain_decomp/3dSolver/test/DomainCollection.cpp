@@ -14,7 +14,7 @@ TEST_CASE("DomainCollection constructors work", "[DomainCollection]")
 		// check that neighbor info makes sense
 		for (auto &p : domains) {
 			Domain<3> &d = *p.second;
-			for (Side s : Side::getValues()) {
+			for (Side<3> s : Side<3>::getValues()) {
 				if (d.hasNbr(s)) {
 					REQUIRE(d.getNbrType(s) == NbrType::Normal);
 					NormalNbrInfo<3> info = d.getNormalNbrInfo(s);
@@ -31,7 +31,7 @@ TEST_CASE("DomainCollection constructors work", "[DomainCollection]")
 		// check that neighbor info makes sense
 		for (auto &p : domains) {
 			Domain<3> &d = *p.second;
-			for (Side s : Side::getValues()) {
+			for (Side<3> s : Side<3>::getValues()) {
 				if (d.hasNbr(s)) {
 					REQUIRE(d.getNbrType(s) == NbrType::Normal);
 					NormalNbrInfo<3> info = d.getNormalNbrInfo(s);
@@ -48,7 +48,7 @@ TEST_CASE("DomainCollection constructors work", "[DomainCollection]")
 		// check that neighbor info makes sense
 		for (auto &p : domains) {
 			Domain<3> &d = *p.second;
-			for (Side s : Side::getValues()) {
+			for (Side<3> s : Side<3>::getValues()) {
 				if (d.hasNbr(s)) {
 					switch (d.getNbrType(s)) {
 						case NbrType::Normal: {
@@ -82,7 +82,7 @@ TEST_CASE("DomainCollection constructors work", "[DomainCollection]")
 			Domain<3> &d = *p.second;
 			if (d.refine_level < 3) { REQUIRE(d.id == d.parent_id); }
 			// check that neighbor info makes sense
-			for (Side s : Side::getValues()) {
+			for (Side<3> s : Side<3>::getValues()) {
 				if (d.hasNbr(s)) {
 					switch (d.getNbrType(s)) {
 						case NbrType::Normal: {

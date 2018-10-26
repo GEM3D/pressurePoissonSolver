@@ -1,429 +1,435 @@
 #include "Side.h"
 #include "catch.hpp"
 using namespace std;
-TEST_CASE("Octant Default constructor works", "[Octant]")
+TEST_CASE("Orthant<3> Default constructor works", "[Octant]")
 {
-	Octant o;
-	REQUIRE(o.toInt() == -1);
+	Orthant<3> o;
+	CHECK(o.toInt() == -1);
 }
-TEST_CASE("Octant int constructor and toInt() works", "[Octant]")
+TEST_CASE("Orthant<3> int constructor and toInt() works", "[Octant]")
 {
 	{
-		Octant o(5);
-		REQUIRE(o.toInt() == 5);
+		Orthant<3> o(5);
+		CHECK(o.toInt() == 5);
 	}
 	{
-		Octant o(-8);
-		REQUIRE(o.toInt() == -8);
+		Orthant<3> o(-8);
+		CHECK(o.toInt() == -8);
 	}
 }
 TEST_CASE("Otant == operator works", "[Octant]")
 {
 	{
-		Octant o(5);
-		REQUIRE(!(o == 4));
-		REQUIRE(o == 5);
-		REQUIRE(!(o == 6));
+		Orthant<3> o(5);
+		CHECK(!(o == 4));
+		CHECK(o == 5);
+		CHECK(!(o == 6));
 	}
 	{
-		Side o(0);
-		REQUIRE(!(o == -1));
-		REQUIRE(o == 0);
-		REQUIRE(!(o == 1));
-	}
-}
-TEST_CASE("Octant values are as expected", "[Octant]")
-{
-	{
-		Octant o(0);
-		Octant expected = Octant::bsw;
-		REQUIRE(o == expected);
-	}
-	{
-		Octant o(1);
-		Octant expected = Octant::bse;
-		REQUIRE(o == expected);
-	}
-	{
-		Octant o(2);
-		Octant expected = Octant::bnw;
-		REQUIRE(o == expected);
-	}
-	{
-		Octant o(3);
-		Octant expected = Octant::bne;
-		REQUIRE(o == expected);
-	}
-	{
-		Octant o(4);
-		Octant expected = Octant::tsw;
-		REQUIRE(o == expected);
-	}
-	{
-		Octant o(5);
-		Octant expected = Octant::tse;
-		REQUIRE(o == expected);
-	}
-	{
-		Octant o(6);
-		Octant expected = Octant::tnw;
-		REQUIRE(o == expected);
-	}
-	{
-		Octant o(7);
-		Octant expected = Octant::tne;
-		REQUIRE(o == expected);
+		Side<3> o(0);
+		CHECK(!(o == -1));
+		CHECK(o == 0);
+		CHECK(!(o == 1));
 	}
 }
-TEST_CASE("Octant getInteriorNbrOnSide() is as expected", "[Octant]")
+TEST_CASE("Orthant<3> values are as expected", "[Octant]")
 {
 	{
-		Octant o = Octant::bsw;
-		REQUIRE(o.getInteriorNbrOnSide(Side::east) == Octant(Octant::bse));
-		REQUIRE(o.getInteriorNbrOnSide(Side::north) == Octant(Octant::bnw));
-		REQUIRE(o.getInteriorNbrOnSide(Side::top) == Octant(Octant::tsw));
+		Orthant<3> o(0);
+		Orthant<3> expected = Orthant<3>::bsw;
+		CHECK(o == expected);
 	}
 	{
-		Octant o = Octant::bse;
-		REQUIRE(o.getInteriorNbrOnSide(Side::west) == Octant(Octant::bsw));
-		REQUIRE(o.getInteriorNbrOnSide(Side::north) == Octant(Octant::bne));
-		REQUIRE(o.getInteriorNbrOnSide(Side::top) == Octant(Octant::tse));
+		Orthant<3> o(1);
+		Orthant<3> expected = Orthant<3>::bse;
+		CHECK(o == expected);
 	}
 	{
-		Octant o = Octant::bnw;
-		REQUIRE(o.getInteriorNbrOnSide(Side::east) == Octant(Octant::bne));
-		REQUIRE(o.getInteriorNbrOnSide(Side::south) == Octant(Octant::bsw));
-		REQUIRE(o.getInteriorNbrOnSide(Side::top) == Octant(Octant::tnw));
+		Orthant<3> o(2);
+		Orthant<3> expected = Orthant<3>::bnw;
+		CHECK(o == expected);
 	}
 	{
-		Octant o = Octant::bne;
-		REQUIRE(o.getInteriorNbrOnSide(Side::west) == Octant(Octant::bnw));
-		REQUIRE(o.getInteriorNbrOnSide(Side::south) == Octant(Octant::bse));
-		REQUIRE(o.getInteriorNbrOnSide(Side::top) == Octant(Octant::tne));
+		Orthant<3> o(3);
+		Orthant<3> expected = Orthant<3>::bne;
+		CHECK(o == expected);
 	}
 	{
-		Octant o = Octant::tsw;
-		REQUIRE(o.getInteriorNbrOnSide(Side::east) == Octant(Octant::tse));
-		REQUIRE(o.getInteriorNbrOnSide(Side::north) == Octant(Octant::tnw));
-		REQUIRE(o.getInteriorNbrOnSide(Side::bottom) == Octant(Octant::bsw));
+		Orthant<3> o(4);
+		Orthant<3> expected = Orthant<3>::tsw;
+		CHECK(o == expected);
 	}
 	{
-		Octant o = Octant::tse;
-		REQUIRE(o.getInteriorNbrOnSide(Side::west) == Octant(Octant::tsw));
-		REQUIRE(o.getInteriorNbrOnSide(Side::north) == Octant(Octant::tne));
-		REQUIRE(o.getInteriorNbrOnSide(Side::bottom) == Octant(Octant::bse));
+		Orthant<3> o(5);
+		Orthant<3> expected = Orthant<3>::tse;
+		CHECK(o == expected);
 	}
 	{
-		Octant o = Octant::tnw;
-		REQUIRE(o.getInteriorNbrOnSide(Side::east) == Octant(Octant::tne));
-		REQUIRE(o.getInteriorNbrOnSide(Side::south) == Octant(Octant::tsw));
-		REQUIRE(o.getInteriorNbrOnSide(Side::bottom) == Octant(Octant::bnw));
+		Orthant<3> o(6);
+		Orthant<3> expected = Orthant<3>::tnw;
+		CHECK(o == expected);
 	}
 	{
-		Octant o = Octant::tne;
-		REQUIRE(o.getInteriorNbrOnSide(Side::west) == Octant(Octant::tnw));
-		REQUIRE(o.getInteriorNbrOnSide(Side::south) == Octant(Octant::tse));
-		REQUIRE(o.getInteriorNbrOnSide(Side::bottom) == Octant(Octant::bne));
+		Orthant<3> o(7);
+		Orthant<3> expected = Orthant<3>::tne;
+		CHECK(o == expected);
 	}
 }
-TEST_CASE("Octant getExteriorNbrOnSide() is as expected", "[Octant]")
+TEST_CASE("Orthant<3> getInteriorNbrOnSide() is as expected", "[Octant]")
 {
 	{
-		Octant o = Octant::bsw;
-		REQUIRE(o.getExteriorNbrOnSide(Side::west) == Octant(Octant::bse));
-		REQUIRE(o.getExteriorNbrOnSide(Side::south) == Octant(Octant::bnw));
-		REQUIRE(o.getExteriorNbrOnSide(Side::bottom) == Octant(Octant::tsw));
+		Orthant<3> o = Orthant<3>::bsw;
+		CHECK(o.getInteriorNbrOnSide(Side<3>::east) == Orthant<3>(Orthant<3>::bse));
+		CHECK(o.getInteriorNbrOnSide(Side<3>::north) == Orthant<3>(Orthant<3>::bnw));
+		CHECK(o.getInteriorNbrOnSide(Side<3>::top) == Orthant<3>(Orthant<3>::tsw));
 	}
 	{
-		Octant o = Octant::bse;
-		REQUIRE(o.getExteriorNbrOnSide(Side::east) == Octant(Octant::bsw));
-		REQUIRE(o.getExteriorNbrOnSide(Side::south) == Octant(Octant::bne));
-		REQUIRE(o.getExteriorNbrOnSide(Side::bottom) == Octant(Octant::tse));
+		Orthant<3> o = Orthant<3>::bse;
+		CHECK(o.getInteriorNbrOnSide(Side<3>::west) == Orthant<3>(Orthant<3>::bsw));
+		CHECK(o.getInteriorNbrOnSide(Side<3>::north) == Orthant<3>(Orthant<3>::bne));
+		CHECK(o.getInteriorNbrOnSide(Side<3>::top) == Orthant<3>(Orthant<3>::tse));
 	}
 	{
-		Octant o = Octant::bnw;
-		REQUIRE(o.getExteriorNbrOnSide(Side::west) == Octant(Octant::bne));
-		REQUIRE(o.getExteriorNbrOnSide(Side::north) == Octant(Octant::bsw));
-		REQUIRE(o.getExteriorNbrOnSide(Side::bottom) == Octant(Octant::tnw));
+		Orthant<3> o = Orthant<3>::bnw;
+		CHECK(o.getInteriorNbrOnSide(Side<3>::east) == Orthant<3>(Orthant<3>::bne));
+		CHECK(o.getInteriorNbrOnSide(Side<3>::south) == Orthant<3>(Orthant<3>::bsw));
+		CHECK(o.getInteriorNbrOnSide(Side<3>::top) == Orthant<3>(Orthant<3>::tnw));
 	}
 	{
-		Octant o = Octant::bne;
-		REQUIRE(o.getExteriorNbrOnSide(Side::east) == Octant(Octant::bnw));
-		REQUIRE(o.getExteriorNbrOnSide(Side::north) == Octant(Octant::bse));
-		REQUIRE(o.getExteriorNbrOnSide(Side::bottom) == Octant(Octant::tne));
+		Orthant<3> o = Orthant<3>::bne;
+		CHECK(o.getInteriorNbrOnSide(Side<3>::west) == Orthant<3>(Orthant<3>::bnw));
+		CHECK(o.getInteriorNbrOnSide(Side<3>::south) == Orthant<3>(Orthant<3>::bse));
+		CHECK(o.getInteriorNbrOnSide(Side<3>::top) == Orthant<3>(Orthant<3>::tne));
 	}
 	{
-		Octant o = Octant::tsw;
-		REQUIRE(o.getExteriorNbrOnSide(Side::west) == Octant(Octant::tse));
-		REQUIRE(o.getExteriorNbrOnSide(Side::south) == Octant(Octant::tnw));
-		REQUIRE(o.getExteriorNbrOnSide(Side::top) == Octant(Octant::bsw));
+		Orthant<3> o = Orthant<3>::tsw;
+		CHECK(o.getInteriorNbrOnSide(Side<3>::east) == Orthant<3>(Orthant<3>::tse));
+		CHECK(o.getInteriorNbrOnSide(Side<3>::north) == Orthant<3>(Orthant<3>::tnw));
+		CHECK(o.getInteriorNbrOnSide(Side<3>::bottom) == Orthant<3>(Orthant<3>::bsw));
 	}
 	{
-		Octant o = Octant::tse;
-		REQUIRE(o.getExteriorNbrOnSide(Side::east) == Octant(Octant::tsw));
-		REQUIRE(o.getExteriorNbrOnSide(Side::south) == Octant(Octant::tne));
-		REQUIRE(o.getExteriorNbrOnSide(Side::top) == Octant(Octant::bse));
+		Orthant<3> o = Orthant<3>::tse;
+		CHECK(o.getInteriorNbrOnSide(Side<3>::west) == Orthant<3>(Orthant<3>::tsw));
+		CHECK(o.getInteriorNbrOnSide(Side<3>::north) == Orthant<3>(Orthant<3>::tne));
+		CHECK(o.getInteriorNbrOnSide(Side<3>::bottom) == Orthant<3>(Orthant<3>::bse));
 	}
 	{
-		Octant o = Octant::tnw;
-		REQUIRE(o.getExteriorNbrOnSide(Side::west) == Octant(Octant::tne));
-		REQUIRE(o.getExteriorNbrOnSide(Side::north) == Octant(Octant::tsw));
-		REQUIRE(o.getExteriorNbrOnSide(Side::top) == Octant(Octant::bnw));
+		Orthant<3> o = Orthant<3>::tnw;
+		CHECK(o.getInteriorNbrOnSide(Side<3>::east) == Orthant<3>(Orthant<3>::tne));
+		CHECK(o.getInteriorNbrOnSide(Side<3>::south) == Orthant<3>(Orthant<3>::tsw));
+		CHECK(o.getInteriorNbrOnSide(Side<3>::bottom) == Orthant<3>(Orthant<3>::bnw));
 	}
 	{
-		Octant o = Octant::tne;
-		REQUIRE(o.getExteriorNbrOnSide(Side::east) == Octant(Octant::tnw));
-		REQUIRE(o.getExteriorNbrOnSide(Side::north) == Octant(Octant::tse));
-		REQUIRE(o.getExteriorNbrOnSide(Side::top) == Octant(Octant::bne));
+		Orthant<3> o = Orthant<3>::tne;
+		CHECK(o.getInteriorNbrOnSide(Side<3>::west) == Orthant<3>(Orthant<3>::tnw));
+		CHECK(o.getInteriorNbrOnSide(Side<3>::south) == Orthant<3>(Orthant<3>::tse));
+		CHECK(o.getInteriorNbrOnSide(Side<3>::bottom) == Orthant<3>(Orthant<3>::bne));
 	}
 }
-TEST_CASE("Octant getInteriorSides() is as expected", "[Octant]")
+TEST_CASE("Orthant<3> getExteriorNbrOnSide() is as expected", "[Octant]")
 {
 	{
-		Octant o     = Octant::bsw;
-		auto   array = o.getInteriorSides();
-		REQUIRE(array[0] == Side(Side::east));
-		REQUIRE(array[1] == Side(Side::north));
-		REQUIRE(array[2] == Side(Side::top));
+		Orthant<3> o = Orthant<3>::bsw;
+		CHECK(o.getExteriorNbrOnSide(Side<3>::west) == Orthant<3>(Orthant<3>::bse));
+		CHECK(o.getExteriorNbrOnSide(Side<3>::south) == Orthant<3>(Orthant<3>::bnw));
+		CHECK(o.getExteriorNbrOnSide(Side<3>::bottom) == Orthant<3>(Orthant<3>::tsw));
 	}
 	{
-		Octant o     = Octant::bse;
-		auto   array = o.getInteriorSides();
-		REQUIRE(array[0] == Side(Side::west));
-		REQUIRE(array[1] == Side(Side::north));
-		REQUIRE(array[2] == Side(Side::top));
+		Orthant<3> o = Orthant<3>::bse;
+		CHECK(o.getExteriorNbrOnSide(Side<3>::east) == Orthant<3>(Orthant<3>::bsw));
+		CHECK(o.getExteriorNbrOnSide(Side<3>::south) == Orthant<3>(Orthant<3>::bne));
+		CHECK(o.getExteriorNbrOnSide(Side<3>::bottom) == Orthant<3>(Orthant<3>::tse));
 	}
 	{
-		Octant o     = Octant::bnw;
-		auto   array = o.getInteriorSides();
-		REQUIRE(array[0] == Side(Side::east));
-		REQUIRE(array[1] == Side(Side::south));
-		REQUIRE(array[2] == Side(Side::top));
+		Orthant<3> o = Orthant<3>::bnw;
+		CHECK(o.getExteriorNbrOnSide(Side<3>::west) == Orthant<3>(Orthant<3>::bne));
+		CHECK(o.getExteriorNbrOnSide(Side<3>::north) == Orthant<3>(Orthant<3>::bsw));
+		CHECK(o.getExteriorNbrOnSide(Side<3>::bottom) == Orthant<3>(Orthant<3>::tnw));
 	}
 	{
-		Octant o     = Octant::bne;
-		auto   array = o.getInteriorSides();
-		REQUIRE(array[0] == Side(Side::west));
-		REQUIRE(array[1] == Side(Side::south));
-		REQUIRE(array[2] == Side(Side::top));
+		Orthant<3> o = Orthant<3>::bne;
+		CHECK(o.getExteriorNbrOnSide(Side<3>::east) == Orthant<3>(Orthant<3>::bnw));
+		CHECK(o.getExteriorNbrOnSide(Side<3>::north) == Orthant<3>(Orthant<3>::bse));
+		CHECK(o.getExteriorNbrOnSide(Side<3>::bottom) == Orthant<3>(Orthant<3>::tne));
 	}
 	{
-		Octant o     = Octant::tsw;
-		auto   array = o.getInteriorSides();
-		REQUIRE(array[0] == Side(Side::east));
-		REQUIRE(array[1] == Side(Side::north));
-		REQUIRE(array[2] == Side(Side::bottom));
+		Orthant<3> o = Orthant<3>::tsw;
+		CHECK(o.getExteriorNbrOnSide(Side<3>::west) == Orthant<3>(Orthant<3>::tse));
+		CHECK(o.getExteriorNbrOnSide(Side<3>::south) == Orthant<3>(Orthant<3>::tnw));
+		CHECK(o.getExteriorNbrOnSide(Side<3>::top) == Orthant<3>(Orthant<3>::bsw));
 	}
 	{
-		Octant o     = Octant::tse;
-		auto   array = o.getInteriorSides();
-		REQUIRE(array[0] == Side(Side::west));
-		REQUIRE(array[1] == Side(Side::north));
-		REQUIRE(array[2] == Side(Side::bottom));
+		Orthant<3> o = Orthant<3>::tse;
+		CHECK(o.getExteriorNbrOnSide(Side<3>::east) == Orthant<3>(Orthant<3>::tsw));
+		CHECK(o.getExteriorNbrOnSide(Side<3>::south) == Orthant<3>(Orthant<3>::tne));
+		CHECK(o.getExteriorNbrOnSide(Side<3>::top) == Orthant<3>(Orthant<3>::bse));
 	}
 	{
-		Octant o     = Octant::tnw;
-		auto   array = o.getInteriorSides();
-		REQUIRE(array[0] == Side(Side::east));
-		REQUIRE(array[1] == Side(Side::south));
-		REQUIRE(array[2] == Side(Side::bottom));
+		Orthant<3> o = Orthant<3>::tnw;
+		CHECK(o.getExteriorNbrOnSide(Side<3>::west) == Orthant<3>(Orthant<3>::tne));
+		CHECK(o.getExteriorNbrOnSide(Side<3>::north) == Orthant<3>(Orthant<3>::tsw));
+		CHECK(o.getExteriorNbrOnSide(Side<3>::top) == Orthant<3>(Orthant<3>::bnw));
 	}
 	{
-		Octant o     = Octant::tne;
-		auto   array = o.getInteriorSides();
-		REQUIRE(array[0] == Side(Side::west));
-		REQUIRE(array[1] == Side(Side::south));
-		REQUIRE(array[2] == Side(Side::bottom));
+		Orthant<3> o = Orthant<3>::tne;
+		CHECK(o.getExteriorNbrOnSide(Side<3>::east) == Orthant<3>(Orthant<3>::tnw));
+		CHECK(o.getExteriorNbrOnSide(Side<3>::north) == Orthant<3>(Orthant<3>::tse));
+		CHECK(o.getExteriorNbrOnSide(Side<3>::top) == Orthant<3>(Orthant<3>::bne));
 	}
 }
-TEST_CASE("Octant getExteriorSides() is as expected", "[Octant]")
+TEST_CASE("Orthant<3> getInteriorSides() is as expected", "[Octant]")
 {
 	{
-		Octant o     = Octant::bsw;
-		auto   array = o.getExteriorSides();
-		REQUIRE(array[0] == Side(Side::west));
-		REQUIRE(array[1] == Side(Side::south));
-		REQUIRE(array[2] == Side(Side::bottom));
+		Orthant<3> o     = Orthant<3>::bsw;
+		auto       array = o.getInteriorSides();
+		CHECK(array[0] == Side<3>(Side<3>::east));
+		CHECK(array[1] == Side<3>(Side<3>::north));
+		CHECK(array[2] == Side<3>(Side<3>::top));
 	}
 	{
-		Octant o     = Octant::bse;
-		auto   array = o.getExteriorSides();
-		REQUIRE(array[0] == Side(Side::east));
-		REQUIRE(array[1] == Side(Side::south));
-		REQUIRE(array[2] == Side(Side::bottom));
+		Orthant<3> o     = Orthant<3>::bse;
+		auto       array = o.getInteriorSides();
+		CHECK(array[0] == Side<3>(Side<3>::west));
+		CHECK(array[1] == Side<3>(Side<3>::north));
+		CHECK(array[2] == Side<3>(Side<3>::top));
 	}
 	{
-		Octant o     = Octant::bnw;
-		auto   array = o.getExteriorSides();
-		REQUIRE(array[0] == Side(Side::west));
-		REQUIRE(array[1] == Side(Side::north));
-		REQUIRE(array[2] == Side(Side::bottom));
+		Orthant<3> o     = Orthant<3>::bnw;
+		auto       array = o.getInteriorSides();
+		CHECK(array[0] == Side<3>(Side<3>::east));
+		CHECK(array[1] == Side<3>(Side<3>::south));
+		CHECK(array[2] == Side<3>(Side<3>::top));
 	}
 	{
-		Octant o     = Octant::bne;
-		auto   array = o.getExteriorSides();
-		REQUIRE(array[0] == Side(Side::east));
-		REQUIRE(array[1] == Side(Side::north));
-		REQUIRE(array[2] == Side(Side::bottom));
+		Orthant<3> o     = Orthant<3>::bne;
+		auto       array = o.getInteriorSides();
+		CHECK(array[0] == Side<3>(Side<3>::west));
+		CHECK(array[1] == Side<3>(Side<3>::south));
+		CHECK(array[2] == Side<3>(Side<3>::top));
 	}
 	{
-		Octant o     = Octant::tsw;
-		auto   array = o.getExteriorSides();
-		REQUIRE(array[0] == Side(Side::west));
-		REQUIRE(array[1] == Side(Side::south));
-		REQUIRE(array[2] == Side(Side::top));
+		Orthant<3> o     = Orthant<3>::tsw;
+		auto       array = o.getInteriorSides();
+		CHECK(array[0] == Side<3>(Side<3>::east));
+		CHECK(array[1] == Side<3>(Side<3>::north));
+		CHECK(array[2] == Side<3>(Side<3>::bottom));
 	}
 	{
-		Octant o     = Octant::tse;
-		auto   array = o.getExteriorSides();
-		REQUIRE(array[0] == Side(Side::east));
-		REQUIRE(array[1] == Side(Side::south));
-		REQUIRE(array[2] == Side(Side::top));
+		Orthant<3> o     = Orthant<3>::tse;
+		auto       array = o.getInteriorSides();
+		CHECK(array[0] == Side<3>(Side<3>::west));
+		CHECK(array[1] == Side<3>(Side<3>::north));
+		CHECK(array[2] == Side<3>(Side<3>::bottom));
 	}
 	{
-		Octant o     = Octant::tnw;
-		auto   array = o.getExteriorSides();
-		REQUIRE(array[0] == Side(Side::west));
-		REQUIRE(array[1] == Side(Side::north));
-		REQUIRE(array[2] == Side(Side::top));
+		Orthant<3> o     = Orthant<3>::tnw;
+		auto       array = o.getInteriorSides();
+		CHECK(array[0] == Side<3>(Side<3>::east));
+		CHECK(array[1] == Side<3>(Side<3>::south));
+		CHECK(array[2] == Side<3>(Side<3>::bottom));
 	}
 	{
-		Octant o     = Octant::tne;
-		auto   array = o.getExteriorSides();
-		REQUIRE(array[0] == Side(Side::east));
-		REQUIRE(array[1] == Side(Side::north));
-		REQUIRE(array[2] == Side(Side::top));
+		Orthant<3> o     = Orthant<3>::tne;
+		auto       array = o.getInteriorSides();
+		CHECK(array[0] == Side<3>(Side<3>::west));
+		CHECK(array[1] == Side<3>(Side<3>::south));
+		CHECK(array[2] == Side<3>(Side<3>::bottom));
 	}
 }
-TEST_CASE("Octant isOnSide() is as expected", "[Octant]")
+TEST_CASE("Orthant<3> getExteriorSides() is as expected", "[Octant]")
 {
 	{
-		Octant o = Octant::bsw;
-		REQUIRE(o.isOnSide(Side::west));
-		REQUIRE(!o.isOnSide(Side::east));
-		REQUIRE(o.isOnSide(Side::south));
-		REQUIRE(!o.isOnSide(Side::north));
-		REQUIRE(o.isOnSide(Side::bottom));
-		REQUIRE(!o.isOnSide(Side::top));
+		Orthant<3> o     = Orthant<3>::bsw;
+		auto       array = o.getExteriorSides();
+		CHECK(array[0] == Side<3>(Side<3>::west));
+		CHECK(array[1] == Side<3>(Side<3>::south));
+		CHECK(array[2] == Side<3>(Side<3>::bottom));
 	}
 	{
-		Octant o = Octant::bse;
-		REQUIRE(!o.isOnSide(Side::west));
-		REQUIRE(o.isOnSide(Side::east));
-		REQUIRE(o.isOnSide(Side::south));
-		REQUIRE(!o.isOnSide(Side::north));
-		REQUIRE(o.isOnSide(Side::bottom));
-		REQUIRE(!o.isOnSide(Side::top));
+		Orthant<3> o     = Orthant<3>::bse;
+		auto       array = o.getExteriorSides();
+		CHECK(array[0] == Side<3>(Side<3>::east));
+		CHECK(array[1] == Side<3>(Side<3>::south));
+		CHECK(array[2] == Side<3>(Side<3>::bottom));
 	}
 	{
-		Octant o = Octant::bnw;
-		REQUIRE(o.isOnSide(Side::west));
-		REQUIRE(!o.isOnSide(Side::east));
-		REQUIRE(!o.isOnSide(Side::south));
-		REQUIRE(o.isOnSide(Side::north));
-		REQUIRE(o.isOnSide(Side::bottom));
-		REQUIRE(!o.isOnSide(Side::top));
+		Orthant<3> o     = Orthant<3>::bnw;
+		auto       array = o.getExteriorSides();
+		CHECK(array[0] == Side<3>(Side<3>::west));
+		CHECK(array[1] == Side<3>(Side<3>::north));
+		CHECK(array[2] == Side<3>(Side<3>::bottom));
 	}
 	{
-		Octant o = Octant::bne;
-		REQUIRE(!o.isOnSide(Side::west));
-		REQUIRE(o.isOnSide(Side::east));
-		REQUIRE(!o.isOnSide(Side::south));
-		REQUIRE(o.isOnSide(Side::north));
-		REQUIRE(o.isOnSide(Side::bottom));
-		REQUIRE(!o.isOnSide(Side::top));
+		Orthant<3> o     = Orthant<3>::bne;
+		auto       array = o.getExteriorSides();
+		CHECK(array[0] == Side<3>(Side<3>::east));
+		CHECK(array[1] == Side<3>(Side<3>::north));
+		CHECK(array[2] == Side<3>(Side<3>::bottom));
 	}
 	{
-		Octant o = Octant::tsw;
-		REQUIRE(o.isOnSide(Side::west));
-		REQUIRE(!o.isOnSide(Side::east));
-		REQUIRE(o.isOnSide(Side::south));
-		REQUIRE(!o.isOnSide(Side::north));
-		REQUIRE(!o.isOnSide(Side::bottom));
-		REQUIRE(o.isOnSide(Side::top));
+		Orthant<3> o     = Orthant<3>::tsw;
+		auto       array = o.getExteriorSides();
+		CHECK(array[0] == Side<3>(Side<3>::west));
+		CHECK(array[1] == Side<3>(Side<3>::south));
+		CHECK(array[2] == Side<3>(Side<3>::top));
 	}
 	{
-		Octant o = Octant::tse;
-		REQUIRE(!o.isOnSide(Side::west));
-		REQUIRE(o.isOnSide(Side::east));
-		REQUIRE(o.isOnSide(Side::south));
-		REQUIRE(!o.isOnSide(Side::north));
-		REQUIRE(!o.isOnSide(Side::bottom));
-		REQUIRE(o.isOnSide(Side::top));
+		Orthant<3> o     = Orthant<3>::tse;
+		auto       array = o.getExteriorSides();
+		CHECK(array[0] == Side<3>(Side<3>::east));
+		CHECK(array[1] == Side<3>(Side<3>::south));
+		CHECK(array[2] == Side<3>(Side<3>::top));
 	}
 	{
-		Octant o = Octant::tnw;
-		REQUIRE(o.isOnSide(Side::west));
-		REQUIRE(!o.isOnSide(Side::east));
-		REQUIRE(!o.isOnSide(Side::south));
-		REQUIRE(o.isOnSide(Side::north));
-		REQUIRE(!o.isOnSide(Side::bottom));
-		REQUIRE(o.isOnSide(Side::top));
+		Orthant<3> o     = Orthant<3>::tnw;
+		auto       array = o.getExteriorSides();
+		CHECK(array[0] == Side<3>(Side<3>::west));
+		CHECK(array[1] == Side<3>(Side<3>::north));
+		CHECK(array[2] == Side<3>(Side<3>::top));
 	}
 	{
-		Octant o = Octant::tne;
-		REQUIRE(!o.isOnSide(Side::west));
-		REQUIRE(o.isOnSide(Side::east));
-		REQUIRE(!o.isOnSide(Side::south));
-		REQUIRE(o.isOnSide(Side::north));
-		REQUIRE(!o.isOnSide(Side::bottom));
-		REQUIRE(o.isOnSide(Side::top));
+		Orthant<3> o     = Orthant<3>::tne;
+		auto       array = o.getExteriorSides();
+		CHECK(array[0] == Side<3>(Side<3>::east));
+		CHECK(array[1] == Side<3>(Side<3>::north));
+		CHECK(array[2] == Side<3>(Side<3>::top));
 	}
 }
-TEST_CASE("Octant getValues() is as expected", "[Octant]")
+TEST_CASE("Orthant<3> isOnSide() is as expected", "[Octant]")
 {
-	std::array<Octant, 8> values = Octant::getValues();
-	REQUIRE(values[0] == Octant(Octant::bsw));
-	REQUIRE(values[1] == Octant(Octant::bse));
-	REQUIRE(values[2] == Octant(Octant::bnw));
-	REQUIRE(values[3] == Octant(Octant::bne));
-	REQUIRE(values[4] == Octant(Octant::tsw));
-	REQUIRE(values[5] == Octant(Octant::tse));
-	REQUIRE(values[6] == Octant(Octant::tnw));
-	REQUIRE(values[7] == Octant(Octant::tne));
+	{
+		Orthant<3> o = Orthant<3>::bsw;
+		CHECK(o.isOnSide(Side<3>::west));
+		CHECK(!o.isOnSide(Side<3>::east));
+		CHECK(o.isOnSide(Side<3>::south));
+		CHECK(!o.isOnSide(Side<3>::north));
+		CHECK(o.isOnSide(Side<3>::bottom));
+		CHECK(!o.isOnSide(Side<3>::top));
+	}
+	{
+		Orthant<3> o = Orthant<3>::bse;
+		CHECK(!o.isOnSide(Side<3>::west));
+		CHECK(o.isOnSide(Side<3>::east));
+		CHECK(o.isOnSide(Side<3>::south));
+		CHECK(!o.isOnSide(Side<3>::north));
+		CHECK(o.isOnSide(Side<3>::bottom));
+		CHECK(!o.isOnSide(Side<3>::top));
+	}
+	{
+		Orthant<3> o = Orthant<3>::bnw;
+		CHECK(o.isOnSide(Side<3>::west));
+		CHECK(!o.isOnSide(Side<3>::east));
+		CHECK(!o.isOnSide(Side<3>::south));
+		CHECK(o.isOnSide(Side<3>::north));
+		CHECK(o.isOnSide(Side<3>::bottom));
+		CHECK(!o.isOnSide(Side<3>::top));
+	}
+	{
+		Orthant<3> o = Orthant<3>::bne;
+		CHECK(!o.isOnSide(Side<3>::west));
+		CHECK(o.isOnSide(Side<3>::east));
+		CHECK(!o.isOnSide(Side<3>::south));
+		CHECK(o.isOnSide(Side<3>::north));
+		CHECK(o.isOnSide(Side<3>::bottom));
+		CHECK(!o.isOnSide(Side<3>::top));
+	}
+	{
+		Orthant<3> o = Orthant<3>::tsw;
+		CHECK(o.isOnSide(Side<3>::west));
+		CHECK(!o.isOnSide(Side<3>::east));
+		CHECK(o.isOnSide(Side<3>::south));
+		CHECK(!o.isOnSide(Side<3>::north));
+		CHECK(!o.isOnSide(Side<3>::bottom));
+		CHECK(o.isOnSide(Side<3>::top));
+	}
+	{
+		Orthant<3> o = Orthant<3>::tse;
+		CHECK(!o.isOnSide(Side<3>::west));
+		CHECK(o.isOnSide(Side<3>::east));
+		CHECK(o.isOnSide(Side<3>::south));
+		CHECK(!o.isOnSide(Side<3>::north));
+		CHECK(!o.isOnSide(Side<3>::bottom));
+		CHECK(o.isOnSide(Side<3>::top));
+	}
+	{
+		Orthant<3> o = Orthant<3>::tnw;
+		CHECK(o.isOnSide(Side<3>::west));
+		CHECK(!o.isOnSide(Side<3>::east));
+		CHECK(!o.isOnSide(Side<3>::south));
+		CHECK(o.isOnSide(Side<3>::north));
+		CHECK(!o.isOnSide(Side<3>::bottom));
+		CHECK(o.isOnSide(Side<3>::top));
+	}
+	{
+		Orthant<3> o = Orthant<3>::tne;
+		CHECK(!o.isOnSide(Side<3>::west));
+		CHECK(o.isOnSide(Side<3>::east));
+		CHECK(!o.isOnSide(Side<3>::south));
+		CHECK(o.isOnSide(Side<3>::north));
+		CHECK(!o.isOnSide(Side<3>::bottom));
+		CHECK(o.isOnSide(Side<3>::top));
+	}
 }
-TEST_CASE("Octant getValuesOnSide() is as expected", "[Octant]")
+TEST_CASE("Orthant<3> getValues() is as expected", "[Octant]")
 {
+	std::array<Orthant<3>, 8> values = Orthant<3>::getValues();
+	CHECK(values[0] == Orthant<3>(Orthant<3>::bsw));
+	CHECK(values[1] == Orthant<3>(Orthant<3>::bse));
+	CHECK(values[2] == Orthant<3>(Orthant<3>::bnw));
+	CHECK(values[3] == Orthant<3>(Orthant<3>::bne));
+	CHECK(values[4] == Orthant<3>(Orthant<3>::tsw));
+	CHECK(values[5] == Orthant<3>(Orthant<3>::tse));
+	CHECK(values[6] == Orthant<3>(Orthant<3>::tnw));
+	CHECK(values[7] == Orthant<3>(Orthant<3>::tne));
+}
+TEST_CASE("Orthant<3> getValuesOnSide() is as expected", "[Octant]")
+{
+	SECTION("Side<3>::west")
 	{
-		std::array<Octant, 4> values = Octant::getValuesOnSide(Side::west);
-		REQUIRE(values[0] == Octant(Octant::bsw));
-		REQUIRE(values[1] == Octant(Octant::bnw));
-		REQUIRE(values[2] == Octant(Octant::tsw));
-		REQUIRE(values[3] == Octant(Octant::tnw));
+		std::array<Orthant<3>, 4> values = Orthant<3>::getValuesOnSide(Side<3>::west);
+		CHECK(values[0] == Orthant<3>(Orthant<3>::bsw));
+		CHECK(values[1] == Orthant<3>(Orthant<3>::bnw));
+		CHECK(values[2] == Orthant<3>(Orthant<3>::tsw));
+		CHECK(values[3] == Orthant<3>(Orthant<3>::tnw));
 	}
+	SECTION("Side<3>::east")
 	{
-		std::array<Octant, 4> values = Octant::getValuesOnSide(Side::east);
-		REQUIRE(values[0] == Octant(Octant::bse));
-		REQUIRE(values[1] == Octant(Octant::bne));
-		REQUIRE(values[2] == Octant(Octant::tse));
-		REQUIRE(values[3] == Octant(Octant::tne));
+		std::array<Orthant<3>, 4> values = Orthant<3>::getValuesOnSide(Side<3>::east);
+		CHECK(values[0] == Orthant<3>(Orthant<3>::bse));
+		CHECK(values[1] == Orthant<3>(Orthant<3>::bne));
+		CHECK(values[2] == Orthant<3>(Orthant<3>::tse));
+		CHECK(values[3] == Orthant<3>(Orthant<3>::tne));
 	}
+	SECTION("Side<3>::south")
 	{
-		std::array<Octant, 4> values = Octant::getValuesOnSide(Side::south);
-		REQUIRE(values[0] == Octant(Octant::bsw));
-		REQUIRE(values[1] == Octant(Octant::bse));
-		REQUIRE(values[2] == Octant(Octant::tsw));
-		REQUIRE(values[3] == Octant(Octant::tse));
+		std::array<Orthant<3>, 4> values = Orthant<3>::getValuesOnSide(Side<3>::south);
+		CHECK(values[0] == Orthant<3>(Orthant<3>::bsw));
+		CHECK(values[1] == Orthant<3>(Orthant<3>::bse));
+		CHECK(values[2] == Orthant<3>(Orthant<3>::tsw));
+		CHECK(values[3] == Orthant<3>(Orthant<3>::tse));
 	}
+	SECTION("Side<3>::north")
 	{
-		std::array<Octant, 4> values = Octant::getValuesOnSide(Side::north);
-		REQUIRE(values[0] == Octant(Octant::bnw));
-		REQUIRE(values[1] == Octant(Octant::bne));
-		REQUIRE(values[2] == Octant(Octant::tnw));
-		REQUIRE(values[3] == Octant(Octant::tne));
+		std::array<Orthant<3>, 4> values = Orthant<3>::getValuesOnSide(Side<3>::north);
+		CHECK(values[0] == Orthant<3>(Orthant<3>::bnw));
+		CHECK(values[1] == Orthant<3>(Orthant<3>::bne));
+		CHECK(values[2] == Orthant<3>(Orthant<3>::tnw));
+		CHECK(values[3] == Orthant<3>(Orthant<3>::tne));
 	}
+	SECTION("Side<3>::bottom")
 	{
-		std::array<Octant, 4> values = Octant::getValuesOnSide(Side::bottom);
-		REQUIRE(values[0] == Octant(Octant::bsw));
-		REQUIRE(values[1] == Octant(Octant::bse));
-		REQUIRE(values[2] == Octant(Octant::bnw));
-		REQUIRE(values[3] == Octant(Octant::bne));
+		std::array<Orthant<3>, 4> values = Orthant<3>::getValuesOnSide(Side<3>::bottom);
+		CHECK(values[0] == Orthant<3>(Orthant<3>::bsw));
+		CHECK(values[1] == Orthant<3>(Orthant<3>::bse));
+		CHECK(values[2] == Orthant<3>(Orthant<3>::bnw));
+		CHECK(values[3] == Orthant<3>(Orthant<3>::bne));
 	}
+	SECTION("Side<3>::top")
 	{
-		std::array<Octant, 4> values = Octant::getValuesOnSide(Side::top);
-		REQUIRE(values[0] == Octant(Octant::tsw));
-		REQUIRE(values[1] == Octant(Octant::tse));
-		REQUIRE(values[2] == Octant(Octant::tnw));
-		REQUIRE(values[3] == Octant(Octant::tne));
+		std::array<Orthant<3>, 4> values = Orthant<3>::getValuesOnSide(Side<3>::top);
+		CHECK(values[0] == Orthant<3>(Orthant<3>::tsw));
+		CHECK(values[1] == Orthant<3>(Orthant<3>::tse));
+		CHECK(values[2] == Orthant<3>(Orthant<3>::tnw));
+		CHECK(values[3] == Orthant<3>(Orthant<3>::tne));
 	}
 }

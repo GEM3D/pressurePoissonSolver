@@ -100,7 +100,7 @@ PW_explicit<Mat> MatrixHelper::formCRSMatrix(double lambda)
 		}
 
 		// boundaries
-		for (Side s : Side::getValues()) {
+		for (Side<3> s : Side<3>::getValues()) {
 			StencilHelper *sh = getStencilHelper(d, s);
 			for (int yi = 0; yi < n; yi++) {
 				for (int xi = 0; xi < n; xi++) {

@@ -69,7 +69,7 @@ void Init::initNeumann(DomainCollection &dc, int n, Vec f, Vec exact,
 		double h_y = d.lengths[1] / n;
 		double h_z = d.lengths[2] / n;
 		// west
-		if (!d.hasNbr(Side::west)) {
+		if (!d.hasNbr(Side<3>::west)) {
 			for (int zi = 0; zi < n; zi++) {
 				for (int yi = 0; yi < n; yi++) {
 					double x, y, z;
@@ -79,7 +79,7 @@ void Init::initNeumann(DomainCollection &dc, int n, Vec f, Vec exact,
 			}
 		}
 		// east
-		if (!d.hasNbr(Side::east)) {
+		if (!d.hasNbr(Side<3>::east)) {
 			for (int zi = 0; zi < n; zi++) {
 				for (int yi = 0; yi < n; yi++) {
 					double x, y, z;
@@ -89,7 +89,7 @@ void Init::initNeumann(DomainCollection &dc, int n, Vec f, Vec exact,
 			}
 		}
 		// south
-		if (!d.hasNbr(Side::south)) {
+		if (!d.hasNbr(Side<3>::south)) {
 			for (int zi = 0; zi < n; zi++) {
 				for (int xi = 0; xi < n; xi++) {
 					double x, y, z;
@@ -99,7 +99,7 @@ void Init::initNeumann(DomainCollection &dc, int n, Vec f, Vec exact,
 			}
 		}
 		// north
-		if (!d.hasNbr(Side::north)) {
+		if (!d.hasNbr(Side<3>::north)) {
 			for (int zi = 0; zi < n; zi++) {
 				for (int xi = 0; xi < n; xi++) {
 					double x, y, z;
@@ -109,7 +109,7 @@ void Init::initNeumann(DomainCollection &dc, int n, Vec f, Vec exact,
 			}
 		}
 		// bottom
-		if (!d.hasNbr(Side::bottom)) {
+		if (!d.hasNbr(Side<3>::bottom)) {
 			for (int yi = 0; yi < n; yi++) {
 				for (int xi = 0; xi < n; xi++) {
 					double x, y, z;
@@ -119,7 +119,7 @@ void Init::initNeumann(DomainCollection &dc, int n, Vec f, Vec exact,
 			}
 		}
 		// top
-		if (!d.hasNbr(Side::top)) {
+		if (!d.hasNbr(Side<3>::top)) {
 			for (int yi = 0; yi < n; yi++) {
 				for (int xi = 0; xi < n; xi++) {
 					double x, y, z;
@@ -165,7 +165,7 @@ void Init::initDirichlet(DomainCollection &dc, int n, Vec f, Vec exact,
 		}
 		// apply boundaries
 		// west
-		if (!d.hasNbr(Side::west)) {
+		if (!d.hasNbr(Side<3>::west)) {
 			for (int zi = 0; zi < n; zi++) {
 				for (int yi = 0; yi < n; yi++) {
 					double x, y, z;
@@ -175,7 +175,7 @@ void Init::initDirichlet(DomainCollection &dc, int n, Vec f, Vec exact,
 			}
 		}
 		// east
-		if (!d.hasNbr(Side::east)) {
+		if (!d.hasNbr(Side<3>::east)) {
 			for (int zi = 0; zi < n; zi++) {
 				for (int yi = 0; yi < n; yi++) {
 					double x, y, z;
@@ -185,7 +185,7 @@ void Init::initDirichlet(DomainCollection &dc, int n, Vec f, Vec exact,
 			}
 		}
 		// south
-		if (!d.hasNbr(Side::south)) {
+		if (!d.hasNbr(Side<3>::south)) {
 			for (int zi = 0; zi < n; zi++) {
 				for (int xi = 0; xi < n; xi++) {
 					double x, y, z;
@@ -195,7 +195,7 @@ void Init::initDirichlet(DomainCollection &dc, int n, Vec f, Vec exact,
 			}
 		}
 		// north
-		if (!d.hasNbr(Side::north)) {
+		if (!d.hasNbr(Side<3>::north)) {
 			for (int zi = 0; zi < n; zi++) {
 				for (int xi = 0; xi < n; xi++) {
 					double x, y, z;
@@ -205,7 +205,7 @@ void Init::initDirichlet(DomainCollection &dc, int n, Vec f, Vec exact,
 			}
 		}
 		// bottom
-		if (!d.hasNbr(Side::bottom)) {
+		if (!d.hasNbr(Side<3>::bottom)) {
 			for (int yi = 0; yi < n; yi++) {
 				for (int xi = 0; xi < n; xi++) {
 					double x, y, z;
@@ -215,7 +215,7 @@ void Init::initDirichlet(DomainCollection &dc, int n, Vec f, Vec exact,
 			}
 		}
 		// top
-		if (!d.hasNbr(Side::top)) {
+		if (!d.hasNbr(Side<3>::top)) {
 			for (int yi = 0; yi < n; yi++) {
 				for (int xi = 0; xi < n; xi++) {
 					double x, y, z;

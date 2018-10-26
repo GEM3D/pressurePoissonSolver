@@ -18,61 +18,61 @@ SchurHelper::SchurHelper(DomainCollection dc, shared_ptr<PatchSolver> solver,
 		sd.enumerateIfaces(ifaces, off_proc_ifaces);
 		solver->addDomain(sd);
 	}
-    /*
+	/*
 	{
-		// send info
-		deque<char *>       buffers;
-		deque<char *>       recv_buffers;
-		vector<MPI_Request> requests;
-		vector<MPI_Request> send_requests;
-		for (auto &p : off_proc_ifaces) {
-			int       dest   = p.second.first;
-			IfaceSet &iface  = p.second.second;
-			int       size   = iface.serialize(nullptr);
-			char *    buffer = new char[size];
-			buffers.push_back(buffer);
-			iface.serialize(buffer);
-			MPI_Request request;
-			MPI_Isend(buffer, size, MPI_CHAR, dest, 0, MPI_COMM_WORLD, &request);
-			send_requests.push_back(request);
-		}
-		MPI_Barrier(MPI_COMM_WORLD);
-		int        is_message;
-		MPI_Status status;
-		MPI_Iprobe(MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &is_message, &status);
-		// recv info
-		while (is_message) {
-			int size;
-			MPI_Get_count(&status, MPI_CHAR, &size);
-			char *buffer = new char[size];
-			recv_buffers.push_back(buffer);
+	    // send info
+	    deque<char *>       buffers;
+	    deque<char *>       recv_buffers;
+	    vector<MPI_Request> requests;
+	    vector<MPI_Request> send_requests;
+	    for (auto &p : off_proc_ifaces) {
+	        int       dest   = p.second.first;
+	        IfaceSet &iface  = p.second.second;
+	        int       size   = iface.serialize(nullptr);
+	        char *    buffer = new char[size];
+	        buffers.push_back(buffer);
+	        iface.serialize(buffer);
+	        MPI_Request request;
+	        MPI_Isend(buffer, size, MPI_CHAR, dest, 0, MPI_COMM_WORLD, &request);
+	        send_requests.push_back(request);
+	    }
+	    MPI_Barrier(MPI_COMM_WORLD);
+	    int        is_message;
+	    MPI_Status status;
+	    MPI_Iprobe(MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &is_message, &status);
+	    // recv info
+	    while (is_message) {
+	        int size;
+	        MPI_Get_count(&status, MPI_CHAR, &size);
+	        char *buffer = new char[size];
+	        recv_buffers.push_back(buffer);
 
-			MPI_Request request;
-			MPI_Irecv(buffer, size, MPI_CHAR, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD,
-			          &request);
-			MPI_Iprobe(MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &is_message, &status);
-			requests.push_back(request);
-		}
-		// wait for all
-		MPI_Barrier(MPI_COMM_WORLD);
-		MPI_Startall(send_requests.size(), &send_requests[0]);
-		MPI_Startall(requests.size(), &requests[0]);
-		MPI_Waitall(requests.size(), &requests[0], MPI_STATUSES_IGNORE);
-		MPI_Barrier(MPI_COMM_WORLD);
-		// delete send buffers
-		for (char *buffer : buffers) {
-			delete[] buffer;
-		}
-		// process received objects
-		for (char *buffer : recv_buffers) {
-			IfaceSet ifs;
-			ifs.deserialize(buffer);
-			ifaces[ifs.id].insert(ifs);
-			delete[] buffer;
-		}
-		MPI_Barrier(MPI_COMM_WORLD);
+	        MPI_Request request;
+	        MPI_Irecv(buffer, size, MPI_CHAR, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD,
+	                  &request);
+	        MPI_Iprobe(MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &is_message, &status);
+	        requests.push_back(request);
+	    }
+	    // wait for all
+	    MPI_Barrier(MPI_COMM_WORLD);
+	    MPI_Startall(send_requests.size(), &send_requests[0]);
+	    MPI_Startall(requests.size(), &requests[0]);
+	    MPI_Waitall(requests.size(), &requests[0], MPI_STATUSES_IGNORE);
+	    MPI_Barrier(MPI_COMM_WORLD);
+	    // delete send buffers
+	    for (char *buffer : buffers) {
+	        delete[] buffer;
+	    }
+	    // process received objects
+	    for (char *buffer : recv_buffers) {
+	        IfaceSet ifs;
+	        ifs.deserialize(buffer);
+	        ifaces[ifs.id].insert(ifs);
+	        delete[] buffer;
+	    }
+	    MPI_Barrier(MPI_COMM_WORLD);
 	}
-    */
+	*/
 	indexDomainIfacesLocal();
 	indexIfacesLocal();
 	this->solver       = solver;
@@ -179,7 +179,7 @@ void SchurHelper::apply(const Vec u, Vec f)
 }
 enum class Rotation : char { x_cw, x_ccw, y_cw, y_ccw, z_cw, z_ccw };
 struct Block {
-	static const Side             side_table[6][6];
+	static const Side<3>          side_table[6][6];
 	static const char             rots_table[6][6];
 	static const vector<Rotation> main_rot_plan[6];
 	static const vector<Rotation> aux_rot_plan_dirichlet[6];
@@ -189,12 +189,12 @@ struct Block {
 	static const char             quad_flip_lookup[4];
 	char                          data = 0;
 	IfaceType                     type;
-	Side                          main;
-	Side                          aux;
+	Side<3>                       main;
+	Side<3>                       aux;
 	int                           j;
 	int                           i;
 	bitset<6>                     neumann;
-	Block(Side main, int j, Side aux, int i, bitset<6> neumann, IfaceType type)
+	Block(Side<3> main, int j, Side<3> aux, int i, bitset<6> neumann, IfaceType type)
 	{
 		this->main    = main;
 		this->j       = j;
@@ -324,7 +324,7 @@ struct Block {
 };
 struct BlockKey {
 	IfaceType type;
-	Side      s;
+	Side<3>   s;
 
 	BlockKey() {}
 	BlockKey(const Block &b)
@@ -338,13 +338,13 @@ struct BlockKey {
 	}
 };
 
-const Side Block::side_table[6][6]
-= {{Side::west, Side::east, Side::top, Side::bottom, Side::south, Side::north},
-   {Side::west, Side::east, Side::bottom, Side::top, Side::north, Side::south},
-   {Side::bottom, Side::top, Side::south, Side::north, Side::east, Side::west},
-   {Side::top, Side::bottom, Side::south, Side::north, Side::west, Side::east},
-   {Side::north, Side::south, Side::west, Side::east, Side::bottom, Side::top},
-   {Side::south, Side::north, Side::east, Side::west, Side::bottom, Side::top}};
+const Side<3> Block::side_table[6][6]
+= {{Side<3>::west, Side<3>::east, Side<3>::top, Side<3>::bottom, Side<3>::south, Side<3>::north},
+   {Side<3>::west, Side<3>::east, Side<3>::bottom, Side<3>::top, Side<3>::north, Side<3>::south},
+   {Side<3>::bottom, Side<3>::top, Side<3>::south, Side<3>::north, Side<3>::east, Side<3>::west},
+   {Side<3>::top, Side<3>::bottom, Side<3>::south, Side<3>::north, Side<3>::west, Side<3>::east},
+   {Side<3>::north, Side<3>::south, Side<3>::west, Side<3>::east, Side<3>::bottom, Side<3>::top},
+   {Side<3>::south, Side<3>::north, Side<3>::east, Side<3>::west, Side<3>::bottom, Side<3>::top}};
 const char Block::rots_table[6][6] = {{3, 1, 0, 0, 2, 2}, {1, 3, 2, 2, 0, 0}, {1, 3, 3, 1, 1, 3},
                                       {1, 3, 1, 3, 3, 1}, {0, 0, 0, 0, 3, 1}, {0, 0, 0, 0, 1, 3}};
 const vector<Rotation> Block::main_rot_plan[6] = {{},
@@ -383,11 +383,11 @@ void       SchurHelper::assembleMatrix(inserter insertBlock)
 		IfaceSet &ifs = p.second;
 		int       i   = ifs.id_global;
 		for (const Iface &iface : ifs.ifaces) {
-			Side aux = iface.s;
+			Side<3> aux = iface.s;
 			for (int s = 0; s < 6; s++) {
 				int j = iface.global_id[s];
 				if (j != -1) {
-					Side main = static_cast<Side>(s);
+					Side<3> main = static_cast<Side<3>>(s);
 					blocks.insert(Block(main, j, aux, i, iface.neumann, iface.type));
 				}
 			}
@@ -422,13 +422,13 @@ void       SchurHelper::assembleMatrix(inserter insertBlock)
 
 		// create domain representing curr_type
 		SchurDomain<3> sd;
-		sd.n                           = n;
+		sd.n = n;
 		sd.domain.lengths.fill(1);
-		sd.neumann                     = curr_type.neumann;
-		sd.getIfaceInfoPtr(Side::west) = new NormalIfaceInfo<3>();
+		sd.neumann                        = curr_type.neumann;
+		sd.getIfaceInfoPtr(Side<3>::west) = new NormalIfaceInfo<3>();
 		solver->addDomain(sd);
-        std::deque<SchurDomain<3>> single_domain;
-        single_domain.push_back(sd);
+		std::deque<SchurDomain<3>> single_domain;
+		single_domain.push_back(sd);
 
 		map<BlockKey, shared_ptr<valarray<double>>> coeffs;
 		// allocate blocks of coefficients
@@ -447,7 +447,7 @@ void       SchurHelper::assembleMatrix(inserter insertBlock)
 			// fill the blocks
 			for (auto &p : coeffs) {
 				BlockKey  bk   = p.first;
-				Side      s    = bk.s;
+				Side<3>   s    = bk.s;
 				IfaceType type = bk.type;
 				VecScale(interp, 0);
 				interpolator->interpolate(sd, s, 0, type, u, interp);
@@ -455,7 +455,7 @@ void       SchurHelper::assembleMatrix(inserter insertBlock)
 				for (int i = 0; i < n * n; i++) {
 					block[i * n * n + j] = -interp_view[i];
 				}
-				if (s == Side::west) {
+				if (s == Side<3>::west) {
 					switch (type) {
 						case IfaceType::normal:
 							block[n * n * j + j] += 0.5;

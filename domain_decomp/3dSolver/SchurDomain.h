@@ -12,8 +12,8 @@ template <size_t D> class IfaceInfo
 	bool         own;
 	virtual void getIds(std::vector<int> &ids) = 0;
 	virtual void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types,
-	                            std::deque<Side> &sides, std::deque<int> &ranks,
-	                            std::deque<bool> &own, Side s)
+	                            std::deque<Side<D>> &sides, std::deque<int> &ranks,
+	                            std::deque<bool> &own, Side<D> s)
 	= 0;
 	virtual void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType> &types) = 0;
 	virtual void setLocalIndexes(const std::map<int, int> &rev_map)                 = 0;
@@ -29,13 +29,13 @@ template <size_t D> class NormalIfaceInfo : public IfaceInfo<D>
 		this->local_index  = 0;
 		this->global_index = 0;
 	}
-	NormalIfaceInfo(Domain<D> &d, Side s)
+	NormalIfaceInfo(Domain<D> &d, Side<D> s)
 	{
 		nbr_info = d.getNormalNbrInfo(s);
 		if (s.isLowerOnAxis()) {
-			this->id = d.id * Side::num_sides + s.toInt();
+			this->id = d.id * Side<D>::num_sides + s.toInt();
 		} else {
-			this->id  = d.getNormalNbrInfo(s).id * Side::num_sides + s.opposite().toInt();
+			this->id  = d.getNormalNbrInfo(s).id * Side<D>::num_sides + s.opposite().toInt();
 			this->own = true;
 		}
 	}
@@ -43,8 +43,9 @@ template <size_t D> class NormalIfaceInfo : public IfaceInfo<D>
 	{
 		ids.push_back(this->id);
 	}
-	void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types, std::deque<Side> &sides,
-	                    std::deque<int> &ranks, std::deque<bool> &own, Side s)
+	void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types,
+	                    std::deque<Side<D>> &sides, std::deque<int> &ranks, std::deque<bool> &own,
+	                    Side<D> s)
 	{
 		ids.push_back(this->id);
 		types.push_back(IfaceType::normal);
@@ -74,16 +75,17 @@ template <size_t D> class CoarseIfaceInfo : public IfaceInfo<D>
 	int              coarse_id;
 	int              coarse_local_index;
 	int              coarse_global_index;
-	CoarseIfaceInfo(Domain<D> &d, Side s)
+	CoarseIfaceInfo(Domain<D> &d, Side<D> s)
 	{
 		nbr_info       = d.getCoarseNbrInfo(s);
-		this->id       = d.id * Side::num_sides + s.toInt();
+		this->id       = d.id * Side<D>::num_sides + s.toInt();
 		nbr_info       = d.getCoarseNbrInfo(s);
 		quad_on_coarse = nbr_info.quad_on_coarse;
-		coarse_id      = nbr_info.id * Side::num_sides + s.opposite().toInt();
+		coarse_id      = nbr_info.id * Side<D>::num_sides + s.opposite().toInt();
 	}
-	void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types, std::deque<Side> &sides,
-	                    std::deque<int> &ranks, std::deque<bool> &own, Side s)
+	void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types,
+	                    std::deque<Side<D>> &sides, std::deque<int> &ranks, std::deque<bool> &own,
+	                    Side<D> s)
 	{
 		ids.push_back(this->id);
 		ids.push_back(coarse_id);
@@ -122,20 +124,21 @@ template <size_t D> class CoarseIfaceInfo : public IfaceInfo<D>
 template <size_t D> class FineIfaceInfo : public IfaceInfo<D>
 {
 	public:
-	FineNbrInfo<D>                                 nbr_info;
-	std::array<int, 1 << Octant::num_orthants / 2> fine_ids;
-	std::array<int, 1 << Octant::num_orthants / 2> fine_local_indexes;
-	std::array<int, 1 << Octant::num_orthants / 2> fine_global_indexes;
-	FineIfaceInfo(Domain<D> &d, Side s)
+	FineNbrInfo<D>                                     nbr_info;
+	std::array<int, 1 << Orthant<D>::num_orthants / 2> fine_ids;
+	std::array<int, 1 << Orthant<D>::num_orthants / 2> fine_local_indexes;
+	std::array<int, 1 << Orthant<D>::num_orthants / 2> fine_global_indexes;
+	FineIfaceInfo(Domain<D> &d, Side<D> s)
 	{
 		nbr_info = d.getFineNbrInfo(s);
-		this->id = d.id * Side::num_sides + s.toInt();
+		this->id = d.id * Side<D>::num_sides + s.toInt();
 		for (size_t i = 0; i < fine_ids.size(); i++) {
-			fine_ids[i] = nbr_info.ids[i] * Side::num_sides + s.opposite().toInt();
+			fine_ids[i] = nbr_info.ids[i] * Side<D>::num_sides + s.opposite().toInt();
 		}
 	}
-	void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types, std::deque<Side> &sides,
-	                    std::deque<int> &ranks, std::deque<bool> &own, Side s)
+	void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types,
+	                    std::deque<Side<D>> &sides, std::deque<int> &ranks, std::deque<bool> &own,
+	                    Side<D> s)
 	{
 		ids.push_back(this->id);
 		types.push_back(IfaceType::coarse_to_coarse);
@@ -182,11 +185,11 @@ template <size_t D> class FineIfaceInfo : public IfaceInfo<D>
 	}
 };
 template <size_t D> struct SchurDomain {
-	Domain<D>                                   domain;
-	int                                         local_index = 0;
-	int                                         n;
-	std::bitset<Side::num_sides>                neumann;
-	std::array<IfaceInfo<D> *, Side::num_sides> iface_info
+	Domain<D>                                      domain;
+	int                                            local_index = 0;
+	int                                            n;
+	std::bitset<Side<D>::num_sides>                neumann;
+	std::array<IfaceInfo<D> *, Side<D>::num_sides> iface_info
 	= {{nullptr, nullptr, nullptr, nullptr, nullptr, nullptr}};
 	std::vector<int> nbr_ids;
 	SchurDomain() = default;
@@ -198,7 +201,7 @@ template <size_t D> struct SchurDomain {
 		neumann     = d.neumann;
 
 		// create iface objects
-		for (Side s : Side::getValues()) {
+		for (Side<D> s : Side<D>::getValues()) {
 			if (d.hasNbr(s)) {
 				switch (d.getNbrType(s)) {
 					case NbrType::Normal:
@@ -214,15 +217,15 @@ template <size_t D> struct SchurDomain {
 			}
 		}
 	}
-	IfaceInfo<D> *&getIfaceInfoPtr(Side s)
+	IfaceInfo<D> *&getIfaceInfoPtr(Side<D> s)
 	{
 		return iface_info[s.toInt()];
 	}
-	NormalIfaceInfo<D> &getNormalIfaceInfo(Side s)
+	NormalIfaceInfo<D> &getNormalIfaceInfo(Side<D> s)
 	{
 		return *(NormalIfaceInfo<D> *) iface_info[s.toInt()];
 	}
-	bool hasNbr(Side s)
+	bool hasNbr(Side<D> s)
 	{
 		return iface_info[s.toInt()] != nullptr;
 	}
@@ -230,7 +233,7 @@ template <size_t D> struct SchurDomain {
 	                     std::map<int, std::pair<int, IfaceSet>> &off_proc_ifaces)
 	{
 		std::array<int, 6> ids;
-		for (Side s : Side::getValues()) {
+		for (Side<D> s : Side<D>::getValues()) {
 			if (hasNbr(s)) {
 				ids[s.toInt()] = getIfaceInfoPtr(s)->id;
 			} else {
@@ -239,10 +242,10 @@ template <size_t D> struct SchurDomain {
 		}
 		std::deque<int>       iface_ids;
 		std::deque<IfaceType> iface_types;
-		std::deque<Side>      iface_sides;
+		std::deque<Side<D>>   iface_sides;
 		std::deque<bool>      iface_own;
 		std::deque<int>       iface_ranks;
-		for (Side s : Side::getValues()) {
+		for (Side<D> s : Side<D>::getValues()) {
 			if (hasNbr(s)) {
 				getIfaceInfoPtr(s)->getIdsAndTypes(iface_ids, iface_types, iface_sides, iface_ranks,
 				                                   iface_own, s);
@@ -251,7 +254,7 @@ template <size_t D> struct SchurDomain {
 		for (size_t i = 0; i < iface_ids.size(); i++) {
 			int       id   = iface_ids[i];
 			IfaceType type = iface_types[i];
-			Side      s    = iface_sides[i];
+			Side<D>   s    = iface_sides[i];
 			int       rank = iface_ranks[i];
 			if (iface_own[i]) {
 				IfaceSet &ifs = ifaces[id];
@@ -268,28 +271,28 @@ template <size_t D> struct SchurDomain {
 	std::vector<int> getIds()
 	{
 		std::vector<int> retval;
-		for (Side s : Side::getValues()) {
+		for (Side<D> s : Side<D>::getValues()) {
 			if (hasNbr(s)) { getIfaceInfoPtr(s)->getIds(retval); }
 		}
 		return retval;
 	}
 	void setLocalIndexes(const std::map<int, int> &rev_map)
 	{
-		for (Side s : Side::getValues()) {
+		for (Side<D> s : Side<D>::getValues()) {
 			if (hasNbr(s)) { getIfaceInfoPtr(s)->setLocalIndexes(rev_map); }
 		}
 	}
 	void setGlobalIndexes(const std::map<int, int> &rev_map)
 	{
-		for (Side s : Side::getValues()) {
+		for (Side<D> s : Side<D>::getValues()) {
 			if (hasNbr(s)) { getIfaceInfoPtr(s)->setGlobalIndexes(rev_map); }
 		}
 	}
-	bool isNeumann(Side s)
+	bool isNeumann(Side<D> s)
 	{
 		return neumann[s.toInt()];
 	}
-	int getIfaceLocalIndex(Side s)
+	int getIfaceLocalIndex(Side<D> s)
 	{
 		return iface_info[s.toInt()]->local_index;
 	}

@@ -26,7 +26,7 @@ template <size_t D> struct Domain : public Serializable {
 	int parent_id     = -1;
 	int oct_on_parent = -1;
 
-	std::array<int, Octant::num_orthants> child_id;
+	std::array<int, Orthant<D>::num_orthants> child_id;
 
 	std::bitset<2 * D> neumann;
 	bool               zero_patch = false;
@@ -34,7 +34,7 @@ template <size_t D> struct Domain : public Serializable {
 	std::array<double, D> starts;
 	std::array<double, D> lengths;
 
-	std::array<NbrInfo<D> *, Side::num_sides> nbr_info;
+	std::array<NbrInfo<D> *, Side<D>::num_sides> nbr_info;
 
 	Domain()
 	{
@@ -48,13 +48,13 @@ template <size_t D> struct Domain : public Serializable {
 	{
 		return l.id < r.id;
 	}
-	NbrInfo<D> *&     getNbrInfoPtr(Side s);
-	NbrType           getNbrType(Side s) const;
-	NormalNbrInfo<D> &getNormalNbrInfo(Side s) const;
-	CoarseNbrInfo<D> &getCoarseNbrInfo(Side s) const;
-	FineNbrInfo<D> &  getFineNbrInfo(Side s) const;
-	inline bool       hasNbr(Side s) const;
-	inline bool       isNeumann(Side s) const;
+	NbrInfo<D> *&     getNbrInfoPtr(Side<D> s);
+	NbrType           getNbrType(Side<D> s) const;
+	NormalNbrInfo<D> &getNormalNbrInfo(Side<D> s) const;
+	CoarseNbrInfo<D> &getCoarseNbrInfo(Side<D> s) const;
+	FineNbrInfo<D> &  getFineNbrInfo(Side<D> s) const;
+	inline bool       hasNbr(Side<D> s) const;
+	inline bool       isNeumann(Side<D> s) const;
 	void              setLocalNeighborIndexes(std::map<int, int> &rev_map);
 	void              setGlobalNeighborIndexes(std::map<int, int> &rev_map);
 	void              setNeumann();
@@ -77,7 +77,7 @@ template <size_t D> class NbrInfo : virtual public Serializable
 	virtual void    setGlobalIndexes(std::map<int, int> &rev_map)               = 0;
 	virtual void    setLocalIndexes(std::map<int, int> &rev_map)                = 0;
 	virtual void    setPtrs(std::map<int, std::shared_ptr<Domain<D>>> &domains) = 0;
-	virtual void    updateRankOnNeighbors(int new_rank, Side s)                 = 0;
+	virtual void    updateRankOnNeighbors(int new_rank, Side<D> s)              = 0;
 };
 template <size_t D> class NormalNbrInfo : public NbrInfo<D>
 {
@@ -121,7 +121,7 @@ template <size_t D> class NormalNbrInfo : public NbrInfo<D>
 	{
 		rank = new_rank;
 	}
-	void updateRankOnNeighbors(int new_rank, Side s)
+	void updateRankOnNeighbors(int new_rank, Side<D> s)
 	{
 		ptr->getNormalNbrInfo(s.opposite()).updateRank(new_rank);
 	}
@@ -184,7 +184,7 @@ template <size_t D> class CoarseNbrInfo : public NbrInfo<D>
 	{
 		rank = new_rank;
 	}
-	void updateRankOnNeighbors(int new_rank, Side s);
+	void updateRankOnNeighbors(int new_rank, Side<D> s);
 	int  serialize(char *buffer) const
 	{
 		BufferWriter writer(buffer);
@@ -205,17 +205,18 @@ template <size_t D> class CoarseNbrInfo : public NbrInfo<D>
 template <size_t D> class FineNbrInfo : public NbrInfo<D>
 {
 	public:
-	std::array<std::shared_ptr<Domain<D>>, Octant::num_orthants/2> ptrs;
-	std::array<int, Octant::num_orthants/2> ranks;
-	std::array<int, Octant::num_orthants/2> ids;
-	std::array<int, Octant::num_orthants/2> global_indexes;
-	std::array<int, Octant::num_orthants/2> local_indexes;
-	FineNbrInfo() {
-        ptrs.fill(nullptr);
-        ranks.fill(0);
-    }
+	std::array<std::shared_ptr<Domain<D>>, Orthant<D>::num_orthants / 2> ptrs;
+	std::array<int, Orthant<D>::num_orthants / 2>                        ranks;
+	std::array<int, Orthant<D>::num_orthants / 2>                        ids;
+	std::array<int, Orthant<D>::num_orthants / 2>                        global_indexes;
+	std::array<int, Orthant<D>::num_orthants / 2>                        local_indexes;
+	FineNbrInfo()
+	{
+		ptrs.fill(nullptr);
+		ranks.fill(0);
+	}
 	~FineNbrInfo() = default;
-	FineNbrInfo(std::array<int, Octant::num_orthants/2> ids)
+	FineNbrInfo(std::array<int, Orthant<D>::num_orthants / 2> ids)
 	{
 		this->ids = ids;
 	}
@@ -256,7 +257,7 @@ template <size_t D> class FineNbrInfo : public NbrInfo<D>
 		ranks[quad_on_coarse] = new_rank;
 	}
 
-	void updateRankOnNeighbors(int new_rank, Side s)
+	void updateRankOnNeighbors(int new_rank, Side<D> s)
 	{
 		for (size_t i = 0; i < ptrs.size(); i++) {
 			ptrs[i]->getCoarseNbrInfo(s.opposite()).updateRank(new_rank);
@@ -277,7 +278,7 @@ template <size_t D> class FineNbrInfo : public NbrInfo<D>
 		return reader.getPos();
 	}
 };
-template <size_t D> inline void CoarseNbrInfo<D>::updateRankOnNeighbors(int new_rank, Side s)
+template <size_t D> inline void CoarseNbrInfo<D>::updateRankOnNeighbors(int new_rank, Side<D> s)
 {
 	ptr->getFineNbrInfo(s.opposite()).updateRank(new_rank, quad_on_coarse);
 }
@@ -289,58 +290,58 @@ template <size_t D> inline Domain<D>::~Domain()
 	}
 	*/
 }
-template <size_t D> inline NbrInfo<D> *&Domain<D>::getNbrInfoPtr(Side s)
+template <size_t D> inline NbrInfo<D> *&Domain<D>::getNbrInfoPtr(Side<D> s)
 {
 	return nbr_info[s.toInt()];
 }
-template <size_t D> inline NbrType Domain<D>::getNbrType(Side s) const
+template <size_t D> inline NbrType Domain<D>::getNbrType(Side<D> s) const
 {
 	return nbr_info[s.toInt()]->getNbrType();
 }
-template <size_t D> inline NormalNbrInfo<D> &Domain<D>::getNormalNbrInfo(Side s) const
+template <size_t D> inline NormalNbrInfo<D> &Domain<D>::getNormalNbrInfo(Side<D> s) const
 {
 	return *(NormalNbrInfo<D> *) nbr_info[s.toInt()];
 }
-template <size_t D> inline CoarseNbrInfo<D> &Domain<D>::getCoarseNbrInfo(Side s) const
+template <size_t D> inline CoarseNbrInfo<D> &Domain<D>::getCoarseNbrInfo(Side<D> s) const
 {
 	return *(CoarseNbrInfo<D> *) nbr_info[s.toInt()];
 }
-template <size_t D> inline FineNbrInfo<D> &Domain<D>::getFineNbrInfo(Side s) const
+template <size_t D> inline FineNbrInfo<D> &Domain<D>::getFineNbrInfo(Side<D> s) const
 {
 	return *(FineNbrInfo<D> *) nbr_info[s.toInt()];
 }
-template <size_t D> inline bool Domain<D>::hasNbr(Side s) const
+template <size_t D> inline bool Domain<D>::hasNbr(Side<D> s) const
 {
 	return nbr_info[s.toInt()] != nullptr;
 }
-template <size_t D> inline bool Domain<D>::isNeumann(Side s) const
+template <size_t D> inline bool Domain<D>::isNeumann(Side<D> s) const
 {
 	return neumann[s.toInt()];
 }
 template <size_t D> inline void Domain<D>::setLocalNeighborIndexes(std::map<int, int> &rev_map)
 {
 	id_local = rev_map.at(id);
-	for (Side s : Side::getValues()) {
+	for (Side<D> s : Side<D>::getValues()) {
 		if (hasNbr(s)) { getNbrInfoPtr(s)->setLocalIndexes(rev_map); }
 	}
 }
 template <size_t D> inline void Domain<D>::setGlobalNeighborIndexes(std::map<int, int> &rev_map)
 {
 	id_global = rev_map.at(id_local);
-	for (Side s : Side::getValues()) {
+	for (Side<D> s : Side<D>::getValues()) {
 		if (hasNbr(s)) { getNbrInfoPtr(s)->setGlobalIndexes(rev_map); }
 	}
 }
 template <size_t D> inline void Domain<D>::setNeumann()
 {
 	for (size_t q = 0; q < neumann.size(); q++) {
-		neumann[q] = !hasNbr(static_cast<Side>(q));
+		neumann[q] = !hasNbr(static_cast<Side<D>>(q));
 	}
 }
 template <size_t D> inline std::vector<int> Domain<D>::getNbrIds()
 {
 	std::vector<int> retval;
-	for (Side s : Side::getValues()) {
+	for (Side<D> s : Side<D>::getValues()) {
 		if (hasNbr(s)) { getNbrInfoPtr(s)->getNbrIds(retval); }
 	}
 	return retval;
@@ -359,12 +360,12 @@ template <size_t D> inline int Domain<D>::serialize(char *buffer) const
 	writer << zero_patch;
 	writer << starts;
 	writer << lengths;
-	std::bitset<Side::num_sides> has_nbr;
-	for (size_t i = 0; i < Side::num_sides; i++) {
+	std::bitset<Side<D>::num_sides> has_nbr;
+	for (size_t i = 0; i < Side<D>::num_sides; i++) {
 		has_nbr[i] = nbr_info[i] != nullptr;
 	}
 	writer << has_nbr;
-	for (Side s : Side::getValues()) {
+	for (Side<D> s : Side<D>::getValues()) {
 		if (hasNbr(s)) {
 			NbrType type = getNbrType(s);
 			writer << type;
@@ -399,9 +400,9 @@ template <size_t D> inline int Domain<D>::deserialize(char *buffer)
 	reader >> zero_patch;
 	reader >> starts;
 	reader >> lengths;
-	std::bitset<Side::num_sides> has_nbr;
+	std::bitset<Side<D>::num_sides> has_nbr;
 	reader >> has_nbr;
-	for (size_t i = 0; i < Side::num_sides; i++) {
+	for (size_t i = 0; i < Side<D>::num_sides; i++) {
 		if (has_nbr[i]) {
 			NbrType type;
 			reader >> type;
@@ -427,13 +428,13 @@ template <size_t D> inline int Domain<D>::deserialize(char *buffer)
 }
 template <size_t D> inline void Domain<D>::setPtrs(std::map<int, std::shared_ptr<Domain>> &domains)
 {
-	for (Side s : Side::getValues()) {
+	for (Side<D> s : Side<D>::getValues()) {
 		if (hasNbr(s)) { getNbrInfoPtr(s)->setPtrs(domains); }
 	}
 }
 template <size_t D> inline void Domain<D>::updateRank(int rank)
 {
-	for (Side s : Side::getValues()) {
+	for (Side<D> s : Side<D>::getValues()) {
 		if (hasNbr(s)) { getNbrInfoPtr(s)->updateRankOnNeighbors(rank, s); }
 	}
 }

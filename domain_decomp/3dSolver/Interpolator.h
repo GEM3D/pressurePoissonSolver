@@ -9,8 +9,8 @@ class Interpolator
 	public:
 	virtual ~Interpolator() {}
 	virtual void interpolate(SchurDomain<3> &d, const Vec u, Vec interp) = 0;
-	virtual void interpolate(SchurDomain<3> &d, Side s, int local_index, IfaceType itype, const Vec u,
-	                         Vec interp)
+	virtual void interpolate(SchurDomain<3> &d, Side<3> s, int local_index, IfaceType itype,
+	                         const Vec u, Vec interp)
 	= 0;
 };
 #endif

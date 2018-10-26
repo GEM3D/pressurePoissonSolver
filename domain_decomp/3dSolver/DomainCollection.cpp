@@ -1,7 +1,6 @@
 #include "DomainCollection.h"
 #include "ZoltanHelpers.h"
 #include <algorithm>
-#include <numeric>
 #include <deque>
 #include <fstream>
 #include <iostream>
@@ -52,7 +51,7 @@ DomainCollection::DomainCollection(OctTree t, int level, int n)
 			}
 
 			// set and enqueue nbrs
-			/*for (Side s : Side::getValues()) {
+			/*for (Side<3> s : Side<3>::getValues()) {
 			    if (n.nbrId(s) != -1) {
 			        int id = n.nbrId(s);
 			        if (!qed.count(id)) {
@@ -63,11 +62,11 @@ DomainCollection::DomainCollection(OctTree t, int level, int n)
 			    }
 			}*/
 			// set and enqueue nbrs
-			for (Side s : Side::getValues()) {
+			for (Side<3> s : Side<3>::getValues()) {
 				if (n.nbrId(s) == -1 && n.parent != -1 && t.nodes[n.parent].nbrId(s) != -1) {
 					OctNode parent = t.nodes[n.parent];
 					OctNode nbr    = t.nodes[parent.nbrId(s)];
-					auto    octs   = Octant::getValuesOnSide(s);
+					auto    octs   = Orthant<3>::getValuesOnSide(s);
 					int     quad   = 0;
 					while (parent.childId(octs[quad]) != n.id) {
 						quad++;
@@ -80,7 +79,7 @@ DomainCollection::DomainCollection(OctTree t, int level, int n)
 				} else if (n.level < level && n.nbrId(s) != -1
 				           && t.nodes[n.nbrId(s)].hasChildren()) {
 					OctNode       nbr  = t.nodes[n.nbrId(s)];
-					auto          octs = Octant::getValuesOnSide(s.opposite());
+					auto          octs = Orthant<3>::getValuesOnSide(s.opposite());
 					array<int, 4> nbr_ids;
 					for (int i = 0; i < 4; i++) {
 						int id     = nbr.childId(octs[i]);
@@ -128,27 +127,27 @@ DomainCollection::DomainCollection(int d_x, int d_y, int d_z, int n)
 					ds.id                    = getID(domain_x, domain_y, domain_z);
 					ds.refine_level          = 1;
 					if (domain_x != 0) {
-						ds.getNbrInfoPtr(Side::west)
+						ds.getNbrInfoPtr(Side<3>::west)
 						= new NormalNbrInfo<3>(getID(domain_x - 1, domain_y, domain_z));
 					}
 					if (domain_x != d_x - 1) {
-						ds.getNbrInfoPtr(Side::east)
+						ds.getNbrInfoPtr(Side<3>::east)
 						= new NormalNbrInfo<3>(getID(domain_x + 1, domain_y, domain_z));
 					}
 					if (domain_y != 0) {
-						ds.getNbrInfoPtr(Side::south)
+						ds.getNbrInfoPtr(Side<3>::south)
 						= new NormalNbrInfo<3>(getID(domain_x, domain_y - 1, domain_z));
 					}
 					if (domain_y != d_y - 1) {
-						ds.getNbrInfoPtr(Side::north)
+						ds.getNbrInfoPtr(Side<3>::north)
 						= new NormalNbrInfo<3>(getID(domain_x, domain_y + 1, domain_z));
 					}
 					if (domain_z != 0) {
-						ds.getNbrInfoPtr(Side::bottom)
+						ds.getNbrInfoPtr(Side<3>::bottom)
 						= new NormalNbrInfo<3>(getID(domain_x, domain_y, domain_z - 1));
 					}
 					if (domain_z != d_z - 1) {
-						ds.getNbrInfoPtr(Side::top)
+						ds.getNbrInfoPtr(Side<3>::top)
 						= new NormalNbrInfo<3>(getID(domain_x, domain_y, domain_z + 1));
 					}
 					ds.lengths[0]  = 1.0 / d_x;
@@ -227,7 +226,7 @@ void DomainCollection::zoltanBalanceDomains()
 		Domain<3> &d = *p.second;
 		graph.vertices.push_back(d.id);
 		graph.ptrs.push_back(graph.edges.size());
-		for (Side s : Side::getValues()) {
+		for (Side<3> s : Side<3>::getValues()) {
 			int edge_id = -1;
 			if (d.hasNbr(s)) {
 				switch (d.getNbrType(s)) {
@@ -428,7 +427,7 @@ void DomainCollection::zoltanBalanceWithLower(DomainCollection &lower)
 		graph.vertices.push_back(d.id);
 		graph.ptrs.push_back(graph.edges.size());
 		// patch to patch communication
-		for (Side s : Side::getValues()) {
+		for (Side<3> s : Side<3>::getValues()) {
 			int edge_id = -1;
 			if (d.hasNbr(s)) {
 				switch (d.getNbrType(s)) {

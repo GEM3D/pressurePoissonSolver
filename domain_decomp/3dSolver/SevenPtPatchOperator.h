@@ -21,28 +21,28 @@ class SevenPtPatchOperator : public PatchOperator
 		VecGetArray(gamma, &gamma_view);
 
 		const double *boundary_west = nullptr;
-		if (d.hasNbr(Side::west)) {
-			boundary_west = &gamma_view[n * n * d.getIfaceLocalIndex(Side::west)];
+		if (d.hasNbr(Side<3>::west)) {
+			boundary_west = &gamma_view[n * n * d.getIfaceLocalIndex(Side<3>::west)];
 		}
 		const double *boundary_east = nullptr;
-		if (d.hasNbr(Side::east)) {
-			boundary_east = &gamma_view[n * n * d.getIfaceLocalIndex(Side::east)];
+		if (d.hasNbr(Side<3>::east)) {
+			boundary_east = &gamma_view[n * n * d.getIfaceLocalIndex(Side<3>::east)];
 		}
 		const double *boundary_south = nullptr;
-		if (d.hasNbr(Side::south)) {
-			boundary_south = &gamma_view[n * n * d.getIfaceLocalIndex(Side::south)];
+		if (d.hasNbr(Side<3>::south)) {
+			boundary_south = &gamma_view[n * n * d.getIfaceLocalIndex(Side<3>::south)];
 		}
 		const double *boundary_north = nullptr;
-		if (d.hasNbr(Side::north)) {
-			boundary_north = &gamma_view[n * n * d.getIfaceLocalIndex(Side::north)];
+		if (d.hasNbr(Side<3>::north)) {
+			boundary_north = &gamma_view[n * n * d.getIfaceLocalIndex(Side<3>::north)];
 		}
 		const double *boundary_bottom = nullptr;
-		if (d.hasNbr(Side::bottom)) {
-			boundary_bottom = &gamma_view[n * n * d.getIfaceLocalIndex(Side::bottom)];
+		if (d.hasNbr(Side<3>::bottom)) {
+			boundary_bottom = &gamma_view[n * n * d.getIfaceLocalIndex(Side<3>::bottom)];
 		}
 		const double *boundary_top = nullptr;
-		if (d.hasNbr(Side::top)) {
-			boundary_top = &gamma_view[n * n * d.getIfaceLocalIndex(Side::top)];
+		if (d.hasNbr(Side<3>::top)) {
+			boundary_top = &gamma_view[n * n * d.getIfaceLocalIndex(Side<3>::top)];
 		}
 
 		double center, north, east, south, west, bottom, top;
@@ -55,7 +55,7 @@ class SevenPtPatchOperator : public PatchOperator
 				if (boundary_west != nullptr) { west = boundary_west[yi + zi * n]; }
 				center = u_ptr[index(n, 0, yi, zi)];
 				east   = u_ptr[index(n, 1, yi, zi)];
-				if (d.isNeumann(Side::west) && !d.hasNbr(Side::west)) {
+				if (d.isNeumann(Side<3>::west) && !d.hasNbr(Side<3>::west)) {
 					f_ptr[index(n, 0, yi, zi)] = (-h_x * west - center + east) / (h_x * h_x);
 				} else {
 					f_ptr[index(n, 0, yi, zi)] = (2 * west - 3 * center + east) / (h_x * h_x);
@@ -81,7 +81,7 @@ class SevenPtPatchOperator : public PatchOperator
 				center = u_ptr[index(n, n - 1, yi, zi)];
 				east   = 0;
 				if (boundary_east != nullptr) { east = boundary_east[yi + zi * n]; }
-				if (d.isNeumann(Side::east) && !d.hasNbr(Side::east)) {
+				if (d.isNeumann(Side<3>::east) && !d.hasNbr(Side<3>::east)) {
 					f_ptr[index(n, n - 1, yi, zi)] = (west - center + h_x * east) / (h_x * h_x);
 				} else {
 					f_ptr[index(n, n - 1, yi, zi)] = (west - 3 * center + 2 * east) / (h_x * h_x);
@@ -97,7 +97,7 @@ class SevenPtPatchOperator : public PatchOperator
 				if (boundary_south != nullptr) { south = boundary_south[xi + zi * n]; }
 				center = u_ptr[index(n, xi, 0, zi)];
 				north  = u_ptr[index(n, xi, 1, zi)];
-				if (d.isNeumann(Side::south) && !d.hasNbr(Side::south)) {
+				if (d.isNeumann(Side<3>::south) && !d.hasNbr(Side<3>::south)) {
 					f_ptr[index(n, xi, 0, zi)] += (-h_y * south - center + north) / (h_y * h_y);
 				} else {
 					f_ptr[index(n, xi, 0, zi)] += (2 * south - 3 * center + north) / (h_y * h_y);
@@ -123,7 +123,7 @@ class SevenPtPatchOperator : public PatchOperator
 				center = u_ptr[index(n, xi, n - 1, zi)];
 				north  = 0;
 				if (boundary_north != nullptr) { north = boundary_north[xi + zi * n]; }
-				if (d.isNeumann(Side::north) && !d.hasNbr(Side::north)) {
+				if (d.isNeumann(Side<3>::north) && !d.hasNbr(Side<3>::north)) {
 					f_ptr[index(n, xi, n - 1, zi)] += (south - center + h_y * north) / (h_y * h_y);
 				} else {
 					f_ptr[index(n, xi, n - 1, zi)]
@@ -140,7 +140,7 @@ class SevenPtPatchOperator : public PatchOperator
 				if (boundary_bottom != nullptr) { bottom = boundary_bottom[xi + yi * n]; }
 				center = u_ptr[index(n, xi, yi, 0)];
 				top    = u_ptr[index(n, xi, yi, 1)];
-				if (d.isNeumann(Side::bottom) && !d.hasNbr(Side::bottom)) {
+				if (d.isNeumann(Side<3>::bottom) && !d.hasNbr(Side<3>::bottom)) {
 					f_ptr[index(n, xi, yi, 0)] += (-h_y * bottom - center + top) / (h_y * h_y);
 				} else {
 					f_ptr[index(n, xi, yi, 0)] += (2 * bottom - 3 * center + top) / (h_y * h_y);
@@ -166,7 +166,7 @@ class SevenPtPatchOperator : public PatchOperator
 				center = u_ptr[index(n, xi, yi, n - 1)];
 				top    = 0;
 				if (boundary_top != nullptr) { top = boundary_top[xi + yi * n]; }
-				if (d.isNeumann(Side::top) && !d.hasNbr(Side::top)) {
+				if (d.isNeumann(Side<3>::top) && !d.hasNbr(Side<3>::top)) {
 					f_ptr[index(n, xi, yi, n - 1)] += (bottom - center + h_y * top) / (h_y * h_y);
 				} else {
 					f_ptr[index(n, xi, yi, n - 1)] += (bottom - 3 * center + 2 * top) / (h_y * h_y);

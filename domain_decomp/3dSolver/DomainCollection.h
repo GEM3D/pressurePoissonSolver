@@ -4,7 +4,6 @@
 #include "InterpCase.h"
 #include "OctTree.h"
 #include "PW.h"
-#include "Side.h"
 #include <map>
 #include <memory>
 #include <petscvec.h>

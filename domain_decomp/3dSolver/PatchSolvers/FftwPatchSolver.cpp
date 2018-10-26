@@ -29,35 +29,35 @@ void FftwPatchSolver::addDomain(SchurDomain<3> &d)
 		fftw_r2r_kind z_transform_inv = FFTW_RODFT01;
 		if (d.neumann.to_ulong()) {
 			// x direction
-			if (d.isNeumann(Side::east) && d.isNeumann(Side::west)) {
+			if (d.isNeumann(Side<3>::east) && d.isNeumann(Side<3>::west)) {
 				x_transform     = FFTW_REDFT10;
 				x_transform_inv = FFTW_REDFT01;
-			} else if (d.isNeumann(Side::west)) {
+			} else if (d.isNeumann(Side<3>::west)) {
 				x_transform     = FFTW_REDFT11;
 				x_transform_inv = FFTW_REDFT11;
-			} else if (d.isNeumann(Side::east)) {
+			} else if (d.isNeumann(Side<3>::east)) {
 				x_transform     = FFTW_RODFT11;
 				x_transform_inv = FFTW_RODFT11;
 			}
 			// y direction
-			if (d.isNeumann(Side::north) && d.isNeumann(Side::south)) {
+			if (d.isNeumann(Side<3>::north) && d.isNeumann(Side<3>::south)) {
 				y_transform     = FFTW_REDFT10;
 				y_transform_inv = FFTW_REDFT01;
-			} else if (d.isNeumann(Side::south)) {
+			} else if (d.isNeumann(Side<3>::south)) {
 				y_transform     = FFTW_REDFT11;
 				y_transform_inv = FFTW_REDFT11;
-			} else if (d.isNeumann(Side::north)) {
+			} else if (d.isNeumann(Side<3>::north)) {
 				y_transform     = FFTW_RODFT11;
 				y_transform_inv = FFTW_RODFT11;
 			}
 			// z direction
-			if (d.isNeumann(Side::bottom) && d.isNeumann(Side::top)) {
+			if (d.isNeumann(Side<3>::bottom) && d.isNeumann(Side<3>::top)) {
 				z_transform     = FFTW_REDFT10;
 				z_transform_inv = FFTW_REDFT01;
-			} else if (d.isNeumann(Side::bottom)) {
+			} else if (d.isNeumann(Side<3>::bottom)) {
 				z_transform     = FFTW_REDFT11;
 				z_transform_inv = FFTW_REDFT11;
-			} else if (d.isNeumann(Side::top)) {
+			} else if (d.isNeumann(Side<3>::top)) {
 				z_transform     = FFTW_RODFT11;
 				z_transform_inv = FFTW_RODFT11;
 			}
@@ -78,12 +78,12 @@ void FftwPatchSolver::addDomain(SchurDomain<3> &d)
 		denom.resize(n * n * n);
 		// create denom vector
 		// z direction
-		if (d.isNeumann(Side::bottom) && d.isNeumann(Side::top)) {
+		if (d.isNeumann(Side<3>::bottom) && d.isNeumann(Side<3>::top)) {
 			for (int zi = 0; zi < n; zi++) {
 				denom[slice(zi * n * n, n * n, 1)]
 				= -4 / (h_z * h_z) * pow(sin(zi * M_PI / (2 * n)), 2);
 			}
-		} else if (d.isNeumann(Side::bottom) || d.isNeumann(Side::top)) {
+		} else if (d.isNeumann(Side<3>::bottom) || d.isNeumann(Side<3>::top)) {
 			for (int zi = 0; zi < n; zi++) {
 				denom[slice(zi * n * n, n * n, 1)]
 				= -4 / (h_z * h_z) * pow(sin((zi + 0.5) * M_PI / (2 * n)), 2);
@@ -103,12 +103,12 @@ void FftwPatchSolver::addDomain(SchurDomain<3> &d)
 		valarray<size_t> strides(2);
 		strides[0] = n * n;
 		strides[1] = 1;
-		if (d.isNeumann(Side::south) && d.isNeumann(Side::north)) {
+		if (d.isNeumann(Side<3>::south) && d.isNeumann(Side<3>::north)) {
 			for (int yi = 0; yi < n; yi++) {
 				denom[gslice(yi * n, sizes, strides)]
 				-= 4 / (h_y * h_y) * pow(sin(yi * M_PI / (2 * n)), 2) * ones;
 			}
-		} else if (d.isNeumann(Side::south) || d.isNeumann(Side::north)) {
+		} else if (d.isNeumann(Side<3>::south) || d.isNeumann(Side<3>::north)) {
 			for (int yi = 0; yi < n; yi++) {
 				denom[gslice(yi * n, sizes, strides)]
 				-= 4 / (h_y * h_y) * pow(sin((yi + 0.5) * M_PI / (2 * n)), 2) * ones;
@@ -123,12 +123,12 @@ void FftwPatchSolver::addDomain(SchurDomain<3> &d)
 		// x direction
 		strides[0] = n * n;
 		strides[1] = n;
-		if (d.isNeumann(Side::west) && d.isNeumann(Side::east)) {
+		if (d.isNeumann(Side<3>::west) && d.isNeumann(Side<3>::east)) {
 			for (int xi = 0; xi < n; xi++) {
 				denom[gslice(xi, sizes, strides)]
 				-= 4 / (h_x * h_x) * pow(sin(xi * M_PI / (2 * n)), 2) * ones;
 			}
-		} else if (d.isNeumann(Side::west) || d.isNeumann(Side::east)) {
+		} else if (d.isNeumann(Side<3>::west) || d.isNeumann(Side<3>::east)) {
 			for (int xi = 0; xi < n; xi++) {
 				denom[gslice(xi, sizes, strides)]
 				-= 4 / (h_x * h_x) * pow(sin((xi + 0.5) * M_PI / (2 * n)), 2) * ones;
@@ -156,19 +156,19 @@ void FftwPatchSolver::solve(SchurDomain<3> &d, const Vec f, Vec u, const Vec gam
 	double h_x        = d.domain.lengths[0] / n;
 	double h_y        = d.domain.lengths[1] / n;
 	double h_z        = d.domain.lengths[2] / n;
-	auto   getSpacing = [=](Side s) {
+	auto   getSpacing = [=](Side<3> s) {
         double retval = 0;
         switch (s.toInt()) {
-            case Side::east:
-            case Side::west:
+            case Side<3>::east:
+            case Side<3>::west:
                 retval = h_x;
                 break;
-            case Side::south:
-            case Side::north:
+            case Side<3>::south:
+            case Side<3>::north:
                 retval = h_y;
                 break;
-            case Side::bottom:
-            case Side::top:
+            case Side<3>::bottom:
+            case Side<3>::top:
                 retval = h_z;
         }
         return retval;
@@ -183,7 +183,7 @@ void FftwPatchSolver::solve(SchurDomain<3> &d, const Vec f, Vec u, const Vec gam
 		f_copy[i] = f_view[start + i];
 	}
 
-	for (Side s : Side::getValues()) {
+	for (Side<3> s : Side<3>::getValues()) {
 		if (d.hasNbr(s)) {
 			int    idx = n * n * d.getIfaceLocalIndex(s);
 			Slice  sl  = getSlice(&f_copy[0], n, s);
