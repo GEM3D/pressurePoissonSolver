@@ -59,8 +59,8 @@ class InterLevelComm
 	 * @param coarse_dc the coarser DomainCollection.
 	 * @param fine_dc the finer DomainCollection.
 	 */
-	InterLevelComm(std::shared_ptr<DomainCollection> coarse_dc,
-	               std::shared_ptr<DomainCollection> fine_dc);
+	InterLevelComm(std::shared_ptr<DomainCollection<3>> coarse_dc,
+	               std::shared_ptr<DomainCollection<3>> fine_dc);
 
 	/**
 	 * @brief Allocate a new vector for which coarse values values will be scattered into.

@@ -9,7 +9,7 @@ inline int      index(const int &n, const int &xi, const int &yi, const int &zi)
 {
 	return xi + yi * n + zi * n * n;
 }
-DftPatchSolver::DftPatchSolver(DomainCollection &dc, double lambda)
+DftPatchSolver::DftPatchSolver(DomainCollection<3> &dc, double lambda)
 {
 	n            = dc.getN();
 	this->lambda = lambda;

@@ -51,13 +51,14 @@ class DftPatchSolver : public PatchSolver
 	                  double *out, const bool inverse);
 
 	public:
-	DftPatchSolver(DomainCollection &dsc, double lambda = 0);
+	DftPatchSolver(DomainCollection<3> &dsc, double lambda = 0);
 	void solve(SchurDomain<3> &d, const Vec f, Vec u, const Vec gamma);
-	void domainSolve(std::deque<SchurDomain<3>> &domains, const Vec f, Vec u, const Vec gamma){
-        for(SchurDomain<3> &d:domains){
-            solve(d,f,u,gamma);
-        }
-    }
+	void domainSolve(std::deque<SchurDomain<3>> &domains, const Vec f, Vec u, const Vec gamma)
+	{
+		for (SchurDomain<3> &d : domains) {
+			solve(d, f, u, gamma);
+		}
+	}
 	void addDomain(SchurDomain<3> &d);
 };
 #endif

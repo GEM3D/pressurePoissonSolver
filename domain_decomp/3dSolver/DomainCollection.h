@@ -19,7 +19,7 @@
  *   -# Partition the domains across processors
  *   -# Determine the number of interfaces, and provide a unique index to each interface.
  */
-class DomainCollection
+template <size_t D> class DomainCollection
 {
 	private:
 	int  n = -1;
@@ -45,7 +45,7 @@ class DomainCollection
 					todo.erase(i);
 					queue.pop_front();
 					map_vec.push_back(i);
-					Domain<3> &d = *domains[i];
+					Domain<D> &d = *domains[i];
 					rev_map[i]   = curr_i;
 					d.id_local   = curr_i;
 					curr_i++;
@@ -133,8 +133,8 @@ class DomainCollection
 	/**
 	 * @brief A map that maps the id of a domain to its domain signature.
 	 */
-	std::map<int, std::shared_ptr<Domain<3>>>        domains;
-	const std::map<int, std::shared_ptr<Domain<3>>> &getDomainMap()
+	std::map<int, std::shared_ptr<Domain<D>>>        domains;
+	const std::map<int, std::shared_ptr<Domain<D>>> &getDomainMap()
 	{
 		return domains;
 	}
@@ -151,9 +151,9 @@ class DomainCollection
 	 * @brief Default empty constructor.
 	 */
 	DomainCollection() = default;
-	DomainCollection(std::map<int, std::shared_ptr<Domain<3>>> domain_set,int n)
+	DomainCollection(std::map<int, std::shared_ptr<Domain<D>>> domain_set, int n)
 	{
-		this->n       = n;
+		this->n = n;
 		domains = domain_set;
 
 		int num_local_domains = domains.size();
@@ -176,7 +176,7 @@ class DomainCollection
 	PW_explicit<Vec> getNewDomainVec() const
 	{
 		PW<Vec> u;
-		VecCreateMPI(MPI_COMM_WORLD, domains.size() * std::pow(n, 3), PETSC_DETERMINE, &u);
+		VecCreateMPI(MPI_COMM_WORLD, domains.size() * std::pow(n, D), PETSC_DETERMINE, &u);
 		return u;
 	}
 
@@ -186,17 +186,17 @@ class DomainCollection
 	}
 	int getGlobalNumCells()
 	{
-		return num_global_domains * n * n * n;
+		return num_global_domains * std::pow(n, D);
 	}
 	int getLocalNumCells()
 	{
-		return domains.size() * n * n * n;
+		return domains.size() * std::pow(n, D);
 	}
 	double volume()
 	{
 		double sum = 0;
 		for (auto &p : domains) {
-			Domain<3> &d = *p.second;
+			Domain<D> &d = *p.second;
 			sum
 			+= std::accumulate(d.lengths.begin(), d.lengths.end(), 1, std::multiplies<double>());
 		}
@@ -211,17 +211,17 @@ class DomainCollection
 		VecGetArray(u, &u_view);
 
 		for (auto &p : domains) {
-			Domain<3> &d     = *p.second;
-			int        start = d.n * d.n * d.n * d.id_local;
+			Domain<D> &d     = *p.second;
+			int        start = std::pow(n, D) * d.id_local;
 
 			double patch_sum = 0;
-			for (int i = 0; i < d.n * d.n * d.n; i++) {
+			for (int i = 0; i < std::pow(n, D); i++) {
 				patch_sum += u_view[start + i];
 			}
 
 			patch_sum
 			*= std::accumulate(d.lengths.begin(), d.lengths.end(), 1, std::multiplies<double>())
-			   / std::pow(d.n, 3);
+			   / std::pow(d.n, D);
 
 			sum += patch_sum;
 		}

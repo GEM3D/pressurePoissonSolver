@@ -6,7 +6,7 @@
 #include <tuple>
 using namespace std;
 
-SchurHelper::SchurHelper(DomainCollection dc, shared_ptr<PatchSolver> solver,
+SchurHelper::SchurHelper(DomainCollection<3> dc, shared_ptr<PatchSolver> solver,
                          shared_ptr<PatchOperator> op, shared_ptr<Interpolator> interpolator)
 {
 	this->n = dc.getN();

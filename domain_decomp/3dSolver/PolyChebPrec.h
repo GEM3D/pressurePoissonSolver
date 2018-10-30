@@ -7,10 +7,10 @@
 class PolyChebPrec
 {
 	private:
-	SchurHelper *       sh;
-	DomainCollection *       dc;
-	double              interval = 0.95;
-	std::vector<double> coeffs
+	SchurHelper *        sh;
+	DomainCollection<3> *dc;
+	double               interval = 0.95;
+	std::vector<double>  coeffs
 	= {4.472135954953655e+00, 5.675247900481234e+00, 3.601012922685066e+00, 2.284885928634731e+00,
 	   1.449787551186771e+00, 9.199076055378766e-01, 5.836924189936992e-01, 3.703598469934007e-01,
 	   2.349977690621489e-01, 1.491089055767314e-01, 9.461139059090561e-02, 6.003206306517687e-02,
@@ -27,7 +27,7 @@ class PolyChebPrec
 		return 0;
 	}
 
-	PolyChebPrec(SchurHelper &sh, DomainCollection &dc);
+	PolyChebPrec(SchurHelper &sh, DomainCollection<3> &dc);
 
 	void getPrec(PC P)
 	{

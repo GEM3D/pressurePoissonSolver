@@ -35,7 +35,7 @@ inline int index(Domain<3> &d, const int &xi, const int &yi, const int &zi)
 	const int &n = d.n;
 	return xi + yi * n + zi * n * n;
 }
-void Init::initNeumann(DomainCollection &dc, int n, Vec f, Vec exact,
+void Init::initNeumann(DomainCollection<3> &dc, int n, Vec f, Vec exact,
                        function<double(double, double, double)> ffun,
                        function<double(double, double, double)> efun,
                        function<double(double, double, double)> nfunx,
@@ -132,7 +132,7 @@ void Init::initNeumann(DomainCollection &dc, int n, Vec f, Vec exact,
 	VecRestoreArray(f, &f_ptr);
 	VecRestoreArray(exact, &exact_ptr);
 }
-void Init::initDirichlet(DomainCollection &dc, int n, Vec f, Vec exact,
+void Init::initDirichlet(DomainCollection<3> &dc, int n, Vec f, Vec exact,
                          function<double(double, double, double)> ffun,
                          function<double(double, double, double)> efun)
 {

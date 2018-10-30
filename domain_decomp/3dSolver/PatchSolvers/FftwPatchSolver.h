@@ -42,7 +42,7 @@ class FftwPatchSolver : public PatchSolver
 	std::map<DomainK, std::valarray<double>> denoms;
 
 	public:
-	FftwPatchSolver(DomainCollection &dsc, double lambda = 0);
+	FftwPatchSolver(DomainCollection<3> &dsc, double lambda = 0);
 	~FftwPatchSolver();
 	void solve(SchurDomain<3> &d, const Vec f, Vec u, const Vec gamma);
 	void domainSolve(std::deque<SchurDomain<3>> &domains, const Vec f, Vec u, const Vec gamma)

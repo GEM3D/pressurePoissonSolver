@@ -2,8 +2,8 @@
 #include <petscao.h>
 using namespace std;
 using namespace GMG;
-InterLevelComm::InterLevelComm(shared_ptr<DomainCollection> coarse_dc,
-                               shared_ptr<DomainCollection> fine_dc)
+InterLevelComm::InterLevelComm(shared_ptr<DomainCollection<3>> coarse_dc,
+                               shared_ptr<DomainCollection<3>> fine_dc)
 {
 	n = coarse_dc->getN();
 	set<int> parent_ids;

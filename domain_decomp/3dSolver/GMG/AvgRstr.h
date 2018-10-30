@@ -15,11 +15,11 @@ class AvgRstr : public Restrictor
 	/**
 	 * @brief The coarse DomainCollection that is being restricted to.
 	 */
-	std::shared_ptr<DomainCollection> coarse_dc;
+	std::shared_ptr<DomainCollection<3>> coarse_dc;
 	/**
 	 * @brief The fine DomainCollection that is being restricted from.
 	 */
-	std::shared_ptr<DomainCollection> fine_dc;
+	std::shared_ptr<DomainCollection<3>> fine_dc;
 	/**
 	 * @brief The communication package for restricting between levels.
 	 */
@@ -33,8 +33,8 @@ class AvgRstr : public Restrictor
 	 * @param fine_dc the DomainCollection that is being restricted from.
 	 * @param ilc the communcation package for these two levels.
 	 */
-	AvgRstr(std::shared_ptr<DomainCollection> coarse_dc, std::shared_ptr<DomainCollection> fine_dc,
-	        std::shared_ptr<InterLevelComm> ilc);
+	AvgRstr(std::shared_ptr<DomainCollection<3>> coarse_dc,
+	        std::shared_ptr<DomainCollection<3>> fine_dc, std::shared_ptr<InterLevelComm> ilc);
 	/**
 	 * @brief restriction function
 	 *

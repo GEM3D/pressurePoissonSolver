@@ -8,6 +8,26 @@
 #include <memory>
 namespace GMG
 {
+class VectorGenerator
+{
+	public:
+	virtual PW<Vec> getNewVector() = 0;
+};
+class DCVG : public VectorGenerator
+{
+	private:
+	std::shared_ptr<DomainCollection<3>> dc;
+
+	public:
+	DCVG(std::shared_ptr<DomainCollection<3>> dc)
+	{
+		this->dc = dc;
+	}
+	PW<Vec> getNewVector()
+	{
+		return dc->getNewDomainVec();
+	}
+};
 /**
  * @brief Represents a level in geometric multi-grid.
  */
@@ -15,9 +35,9 @@ class Level
 {
 	private:
 	/**
-	 * @brief the DomainCollection for this level.
+	 * @brief the VectorGenerator for this level.
 	 */
-	std::shared_ptr<DomainCollection> dc;
+	std::shared_ptr<VectorGenerator> vg;
 	/**
 	 * @brief The operator (matrix) for this level.
 	 */
@@ -49,10 +69,9 @@ class Level
 	 *
 	 * @param dc pointer to the DomainCollection for this level
 	 */
-	Level(std::shared_ptr<DomainCollection> dc)
-	{
-		this->dc = dc;
-	}
+	Level(std::shared_ptr<VectorGenerator> vg) {
+        this->vg = vg;
+    }
 	/**
 	 * @brief Set the restriction operator for restricting from this level to the coarser level.
 	 *
@@ -130,9 +149,9 @@ class Level
 	 *
 	 * @return DomainCollection for this level.
 	 */
-	const DomainCollection &getDomainCollection() const
+	const std::shared_ptr<VectorGenerator> &getVectorGenerator() const
 	{
-		return *dc;
+		return vg;
 	}
 	/**
 	 * @brief Set pointer to the coarser level.

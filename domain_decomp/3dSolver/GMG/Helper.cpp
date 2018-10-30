@@ -12,7 +12,7 @@
 using namespace std;
 using namespace GMG;
 using nlohmann::json;
-Helper::Helper(int n, OctTree t, std::vector<std::shared_ptr<DomainCollection>> dcs,
+Helper::Helper(int n, OctTree t, std::vector<std::shared_ptr<DomainCollection<3>>> dcs,
                std::shared_ptr<SchurHelper> sh, std::string config_file)
 {
 	ifstream config_stream(config_file);
@@ -83,7 +83,8 @@ Helper::Helper(int n, OctTree t, std::vector<std::shared_ptr<DomainCollection>> 
 	// create  level objects
 	vector<shared_ptr<Level>> levels(num_levels);
 	for (int i = 0; i < num_levels; i++) {
-		levels[i].reset(new Level(dcs[i]));
+        std::shared_ptr<DCVG> vg(new DCVG(dcs[i]));
+		levels[i].reset(new Level(vg));
 		levels[i]->setOperator(ops[i]);
 		levels[i]->setSmoother(smoothers[i]);
 	}

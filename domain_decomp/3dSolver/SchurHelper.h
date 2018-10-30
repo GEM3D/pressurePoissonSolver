@@ -71,7 +71,7 @@ class SchurHelper
 	 * @param dc the DomainCollection
 	 * @param comm the teuchos communicator
 	 */
-	SchurHelper(DomainCollection dc, std::shared_ptr<PatchSolver> solver,
+	SchurHelper(DomainCollection<3> dc, std::shared_ptr<PatchSolver> solver,
 	            std::shared_ptr<PatchOperator> op, std::shared_ptr<Interpolator> interpolator);
 
 	/**

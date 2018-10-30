@@ -16,11 +16,11 @@ class DrctIntp : public Interpolator
 	/**
 	 * @brief The coarser set of domains
 	 */
-	std::shared_ptr<DomainCollection> coarse_dc;
+	std::shared_ptr<DomainCollection<3>> coarse_dc;
 	/**
 	 * @brief The finer set of domains
 	 */
-	std::shared_ptr<DomainCollection> fine_dc;
+	std::shared_ptr<DomainCollection<3>> fine_dc;
 	/**
 	 * @brief The comm package between the levels.
 	 */
@@ -34,8 +34,8 @@ class DrctIntp : public Interpolator
 	 * @param fine_dc the finer set of domains.
 	 * @param ilc the comm package between the levels.
 	 */
-	DrctIntp(std::shared_ptr<DomainCollection> coarse_dc, std::shared_ptr<DomainCollection> fine_dc,
-	         std::shared_ptr<InterLevelComm> ilc);
+	DrctIntp(std::shared_ptr<DomainCollection<3>> coarse_dc,
+	         std::shared_ptr<DomainCollection<3>> fine_dc, std::shared_ptr<InterLevelComm> ilc);
 	/**
 	 * @brief Interpolate from the finer level to the coarser level.
 	 *

@@ -6,12 +6,12 @@
 class FuncWrap
 {
 	public:
-	PW<Vec>           u;
-	PW<Vec>           f;
-	SchurHelper *     sh = nullptr;
-	DomainCollection *dc = nullptr;
-	FuncWrap()           = default;
-	FuncWrap(SchurHelper *sh, DomainCollection *dc)
+	PW<Vec>              u;
+	PW<Vec>              f;
+	SchurHelper *        sh = nullptr;
+	DomainCollection<3> *dc = nullptr;
+	FuncWrap()              = default;
+	FuncWrap(SchurHelper *sh, DomainCollection<3> *dc)
 	{
 		f        = dc->getNewDomainVec();
 		u        = dc->getNewDomainVec();
@@ -38,9 +38,9 @@ class FuncWrap
 class FullFuncWrap
 {
 	public:
-	SchurHelper *     sh = nullptr;
-	DomainCollection *dc = nullptr;
-	FullFuncWrap(SchurHelper *sh, DomainCollection *dc)
+	SchurHelper *        sh = nullptr;
+	DomainCollection<3> *dc = nullptr;
+	FullFuncWrap(SchurHelper *sh, DomainCollection<3> *dc)
 	{
 		this->sh = sh;
 		this->dc = dc;
@@ -52,12 +52,12 @@ class FullFuncWrap
 		w->sh->apply(x, y);
 		return 0;
 	}
-	static PW_explicit<Mat> getMatrix(SchurHelper *sh, DomainCollection *dc)
+	static PW_explicit<Mat> getMatrix(SchurHelper *sh, DomainCollection<3> *dc)
 	{
-		PW<Mat> A;
-		int     M = dc->getGlobalNumCells();
-		int     m = dc->getLocalNumCells();
-        FullFuncWrap wrapper(sh,dc);
+		PW<Mat>      A;
+		int          M = dc->getGlobalNumCells();
+		int          m = dc->getLocalNumCells();
+		FullFuncWrap wrapper(sh, dc);
 		MatCreateShell(MPI_COMM_WORLD, m, m, M, M, &wrapper, &A);
 		MatShellSetOperation(A, MATOP_MULT, (void (*)(void)) multiply);
 		return A;
@@ -66,15 +66,18 @@ class FullFuncWrap
 class SchwarzPrec
 {
 	public:
-	SchurHelper *     sh = nullptr;
-	DomainCollection *dc = nullptr;
-	SchwarzPrec()        = default;
-	SchwarzPrec(SchurHelper *sh, DomainCollection *dc)
+	SchurHelper *        sh = nullptr;
+	DomainCollection<3> *dc = nullptr;
+	SchwarzPrec()           = default;
+	SchwarzPrec(SchurHelper *sh, DomainCollection<3> *dc)
 	{
 		this->sh = sh;
 		this->dc = dc;
 	}
-	void apply(Vec f, Vec u) { sh->solveWithSolution(f, u); }
+	void apply(Vec f, Vec u)
+	{
+		sh->solveWithSolution(f, u);
+	}
 	static int multiply(PC A, Vec f, Vec u)
 	{
 		SchwarzPrec *w = nullptr;

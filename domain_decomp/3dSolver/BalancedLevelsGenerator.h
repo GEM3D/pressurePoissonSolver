@@ -115,8 +115,8 @@ inline void BalancedLevelsGenerator::extractLevel(const OctTree &t, int level, i
 			levels[level - 1][d.id] = d_ptr;
 		}
 	}
-	for (auto &p : levels[level-1]) {
-		p.second->setPtrs(levels[level-1]);
+	for (auto &p : levels[level - 1]) {
+		p.second->setPtrs(levels[level - 1]);
 	}
 }
 inline void BalancedLevelsGenerator::balanceLevel(int level)
@@ -135,8 +135,8 @@ inline void BalancedLevelsGenerator::balanceLevel(int level)
 	// Query functions
 	// Number of Vertices
 	auto numObjFn = [](void *data, int *ierr) -> int {
-		DomainMap& map = *(DomainMap *) data;
-		*ierr         = ZOLTAN_OK;
+		DomainMap &map = *(DomainMap *) data;
+		*ierr          = ZOLTAN_OK;
 		return map.size();
 	};
 	Zoltan_Set_Num_Obj_Fn(zz, numObjFn, &levels[level - 1]);
@@ -145,9 +145,9 @@ inline void BalancedLevelsGenerator::balanceLevel(int level)
 	auto objListFn
 	= [](void *data, int num_gid_entries, int num_lid_entries, ZOLTAN_ID_PTR global_ids,
 	     ZOLTAN_ID_PTR local_ids, int wgt_dim, float *obj_wgts, int *ierr) {
-		  DomainMap& map = *(DomainMap *) data;
-		  *ierr         = ZOLTAN_OK;
-		  int pos       = 0;
+		  DomainMap &map = *(DomainMap *) data;
+		  *ierr          = ZOLTAN_OK;
+		  int pos        = 0;
 		  for (auto p : map) {
 			  global_ids[pos] = p.first;
 			  pos++;
@@ -214,8 +214,8 @@ inline void BalancedLevelsGenerator::balanceLevel(int level)
 	Zoltan_Set_Obj_Size_Fn(zz,
 	                       [](void *data, int num_gid_entries, int num_lid_entries,
 	                          ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id, int *ierr) {
-		                       DomainMap& map = *(DomainMap *) data;
-		                       *ierr         = ZOLTAN_OK;
+		                       DomainMap &map = *(DomainMap *) data;
+		                       *ierr          = ZOLTAN_OK;
 		                       return map[*global_id]->serialize(nullptr);
 	                       },
 	                       &levels[level - 1]);
@@ -223,8 +223,8 @@ inline void BalancedLevelsGenerator::balanceLevel(int level)
 	                       [](void *data, int num_gid_entries, int num_lid_entries,
 	                          ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id, int dest, int size,
 	                          char *buf, int *ierr) {
-		                       DomainMap& map = *(DomainMap *) data;
-		                       *ierr         = ZOLTAN_OK;
+		                       DomainMap &map = *(DomainMap *) data;
+		                       *ierr          = ZOLTAN_OK;
 		                       map[*global_id]->serialize(buf);
 		                       map.erase(*global_id);
 	                       },
@@ -232,8 +232,8 @@ inline void BalancedLevelsGenerator::balanceLevel(int level)
 	Zoltan_Set_Unpack_Obj_Fn(
 	zz,
 	[](void *data, int num_gid_entries, ZOLTAN_ID_PTR global_id, int size, char *buf, int *ierr) {
-		DomainMap& map = *(DomainMap *) data;
-		*ierr         = ZOLTAN_OK;
+		DomainMap &map = *(DomainMap *) data;
+		*ierr          = ZOLTAN_OK;
 		map[*global_id].reset(new Domain<3>());
 		map[*global_id]->deserialize(buf);
 	},
@@ -303,8 +303,8 @@ inline void BalancedLevelsGenerator::balanceLevel(int level)
 	std::cout << prev << "\n";
 	std::cout << std::endl;
 #endif
-	for (auto &p : levels[level-1]) {
-		p.second->setPtrs(levels[level-1]);
+	for (auto &p : levels[level - 1]) {
+		p.second->setPtrs(levels[level - 1]);
 	}
 }
 inline void BalancedLevelsGenerator::balanceLevelWithLower(int level)
@@ -540,8 +540,8 @@ inline void BalancedLevelsGenerator::balanceLevelWithLower(int level)
 	std::cout << prev << "\n";
 	std::cout << std::endl;
 #endif
-	for (auto &p : this->levels[level-1]) {
-		p.second->setPtrs(this->levels[level-1]);
+	for (auto &p : this->levels[level - 1]) {
+		p.second->setPtrs(this->levels[level - 1]);
 	}
 }
 #endif

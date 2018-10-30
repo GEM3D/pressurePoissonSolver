@@ -2,7 +2,7 @@
 #include <functional>
 using namespace std;
 using namespace GMG;
-AvgRstr::AvgRstr(shared_ptr<DomainCollection> coarse_dc, shared_ptr<DomainCollection> fine_dc,
+AvgRstr::AvgRstr(shared_ptr<DomainCollection<3>> coarse_dc, shared_ptr<DomainCollection<3>> fine_dc,
                  shared_ptr<InterLevelComm> ilc)
 {
 	this->coarse_dc = coarse_dc;

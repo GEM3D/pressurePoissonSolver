@@ -184,7 +184,7 @@ int main(int argc, char *argv[])
 	///////////////
 	// Create Mesh
 	///////////////
-	shared_ptr<DomainCollection> dc;
+	shared_ptr<DomainCollection<3>> dc;
 	OctTree                      t;
 	if (f_mesh) {
 		string d = args::get(f_mesh);
@@ -200,7 +200,7 @@ int main(int argc, char *argv[])
 	// partition domains if running in parallel
 	if (num_procs > 1) { blg.zoltanBalance(); }
 
-	dc.reset(new DomainCollection(blg.levels[t.num_levels - 1], n));
+	dc.reset(new DomainCollection<3>(blg.levels[t.num_levels - 1], n));
 	if (f_neumann) { dc->setNeumann(); }
 
 	// the functions that we are using
@@ -412,10 +412,10 @@ int main(int argc, char *argv[])
 					sp->getPrec(pc);
 				}
 				if (f_gmg) {
-					vector<shared_ptr<DomainCollection>> dcs(t.num_levels);
+					vector<shared_ptr<DomainCollection<3>>> dcs(t.num_levels);
 					dcs[0] = dc;
 					for (int i = 1; i < t.num_levels; i++) {
-						dcs[i].reset(new DomainCollection(blg.levels[t.num_levels-1-i], n));
+						dcs[i].reset(new DomainCollection<3>(blg.levels[t.num_levels - 1 - i], n));
 					}
 
 					gh.reset(new GMG::Helper(n, t, dcs, sch, args::get(f_gmg)));

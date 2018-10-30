@@ -5,7 +5,7 @@
 class MatrixHelper
 {
 	private:
-	DomainCollection dc;
+	DomainCollection<3> dc;
 
 	public:
 	/**
@@ -17,7 +17,7 @@ class MatrixHelper
 	 * @param h_y the y spacing
 	 * @param comm the teuchos communicator
 	 */
-	MatrixHelper(DomainCollection dc);
+	MatrixHelper(DomainCollection<3> dc);
 
 	/**
 	 * @brief Form the matrix

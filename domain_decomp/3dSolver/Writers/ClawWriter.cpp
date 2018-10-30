@@ -1,7 +1,7 @@
 #include "ClawWriter.h"
 #include <fstream>
 using namespace std;
-ClawWriter::ClawWriter(DomainCollection &dc)
+ClawWriter::ClawWriter(DomainCollection<3> &dc)
 {
 	this->dc = dc;
 }

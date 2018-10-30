@@ -3,12 +3,12 @@ using namespace GMG;
 void Cycle::prepCoarser(const Level &level)
 {
 	// calculate residual
-	PW<Vec> r = level.getDomainCollection().getNewDomainVec();
+	PW<Vec> r = level.getVectorGenerator()->getNewVector();
 	level.getOperator().apply(u_vectors.front(), r);
 	VecAYPX(r, -1, f_vectors.front());
 	// create vectors for coarser levels
-	PW<Vec> new_u = level.getCoarser().getDomainCollection().getNewDomainVec();
-	PW<Vec> new_f = level.getCoarser().getDomainCollection().getNewDomainVec();
+	PW<Vec> new_u = level.getCoarser().getVectorGenerator()->getNewVector();
+	PW<Vec> new_f = level.getCoarser().getVectorGenerator()->getNewVector();
 	level.getRestrictor().restrict(new_f, r);
 	u_vectors.push_front(new_u);
 	f_vectors.push_front(new_f);

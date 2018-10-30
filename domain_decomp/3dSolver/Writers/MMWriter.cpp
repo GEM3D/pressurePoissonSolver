@@ -1,7 +1,7 @@
 #include "MMWriter.h"
 #include <fstream>
 using namespace std;
-MMWriter::MMWriter(DomainCollection &dc, bool amr)
+MMWriter::MMWriter(DomainCollection<3> &dc, bool amr)
 {
 	this->amr = amr;
 	this->dc  = dc;

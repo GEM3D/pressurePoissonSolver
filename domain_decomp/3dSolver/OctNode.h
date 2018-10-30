@@ -75,7 +75,7 @@ struct OctNode {
 	/**
 	 * @return Whether or not this node has any children.
 	 */
-	bool hasChildren()const
+	bool hasChildren() const
 	{
 		return child_id[0] != -1;
 	}

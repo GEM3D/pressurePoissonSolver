@@ -5,11 +5,11 @@
 class MMWriter
 {
 	private:
-	DomainCollection dc;
-	bool             amr;
+	DomainCollection<3> dc;
+	bool                amr;
 
 	public:
-	MMWriter(DomainCollection &dc, bool amr);
+	MMWriter(DomainCollection<3> &dc, bool amr);
 	void write(const Vec u, std::string filename);
 };
 #endif

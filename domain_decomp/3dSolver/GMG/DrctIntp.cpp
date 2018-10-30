@@ -2,8 +2,8 @@
 #include <functional>
 using namespace std;
 using namespace GMG;
-DrctIntp::DrctIntp(shared_ptr<DomainCollection> coarse_dc, shared_ptr<DomainCollection> fine_dc,
-                   shared_ptr<InterLevelComm> ilc)
+DrctIntp::DrctIntp(shared_ptr<DomainCollection<3>> coarse_dc,
+                   shared_ptr<DomainCollection<3>> fine_dc, shared_ptr<InterLevelComm> ilc)
 {
 	this->coarse_dc = coarse_dc;
 	this->fine_dc   = fine_dc;

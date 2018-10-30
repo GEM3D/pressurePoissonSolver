@@ -2,7 +2,7 @@
 #include "StencilHelper.h"
 #include <iostream>
 using namespace std;
-MatrixHelper::MatrixHelper(DomainCollection dc)
+MatrixHelper::MatrixHelper(DomainCollection<3> dc)
 {
 	this->dc = dc;
 }
