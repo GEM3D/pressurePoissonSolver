@@ -12,7 +12,7 @@
 using namespace std;
 using namespace GMG;
 using nlohmann::json;
-Helper::Helper(int n, OctTree t, std::shared_ptr<DomainCollection> dc,
+Helper::Helper(int n, OctTree t, std::vector<std::shared_ptr<DomainCollection>> dcs,
                std::shared_ptr<SchurHelper> sh, std::string config_file)
 {
 	ifstream config_stream(config_file);
@@ -35,18 +35,14 @@ Helper::Helper(int n, OctTree t, std::shared_ptr<DomainCollection> dc,
 	}
 	if (num_levels <= 0 || num_levels > t.num_levels) { num_levels = t.num_levels; }
 	// generate and balance domain collections
-	vector<shared_ptr<DomainCollection>> dcs(num_levels);
 	vector<shared_ptr<SchurHelper>>      helpers(num_levels);
-	dcs[0]     = dc;
 	helpers[0] = sh;
 	for (int i = 1; i < num_levels; i++) {
-		dcs[i].reset(new DomainCollection(t, t.num_levels - i, n));
-		if ((dcs[i]->getGlobalNumDomains() + 0.0) / size < patches_per_proc) { 
-            num_levels = i; 
-            break;
-        }
-		if (dc->neumann) { dcs[i]->setNeumann(); }
-		dcs[i]->zoltanBalanceWithLower(*dcs[i - 1]);
+		if ((dcs[i]->getGlobalNumDomains() + 0.0) / size < patches_per_proc) {
+			num_levels = i;
+			break;
+		}
+		if (dcs[0]->neumann) { dcs[i]->setNeumann(); }
 		helpers[i].reset(
 		new SchurHelper(*dcs[i], sh->getSolver(), sh->getOp(), sh->getInterpolator()));
 	}

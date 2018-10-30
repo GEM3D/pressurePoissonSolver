@@ -75,7 +75,7 @@ struct OctNode {
 	/**
 	 * @return Whether or not this node has any children.
 	 */
-	bool hasChildren()
+	bool hasChildren()const
 	{
 		return child_id[0] != -1;
 	}
@@ -86,7 +86,7 @@ struct OctNode {
 	 *
 	 * @return The result.
 	 */
-	bool hasNbr(Side<3> s)
+	bool hasNbr(Side<3> s) const
 	{
 		return nbr_id[s.toInt()] != -1;
 	}
@@ -109,6 +109,10 @@ struct OctNode {
 	 * @return the neighbor id.
 	 */
 	int &nbrId(Side<3> s)
+	{
+		return nbr_id[s.toInt()];
+	}
+	int nbrId(Side<3> s) const
 	{
 		return nbr_id[s.toInt()];
 	}

@@ -1,6 +1,7 @@
 #include "../DomainCollection.h"
 #include "catch.hpp"
 using namespace std;
+#if 0
 TEST_CASE("DomainCollection constructors work", "[DomainCollection]")
 {
 	PetscInitialize(nullptr, nullptr, nullptr, nullptr);
@@ -108,3 +109,4 @@ TEST_CASE("DomainCollection constructors work", "[DomainCollection]")
 		}
 	}
 }
+#endif

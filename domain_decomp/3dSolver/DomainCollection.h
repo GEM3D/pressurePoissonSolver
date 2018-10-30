@@ -4,8 +4,10 @@
 #include "InterpCase.h"
 #include "OctTree.h"
 #include "PW.h"
+#include <deque>
 #include <map>
 #include <memory>
+#include <petscao.h>
 #include <petscvec.h>
 #include <set>
 #include <string>
@@ -21,23 +23,113 @@ class DomainCollection
 {
 	private:
 	int  n = -1;
-	void indexDomainsLocal();
-	void indexDomainsGlobal();
+	void indexDomainsLocal()
+	{
+		int                curr_i = 0;
+		std::vector<int>   map_vec;
+		std::vector<int>   off_proc_map_vec;
+		std::map<int, int> rev_map;
+		std::set<int>      offs;
+		if (!domains.empty()) {
+			std::set<int> todo;
+			for (auto &p : domains) {
+				todo.insert(p.first);
+			}
+			std::set<int> enqueued;
+			while (!todo.empty()) {
+				std::deque<int> queue;
+				queue.push_back(*todo.begin());
+				enqueued.insert(*todo.begin());
+				while (!queue.empty()) {
+					int i = queue.front();
+					todo.erase(i);
+					queue.pop_front();
+					map_vec.push_back(i);
+					Domain<3> &d = *domains[i];
+					rev_map[i]   = curr_i;
+					d.id_local   = curr_i;
+					curr_i++;
+					for (int i : d.getNbrIds()) {
+						if (!enqueued.count(i)) {
+							enqueued.insert(i);
+							if (domains.count(i)) {
+								queue.push_back(i);
+							} else {
+								if (!offs.count(i)) {
+									offs.insert(i);
+									off_proc_map_vec.push_back(i);
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		// map off proc
+		for (int i : off_proc_map_vec) {
+			rev_map[i] = curr_i;
+			curr_i++;
+		}
+		for (auto &p : domains) {
+			p.second->setLocalNeighborIndexes(rev_map);
+		}
+		// domain_rev_map          = rev_map;
+		domain_map_vec          = map_vec;
+		domain_gid_map_vec      = map_vec;
+		domain_off_proc_map_vec = off_proc_map_vec;
+		indexDomainsGlobal();
+	}
+	void indexDomainsGlobal()
+	{
+		// global indices are going to be sequentially increasing with rank
+		int local_size = domains.size();
+		int start_i;
+		MPI_Scan(&local_size, &start_i, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+		start_i -= local_size;
+		std::vector<int> new_global(local_size);
+		iota(new_global.begin(), new_global.end(), start_i);
+
+		// create map for gids
+		PW<AO> ao;
+		AOCreateMapping(MPI_COMM_WORLD, local_size, &domain_map_vec[0], &new_global[0], &ao);
+
+		// get global indices that we want to recieve for dest vector
+		std::vector<int> inds = domain_map_vec;
+		for (int i : domain_off_proc_map_vec) {
+			inds.push_back(i);
+		}
+
+		// get new global indices
+		AOApplicationToPetsc(ao, inds.size(), &inds[0]);
+		std::map<int, int> rev_map;
+		for (size_t i = 0; i < inds.size(); i++) {
+			rev_map[i] = inds[i];
+		}
+
+		for (auto &p : domains) {
+			p.second->setGlobalNeighborIndexes(rev_map);
+		}
+		for (size_t i = 0; i < domain_map_vec.size(); i++) {
+			domain_map_vec[i] = inds[i];
+		}
+		for (size_t i = 0; i < domain_off_proc_map_vec.size(); i++) {
+			domain_off_proc_map_vec[i] = inds[domain_map_vec.size() + i];
+		}
+	}
+
 	void zoltanBalanceDomains();
-	void reIndex();
+	void reIndex()
+	{
+		indexDomainsLocal();
+	}
 
 	public:
 	int  rank;
-	int  num_pins;
 	bool neumann = false;
 	/**
 	 * @brief Number of total domains.
 	 */
 	int num_global_domains = 1;
-	/**
-	 * @brief Number of total interfaces.
-	 */
-	int num_global_interfaces = 0;
 	/**
 	 * @brief A map that maps the id of a domain to its domain signature.
 	 */
@@ -59,22 +151,20 @@ class DomainCollection
 	 * @brief Default empty constructor.
 	 */
 	DomainCollection() = default;
+	DomainCollection(std::map<int, std::shared_ptr<Domain<3>>> domain_set,int n)
+	{
+		this->n       = n;
+		domains = domain_set;
 
-	DomainCollection(OctTree t, int level, int n);
-	DomainCollection(OctTree t, int n) : DomainCollection(t, t.num_levels, n){};
-	/**
-	 * @brief Generate a grid of domains.
-	 *
-	 * @param d_x number of domains in the x direction.
-	 * @param d_y number of domains in the y direction.
-	 * @param rank the rank of the MPI process.
-	 */
-	DomainCollection(int d_x, int d_y, int d_z, int n);
-	/**
-	 * @brief Balance the domains over processors using Zoltan
-	 */
-	void zoltanBalance();
-	void zoltanBalanceWithLower(DomainCollection &lower);
+		int num_local_domains = domains.size();
+		MPI_Allreduce(&num_local_domains, &num_global_domains, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+
+		reIndex();
+
+		for (auto &p : domains) {
+			p.second->setPtrs(domains);
+		}
+	}
 
 	void setNeumann()
 	{
@@ -83,11 +173,17 @@ class DomainCollection
 			p.second->setNeumann();
 		}
 	}
-	PW_explicit<Vec> getNewDomainVec() const;
+	PW_explicit<Vec> getNewDomainVec() const
+	{
+		PW<Vec> u;
+		VecCreateMPI(MPI_COMM_WORLD, domains.size() * std::pow(n, 3), PETSC_DETERMINE, &u);
+		return u;
+	}
 
-	int getGlobalNumDomains(){
-        return num_global_domains;
-    }
+	int getGlobalNumDomains()
+	{
+		return num_global_domains;
+	}
 	int getGlobalNumCells()
 	{
 		return num_global_domains * n * n * n;
@@ -96,7 +192,43 @@ class DomainCollection
 	{
 		return domains.size() * n * n * n;
 	}
-	double integrate(const Vec u);
-	double volume();
+	double volume()
+	{
+		double sum = 0;
+		for (auto &p : domains) {
+			Domain<3> &d = *p.second;
+			sum
+			+= std::accumulate(d.lengths.begin(), d.lengths.end(), 1, std::multiplies<double>());
+		}
+		double retval;
+		MPI_Allreduce(&sum, &retval, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		return retval;
+	}
+	double integrate(const Vec u)
+	{
+		double  sum = 0;
+		double *u_view;
+		VecGetArray(u, &u_view);
+
+		for (auto &p : domains) {
+			Domain<3> &d     = *p.second;
+			int        start = d.n * d.n * d.n * d.id_local;
+
+			double patch_sum = 0;
+			for (int i = 0; i < d.n * d.n * d.n; i++) {
+				patch_sum += u_view[start + i];
+			}
+
+			patch_sum
+			*= std::accumulate(d.lengths.begin(), d.lengths.end(), 1, std::multiplies<double>())
+			   / std::pow(d.n, 3);
+
+			sum += patch_sum;
+		}
+		double retval;
+		MPI_Allreduce(&sum, &retval, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		VecRestoreArray(u, &u_view);
+		return retval;
+	}
 };
 #endif

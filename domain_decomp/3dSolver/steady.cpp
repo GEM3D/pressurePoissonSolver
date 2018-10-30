@@ -1,3 +1,4 @@
+#include "BalancedLevelsGenerator.h"
 #include "DomainCollection.h"
 #include "FunctionWrapper.h"
 #include "GMG/Helper.h"
@@ -188,20 +189,19 @@ int main(int argc, char *argv[])
 	if (f_mesh) {
 		string d = args::get(f_mesh);
 		t        = OctTree(d);
-		if (f_div) {
-			for (int i = 0; i < args::get(f_div); i++) {
-				t.refineLeaves();
-			}
-		}
-		dc.reset(new DomainCollection(t, n));
-	} else {
-		int d = args::get(f_cube);
-		dc.reset(new DomainCollection(d, d, d, n));
 	}
-	if (f_neumann) { dc->setNeumann(); }
+	if (f_div) {
+		for (int i = 0; i < args::get(f_div); i++) {
+			t.refineLeaves();
+		}
+	}
+	BalancedLevelsGenerator blg(t, n);
 
 	// partition domains if running in parallel
-	if (num_procs > 1) { dc->zoltanBalance(); }
+	if (num_procs > 1) { blg.zoltanBalance(); }
+
+	dc.reset(new DomainCollection(blg.levels[t.num_levels - 1], n));
+	if (f_neumann) { dc->setNeumann(); }
 
 	// the functions that we are using
 	function<double(double, double, double)> ffun;
@@ -412,7 +412,13 @@ int main(int argc, char *argv[])
 					sp->getPrec(pc);
 				}
 				if (f_gmg) {
-					gh.reset(new GMG::Helper(n, t, dc, sch, args::get(f_gmg)));
+					vector<shared_ptr<DomainCollection>> dcs(t.num_levels);
+					dcs[0] = dc;
+					for (int i = 1; i < t.num_levels; i++) {
+						dcs[i].reset(new DomainCollection(blg.levels[t.num_levels-1-i], n));
+					}
+
+					gh.reset(new GMG::Helper(n, t, dcs, sch, args::get(f_gmg)));
 					gh->getPrec(pc);
 				}
 				if (f_ibd) { sch->getPBDiagInv(pc); }

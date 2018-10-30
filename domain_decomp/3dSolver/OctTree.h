@@ -47,5 +47,6 @@ struct OctTree {
 	 * @param n the node to refine.
 	 */
 	void refineNode(OctNode &n);
+    void zoltanBalanceDomains();
 };
 #endif
