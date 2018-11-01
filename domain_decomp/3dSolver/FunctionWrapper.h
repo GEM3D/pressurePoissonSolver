@@ -8,10 +8,10 @@ class FuncWrap
 	public:
 	PW<Vec>              u;
 	PW<Vec>              f;
-	SchurHelper *        sh = nullptr;
+	SchurHelper<3> *     sh = nullptr;
 	DomainCollection<3> *dc = nullptr;
 	FuncWrap()              = default;
-	FuncWrap(SchurHelper *sh, DomainCollection<3> *dc)
+	FuncWrap(SchurHelper<3> *sh, DomainCollection<3> *dc)
 	{
 		f        = dc->getNewDomainVec();
 		u        = dc->getNewDomainVec();
@@ -25,12 +25,13 @@ class FuncWrap
 		w->sh->solveWithInterface(w->f, w->u, x, y);
 		return 0;
 	}
-	PW_explicit<Mat> getMatrix()
+	static PW_explicit<Mat> getMatrix(SchurHelper<3> *sh, DomainCollection<3> *dc)
 	{
-		PW<Mat> A;
-		int     M = sh->getSchurVecGlobalSize();
-		int     m = sh->getSchurVecLocalSize();
-		MatCreateShell(MPI_COMM_WORLD, m, m, M, M, this, &A);
+		PW<Mat>   A;
+		int       M       = sh->getSchurVecGlobalSize();
+		int       m       = sh->getSchurVecLocalSize();
+		FuncWrap *wrapper = new FuncWrap(sh, dc);
+		MatCreateShell(MPI_COMM_WORLD, m, m, M, M, wrapper, &A);
 		MatShellSetOperation(A, MATOP_MULT, (void (*)(void)) multiply);
 		return A;
 	}
@@ -38,9 +39,9 @@ class FuncWrap
 class FullFuncWrap
 {
 	public:
-	SchurHelper *        sh = nullptr;
+	SchurHelper<3> *     sh = nullptr;
 	DomainCollection<3> *dc = nullptr;
-	FullFuncWrap(SchurHelper *sh, DomainCollection<3> *dc)
+	FullFuncWrap(SchurHelper<3> *sh, DomainCollection<3> *dc)
 	{
 		this->sh = sh;
 		this->dc = dc;
@@ -52,12 +53,12 @@ class FullFuncWrap
 		w->sh->apply(x, y);
 		return 0;
 	}
-	static PW_explicit<Mat> getMatrix(SchurHelper *sh, DomainCollection<3> *dc)
+	static PW_explicit<Mat> getMatrix(SchurHelper<3> *sh, DomainCollection<3> *dc)
 	{
-		PW<Mat>      A;
-		int          M = dc->getGlobalNumCells();
-		int          m = dc->getLocalNumCells();
-		FullFuncWrap wrapper(sh, dc);
+		PW<Mat>       A;
+		int           M       = dc->getGlobalNumCells();
+		int           m       = dc->getLocalNumCells();
+		FullFuncWrap *wrapper = new FullFuncWrap(sh, dc);
 		MatCreateShell(MPI_COMM_WORLD, m, m, M, M, &wrapper, &A);
 		MatShellSetOperation(A, MATOP_MULT, (void (*)(void)) multiply);
 		return A;
@@ -66,10 +67,10 @@ class FullFuncWrap
 class SchwarzPrec
 {
 	public:
-	SchurHelper *        sh = nullptr;
+	SchurHelper<3> *     sh = nullptr;
 	DomainCollection<3> *dc = nullptr;
 	SchwarzPrec()           = default;
-	SchwarzPrec(SchurHelper *sh, DomainCollection<3> *dc)
+	SchwarzPrec(SchurHelper<3> *sh, DomainCollection<3> *dc)
 	{
 		this->sh = sh;
 		this->dc = dc;

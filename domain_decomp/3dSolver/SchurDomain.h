@@ -229,8 +229,8 @@ template <size_t D> struct SchurDomain {
 	{
 		return iface_info[s.toInt()] != nullptr;
 	}
-	void enumerateIfaces(std::map<int, IfaceSet> &                ifaces,
-	                     std::map<int, std::pair<int, IfaceSet>> &off_proc_ifaces)
+	void enumerateIfaces(std::map<int, IfaceSet<D>> &                ifaces,
+	                     std::map<int, std::pair<int, IfaceSet<D>>> &off_proc_ifaces)
 	{
 		std::array<int, 6> ids;
 		for (Side<D> s : Side<D>::getValues()) {
@@ -257,14 +257,14 @@ template <size_t D> struct SchurDomain {
 			Side<D>   s    = iface_sides[i];
 			int       rank = iface_ranks[i];
 			if (iface_own[i]) {
-				IfaceSet &ifs = ifaces[id];
-				ifs.id        = id;
-				ifs.insert(Iface(ids, type, s, neumann));
+				IfaceSet<D> &ifs = ifaces[id];
+				ifs.id           = id;
+				ifs.insert(Iface<D>(ids, type, s, neumann));
 			} else {
-				IfaceSet &ifs             = off_proc_ifaces[id].second;
+				IfaceSet<D> &ifs          = off_proc_ifaces[id].second;
 				off_proc_ifaces[id].first = rank;
 				ifs.id                    = id;
-				ifs.insert(Iface(ids, type, s, neumann));
+				ifs.insert(Iface<D>(ids, type, s, neumann));
 			}
 		}
 	}

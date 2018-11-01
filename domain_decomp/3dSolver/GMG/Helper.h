@@ -25,7 +25,7 @@ class Helper
 	}
 
 	Helper(int n, OctTree t, std::vector<std::shared_ptr<DomainCollection<3>>> domains,
-	       std::shared_ptr<SchurHelper> sh, std::string config_file);
+	       std::shared_ptr<SchurHelper<3>> sh, std::string config_file);
 
 	void getPrec(PC P)
 	{

@@ -1,7 +1,7 @@
 #include "PolyChebPrec.h"
 #include <iostream>
 using namespace std;
-PolyChebPrec::PolyChebPrec(SchurHelper &sh, DomainCollection<3> &dc)
+PolyChebPrec::PolyChebPrec(SchurHelper<3> &sh, DomainCollection<3> &dc)
 {
 	this->sh = &sh;
 	this->dc = &dc;

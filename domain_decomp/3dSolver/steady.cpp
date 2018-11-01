@@ -9,6 +9,7 @@
 #include "PatchSolvers/FftwPatchSolver.h"
 #include "PolyChebPrec.h"
 #include "SchurHelper.h"
+#include "SchurMatrixHelper.h"
 #include "SevenPtPatchOperator.h"
 #include "Timer.h"
 #include "TriLinInterp.h"
@@ -185,7 +186,7 @@ int main(int argc, char *argv[])
 	// Create Mesh
 	///////////////
 	shared_ptr<DomainCollection<3>> dc;
-	OctTree                      t;
+	OctTree                         t;
 	if (f_mesh) {
 		string d = args::get(f_mesh);
 		t        = OctTree(d);
@@ -279,14 +280,11 @@ int main(int argc, char *argv[])
 	if (f_amgx) { amgxsolver = new AmgxWrapper(args::get(f_amgx)); }
 #endif
 
-#ifdef ENABLE_MUELU_CUDA
-	if (f_meulucuda) { MueLuCudaWrapper::initialize(); }
-#endif
 	Tools::Timer timer;
 	for (int loop = 0; loop < loop_count; loop++) {
 		timer.start("Domain Initialization");
 
-		shared_ptr<SchurHelper> sch(new SchurHelper(*dc, p_solver, p_operator, p_interp));
+		shared_ptr<SchurHelper<3>> sch(new SchurHelper<3>(*dc, p_solver, p_operator, p_interp));
 		MatrixHelper            mh(*dc);
 
 		PW<Vec> u     = dc->getNewDomainVec();
@@ -321,12 +319,6 @@ int main(int argc, char *argv[])
 			VecShift(f, -fdiff);
 		}
 
-#ifdef ENABLE_MUELU
-		MueLuWrapper *meulusolver = nullptr;
-#endif
-#ifdef ENABLE_MUELU_CUDA
-		MueLuCudaWrapper *meulucudasolver = nullptr;
-#endif
 		if (f_noschur || dc->num_global_domains != 1) {
 			// do iterative solve
 
@@ -354,8 +346,7 @@ int main(int argc, char *argv[])
 				if (f_noschur) {
 					A = FullFuncWrap::getMatrix(sch.get(), dc.get());
 				} else {
-					w.reset(new FuncWrap(sch.get(), &*dc));
-					A = w->getMatrix();
+					A = FuncWrap::getMatrix(sch.get(), dc.get());
 				}
 			} else {
 				timer.start("Matrix Formation");
@@ -363,10 +354,11 @@ int main(int argc, char *argv[])
 				if (f_noschur) {
 					A = mh.formCRSMatrix();
 				} else {
+					SchurMatrixHelper smh(sch);
 					if (f_pbm) {
-						A = sch->getPBMatrix();
+						A = smh.getPBMatrix();
 					} else {
-						A = sch->formCRSMatrix();
+						A = smh.formCRSMatrix();
 					}
 				}
 
@@ -382,18 +374,6 @@ int main(int argc, char *argv[])
 			}
 
 			if (false) {
-#ifdef ENABLE_MUELU
-			} else if (f_meulu) {
-				timer.start("MeuLu Setup");
-				meulusolver = new MueLuWrapper(A, tol, args::get(f_meulu));
-				timer.stop("MeuLu Setup");
-#endif
-#ifdef ENABLE_MUELU_CUDA
-			} else if (f_meulucuda) {
-				timer.start("MeuLu Setup");
-				meulucudasolver = new MueLuCudaWrapper(A, tol, args::get(f_meulucuda));
-				timer.stop("MeuLu Setup");
-#endif
 #ifdef ENABLE_AMGX
 			} else if (f_amgx) {
 				timer.start("AMGX Setup");
@@ -421,7 +401,6 @@ int main(int argc, char *argv[])
 					gh.reset(new GMG::Helper(n, t, dcs, sch, args::get(f_gmg)));
 					gh->getPrec(pc);
 				}
-				if (f_ibd) { sch->getPBDiagInv(pc); }
 				if (f_cheb) {
 					PolyChebPrec *pcp = new PolyChebPrec(*sch, *dc);
 					pcp->getPrec(pc);
@@ -443,24 +422,6 @@ int main(int argc, char *argv[])
 		if ((f_noschur || dc->num_global_domains != 1) && !f_cfft) {
 			timer.start("Linear Solve");
 			if (false) {
-#ifdef ENABLE_MUELU
-			} else if (f_meulu) {
-				// solve
-				if (f_noschur) {
-					meulusolver->solve(u, f);
-				} else {
-					meulusolver->solve(gamma, b);
-				}
-#endif
-#ifdef ENABLE_MUELU_CUDA
-			} else if (f_meulucuda) {
-				// solve
-				if (f_noschur) {
-					meulucudasolver->solve(u, f);
-				} else {
-					meulucudasolver->solve(gamma, b);
-				}
-#endif
 #ifdef ENABLE_AMGX
 			} else if (f_amgx) {
 				// solve
@@ -574,19 +535,10 @@ int main(int argc, char *argv[])
 		}
 #endif
 		cout.unsetf(std::ios_base::floatfield);
-#ifdef ENABLE_MUELU
-		if (meulusolver != nullptr) { delete meulusolver; }
-#endif
-#ifdef ENABLE_MUELU_CUDA
-		if (meulucudasolver != nullptr) { delete meulucudasolver; }
-#endif
 	}
 
 #ifdef ENABLE_AMGX
 	if (amgxsolver != nullptr) { delete amgxsolver; }
-#endif
-#ifdef ENABLE_MUELU_CUDA
-	if (f_meulucuda) { MueLuCudaWrapper::finalize(); }
 #endif
 	if (my_global_rank == 0) { cout << timer; }
 	PetscFinalize();

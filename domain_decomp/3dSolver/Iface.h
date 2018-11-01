@@ -7,15 +7,16 @@
 #include <map>
 #include <set>
 #include <vector>
-struct Iface {
-	IfaceType          type;
-	Side<3>            s;
-	std::array<int, 6> ids       = {{-1, -1, -1, -1, -1, -1}};
-	std::array<int, 6> local_id  = {{-1, -1, -1, -1, -1, -1}};
-	std::array<int, 6> global_id = {{-1, -1, -1, -1, -1, -1}};
-	std::bitset<6>     neumann;
+template <size_t D> struct Iface {
+	IfaceType                           type;
+	Side<D>                             s;
+	std::array<int, Side<D>::num_sides> ids       = {{-1, -1, -1, -1, -1, -1}};
+	std::array<int, Side<D>::num_sides> local_id  = {{-1, -1, -1, -1, -1, -1}};
+	std::array<int, Side<D>::num_sides> global_id = {{-1, -1, -1, -1, -1, -1}};
+	std::bitset<Side<D>::num_sides>     neumann;
 	Iface() = default;
-	Iface(std::array<int, 6> ids, IfaceType type, Side<3> s, std::bitset<6> neumann)
+	Iface(std::array<int, Side<D>::num_sides> ids, IfaceType type, Side<D> s,
+	      std::bitset<Side<D>::num_sides> neumann)
 	{
 		this->ids     = ids;
 		this->type    = type;
@@ -23,36 +24,36 @@ struct Iface {
 		this->neumann = neumann;
 	}
 };
-struct IfaceSet : public Serializable {
-	int                id        = -1;
-	int                id_local  = -1;
-	int                id_global = -1;
-	std::vector<Iface> ifaces;
-	std::set<int>      getNbrs() const
+template <size_t D> struct IfaceSet : public Serializable {
+	int                   id        = -1;
+	int                   id_local  = -1;
+	int                   id_global = -1;
+	std::vector<Iface<D>> ifaces;
+	std::set<int>         getNbrs() const
 	{
 		std::set<int> retval;
-		for (const Iface &iface : ifaces) {
+		for (const Iface<D> &iface : ifaces) {
 			for (const int i : iface.ids) {
 				if (i != -1 && i != id) { retval.insert(i); }
 			}
 		}
 		return retval;
 	}
-	void insert(Iface i)
+	void insert(Iface<D> i)
 	{
 		ifaces.push_back(i);
 	}
-	void insert(IfaceSet ifs)
+	void insert(IfaceSet<D> ifs)
 	{
 		id = ifs.id;
-		for (Iface &i : ifs.ifaces) {
+		for (Iface<D> &i : ifs.ifaces) {
 			ifaces.push_back(i);
 		}
 	}
 	void setLocalIndexes(const std::map<int, int> &rev_map)
 	{
 		id_local = rev_map.at(id);
-		for (Iface &iface : ifaces) {
+		for (Iface<D> &iface : ifaces) {
 			for (int i = 0; i < 6; i++) {
 				if (iface.ids[i] != -1) { iface.local_id[i] = rev_map.at(iface.ids[i]); }
 			}
@@ -61,7 +62,7 @@ struct IfaceSet : public Serializable {
 	void setGlobalIndexes(const std::map<int, int> &rev_map)
 	{
 		id_global = rev_map.at(id_local);
-		for (Iface &iface : ifaces) {
+		for (Iface<D> &iface : ifaces) {
 			for (int i = 0; i < 6; i++) {
 				if (iface.local_id[i] != -1) { iface.global_id[i] = rev_map.at(iface.local_id[i]); }
 			}
@@ -74,7 +75,7 @@ struct IfaceSet : public Serializable {
 		writer << id_global;
 		int size = ifaces.size();
 		writer << size;
-		for (const Iface &i : ifaces) {
+		for (const Iface<D> &i : ifaces) {
 			writer << i;
 		}
 		return writer.getPos();
@@ -87,7 +88,7 @@ struct IfaceSet : public Serializable {
 		int size = 0;
 		reader >> size;
 		for (int i = 0; i < size; i++) {
-			Iface iface;
+			Iface<D> iface;
 			reader >> iface;
 			ifaces.push_back(iface);
 		}

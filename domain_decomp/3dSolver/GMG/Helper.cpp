@@ -13,7 +13,7 @@ using namespace std;
 using namespace GMG;
 using nlohmann::json;
 Helper::Helper(int n, OctTree t, std::vector<std::shared_ptr<DomainCollection<3>>> dcs,
-               std::shared_ptr<SchurHelper> sh, std::string config_file)
+               std::shared_ptr<SchurHelper<3>> sh, std::string config_file)
 {
 	ifstream config_stream(config_file);
 	json     config_j;
@@ -35,7 +35,7 @@ Helper::Helper(int n, OctTree t, std::vector<std::shared_ptr<DomainCollection<3>
 	}
 	if (num_levels <= 0 || num_levels > t.num_levels) { num_levels = t.num_levels; }
 	// generate and balance domain collections
-	vector<shared_ptr<SchurHelper>>      helpers(num_levels);
+	vector<shared_ptr<SchurHelper<3>>> helpers(num_levels);
 	helpers[0] = sh;
 	for (int i = 1; i < num_levels; i++) {
 		if ((dcs[i]->getGlobalNumDomains() + 0.0) / size < patches_per_proc) {
@@ -44,7 +44,7 @@ Helper::Helper(int n, OctTree t, std::vector<std::shared_ptr<DomainCollection<3>
 		}
 		if (dcs[0]->neumann) { dcs[i]->setNeumann(); }
 		helpers[i].reset(
-		new SchurHelper(*dcs[i], sh->getSolver(), sh->getOp(), sh->getInterpolator()));
+		new SchurHelper<3>(*dcs[i], sh->getSolver(), sh->getOp(), sh->getInterpolator()));
 	}
 
 	// generate operators
@@ -60,15 +60,15 @@ Helper::Helper(int n, OctTree t, std::vector<std::shared_ptr<DomainCollection<3>
 			MatrixHelper mh(*dcs[i]);
 			ops[i].reset(new MatOp(mh.formCRSMatrix()));
 		} else if (op_type == "matrix_free") {
-			ops[i].reset(new WrapOp(helpers[i]));
+			ops[i].reset(new WrapOp<3>(helpers[i]));
 		}
 	}
 
 	// generate smoothers
 	vector<shared_ptr<Smoother>> smoothers(num_levels);
-	smoothers[0].reset(new FFTBlockJacobiSmoother(sh));
+	smoothers[0].reset(new FFTBlockJacobiSmoother<3>(sh));
 	for (int i = 1; i < num_levels; i++) {
-		smoothers[i].reset(new FFTBlockJacobiSmoother(helpers[i]));
+		smoothers[i].reset(new FFTBlockJacobiSmoother<3>(helpers[i]));
 	}
 
 	// generate inter-level comms, restrictors, interpolators
@@ -83,7 +83,7 @@ Helper::Helper(int n, OctTree t, std::vector<std::shared_ptr<DomainCollection<3>
 	// create  level objects
 	vector<shared_ptr<Level>> levels(num_levels);
 	for (int i = 0; i < num_levels; i++) {
-        std::shared_ptr<DCVG> vg(new DCVG(dcs[i]));
+		std::shared_ptr<DCVG> vg(new DCVG(dcs[i]));
 		levels[i].reset(new Level(vg));
 		levels[i]->setOperator(ops[i]);
 		levels[i]->setSmoother(smoothers[i]);

@@ -9,13 +9,13 @@ namespace GMG
  * @brief A block Jacobi smoother that uses FFTW solves on each patch. Implemented using the
  * SchurHelper class.
  */
-class FFTBlockJacobiSmoother : public Smoother
+template <size_t D> class FFTBlockJacobiSmoother : public Smoother
 {
 	private:
 	/**
 	 * @brief point to the SchurHelper object.
 	 */
-	std::shared_ptr<SchurHelper> sh;
+	std::shared_ptr<SchurHelper<D>> sh;
 
 	public:
 	/**
@@ -23,7 +23,7 @@ class FFTBlockJacobiSmoother : public Smoother
 	 *
 	 * @param sh pointer to the SchurHelper object
 	 */
-	FFTBlockJacobiSmoother(std::shared_ptr<SchurHelper> sh)
+	FFTBlockJacobiSmoother(std::shared_ptr<SchurHelper<D>> sh)
 	{
 		this->sh = sh;
 	}

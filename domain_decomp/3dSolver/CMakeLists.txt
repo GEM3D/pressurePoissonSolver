@@ -100,7 +100,7 @@ link_directories("${Zoltan_DIR}/lib")
 # file(s) to use to build the executable.
 #
 add_executable(steady steady.cpp)
-add_library(SchurHelper SchurHelper.cpp)
+add_library(SchurHelper SchurMatrixHelper.cpp)
 add_library(MatrixHelper MatrixHelper.cpp)
 add_library(DomainCollection OctTree.cpp)
 add_library(Interpolators TriLinInterp.cpp)
