@@ -6,7 +6,7 @@
 #include "BilinearInterpolator.h"
 #include "GMG/Helper2d.h"
 #include "Init.h"
-#include "MatrixHelper.h"
+#include "MatrixHelper2d.h"
 #include "PatchSolvers/FftwPatchSolver.h"
 #include "PatchSolvers/FishpackPatchSolver.h"
 #include "PolyChebPrec.h"
@@ -373,7 +373,8 @@ int main(int argc, char *argv[])
 				timer.start("Matrix Formation");
 
 				if (f_noschur) {
-					//			A = mh.formCRSMatrix();
+                    MatrixHelper2d mh(*dc);
+								A = mh.formCRSMatrix();
 				} else {
 					//			A = sch->formCRSMatrix();
 				}
