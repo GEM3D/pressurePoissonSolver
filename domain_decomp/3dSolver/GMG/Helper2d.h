@@ -24,8 +24,8 @@ class Helper2d
 		return 0;
 	}
 
-	Helper2d(int n, Tree<2> t, std::vector<std::shared_ptr<DomainCollection<2>>> domains,
-	       std::shared_ptr<SchurHelper<2>> sh, std::string config_file);
+	Helper2d(int n, std::vector<std::shared_ptr<DomainCollection<2>>> domains,
+	         std::shared_ptr<SchurHelper<2>> sh, std::string config_file);
 
 	void getPrec(PC P)
 	{

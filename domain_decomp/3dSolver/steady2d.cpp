@@ -429,7 +429,7 @@ int main(int argc, char *argv[])
 						dcs[i].reset(new DomainCollection<2>(blg.levels[t.num_levels - 1 - i], n));
 					}
 
-					gh.reset(new GMG::Helper2d(n, t, dcs, sch, args::get(f_gmg)));
+					gh.reset(new GMG::Helper2d(n, dcs, sch, args::get(f_gmg)));
 					gh->getPrec(pc);
 				}
 				PCSetUp(pc);

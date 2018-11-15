@@ -12,7 +12,7 @@
 using namespace std;
 using namespace GMG;
 using nlohmann::json;
-Helper::Helper(int n, Tree<3> t, std::vector<std::shared_ptr<DomainCollection<3>>> dcs,
+Helper::Helper(int n, std::vector<std::shared_ptr<DomainCollection<3>>> dcs,
                std::shared_ptr<SchurHelper<3>> sh, std::string config_file)
 {
 	ifstream config_stream(config_file);
@@ -33,7 +33,7 @@ Helper::Helper(int n, Tree<3> t, std::vector<std::shared_ptr<DomainCollection<3>
 	} catch (nlohmann::detail::out_of_range oor) {
 		patches_per_proc = 0;
 	}
-	if (num_levels <= 0 || num_levels > t.num_levels) { num_levels = t.num_levels; }
+	if (num_levels <= 0 || num_levels > (int) dcs.size()) { num_levels = dcs.size(); }
 	// generate and balance domain collections
 	vector<shared_ptr<SchurHelper<3>>> helpers(num_levels);
 	helpers[0] = sh;
@@ -73,8 +73,8 @@ Helper::Helper(int n, Tree<3> t, std::vector<std::shared_ptr<DomainCollection<3>
 
 	// generate inter-level comms, restrictors, interpolators
 	vector<shared_ptr<InterLevelComm<3>>> comms(num_levels - 1);
-	vector<shared_ptr<Restrictor>>     restrictors(num_levels - 1);
-	vector<shared_ptr<Interpolator>>   interpolators(num_levels - 1);
+	vector<shared_ptr<Restrictor>>        restrictors(num_levels - 1);
+	vector<shared_ptr<Interpolator>>      interpolators(num_levels - 1);
 	for (int i = 0; i < num_levels - 1; i++) {
 		comms[i].reset(new InterLevelComm<3>(dcs[i + 1], dcs[i]));
 		restrictors[i].reset(new AvgRstr<3>(dcs[i + 1], dcs[i], comms[i]));

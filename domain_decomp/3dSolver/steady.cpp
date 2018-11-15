@@ -398,7 +398,7 @@ int main(int argc, char *argv[])
 						dcs[i].reset(new DomainCollection<3>(blg.levels[t.num_levels - 1 - i], n));
 					}
 
-					gh.reset(new GMG::Helper(n, t, dcs, sch, args::get(f_gmg)));
+					gh.reset(new GMG::Helper(n, dcs, sch, args::get(f_gmg)));
 					gh->getPrec(pc);
 				}
 				if (f_cheb) {

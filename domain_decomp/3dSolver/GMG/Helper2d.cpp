@@ -12,8 +12,8 @@
 using namespace std;
 using namespace GMG;
 using nlohmann::json;
-Helper2d::Helper2d(int n, Tree<2> t, std::vector<std::shared_ptr<DomainCollection<2>>> dcs,
-               std::shared_ptr<SchurHelper<2>> sh, std::string config_file)
+Helper2d::Helper2d(int n, std::vector<std::shared_ptr<DomainCollection<2>>> dcs,
+                   std::shared_ptr<SchurHelper<2>> sh, std::string config_file)
 {
 	ifstream config_stream(config_file);
 	json     config_j;
@@ -33,7 +33,7 @@ Helper2d::Helper2d(int n, Tree<2> t, std::vector<std::shared_ptr<DomainCollectio
 	} catch (nlohmann::detail::out_of_range oor) {
 		patches_per_proc = 0;
 	}
-	if (num_levels <= 0 || num_levels > t.num_levels) { num_levels = t.num_levels; }
+	if (num_levels <= 0 || num_levels > (int) dcs.size()) { num_levels = dcs.size(); }
 	// generate and balance domain collections
 	vector<shared_ptr<SchurHelper<2>>> helpers(num_levels);
 	helpers[0] = sh;
@@ -56,13 +56,13 @@ Helper2d::Helper2d(int n, Tree<2> t, std::vector<std::shared_ptr<DomainCollectio
 	}
 	vector<shared_ptr<Operator>> ops(num_levels);
 	for (int i = 0; i < num_levels; i++) {
-        /*
+		/*
 		if (op_type == "crs_matrix") {
-			MatrixHelper mh(*dcs[i]);
-			ops[i].reset(new MatOp(mh.formCRSMatrix()));
+		    MatrixHelper mh(*dcs[i]);
+		    ops[i].reset(new MatOp(mh.formCRSMatrix()));
 		} else if (op_type == "matrix_free") {
 		}
-        */
+		*/
 		ops[i].reset(new WrapOp<2>(helpers[i]));
 	}
 
@@ -75,8 +75,8 @@ Helper2d::Helper2d(int n, Tree<2> t, std::vector<std::shared_ptr<DomainCollectio
 
 	// generate inter-level comms, restrictors, interpolators
 	vector<shared_ptr<InterLevelComm<2>>> comms(num_levels - 1);
-	vector<shared_ptr<Restrictor>>     restrictors(num_levels - 1);
-	vector<shared_ptr<Interpolator>>   interpolators(num_levels - 1);
+	vector<shared_ptr<Restrictor>>        restrictors(num_levels - 1);
+	vector<shared_ptr<Interpolator>>      interpolators(num_levels - 1);
 	for (int i = 0; i < num_levels - 1; i++) {
 		comms[i].reset(new InterLevelComm<2>(dcs[i + 1], dcs[i]));
 		restrictors[i].reset(new AvgRstr<2>(dcs[i + 1], dcs[i], comms[i]));

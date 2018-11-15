@@ -128,10 +128,10 @@ template <size_t D> class CoarseIfaceInfo : public IfaceInfo<D>
 template <size_t D> class FineIfaceInfo : public IfaceInfo<D>
 {
 	public:
-	FineNbrInfo<D>                                     nbr_info;
-	std::array<int, 1 << Orthant<D>::num_orthants / 2> fine_ids;
-	std::array<int, 1 << Orthant<D>::num_orthants / 2> fine_local_indexes;
-	std::array<int, 1 << Orthant<D>::num_orthants / 2> fine_global_indexes;
+	FineNbrInfo<D>                                nbr_info;
+	std::array<int, Orthant<D - 1>::num_orthants> fine_ids;
+	std::array<int, Orthant<D - 1>::num_orthants> fine_local_indexes;
+	std::array<int, Orthant<D - 1>::num_orthants> fine_global_indexes;
 	FineIfaceInfo(Domain<D> &d, Side<D> s)
 	{
 		nbr_info = d.getFineNbrInfo(s);

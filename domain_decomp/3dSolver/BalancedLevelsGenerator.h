@@ -88,10 +88,10 @@ inline void BalancedLevelsGenerator<D>::extractLevel(const Tree<D> &t, int level
 					}
 				} else if (n.level < level && n.nbrId(s) != -1
 				           && t.nodes.at(n.nbrId(s)).hasChildren()) {
-					Node<D>            nbr  = t.nodes.at(n.nbrId(s));
-					auto               octs = Orthant<D>::getValuesOnSide(s.opposite());
-					std::array<int, Orthant<D>::num_orthants/2> nbr_ids;
-					for (size_t i = 0; i < Orthant<D>::num_orthants/2; i++) {
+					Node<D> nbr  = t.nodes.at(n.nbrId(s));
+					auto    octs = Orthant<D>::getValuesOnSide(s.opposite());
+					std::array<int, Orthant<D>::num_orthants / 2> nbr_ids;
+					for (size_t i = 0; i < Orthant<D>::num_orthants / 2; i++) {
 						int id     = nbr.childId(octs[i]);
 						nbr_ids[i] = id;
 						if (!qed.count(id)) {

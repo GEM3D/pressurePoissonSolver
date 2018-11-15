@@ -95,23 +95,24 @@ template <size_t D> class SchurHelper
 	PW_explicit<Vec> getNewSchurVec()
 	{
 		PW<Vec> u;
-		VecCreateMPI(MPI_COMM_WORLD, iface_map_vec.size() * n * n, PETSC_DETERMINE, &u);
+		VecCreateMPI(MPI_COMM_WORLD, iface_map_vec.size() * std::pow(n, D - 1), PETSC_DETERMINE,
+		             &u);
 		return u;
 	}
 	PW_explicit<Vec> getNewSchurDistVec()
 	{
 		PW<Vec> u;
-		VecCreateSeq(PETSC_COMM_SELF, iface_dist_map_vec.size() * n * n, &u);
+		VecCreateSeq(PETSC_COMM_SELF, iface_dist_map_vec.size() * std::pow(n, D - 1), &u);
 		return u;
 	}
 
 	int getSchurVecLocalSize()
 	{
-		return iface_map_vec.size() * n * n;
+		return iface_map_vec.size() * std::pow(n, D - 1);
 	}
 	int getSchurVecGlobalSize()
 	{
-		return num_global_ifaces * n * n;
+		return num_global_ifaces * std::pow(n, D - 1);
 	}
 	// getters
 	std::shared_ptr<Interpolator<D>> getInterpolator()
@@ -213,8 +214,8 @@ inline SchurHelper<D>::SchurHelper(DomainCollection<D> dc, std::shared_ptr<Patch
 	local_interp       = getNewSchurDistVec();
 	gamma              = getNewSchurVec();
 	PW<IS> dist_is;
-	ISCreateBlock(MPI_COMM_SELF, n * n, iface_dist_map_vec.size(), &iface_dist_map_vec[0],
-	              PETSC_COPY_VALUES, &dist_is);
+	ISCreateBlock(MPI_COMM_SELF, std::pow(n, D - 1), iface_dist_map_vec.size(),
+	              &iface_dist_map_vec[0], PETSC_COPY_VALUES, &dist_is);
 	VecScatterCreate(gamma, dist_is, local_gamma, nullptr, &scatter);
 
 	int num_ifaces = ifaces.size();

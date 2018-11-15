@@ -23,72 +23,58 @@ void BilinearInterpolator::interpolate(SchurDomain<2> &d, Side<2> s, int local_i
 	VecGetArray(interp, &interp_view);
 	double *u_view;
 	VecGetArray(u, &u_view);
-	int right  = -1;
-	int ctfidx = -1;
-    int idx = local_index*n;
+	int idx = local_index * n;
 	switch (itype.toInt()) {
 		case IfaceType::normal: {
-			Slice<1> sl  = getSlice<2>(d, u_view, s);
+			Slice<1> sl = getSlice<2>(d, u_view, s);
 			for (int i = 0; i < n; i++) {
 				interp_view[idx + i] += 0.5 * sl({i});
 			}
 		} break;
-                                /*
-		case IfaceType::coarse_from_coarse: {
-			Slice sl  = getSlice(d, n, u_view, s);
+		case IfaceType::coarse_to_coarse: {
+			Slice<1> sl = getSlice<2>(d, u_view, s);
 			// middle cases
 			for (int i = 0; i < n; i++) {
-				interp_view[idx + i] += 1.0 / 3 * sl[i];
+				interp_view[idx + i] += 1.0 / 3 * sl({i});
 			}
 		} break;
-		case IfaceType::coarse_from_fine_on_left:
-			right++;
-		case IfaceType::coarse_from_fine_on_right:
-			right++;
-			{
-				Slice sl                = getSlice(d, n, u_view, s);
-				bool  edge_on_beginning = ((s == Side::north || s == Side::west) && !right)
-				                         || ((s == Side::east || s == Side::south) && right);
-				if (edge_on_beginning) {
-					// middle cases
-					for (int i = 0; i < n; i += 2) {
-						interp_view[idx + i / 2] += 1.0 / 3 * sl[i] + 1.0 / 3 * sl[i + 1];
-					}
-				} else {
-					// middle cases
-					for (int i = 0; i < n; i += 2) {
-						interp_view[idx + (n + i) / 2] += 1.0 / 3 * sl[i] + 1.0 / 3 * sl[i + 1];
-					}
+		case IfaceType::fine_to_coarse: {
+			Slice<1> sl = getSlice<2>(d, u_view, s);
+			if (itype.getOrthant() == 0) {
+				// middle cases
+				for (int i = 0; i < n; i += 2) {
+					interp_view[idx + i / 2] += 1.0 / 3 * sl({i}) + 1.0 / 3 * sl({i + 1});
+				}
+			} else {
+				// middle cases
+				for (int i = 0; i < n; i += 2) {
+					interp_view[idx + (n + i) / 2] += 1.0 / 3 * sl({i}) + 1.0 / 3 * sl({i + 1});
 				}
 			}
-			break;
-		case IfaceType::fine_from_fine: {
-			Slice sl  = getSlice(d, n, u_view, s);
-			int   idx = n * d.index(s);
+		} break;
+		case IfaceType::fine_to_fine: {
+			Slice<1> sl = getSlice<2>(d, u_view, s);
 			// middle cases
 			for (int i = 0; i < n; i += 2) {
-				interp_view[idx + i] += 5.0 / 6 * sl[i] - 1.0 / 6 * sl[i + 1];
+				interp_view[idx + i] += 5.0 / 6 * sl({i}) - 1.0 / 6 * sl({i + 1});
 			}
 			for (int i = 1; i < n; i += 2) {
-				interp_view[idx + i] += 5.0 / 6 * sl[i] - 1.0 / 6 * sl[i - 1];
+				interp_view[idx + i] += 5.0 / 6 * sl({i}) - 1.0 / 6 * sl({i - 1});
 			}
 		} break;
-		case IfaceType::fine_from_coarse_to_fine_on_right: {
-			Slice sl                = getSlice(d, n, u_view, s);
-			bool  edge_on_beginning = ((s == Side::north || s == Side::west) && right)
-			                         || ((s == Side::east || s == Side::south) && !right);
-			if (edge_on_beginning) {
+		case IfaceType::coarse_to_fine: {
+			Slice<1> sl = getSlice<2>(d, u_view, s);
+			if (itype.getOrthant() == 0) {
 				for (int i = 0; i < n; i++) {
-					interp_view[idx + i] += 2.0 / 6 * sl[i / 2];
+					interp_view[idx + i] += 2.0 / 6 * sl({i / 2});
 				}
 			} else {
 				// middle cases
 				for (int i = 0; i < n; i++) {
-					interp_view[idx + i] += 2.0 / 6 * sl[(n + i) / 2];
+					interp_view[idx + i] += 2.0 / 6 * sl({(n + i) / 2});
 				}
 			}
 		} break;
-        */
 	}
 
 	VecRestoreArray(interp, &interp_view);

@@ -205,11 +205,11 @@ template <size_t D> class CoarseNbrInfo : public NbrInfo<D>
 template <size_t D> class FineNbrInfo : public NbrInfo<D>
 {
 	public:
-	std::array<std::shared_ptr<Domain<D>>, Orthant<D>::num_orthants / 2> ptrs;
-	std::array<int, Orthant<D>::num_orthants / 2>                        ranks;
-	std::array<int, Orthant<D>::num_orthants / 2>                        ids;
-	std::array<int, Orthant<D>::num_orthants / 2>                        global_indexes;
-	std::array<int, Orthant<D>::num_orthants / 2>                        local_indexes;
+	std::array<std::shared_ptr<Domain<D>>, Orthant<D - 1>::num_orthants> ptrs;
+	std::array<int, Orthant<D - 1>::num_orthants>                        ranks;
+	std::array<int, Orthant<D - 1>::num_orthants>                        ids;
+	std::array<int, Orthant<D - 1>::num_orthants>                        global_indexes;
+	std::array<int, Orthant<D - 1>::num_orthants>                        local_indexes;
 	FineNbrInfo()
 	{
 		ptrs.fill(nullptr);
