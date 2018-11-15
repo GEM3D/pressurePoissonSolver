@@ -3,7 +3,7 @@
 #include "DrctIntp.h"
 #include "FFTBlockJacobiSmoother.h"
 #include "MatOp.h"
-#include "MatrixHelper.h"
+#include "MatrixHelper2d.h"
 #include "TriLinIntp.h"
 #include "VCycle.h"
 #include "WCycle.h"
@@ -56,14 +56,12 @@ Helper2d::Helper2d(int n, std::vector<std::shared_ptr<DomainCollection<2>>> dcs,
 	}
 	vector<shared_ptr<Operator>> ops(num_levels);
 	for (int i = 0; i < num_levels; i++) {
-		/*
 		if (op_type == "crs_matrix") {
-		    MatrixHelper mh(*dcs[i]);
-		    ops[i].reset(new MatOp(mh.formCRSMatrix()));
+			MatrixHelper2d mh(*dcs[i]);
+			ops[i].reset(new MatOp(mh.formCRSMatrix()));
 		} else if (op_type == "matrix_free") {
+			ops[i].reset(new WrapOp<2>(helpers[i]));
 		}
-		*/
-		ops[i].reset(new WrapOp<2>(helpers[i]));
 	}
 
 	// generate smoothers

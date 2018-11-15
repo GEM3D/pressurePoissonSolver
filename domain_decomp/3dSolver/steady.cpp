@@ -5,7 +5,7 @@
 #include "Init.h"
 #include "MatrixHelper.h"
 #include "OctTree.h"
-//#include "PatchSolvers/DftPatchSolver.h"
+#include "PatchSolvers/DftPatchSolver.h"
 #include "PatchSolvers/FftwPatchSolver.h"
 #include "PolyChebPrec.h"
 #include "SchurHelper.h"
@@ -264,7 +264,7 @@ int main(int argc, char *argv[])
 	// set the patch solver
 	shared_ptr<PatchSolver<3>> p_solver;
 	if (f_dft) {
-		//	p_solver.reset(new DftPatchSolver(*dc));
+		p_solver.reset(new DftPatchSolver<3>(*dc));
 	} else {
 		p_solver.reset(new FftwPatchSolver<3>(*dc));
 	}

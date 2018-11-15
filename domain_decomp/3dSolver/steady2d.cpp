@@ -8,6 +8,7 @@
 #include "Init.h"
 #include "MatrixHelper2d.h"
 #include "PatchSolvers/FftwPatchSolver.h"
+#include "PatchSolvers/DftPatchSolver.h"
 #include "PatchSolvers/FishpackPatchSolver.h"
 #include "PolyChebPrec.h"
 #include "QuadInterpolator.h"
@@ -137,6 +138,7 @@ int main(int argc, char *argv[])
 	                                    {"muelucuda"});
 #endif
 	args::Flag f_cheb(parser, "", "cheb preconditioner", {"cheb"});
+	args::Flag              f_dft(parser, "", "dft", {"dft"});
 
 	int num_procs;
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
@@ -263,7 +265,9 @@ int main(int argc, char *argv[])
 
 	// set the patch solver
 	shared_ptr<PatchSolver<2>> p_solver;
-	if (f_fish) {
+	if (f_dft) {
+		p_solver.reset(new DftPatchSolver<2>(*dc));
+    }else if (f_fish) {
 		//	p_solver.reset(new FishpackPatchSolver());
 	} else {
 		p_solver.reset(new FftwPatchSolver<2>(*dc));
@@ -288,7 +292,6 @@ int main(int argc, char *argv[])
 		timer.start("Domain Initialization");
 
 		shared_ptr<SchurHelper<2>> sch(new SchurHelper<2>(*dc, p_solver, p_operator, p_interp));
-		// MatrixHelper mh(dc);
 		/*
 		if (f_outim) {
 		    IfaceMatrixHelper imh(dc);
@@ -318,7 +321,6 @@ int main(int argc, char *argv[])
 		PW<Vec>                   diff  = sch->getNewSchurVec();
 		PW<Vec>                   b     = sch->getNewSchurVec();
 		PW<Mat>                   A;
-		shared_ptr<FuncWrap<2>>   w;
 		shared_ptr<GMG::Helper2d> gh;
 
 		// Create linear problem for the Belos solver
@@ -373,8 +375,8 @@ int main(int argc, char *argv[])
 				timer.start("Matrix Formation");
 
 				if (f_noschur) {
-                    MatrixHelper2d mh(*dc);
-								A = mh.formCRSMatrix();
+					MatrixHelper2d mh(*dc);
+					A = mh.formCRSMatrix();
 				} else {
 					//			A = sch->formCRSMatrix();
 				}
