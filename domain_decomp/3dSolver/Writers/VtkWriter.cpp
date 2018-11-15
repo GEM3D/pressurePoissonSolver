@@ -1,7 +1,7 @@
 #include "VtkWriter.h"
 using namespace std;
 vtkSmartPointer<vtkMultiProcessController> VtkWriter::controller;
-VtkWriter::VtkWriter(DomainCollection &dc, string file_name)
+VtkWriter::VtkWriter(DomainCollection<3> &dc, string file_name)
 {
 	if (controller == nullptr) {
 		controller = vtkSmartPointer<vtkMPIController>::New();
@@ -36,21 +36,21 @@ void VtkWriter::add(Vec u, string name)
 
 	for (auto &p : dc.domains) {
 		Domain<3> &d     = *p.second;
-		int     n     = d.n;
-		double  h_x   = d.x_length / n;
-		double  h_y   = d.y_length / n;
-		double  h_z   = d.z_length / n;
-		int     start = d.id_local * n * n * n;
+		int        n     = d.n;
+		double     h_x   = d.lengths[0] / n;
+		double     h_y   = d.lengths[1] / n;
+		double     h_z   = d.lengths[2] / n;
+		int        start = d.id_local * n * n * n;
 
 		// create image object
 		vtkSmartPointer<vtkImageData> image = images[d.id];
 		if (image == nullptr) {
 			image        = vtkSmartPointer<vtkImageData>::New();
 			images[d.id] = image;
-			image->SetOrigin(d.x_start, d.y_start, d.z_start);
+			image->SetOrigin(d.starts[0], d.starts[1], d.starts[2]);
 			image->SetSpacing(h_x, h_y, h_z);
-			image->SetExtent(d.x_start, d.x_start + d.x_length, d.y_start, d.y_start + d.y_length,
-			                 d.z_start, d.z_start + d.z_length);
+			image->SetExtent(d.starts[0], d.starts[0] + d.lengths[0], d.starts[1],
+			                 d.starts[1] + d.lengths[1], d.starts[2], d.starts[2] + d.lengths[2]);
 			image->PrepareForNewData();
 			image->SetDimensions(n + 1, n + 1, n + 1);
 			// add image to dataset

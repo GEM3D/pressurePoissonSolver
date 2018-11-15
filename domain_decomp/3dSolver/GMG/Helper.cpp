@@ -12,7 +12,7 @@
 using namespace std;
 using namespace GMG;
 using nlohmann::json;
-Helper::Helper(int n, OctTree t, std::vector<std::shared_ptr<DomainCollection<3>>> dcs,
+Helper::Helper(int n, Tree<3> t, std::vector<std::shared_ptr<DomainCollection<3>>> dcs,
                std::shared_ptr<SchurHelper<3>> sh, std::string config_file)
 {
 	ifstream config_stream(config_file);
@@ -72,18 +72,18 @@ Helper::Helper(int n, OctTree t, std::vector<std::shared_ptr<DomainCollection<3>
 	}
 
 	// generate inter-level comms, restrictors, interpolators
-	vector<shared_ptr<InterLevelComm>> comms(num_levels - 1);
+	vector<shared_ptr<InterLevelComm<3>>> comms(num_levels - 1);
 	vector<shared_ptr<Restrictor>>     restrictors(num_levels - 1);
 	vector<shared_ptr<Interpolator>>   interpolators(num_levels - 1);
 	for (int i = 0; i < num_levels - 1; i++) {
-		comms[i].reset(new InterLevelComm(dcs[i + 1], dcs[i]));
-		restrictors[i].reset(new AvgRstr(dcs[i + 1], dcs[i], comms[i]));
+		comms[i].reset(new InterLevelComm<3>(dcs[i + 1], dcs[i]));
+		restrictors[i].reset(new AvgRstr<3>(dcs[i + 1], dcs[i], comms[i]));
 	}
 
 	// create  level objects
 	vector<shared_ptr<Level>> levels(num_levels);
 	for (int i = 0; i < num_levels; i++) {
-		std::shared_ptr<DCVG> vg(new DCVG(dcs[i]));
+		std::shared_ptr<DCVG<3>> vg(new DCVG<3>(dcs[i]));
 		levels[i].reset(new Level(vg));
 		levels[i]->setOperator(ops[i]);
 		levels[i]->setSmoother(smoothers[i]);
@@ -102,7 +102,7 @@ Helper::Helper(int n, OctTree t, std::vector<std::shared_ptr<DomainCollection<3>
 	if (interpolator == "constant") {
 		for (int i = 0; i < num_levels - 1; i++) {
 			levels[i + 1]->setInterpolator(
-			shared_ptr<Interpolator>(new DrctIntp(dcs[i + 1], dcs[i], comms[i])));
+			shared_ptr<Interpolator>(new DrctIntp<3>(dcs[i + 1], dcs[i], comms[i])));
 		}
 	} else if (interpolator == "trilinear") {
 		for (int i = 0; i < num_levels - 1; i++) {

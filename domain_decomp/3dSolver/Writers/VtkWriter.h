@@ -16,7 +16,7 @@
 class VtkWriter
 {
 	private:
-	DomainCollection                                  dc;
+	DomainCollection<3>                                  dc;
 	std::string                                       file_name;
 	static vtkSmartPointer<vtkMultiProcessController> controller;
 	std::map<int, vtkSmartPointer<vtkImageData>> images;
@@ -26,7 +26,7 @@ class VtkWriter
 	vtkSmartPointer<vtkMultiPieceDataSet>        data;
 
 	public:
-	VtkWriter(DomainCollection &dc, std::string file_name);
+	VtkWriter(DomainCollection<3> &dc, std::string file_name);
 	void add(Vec u, std::string name);
 	void write();
 };

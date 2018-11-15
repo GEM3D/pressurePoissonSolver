@@ -3,15 +3,15 @@
 #include "SchurHelper.h"
 #include <iostream>
 #include <petscpc.h>
-class FuncWrap
+template <size_t D> class FuncWrap
 {
 	public:
 	PW<Vec>              u;
 	PW<Vec>              f;
-	SchurHelper<3> *     sh = nullptr;
-	DomainCollection<3> *dc = nullptr;
+	SchurHelper<D> *     sh = nullptr;
+	DomainCollection<D> *dc = nullptr;
 	FuncWrap()              = default;
-	FuncWrap(SchurHelper<3> *sh, DomainCollection<3> *dc)
+	FuncWrap(SchurHelper<D> *sh, DomainCollection<D> *dc)
 	{
 		f        = dc->getNewDomainVec();
 		u        = dc->getNewDomainVec();
@@ -25,7 +25,7 @@ class FuncWrap
 		w->sh->solveWithInterface(w->f, w->u, x, y);
 		return 0;
 	}
-	static PW_explicit<Mat> getMatrix(SchurHelper<3> *sh, DomainCollection<3> *dc)
+	static PW_explicit<Mat> getMatrix(SchurHelper<D> *sh, DomainCollection<D> *dc)
 	{
 		PW<Mat>   A;
 		int       M       = sh->getSchurVecGlobalSize();
@@ -36,12 +36,13 @@ class FuncWrap
 		return A;
 	}
 };
+template <size_t D> 
 class FullFuncWrap
 {
 	public:
-	SchurHelper<3> *     sh = nullptr;
-	DomainCollection<3> *dc = nullptr;
-	FullFuncWrap(SchurHelper<3> *sh, DomainCollection<3> *dc)
+	SchurHelper<D> *     sh = nullptr;
+	DomainCollection<D> *dc = nullptr;
+	FullFuncWrap(SchurHelper<D> *sh, DomainCollection<D> *dc)
 	{
 		this->sh = sh;
 		this->dc = dc;
@@ -53,13 +54,13 @@ class FullFuncWrap
 		w->sh->apply(x, y);
 		return 0;
 	}
-	static PW_explicit<Mat> getMatrix(SchurHelper<3> *sh, DomainCollection<3> *dc)
+	static PW_explicit<Mat> getMatrix(SchurHelper<D> *sh, DomainCollection<D> *dc)
 	{
 		PW<Mat>       A;
 		int           M       = dc->getGlobalNumCells();
 		int           m       = dc->getLocalNumCells();
 		FullFuncWrap *wrapper = new FullFuncWrap(sh, dc);
-		MatCreateShell(MPI_COMM_WORLD, m, m, M, M, &wrapper, &A);
+		MatCreateShell(MPI_COMM_WORLD, m, m, M, M, wrapper, &A);
 		MatShellSetOperation(A, MATOP_MULT, (void (*)(void)) multiply);
 		return A;
 	}

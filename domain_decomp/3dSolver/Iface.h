@@ -10,15 +10,22 @@
 template <size_t D> struct Iface {
 	IfaceType                           type;
 	Side<D>                             s;
-	std::array<int, Side<D>::num_sides> ids       = {{-1, -1, -1, -1, -1, -1}};
-	std::array<int, Side<D>::num_sides> local_id  = {{-1, -1, -1, -1, -1, -1}};
-	std::array<int, Side<D>::num_sides> global_id = {{-1, -1, -1, -1, -1, -1}};
+	std::array<int, Side<D>::num_sides> ids;
+	std::array<int, Side<D>::num_sides> local_id;
+	std::array<int, Side<D>::num_sides> global_id;
 	std::bitset<Side<D>::num_sides>     neumann;
-	Iface() = default;
+	Iface()
+	{
+		ids.fill(-1);
+		local_id.fill(-1);
+		global_id.fill(-1);
+	}
 	Iface(std::array<int, Side<D>::num_sides> ids, IfaceType type, Side<D> s,
 	      std::bitset<Side<D>::num_sides> neumann)
 	{
-		this->ids     = ids;
+		this->ids = ids;
+		local_id.fill(-1);
+		global_id.fill(-1);
 		this->type    = type;
 		this->s       = s;
 		this->neumann = neumann;
@@ -54,7 +61,7 @@ template <size_t D> struct IfaceSet : public Serializable {
 	{
 		id_local = rev_map.at(id);
 		for (Iface<D> &iface : ifaces) {
-			for (int i = 0; i < 6; i++) {
+			for (int i = 0; i < Side<D>::num_sides; i++) {
 				if (iface.ids[i] != -1) { iface.local_id[i] = rev_map.at(iface.ids[i]); }
 			}
 		}
@@ -63,7 +70,7 @@ template <size_t D> struct IfaceSet : public Serializable {
 	{
 		id_global = rev_map.at(id_local);
 		for (Iface<D> &iface : ifaces) {
-			for (int i = 0; i < 6; i++) {
+			for (int i = 0; i < Side<D>::num_sides; i++) {
 				if (iface.local_id[i] != -1) { iface.global_id[i] = rev_map.at(iface.local_id[i]); }
 			}
 		}

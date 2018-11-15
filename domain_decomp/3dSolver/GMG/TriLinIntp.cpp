@@ -24,7 +24,7 @@ inline std::array<std::array<Side<3>, 2>, 12> getPairValues()
 	                                                {{Side<3>::north, Side<3>::top}}}});
 }
 TriLinIntp::TriLinIntp(shared_ptr<DomainCollection<3>> coarse_dc,
-                       shared_ptr<DomainCollection<3>> fine_dc, shared_ptr<InterLevelComm> ilc)
+                       shared_ptr<DomainCollection<3>> fine_dc, shared_ptr<InterLevelComm<3>> ilc)
 {
 	this->coarse_dc = coarse_dc;
 	this->fine_dc   = fine_dc;

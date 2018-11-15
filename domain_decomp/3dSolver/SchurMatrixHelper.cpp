@@ -74,30 +74,13 @@ struct Block {
 			if (auxFlipped()) { quad = quad_flip_lookup[quad]; }
 			return quad;
 		};
-		switch (type) {
-			case IfaceType::fine_to_coarse_0:
-			case IfaceType::fine_to_coarse_1:
-			case IfaceType::fine_to_coarse_2:
-			case IfaceType::fine_to_coarse_3: {
-				int quad = (int) type - (int) IfaceType::fine_to_coarse_0;
+		switch (type.toInt()) {
+			case IfaceType::fine_to_coarse:
+			case IfaceType::fine_to_fine:
+			case IfaceType::coarse_to_fine: {
+				int quad = type.getOrthant();
 				quad     = rotateQuad(quad);
-				type     = IfaceType::fine_to_coarse_0 + quad;
-			} break;
-			case IfaceType::fine_to_fine_0:
-			case IfaceType::fine_to_fine_1:
-			case IfaceType::fine_to_fine_2:
-			case IfaceType::fine_to_fine_3: {
-				int quad = (int) type - (int) IfaceType::fine_to_fine_0;
-				quad     = rotateQuad(quad);
-				type     = IfaceType::fine_to_fine_0 + quad;
-			} break;
-			case IfaceType::coarse_to_fine_0:
-			case IfaceType::coarse_to_fine_1:
-			case IfaceType::coarse_to_fine_2:
-			case IfaceType::coarse_to_fine_3: {
-				int quad = (int) type - (int) IfaceType::coarse_to_fine_0;
-				quad     = rotateQuad(quad);
-				type     = IfaceType::coarse_to_fine_0 + quad;
+				type.setOrthant(quad);
 			} break;
 			default:
 				break;
@@ -282,15 +265,12 @@ void SchurMatrixHelper::assembleMatrix(inserter insertBlock)
 					block[i * n * n + j] = -interp_view[i];
 				}
 				if (s == Side<3>::west) {
-					switch (type) {
+					switch (type.toInt()) {
 						case IfaceType::normal:
 							block[n * n * j + j] += 0.5;
 							break;
 						case IfaceType::coarse_to_coarse:
-						case IfaceType::fine_to_fine_0:
-						case IfaceType::fine_to_fine_1:
-						case IfaceType::fine_to_fine_2:
-						case IfaceType::fine_to_fine_3:
+                        case IfaceType::fine_to_fine:
 							block[n * n * j + j] += 1.0;
 							break;
 						default:

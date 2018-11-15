@@ -2,7 +2,7 @@
 #define SEVENPTPATCHOPERATOR_H
 #include "PatchOperator.h"
 #include "Utils.h"
-class SevenPtPatchOperator : public PatchOperator
+class SevenPtPatchOperator : public PatchOperator<3>
 {
 	public:
 	void apply(SchurDomain<3> &d, const Vec u, const Vec gamma, Vec f)

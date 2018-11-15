@@ -9,17 +9,17 @@
 #include <set>
 #include <vector>
 #include <zoltan.h>
-class BalancedLevelsGenerator
+template <size_t D> class BalancedLevelsGenerator
 {
 	private:
-	void extractLevel(const OctTree &t, int level, int n);
+	void extractLevel(const Tree<D> &t, int level, int n);
 	void balanceLevel(int level);
 	void balanceLevelWithLower(int level);
 
 	public:
-	using DomainMap = std::map<int, std::shared_ptr<Domain<3>>>;
+	using DomainMap = std::map<int, std::shared_ptr<Domain<D>>>;
 	std::vector<DomainMap> levels;
-	BalancedLevelsGenerator(const OctTree &t, int n)
+	BalancedLevelsGenerator(const Tree<D> &t, int n)
 	{
 		levels.resize(t.num_levels);
 		for (int i = 1; i <= t.num_levels; i++) {
@@ -35,31 +35,28 @@ class BalancedLevelsGenerator
 	}
 };
 
-inline void BalancedLevelsGenerator::extractLevel(const OctTree &t, int level, int nx)
+template <size_t D>
+inline void BalancedLevelsGenerator<D>::extractLevel(const Tree<D> &t, int level, int nx)
 {
 	int rank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	if (rank == 0) {
-		OctNode         child = *t.levels.at(level);
+		Node<D>         child = *t.levels.at(level);
 		std::deque<int> q;
 		std::set<int>   qed;
 		q.push_back(child.id);
 		qed.insert(child.id);
 
 		while (!q.empty()) {
-			std::shared_ptr<Domain<3>> d_ptr(new Domain<3>());
-			Domain<3> &                d = *d_ptr;
-			OctNode                    n = t.nodes.at(q.front());
+			std::shared_ptr<Domain<D>> d_ptr(new Domain<D>());
+			Domain<D> &                d = *d_ptr;
+			Node<D>                    n = t.nodes.at(q.front());
 			q.pop_front();
 
 			d.n            = nx;
 			d.id           = n.id;
-			d.lengths[0]   = n.x_length;
-			d.lengths[1]   = n.y_length;
-			d.lengths[2]   = n.z_length;
-			d.starts[0]    = n.x_start;
-			d.starts[1]    = n.y_start;
-			d.starts[2]    = n.z_start;
+			d.lengths      = n.lengths;
+			d.starts       = n.starts;
 			d.child_id     = n.child_id;
 			d.refine_level = n.level;
 			if (n.level < level) {
@@ -75,26 +72,26 @@ inline void BalancedLevelsGenerator::extractLevel(const OctTree &t, int level, i
 			}
 
 			// set and enqueue nbrs
-			for (Side<3> s : Side<3>::getValues()) {
+			for (Side<D> s : Side<D>::getValues()) {
 				if (n.nbrId(s) == -1 && n.parent != -1 && t.nodes.at(n.parent).nbrId(s) != -1) {
-					OctNode parent = t.nodes.at(n.parent);
-					OctNode nbr    = t.nodes.at(parent.nbrId(s));
-					auto    octs   = Orthant<3>::getValuesOnSide(s);
+					Node<D> parent = t.nodes.at(n.parent);
+					Node<D> nbr    = t.nodes.at(parent.nbrId(s));
+					auto    octs   = Orthant<D>::getValuesOnSide(s);
 					int     quad   = 0;
 					while (parent.childId(octs[quad]) != n.id) {
 						quad++;
 					}
-					d.getNbrInfoPtr(s) = new CoarseNbrInfo<3>(nbr.id, quad);
+					d.getNbrInfoPtr(s) = new CoarseNbrInfo<D>(nbr.id, quad);
 					if (!qed.count(nbr.id)) {
 						q.push_back(nbr.id);
 						qed.insert(nbr.id);
 					}
 				} else if (n.level < level && n.nbrId(s) != -1
 				           && t.nodes.at(n.nbrId(s)).hasChildren()) {
-					OctNode            nbr  = t.nodes.at(n.nbrId(s));
-					auto               octs = Orthant<3>::getValuesOnSide(s.opposite());
-					std::array<int, 4> nbr_ids;
-					for (int i = 0; i < 4; i++) {
+					Node<D>            nbr  = t.nodes.at(n.nbrId(s));
+					auto               octs = Orthant<D>::getValuesOnSide(s.opposite());
+					std::array<int, Orthant<D>::num_orthants/2> nbr_ids;
+					for (size_t i = 0; i < Orthant<D>::num_orthants/2; i++) {
 						int id     = nbr.childId(octs[i]);
 						nbr_ids[i] = id;
 						if (!qed.count(id)) {
@@ -102,14 +99,14 @@ inline void BalancedLevelsGenerator::extractLevel(const OctTree &t, int level, i
 							qed.insert(id);
 						}
 					}
-					d.getNbrInfoPtr(s) = new FineNbrInfo<3>(nbr_ids);
+					d.getNbrInfoPtr(s) = new FineNbrInfo<D>(nbr_ids);
 				} else if (n.nbrId(s) != -1) {
 					int id = n.nbrId(s);
 					if (!qed.count(id)) {
 						q.push_back(id);
 						qed.insert(id);
 					}
-					d.getNbrInfoPtr(s) = new NormalNbrInfo<3>(id);
+					d.getNbrInfoPtr(s) = new NormalNbrInfo<D>(id);
 				}
 			}
 			levels[level - 1][d.id] = d_ptr;
@@ -119,7 +116,7 @@ inline void BalancedLevelsGenerator::extractLevel(const OctTree &t, int level, i
 		p.second->setPtrs(levels[level - 1]);
 	}
 }
-inline void BalancedLevelsGenerator::balanceLevel(int level)
+template <size_t D> inline void BalancedLevelsGenerator<D>::balanceLevel(int level)
 {
 	struct Zoltan_Struct *zz = Zoltan_Create(MPI_COMM_WORLD);
 
@@ -163,10 +160,10 @@ inline void BalancedLevelsGenerator::balanceLevel(int level)
 	};
 	CompressedVertex graph;
 	for (auto &p : levels[level - 1]) {
-		Domain<3> &d = *p.second;
+		Domain<D> &d = *p.second;
 		graph.vertices.push_back(d.id);
 		graph.ptrs.push_back(graph.edges.size());
-		for (Side<3> s : Side<3>::getValues()) {
+		for (Side<D> s : Side<D>::getValues()) {
 			int edge_id = -1;
 			if (d.hasNbr(s)) {
 				switch (d.getNbrType(s)) {
@@ -185,7 +182,7 @@ inline void BalancedLevelsGenerator::balanceLevel(int level)
 						break;
 				}
 			}
-			graph.edges.push_back(edge_id * 6 + s.toInt());
+			graph.edges.push_back(edge_id * Side<D>::num_sides + s.toInt());
 		}
 	}
 
@@ -234,7 +231,7 @@ inline void BalancedLevelsGenerator::balanceLevel(int level)
 	[](void *data, int num_gid_entries, ZOLTAN_ID_PTR global_id, int size, char *buf, int *ierr) {
 		DomainMap &map = *(DomainMap *) data;
 		*ierr          = ZOLTAN_OK;
-		map[*global_id].reset(new Domain<3>());
+		map[*global_id].reset(new Domain<D>());
 		map[*global_id]->deserialize(buf);
 	},
 	&levels[level - 1]);
@@ -307,7 +304,7 @@ inline void BalancedLevelsGenerator::balanceLevel(int level)
 		p.second->setPtrs(levels[level - 1]);
 	}
 }
-inline void BalancedLevelsGenerator::balanceLevelWithLower(int level)
+template <size_t D> inline void BalancedLevelsGenerator<D>::balanceLevelWithLower(int level)
 {
 	struct Zoltan_Struct *zz = Zoltan_Create(MPI_COMM_WORLD);
 
@@ -366,11 +363,11 @@ inline void BalancedLevelsGenerator::balanceLevelWithLower(int level)
 	CompressedVertex graph;
 	// process coarse level
 	for (auto &p : this->levels[level - 1]) {
-		Domain<3> &d = *p.second;
+		Domain<D> &d = *p.second;
 		graph.vertices.push_back(d.id);
 		graph.ptrs.push_back(graph.edges.size());
 		// patch to patch communication
-		for (Side<3> s : Side<3>::getValues()) {
+		for (Side<D> s : Side<D>::getValues()) {
 			int edge_id = -1;
 			if (d.hasNbr(s)) {
 				switch (d.getNbrType(s)) {
@@ -389,14 +386,14 @@ inline void BalancedLevelsGenerator::balanceLevelWithLower(int level)
 						break;
 				}
 			}
-			graph.edges.push_back(edge_id * 6 + s.toInt());
+			graph.edges.push_back(edge_id * Side<D>::num_sides + s.toInt());
 		}
 		// level to level communication
 		graph.edges.push_back(-d.id - 1);
 	}
 	// process fine level
 	for (auto &p : this->levels[level]) {
-		Domain<3> &d = *p.second;
+		Domain<D> &d = *p.second;
 		graph.vertices.push_back(d.id);
 		graph.ptrs.push_back(graph.edges.size());
 		graph.edges.push_back(-d.parent_id - 1);
@@ -474,7 +471,7 @@ inline void BalancedLevelsGenerator::balanceLevelWithLower(int level)
 	[](void *data, int num_gid_entries, ZOLTAN_ID_PTR global_id, int size, char *buf, int *ierr) {
 		Levels *levels = (Levels *) data;
 		*ierr          = ZOLTAN_OK;
-		(*levels->upper)[*global_id].reset(new Domain<3>());
+		(*levels->upper)[*global_id].reset(new Domain<D>());
 		(*levels->upper)[*global_id]->deserialize(buf);
 	},
 	&levels);

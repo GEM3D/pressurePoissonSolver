@@ -100,10 +100,10 @@ link_directories("${Zoltan_DIR}/lib")
 # file(s) to use to build the executable.
 #
 add_executable(steady steady.cpp)
+add_executable(steady2d steady2d.cpp)
 add_library(SchurHelper SchurMatrixHelper.cpp)
 add_library(MatrixHelper MatrixHelper.cpp)
-add_library(DomainCollection OctTree.cpp)
-add_library(Interpolators TriLinInterp.cpp)
+add_library(Interpolators TriLinInterp.cpp BilinearInterpolator.cpp)
 add_library(Init Init.cpp)
 add_library(PBMatrix PBMatrix.cpp)
 add_library(PolyPrecs PolyChebPrec.cpp)
@@ -116,11 +116,9 @@ add_library(PolyPrecs PolyChebPrec.cpp)
 #
 target_link_libraries(steady
     SchurHelper
-    DomainCollection
     Init
     MatrixHelper
     GMG
-    FftwPatchSolver
     Interpolators
     MMWriter
     ClawWriter
@@ -128,6 +126,23 @@ target_link_libraries(steady
     PolyPrecs
   ${MPI_CXX_LIBRARIES} 
   ${PETSC_LIBRARIES} 
+  ${FFTW_LIBRARIES} 
+    ${Zoltan_LIBRARIES}
+)
+target_link_libraries(steady2d
+    SchurHelper
+    Init
+    MatrixHelper
+    GMG
+    Interpolators
+    MMWriter
+    ClawWriter
+    PBMatrix
+    PolyPrecs
+  ${MPI_CXX_LIBRARIES} 
+  ${PETSC_LIBRARIES} 
+  ${FFTW_LIBRARIES} 
+    ${Zoltan_LIBRARIES}
 )
 if(ENABLE_MUELU)
     find_library(MUELU_LIB MueLuWrapper)
@@ -147,6 +162,7 @@ endif()
 
 if(VTK_FOUND)
     target_link_libraries(steady VtkWriter)
+    target_link_libraries(steady2d VtkWriter)
 endif(VTK_FOUND)
 if(AMGX_FOUND)
 add_library(AmgxWrapper AmgxWrapper.cpp)
@@ -155,9 +171,6 @@ target_link_libraries(AmgxWrapper
    ${AMGX_LIBRARIES}
 )
 endif()
-target_link_libraries(DomainCollection 
-    ${Zoltan_LIBRARIES}
-)
 
 add_subdirectory(PatchSolvers)
 add_subdirectory(Writers)

@@ -5,7 +5,7 @@
 #include "Init.h"
 #include "MatrixHelper.h"
 #include "OctTree.h"
-#include "PatchSolvers/DftPatchSolver.h"
+//#include "PatchSolvers/DftPatchSolver.h"
 #include "PatchSolvers/FftwPatchSolver.h"
 #include "PolyChebPrec.h"
 #include "SchurHelper.h"
@@ -186,17 +186,17 @@ int main(int argc, char *argv[])
 	// Create Mesh
 	///////////////
 	shared_ptr<DomainCollection<3>> dc;
-	OctTree                         t;
+	Tree<3>                         t;
 	if (f_mesh) {
 		string d = args::get(f_mesh);
-		t        = OctTree(d);
+		t        = Tree<3>(d);
 	}
 	if (f_div) {
 		for (int i = 0; i < args::get(f_div); i++) {
 			t.refineLeaves();
 		}
 	}
-	BalancedLevelsGenerator blg(t, n);
+	BalancedLevelsGenerator<3> blg(t, n);
 
 	// partition domains if running in parallel
 	if (num_procs > 1) { blg.zoltanBalance(); }
@@ -262,18 +262,18 @@ int main(int argc, char *argv[])
 	}
 
 	// set the patch solver
-	shared_ptr<PatchSolver> p_solver;
+	shared_ptr<PatchSolver<3>> p_solver;
 	if (f_dft) {
-		p_solver.reset(new DftPatchSolver(*dc));
+		//	p_solver.reset(new DftPatchSolver(*dc));
 	} else {
-		p_solver.reset(new FftwPatchSolver(*dc));
+		p_solver.reset(new FftwPatchSolver<3>(*dc));
 	}
 
 	// patch operator
-	shared_ptr<PatchOperator> p_operator(new SevenPtPatchOperator());
+	shared_ptr<PatchOperator<3>> p_operator(new SevenPtPatchOperator());
 
 	// interface interpolator
-	shared_ptr<Interpolator> p_interp(new TriLinInterp());
+	shared_ptr<Interpolator<3>> p_interp(new TriLinInterp());
 
 #ifdef ENABLE_AMGX
 	AmgxWrapper *amgxsolver = nullptr;
@@ -285,7 +285,7 @@ int main(int argc, char *argv[])
 		timer.start("Domain Initialization");
 
 		shared_ptr<SchurHelper<3>> sch(new SchurHelper<3>(*dc, p_solver, p_operator, p_interp));
-		MatrixHelper            mh(*dc);
+		MatrixHelper               mh(*dc);
 
 		PW<Vec> u     = dc->getNewDomainVec();
 		PW<Vec> exact = dc->getNewDomainVec();
@@ -304,7 +304,7 @@ int main(int argc, char *argv[])
 		PW<Vec>                 diff  = sch->getNewSchurVec();
 		PW<Vec>                 b     = sch->getNewSchurVec();
 		PW<Mat>                 A;
-		shared_ptr<FuncWrap>    w;
+		shared_ptr<FuncWrap<3>> w;
 		shared_ptr<SchwarzPrec> sp;
 		shared_ptr<GMG::Helper> gh;
 
@@ -344,9 +344,9 @@ int main(int argc, char *argv[])
 
 			if (f_wrapper) {
 				if (f_noschur) {
-					A = FullFuncWrap::getMatrix(sch.get(), dc.get());
+					A = FullFuncWrap<3>::getMatrix(sch.get(), dc.get());
 				} else {
-					A = FuncWrap::getMatrix(sch.get(), dc.get());
+					A = FuncWrap<3>::getMatrix(sch.get(), dc.get());
 				}
 			} else {
 				timer.start("Matrix Formation");

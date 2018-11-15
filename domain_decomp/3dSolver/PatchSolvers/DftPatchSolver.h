@@ -9,21 +9,19 @@
 enum class DftType { DCT_II, DCT_III, DCT_IV, DST_II, DST_III, DST_IV };
 #ifndef DOMAINK
 #define DOMAINK
-struct DomainK {
+template <size_t D> struct DomainK {
 	ulong  neumann = 0;
 	double h_x     = 0;
-	double h_y     = 0;
 
 	DomainK() {}
-	DomainK(const SchurDomain<3> &d)
+	DomainK(const SchurDomain<D> &d)
 	{
 		this->neumann = d.neumann.to_ulong();
 		this->h_x     = d.domain.lengths[0];
-		this->h_y     = d.domain.lengths[1];
 	}
 	friend bool operator<(const DomainK &l, const DomainK &r)
 	{
-		return std::tie(l.neumann, l.h_x, l.h_y) < std::tie(r.neumann, r.h_x, r.h_y);
+		return std::tie(l.neumann, l.h_x) < std::tie(r.neumann, r.h_x);
 	}
 };
 #endif

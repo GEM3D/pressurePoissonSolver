@@ -89,8 +89,10 @@ template <size_t D> class CoarseIfaceInfo : public IfaceInfo<D>
 	{
 		ids.push_back(this->id);
 		ids.push_back(coarse_id);
-		types.push_back(IfaceType::fine_to_fine_0 + quad_on_coarse);
-		types.push_back(IfaceType::fine_to_coarse_0 + quad_on_coarse);
+		IfaceType fine_type(IfaceType::fine_to_fine, quad_on_coarse);
+		IfaceType coarse_type(IfaceType::fine_to_coarse, quad_on_coarse);
+		types.push_back(fine_type);
+		types.push_back(coarse_type);
 		sides.push_back(s);
 		sides.push_back(s);
 		ranks.push_back(nbr_info.rank);
@@ -102,8 +104,10 @@ template <size_t D> class CoarseIfaceInfo : public IfaceInfo<D>
 	{
 		idx.push_back(this->local_index);
 		idx.push_back(coarse_local_index);
-		types.push_back(IfaceType::fine_to_fine_0 + quad_on_coarse);
-		types.push_back(IfaceType::fine_to_coarse_0 + quad_on_coarse);
+		IfaceType fine_type(IfaceType::fine_to_fine, quad_on_coarse);
+		IfaceType coarse_type(IfaceType::fine_to_coarse, quad_on_coarse);
+		types.push_back(fine_type);
+		types.push_back(coarse_type);
 	}
 	void getIds(std::vector<int> &ids)
 	{
@@ -147,7 +151,8 @@ template <size_t D> class FineIfaceInfo : public IfaceInfo<D>
 		own.push_back(true);
 		for (size_t i = 0; i < fine_ids.size(); i++) {
 			ids.push_back(fine_ids[i]);
-			types.push_back(IfaceType::coarse_to_fine_0 + i);
+			IfaceType type(IfaceType::coarse_to_fine, i);
+			types.push_back(type);
 			sides.push_back(s);
 			ranks.push_back(nbr_info.ranks[i]);
 			own.push_back(nbr_info.ptrs[i] != nullptr);
@@ -159,7 +164,8 @@ template <size_t D> class FineIfaceInfo : public IfaceInfo<D>
 		types.push_back(IfaceType::coarse_to_coarse);
 		for (size_t i = 0; i < fine_local_indexes.size(); i++) {
 			idx.push_back(fine_local_indexes[i]);
-			types.push_back(IfaceType::coarse_to_fine_0 + i);
+			IfaceType type(IfaceType::coarse_to_fine, i);
+			types.push_back(type);
 		}
 	}
 	void getIds(std::vector<int> &ids)
@@ -189,12 +195,12 @@ template <size_t D> struct SchurDomain {
 	int                                            local_index = 0;
 	int                                            n;
 	std::bitset<Side<D>::num_sides>                neumann;
-	std::array<IfaceInfo<D> *, Side<D>::num_sides> iface_info
-	= {{nullptr, nullptr, nullptr, nullptr, nullptr, nullptr}};
-	std::vector<int> nbr_ids;
+	std::array<IfaceInfo<D> *, Side<D>::num_sides> iface_info;
+	std::vector<int>                               nbr_ids;
 	SchurDomain() = default;
 	SchurDomain(Domain<D> &d)
 	{
+		iface_info.fill(nullptr);
 		domain      = d;
 		local_index = d.id_local;
 		n           = d.n;
@@ -232,7 +238,7 @@ template <size_t D> struct SchurDomain {
 	void enumerateIfaces(std::map<int, IfaceSet<D>> &                ifaces,
 	                     std::map<int, std::pair<int, IfaceSet<D>>> &off_proc_ifaces)
 	{
-		std::array<int, 6> ids;
+		std::array<int, Side<D>::num_sides> ids;
 		for (Side<D> s : Side<D>::getValues()) {
 			if (hasNbr(s)) {
 				ids[s.toInt()] = getIfaceInfoPtr(s)->id;

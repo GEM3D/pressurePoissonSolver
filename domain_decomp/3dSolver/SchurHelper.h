@@ -20,8 +20,7 @@
  *   - Provide member functions for calculating error, residual, etc.
  *   - Provide member functions that generate the Schur complement matrix.
  */
-template <size_t D> 
-class SchurHelper
+template <size_t D> class SchurHelper
 {
 	private:
 	int n;
@@ -34,20 +33,20 @@ class SchurHelper
 	/**
 	 * @brief Interpolates to interface values
 	 */
-	std::shared_ptr<Interpolator> interpolator;
+	std::shared_ptr<Interpolator<D>> interpolator;
 
 	/**
 	 * @brief The patch operator
 	 */
-	std::shared_ptr<PatchOperator> op;
+	std::shared_ptr<PatchOperator<D>> op;
 
 	/**
 	 * @brief The patch solver
 	 */
-	std::shared_ptr<PatchSolver> solver;
+	std::shared_ptr<PatchSolver<D>> solver;
 
 	std::deque<SchurDomain<D>> domains;
-	std::map<int, IfaceSet<D>>    ifaces;
+	std::map<int, IfaceSet<D>> ifaces;
 
 	std::vector<int> iface_dist_map_vec;
 	std::vector<int> iface_map_vec;
@@ -66,8 +65,9 @@ class SchurHelper
 	 * @param dc the DomainCollection
 	 * @param comm the teuchos communicator
 	 */
-	SchurHelper(DomainCollection<D> dc, std::shared_ptr<PatchSolver> solver,
-	            std::shared_ptr<PatchOperator> op, std::shared_ptr<Interpolator> interpolator);
+	SchurHelper(DomainCollection<D> dc, std::shared_ptr<PatchSolver<D>> solver,
+	            std::shared_ptr<PatchOperator<D>> op,
+	            std::shared_ptr<Interpolator<D>>  interpolator);
 
 	/**
 	 * @brief Solve with a given set of interface values
@@ -114,15 +114,15 @@ class SchurHelper
 		return num_global_ifaces * n * n;
 	}
 	// getters
-	std::shared_ptr<Interpolator> getInterpolator()
+	std::shared_ptr<Interpolator<D>> getInterpolator()
 	{
 		return interpolator;
 	}
-	std::shared_ptr<PatchOperator> getOp()
+	std::shared_ptr<PatchOperator<D>> getOp()
 	{
 		return op;
 	}
-	std::shared_ptr<PatchSolver> getSolver()
+	std::shared_ptr<PatchSolver<D>> getSolver()
 	{
 		return solver;
 	}
@@ -135,10 +135,10 @@ class SchurHelper
 		return n;
 	}
 };
-template <size_t D> 
-inline SchurHelper<D>::SchurHelper(DomainCollection<D> dc, std::shared_ptr<PatchSolver> solver,
-                                std::shared_ptr<PatchOperator> op,
-                                std::shared_ptr<Interpolator>  interpolator)
+template <size_t D>
+inline SchurHelper<D>::SchurHelper(DomainCollection<D> dc, std::shared_ptr<PatchSolver<D>> solver,
+                                   std::shared_ptr<PatchOperator<D>> op,
+                                   std::shared_ptr<Interpolator<D>>  interpolator)
 {
 	this->n = dc.getN();
 	for (auto &p : dc.domains) {
@@ -220,7 +220,7 @@ inline SchurHelper<D>::SchurHelper(DomainCollection<D> dc, std::shared_ptr<Patch
 	int num_ifaces = ifaces.size();
 	MPI_Allreduce(&num_ifaces, &num_global_ifaces, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 }
-template <size_t D> 
+template <size_t D>
 inline void SchurHelper<D>::solveWithInterface(const Vec f, Vec u, const Vec gamma, Vec diff)
 {
 	// initilize our local variables
@@ -240,9 +240,9 @@ inline void SchurHelper<D>::solveWithInterface(const Vec f, Vec u, const Vec gam
 	VecScatterEnd(scatter, local_interp, diff, ADD_VALUES, SCATTER_REVERSE);
 	VecAXPBY(diff, 1.0, -1.0, gamma);
 }
-template <size_t D> 
+template <size_t D>
 inline void SchurHelper<D>::solveAndInterpolateWithInterface(const Vec f, Vec u, const Vec gamma,
-                                                          Vec interp)
+                                                             Vec interp)
 {
 	// initilize our local variables
 	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
@@ -260,8 +260,7 @@ inline void SchurHelper<D>::solveAndInterpolateWithInterface(const Vec f, Vec u,
 	VecScatterBegin(scatter, local_interp, interp, ADD_VALUES, SCATTER_REVERSE);
 	VecScatterEnd(scatter, local_interp, interp, ADD_VALUES, SCATTER_REVERSE);
 }
-template <size_t D> 
-inline void SchurHelper<D>::solveWithSolution(const Vec f, Vec u)
+template <size_t D> inline void SchurHelper<D>::solveWithSolution(const Vec f, Vec u)
 {
 	// initilize our local variables
 	VecScale(local_gamma, 0);
@@ -278,7 +277,7 @@ inline void SchurHelper<D>::solveWithSolution(const Vec f, Vec u)
 	// solve over domains on this proc
 	solver->domainSolve(domains, f, u, local_gamma);
 }
-template <size_t D> 
+template <size_t D>
 inline void SchurHelper<D>::interpolateToInterface(const Vec f, Vec u, Vec gamma)
 {
 	// initilize our local variables
@@ -290,7 +289,7 @@ inline void SchurHelper<D>::interpolateToInterface(const Vec f, Vec u, Vec gamma
 	VecScatterBegin(scatter, local_interp, gamma, ADD_VALUES, SCATTER_REVERSE);
 	VecScatterEnd(scatter, local_interp, gamma, ADD_VALUES, SCATTER_REVERSE);
 }
-template <size_t D> 
+template <size_t D>
 inline void SchurHelper<D>::applyWithInterface(const Vec u, const Vec gamma, Vec f)
 {
 	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
@@ -299,8 +298,7 @@ inline void SchurHelper<D>::applyWithInterface(const Vec u, const Vec gamma, Vec
 		op->apply(sd, u, local_gamma, f);
 	}
 }
-template <size_t D> 
-inline void SchurHelper<D>::apply(const Vec u, Vec f)
+template <size_t D> inline void SchurHelper<D>::apply(const Vec u, Vec f)
 {
 	VecScale(local_interp, 0);
 	for (SchurDomain<D> &sd : domains) {
@@ -316,8 +314,7 @@ inline void SchurHelper<D>::apply(const Vec u, Vec f)
 		op->apply(sd, u, local_gamma, f);
 	}
 }
-template <size_t D> 
-inline void SchurHelper<D>::indexDomainIfacesLocal()
+template <size_t D> inline void SchurHelper<D>::indexDomainIfacesLocal()
 {
 	using namespace std;
 	vector<int>   map_vec;
@@ -339,8 +336,7 @@ inline void SchurHelper<D>::indexDomainIfacesLocal()
 	}
 	iface_dist_map_vec = map_vec;
 }
-template <size_t D> 
-inline void SchurHelper<D>::indexIfacesLocal()
+template <size_t D> inline void SchurHelper<D>::indexIfacesLocal()
 {
 	using namespace std;
 	int           curr_i = 0;
@@ -364,7 +360,7 @@ inline void SchurHelper<D>::indexIfacesLocal()
 				queue.pop_front();
 				map_vec.push_back(i);
 				IfaceSet<D> &ifs = ifaces.at(i);
-				rev_map[i]    = curr_i;
+				rev_map[i]       = curr_i;
 				curr_i++;
 				for (int nbr : ifs.getNbrs()) {
 					if (!enqueued.count(nbr)) {
@@ -392,8 +388,7 @@ inline void SchurHelper<D>::indexIfacesLocal()
 	iface_off_proc_map_vec = off_proc_map_vec;
 	indexIfacesGlobal();
 }
-template <size_t D> 
-inline void SchurHelper<D>::indexIfacesGlobal()
+template <size_t D> inline void SchurHelper<D>::indexIfacesGlobal()
 {
 	using namespace std;
 	// global indices are going to be sequentially increasing with rank

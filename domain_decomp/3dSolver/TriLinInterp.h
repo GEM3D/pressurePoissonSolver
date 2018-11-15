@@ -1,7 +1,7 @@
 #ifndef TRILININTERP_H
 #define TRILININTERP_H
 #include "Interpolator.h"
-class TriLinInterp : public Interpolator
+class TriLinInterp : public Interpolator<3>
 {
 	public:
 	void interpolate(SchurDomain<3> &d, const Vec u, Vec interp);

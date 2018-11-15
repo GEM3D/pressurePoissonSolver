@@ -228,3 +228,145 @@ void Init::initDirichlet(DomainCollection<3> &dc, int n, Vec f, Vec exact,
 	VecRestoreArray(f, &f_ptr);
 	VecRestoreArray(exact, &exact_ptr);
 }
+void Init::initNeumann2d(DomainCollection<2> &dc, int n, Vec f, Vec exact,
+                         function<double(double, double)> ffun,
+                         function<double(double, double)> efun,
+                         function<double(double, double)> nfunx,
+                         function<double(double, double)> nfuny)
+{
+	n = dc.getN();
+	double *f_ptr;
+	VecGetArray(f, &f_ptr);
+	double *exact_ptr;
+	VecGetArray(exact, &exact_ptr);
+	for (auto &p : dc.domains) {
+		Domain<2> &d = *p.second;
+
+		double *f_vals     = f_ptr + d.id_local * n * n;
+		double *exact_vals = exact_ptr + d.id_local * n * n;
+
+		// Generate RHS vector
+		double h_x = d.lengths[0] / n;
+		double h_y = d.lengths[1] / n;
+		for (int yi = 0; yi < n; yi++) {
+			for (int xi = 0; xi < n; xi++) {
+				double x                = d.starts[0] + h_x / 2.0 + d.lengths[0] * xi / n;
+				double y                = d.starts[1] + h_y / 2.0 + d.lengths[1] * yi / n;
+				f_vals[yi * n + xi]     = ffun(x, y);
+				exact_vals[yi * n + xi] = efun(x, y);
+			}
+		}
+		// apply boundaries
+		// west
+		if (!d.hasNbr(Side<2>::west)) {
+			for (int yi = 0; yi < n; yi++) {
+				double y = d.starts[1] + h_y / 2.0 + d.lengths[1] * yi / n;
+				f_vals[yi * n] += nfunx(d.starts[0], y) / h_x;
+			}
+		}
+		// east
+		if (!d.hasNbr(Side<2>::east)) {
+			for (int yi = 0; yi < n; yi++) {
+				double y = d.starts[1] + h_y / 2.0 + d.lengths[1] * yi / n;
+				f_vals[yi * n + n - 1] -= nfunx(d.starts[0] + d.lengths[0], y) / h_x;
+			}
+		}
+		// south
+		if (!d.hasNbr(Side<2>::south)) {
+			for (int xi = 0; xi < n; xi++) {
+				double x = d.starts[0] + h_x / 2.0 + d.lengths[0] * xi / n;
+				f_vals[xi] += nfuny(x, d.starts[1]) / h_y;
+			}
+		}
+		// north
+		if (!d.hasNbr(Side<2>::north)) {
+			for (int xi = 0; xi < n; xi++) {
+				double x = d.starts[0] + h_x / 2.0 + d.lengths[0] * xi / n;
+				f_vals[n * (n - 1) + xi] -= nfuny(x, d.starts[1] + d.lengths[1]) / h_y;
+			}
+		}
+	}
+	VecRestoreArray(f, &f_ptr);
+	VecRestoreArray(exact, &exact_ptr);
+}
+void Init::initDirichlet2d(DomainCollection<2> &dc, int n, Vec f, Vec exact,
+                           function<double(double, double)> ffun,
+                           function<double(double, double)> efun)
+{
+	n = dc.getN();
+	double *f_ptr;
+	VecGetArray(f, &f_ptr);
+	double *exact_ptr;
+	VecGetArray(exact, &exact_ptr);
+	for (auto &p : dc.domains) {
+		Domain<2> &d = *p.second;
+
+		double *f_vals     = f_ptr + d.id_local * n * n;
+		double *exact_vals = exact_ptr + d.id_local * n * n;
+		// Generate RHS vector
+		double h_x = d.lengths[0] / n;
+		double h_y = d.lengths[1] / n;
+		for (int yi = 0; yi < n; yi++) {
+			for (int xi = 0; xi < n; xi++) {
+				double x                = d.starts[0] + h_x / 2.0 + d.lengths[0] * xi / n;
+				double y                = d.starts[1] + h_y / 2.0 + d.lengths[1] * yi / n;
+				f_vals[yi * n + xi]     = ffun(x, y);
+				exact_vals[yi * n + xi] = efun(x, y);
+			}
+		}
+		// apply boundaries
+		// west
+		if (!d.hasNbr(Side<2>::west)) {
+			for (int yi = 0; yi < n; yi++) {
+				double y = d.starts[1] + h_y / 2.0 + d.lengths[1] * yi / n;
+				f_vals[yi * n] -= efun(d.starts[0], y) * 2 / (h_x * h_x);
+			}
+		}
+		// east
+		if (!d.hasNbr(Side<2>::east)) {
+			for (int yi = 0; yi < n; yi++) {
+				double y = d.starts[1] + h_y / 2.0 + d.lengths[1] * yi / n;
+				f_vals[yi * n + n - 1] -= efun(d.starts[0] + d.lengths[0], y) * 2 / (h_x * h_x);
+			}
+		}
+		// south
+		if (!d.hasNbr(Side<2>::south)) {
+			for (int xi = 0; xi < n; xi++) {
+				double x = d.starts[0] + h_x / 2.0 + d.lengths[0] * xi / n;
+				f_vals[xi] -= efun(x, d.starts[1]) * 2 / (h_y * h_y);
+			}
+		}
+		// north
+		if (!d.hasNbr(Side<2>::north)) {
+			for (int xi = 0; xi < n; xi++) {
+				double x = d.starts[0] + h_x / 2.0 + d.lengths[0] * xi / n;
+				f_vals[n * (n - 1) + xi] -= efun(x, d.starts[1] + d.lengths[1]) * 2 / (h_y * h_y);
+			}
+		}
+	}
+	VecRestoreArray(f, &f_ptr);
+	VecRestoreArray(exact, &exact_ptr);
+}
+void Init::fillSolution2d(DomainCollection<2> &dc, Vec u,
+                          function<double(double, double, double)> fun, double time)
+{
+	double *vec;
+	VecGetArray(u, &vec);
+	int n = dc.getN();
+	for (auto &p : dc.domains) {
+		Domain<2> &d = *p.second;
+
+		double *f = vec + d.id_local * n * n;
+
+		double h_x = d.lengths[0] / n;
+		double h_y = d.lengths[1] / n;
+		for (int yi = 0; yi < n; yi++) {
+			for (int xi = 0; xi < n; xi++) {
+				double x       = d.starts[0] + h_x / 2.0 + d.lengths[0] * xi / n;
+				double y       = d.starts[1] + h_y / 2.0 + d.lengths[1] * yi / n;
+				f[yi * n + xi] = fun(x, y, time);
+			}
+		}
+	}
+	VecRestoreArray(u, &vec);
+}

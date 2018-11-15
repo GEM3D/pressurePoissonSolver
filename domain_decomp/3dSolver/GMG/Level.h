@@ -13,13 +13,13 @@ class VectorGenerator
 	public:
 	virtual PW<Vec> getNewVector() = 0;
 };
-class DCVG : public VectorGenerator
+template <size_t D> class DCVG : public VectorGenerator
 {
 	private:
-	std::shared_ptr<DomainCollection<3>> dc;
+	std::shared_ptr<DomainCollection<D>> dc;
 
 	public:
-	DCVG(std::shared_ptr<DomainCollection<3>> dc)
+	DCVG(std::shared_ptr<DomainCollection<D>> dc)
 	{
 		this->dc = dc;
 	}
@@ -69,9 +69,10 @@ class Level
 	 *
 	 * @param dc pointer to the DomainCollection for this level
 	 */
-	Level(std::shared_ptr<VectorGenerator> vg) {
-        this->vg = vg;
-    }
+	Level(std::shared_ptr<VectorGenerator> vg)
+	{
+		this->vg = vg;
+	}
 	/**
 	 * @brief Set the restriction operator for restricting from this level to the coarser level.
 	 *

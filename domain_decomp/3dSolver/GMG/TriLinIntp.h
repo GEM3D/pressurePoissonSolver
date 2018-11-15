@@ -24,7 +24,7 @@ class TriLinIntp : public Interpolator
 	/**
 	 * @brief The comm package between the levels.
 	 */
-	std::shared_ptr<InterLevelComm> ilc;
+	std::shared_ptr<InterLevelComm<3>> ilc;
 
 	public:
 	/**
@@ -35,7 +35,8 @@ class TriLinIntp : public Interpolator
 	 * @param ilc the comm package between the levels.
 	 */
 	TriLinIntp(std::shared_ptr<DomainCollection<3>> coarse_dc,
-	           std::shared_ptr<DomainCollection<3>> fine_dc, std::shared_ptr<InterLevelComm> ilc);
+	           std::shared_ptr<DomainCollection<3>> fine_dc,
+	           std::shared_ptr<InterLevelComm<3>>   ilc);
 	/**
 	 * @brief Interpolate from the finer level to the coarser level.
 	 *
