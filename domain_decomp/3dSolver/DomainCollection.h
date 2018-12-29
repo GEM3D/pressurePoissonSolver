@@ -198,7 +198,7 @@ template <size_t D> class DomainCollection
 		for (auto &p : domains) {
 			Domain<D> &d = *p.second;
 			sum
-			+= std::accumulate(d.lengths.begin(), d.lengths.end(), 1, std::multiplies<double>());
+			+= std::accumulate(d.lengths.begin(), d.lengths.end(), 1.0, std::multiplies<double>());
 		}
 		double retval;
 		MPI_Allreduce(&sum, &retval, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
@@ -220,7 +220,7 @@ template <size_t D> class DomainCollection
 			}
 
 			patch_sum
-			*= std::accumulate(d.lengths.begin(), d.lengths.end(), 1, std::multiplies<double>())
+			*= std::accumulate(d.lengths.begin(), d.lengths.end(), 1.0, std::multiplies<double>())
 			   / std::pow(d.n, D);
 
 			sum += patch_sum;

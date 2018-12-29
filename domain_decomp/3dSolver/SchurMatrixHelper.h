@@ -14,6 +14,7 @@ class SchurMatrixHelper
 	SchurMatrixHelper(std::shared_ptr<SchurHelper<3>> sh)
 	{
 		this->sh = sh;
+        n=sh->getN();
 	}
 	PW_explicit<Mat> formCRSMatrix();
 	PBMatrix *       formPBMatrix();

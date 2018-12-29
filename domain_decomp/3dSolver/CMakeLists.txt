@@ -101,7 +101,7 @@ link_directories("${Zoltan_DIR}/lib")
 #
 add_executable(steady steady.cpp)
 add_executable(steady2d steady2d.cpp)
-add_library(SchurHelper SchurMatrixHelper.cpp)
+add_library(SchurHelper SchurMatrixHelper.cpp SchurMatrixHelper2d.cpp)
 add_library(MatrixHelper MatrixHelper.cpp MatrixHelper2d.cpp)
 add_library(Interpolators TriLinInterp.cpp BilinearInterpolator.cpp)
 add_library(Init Init.cpp)
@@ -120,8 +120,6 @@ target_link_libraries(steady
     MatrixHelper
     GMG
     Interpolators
-    MMWriter
-    ClawWriter
     PBMatrix
     PolyPrecs
   ${MPI_CXX_LIBRARIES} 
@@ -135,7 +133,6 @@ target_link_libraries(steady2d
     MatrixHelper
     GMG
     Interpolators
-    MMWriter
     ClawWriter
     PBMatrix
     PolyPrecs

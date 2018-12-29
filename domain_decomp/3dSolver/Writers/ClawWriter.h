@@ -4,11 +4,11 @@
 class ClawWriter
 {
 	private:
-	DomainCollection<3> dc;
-	void writePatch(Domain<3> &d, std::ostream &os, double *u_view, double *resid_view);
+	DomainCollection<2> dc;
+	void writePatch(Domain<2> &d, std::ostream &os, double *u_view, double *resid_view);
 
 	public:
-	ClawWriter(DomainCollection<3> &dc);
+	ClawWriter(DomainCollection<2> &dc);
 	void write(Vec u, Vec resid);
 };
 #endif

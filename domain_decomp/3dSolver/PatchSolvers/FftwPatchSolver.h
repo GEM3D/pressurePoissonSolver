@@ -81,20 +81,20 @@ template <size_t D> void FftwPatchSolver<D>::addDomain(SchurDomain<D> &d)
 	fftw_r2r_kind transforms_inv[D];
 	if (!plan1.count(d)) {
 		for (size_t i = 0; i < D; i++) {
-			ns[i] = n;
+			ns[D-1-i] = n;
 			// x direction
 			if (d.isNeumann(2 * i) && d.isNeumann(2 * i + 1)) {
-				transforms[i]     = FFTW_REDFT10;
-				transforms_inv[i] = FFTW_REDFT01;
+				transforms[D-1-i]     = FFTW_REDFT10;
+				transforms_inv[D-1-i] = FFTW_REDFT01;
 			} else if (d.isNeumann(2 * i)) {
-				transforms[i]     = FFTW_REDFT11;
-				transforms_inv[i] = FFTW_REDFT11;
+				transforms[D-1-i]     = FFTW_REDFT11;
+				transforms_inv[D-1-i] = FFTW_REDFT11;
 			} else if (d.isNeumann(2 * i + 1)) {
-				transforms[i]     = FFTW_RODFT11;
-				transforms_inv[i] = FFTW_RODFT11;
+				transforms[D-1-i]     = FFTW_RODFT11;
+				transforms_inv[D-1-i] = FFTW_RODFT11;
 			} else {
-				transforms[i]     = FFTW_RODFT10;
-				transforms_inv[i] = FFTW_RODFT01;
+				transforms[D-1-i]     = FFTW_RODFT10;
+				transforms_inv[D-1-i] = FFTW_RODFT01;
 			}
 		}
 

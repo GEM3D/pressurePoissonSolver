@@ -7,12 +7,13 @@
 #include "GMG/Helper2d.h"
 #include "Init.h"
 #include "MatrixHelper2d.h"
-#include "PatchSolvers/FftwPatchSolver.h"
 #include "PatchSolvers/DftPatchSolver.h"
+#include "PatchSolvers/FftwPatchSolver.h"
 #include "PatchSolvers/FishpackPatchSolver.h"
 #include "PolyChebPrec.h"
 #include "QuadInterpolator.h"
 #include "SchurHelper.h"
+#include "SchurMatrixHelper2d.h"
 #include "Writers/ClawWriter.h"
 #include "Writers/MMWriter.h"
 #ifdef ENABLE_AMGX
@@ -138,7 +139,7 @@ int main(int argc, char *argv[])
 	                                    {"muelucuda"});
 #endif
 	args::Flag f_cheb(parser, "", "cheb preconditioner", {"cheb"});
-	args::Flag              f_dft(parser, "", "dft", {"dft"});
+	args::Flag f_dft(parser, "", "dft", {"dft"});
 
 	int num_procs;
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
@@ -267,7 +268,7 @@ int main(int argc, char *argv[])
 	shared_ptr<PatchSolver<2>> p_solver;
 	if (f_dft) {
 		p_solver.reset(new DftPatchSolver<2>(*dc));
-    }else if (f_fish) {
+	} else if (f_fish) {
 		//	p_solver.reset(new FishpackPatchSolver());
 	} else {
 		p_solver.reset(new FftwPatchSolver<2>(*dc));
@@ -378,18 +379,21 @@ int main(int argc, char *argv[])
 					MatrixHelper2d mh(*dc);
 					A = mh.formCRSMatrix();
 				} else {
-					//			A = sch->formCRSMatrix();
+					SchurMatrixHelper2d mh(sch);
+					A = mh.formCRSMatrix();
 				}
 
 				timer.stop("Matrix Formation");
+			}
 
-				if (f_m) {
-					PetscViewer viewer;
-					PetscViewerBinaryOpen(PETSC_COMM_WORLD, args::get(f_m).c_str(), FILE_MODE_WRITE,
-					                      &viewer);
-					MatView(A, viewer);
-					PetscViewerDestroy(&viewer);
-				}
+			if (f_m) {
+				PW<Mat> A_copy;
+				MatConvert(A, MATMPIAIJ, MAT_INITIAL_MATRIX, &A_copy);
+				PetscViewer viewer;
+				PetscViewerBinaryOpen(PETSC_COMM_WORLD, args::get(f_m).c_str(), FILE_MODE_WRITE,
+				                      &viewer);
+				MatView(A_copy, viewer);
+				PetscViewerDestroy(&viewer);
 			}
 
 			if (false) {
@@ -553,21 +557,10 @@ int main(int argc, char *argv[])
 		}
 
 		// output
-		/*
-		MMWriter mmwriter(dc, f_amr);
-		if (f_s) { mmwriter.write(u, args::get(f_s)); }
-		if (f_resid) { mmwriter.write(resid, args::get(f_resid)); }
-		if (f_error) { mmwriter.write(error, args::get(f_error)); }
-		if (f_g) {
-		    PetscViewer viewer;
-		    PetscViewerASCIIOpen(PETSC_COMM_WORLD, args::get(f_g).c_str(), &viewer);
-		    VecView(gamma, viewer);
-		}
 		if (f_outclaw) {
-		    ClawWriter writer(dc);
-		    writer.write(u, resid);
+			ClawWriter writer(*dc);
+			writer.write(u, resid);
 		}
-		*/
 #ifdef HAVE_VTK
 		if (f_outvtk) {
 			VtkWriter2d writer(*dc, args::get(f_outvtk));
@@ -575,6 +568,7 @@ int main(int argc, char *argv[])
 			writer.add(error, "Error");
 			writer.add(resid, "Residual");
 			writer.add(f, "RHS");
+			writer.add(exact, "Exact");
 			writer.write();
 		}
 #endif

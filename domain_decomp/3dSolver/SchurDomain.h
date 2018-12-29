@@ -197,7 +197,10 @@ template <size_t D> struct SchurDomain {
 	std::bitset<Side<D>::num_sides>                neumann;
 	std::array<IfaceInfo<D> *, Side<D>::num_sides> iface_info;
 	std::vector<int>                               nbr_ids;
-	SchurDomain() = default;
+	SchurDomain()
+	{
+		iface_info.fill(nullptr);
+	}
 	SchurDomain(Domain<D> &d)
 	{
 		iface_info.fill(nullptr);

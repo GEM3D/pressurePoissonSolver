@@ -1,9 +1,3 @@
-add_library(MMWriter MMWriter.cpp)
-target_link_libraries(MMWriter
-    ${Trilinos_TPL_LIBRARIES}
-    ${Trilinos_LIBRARIES} 
-)
-
 add_library(ClawWriter ClawWriter.cpp)
 target_link_libraries(ClawWriter
     ${Trilinos_TPL_LIBRARIES}

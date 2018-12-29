@@ -196,13 +196,6 @@ int main(int argc, char *argv[])
 			t.refineLeaves();
 		}
 	}
-	BalancedLevelsGenerator<3> blg(t, n);
-
-	// partition domains if running in parallel
-	if (num_procs > 1) { blg.zoltanBalance(); }
-
-	dc.reset(new DomainCollection<3>(blg.levels[t.num_levels - 1], n));
-	if (f_neumann) { dc->setNeumann(); }
 
 	// the functions that we are using
 	function<double(double, double, double)> ffun;
@@ -263,11 +256,6 @@ int main(int argc, char *argv[])
 
 	// set the patch solver
 	shared_ptr<PatchSolver<3>> p_solver;
-	if (f_dft) {
-		p_solver.reset(new DftPatchSolver<3>(*dc));
-	} else {
-		p_solver.reset(new FftwPatchSolver<3>(*dc));
-	}
 
 	// patch operator
 	shared_ptr<PatchOperator<3>> p_operator(new SevenPtPatchOperator());
@@ -283,7 +271,23 @@ int main(int argc, char *argv[])
 	Tools::Timer timer;
 	for (int loop = 0; loop < loop_count; loop++) {
 		timer.start("Domain Initialization");
+		BalancedLevelsGenerator<3> blg(t, n);
 
+		// partition domains if running in parallel
+		if (num_procs > 1) {
+			timer.start("Zoltan Balance");
+			blg.zoltanBalance();
+			timer.stop("Zoltan Balance");
+		}
+
+		dc.reset(new DomainCollection<3>(blg.levels[t.num_levels - 1], n));
+		if (f_neumann) { dc->setNeumann(); }
+
+		if (f_dft) {
+			p_solver.reset(new DftPatchSolver<3>(*dc));
+		} else {
+			p_solver.reset(new FftwPatchSolver<3>(*dc));
+		}
 		shared_ptr<SchurHelper<3>> sch(new SchurHelper<3>(*dc, p_solver, p_operator, p_interp));
 		MatrixHelper               mh(*dc);
 
@@ -392,13 +396,17 @@ int main(int argc, char *argv[])
 					sp->getPrec(pc);
 				}
 				if (f_gmg) {
+					timer.start("GMG Setup");
+					timer.start("GMG Domain Collection Setup");
 					vector<shared_ptr<DomainCollection<3>>> dcs(t.num_levels);
 					dcs[0] = dc;
 					for (int i = 1; i < t.num_levels; i++) {
 						dcs[i].reset(new DomainCollection<3>(blg.levels[t.num_levels - 1 - i], n));
 					}
+					timer.stop("GMG Domain Collection Setup");
 
 					gh.reset(new GMG::Helper(n, dcs, sch, args::get(f_gmg)));
+					timer.stop("GMG Setup");
 					gh->getPrec(pc);
 				}
 				if (f_cheb) {
@@ -510,18 +518,10 @@ int main(int argc, char *argv[])
 		}
 
 		// output
-		MMWriter mmwriter(*dc, f_amr);
-		if (f_s) { mmwriter.write(u, args::get(f_s)); }
-		if (f_resid) { mmwriter.write(resid, args::get(f_resid)); }
-		if (f_error) { mmwriter.write(error, args::get(f_error)); }
 		if (f_g) {
 			PetscViewer viewer;
 			PetscViewerASCIIOpen(PETSC_COMM_WORLD, args::get(f_g).c_str(), &viewer);
 			VecView(gamma, viewer);
-		}
-		if (f_outclaw) {
-			ClawWriter writer(*dc);
-			writer.write(u, resid);
 		}
 #ifdef HAVE_VTK
 		if (f_outvtk) {
