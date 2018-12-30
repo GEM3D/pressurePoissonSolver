@@ -1,0 +1,7 @@
+target_sources_local(UTILS PRIVATE ClawWriter.cpp)
+if(VTK_FOUND)
+    target_sources_local(UTILS PRIVATE VtkWriter.cpp VtkWriter2d.cpp)
+    link_directories(${VTK_LIBRARY_DIRS})
+    target_include_directories(UTILS PRIVATE ${VTK_INCLUDE_DIRS})
+    target_link_libraries(UTILS ${VTK_LIBRARIES})
+endif()
