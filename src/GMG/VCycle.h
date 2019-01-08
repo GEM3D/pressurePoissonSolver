@@ -50,14 +50,17 @@ class VCycle : public Cycle
 		try {
 			num_pre_sweeps = config_j.at("pre_sweeps");
 		} catch (nlohmann::detail::out_of_range oor) {
+            throw 0;
 		}
 		try {
 			num_post_sweeps = config_j.at("post_sweeps");
 		} catch (nlohmann::detail::out_of_range oor) {
+            throw 0;
 		}
 		try {
 			num_coarse_sweeps = config_j.at("coarse_sweeps");
 		} catch (nlohmann::detail::out_of_range oor) {
+            throw 0;
 		}
 	}
 };
