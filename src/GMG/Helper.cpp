@@ -112,6 +112,7 @@ Helper::Helper(int n, std::vector<std::shared_ptr<DomainCollection<3>>> dcs,
 		}
 	} else {
 		// TODO throw error
+		throw 343;
 	}
 
 	// link levels to each other
@@ -135,6 +136,7 @@ Helper::Helper(int n, std::vector<std::shared_ptr<DomainCollection<3>>> dcs,
 		cycle.reset(new WCycle(levels[0], config_j));
 	} else {
 		// TODO throw error
+		throw 343;
 	}
 }
 void Helper::apply(Vec f, Vec u)

@@ -157,6 +157,7 @@ class InteriorHelper : public Helper
 		}
 	}
 };
+constexpr int InteriorHelper::center_coeffs[8][8];
 class ExtFaceHelper : public Helper
 {
 	private:
@@ -253,6 +254,7 @@ class ExtFaceHelper : public Helper
 		}
 	}
 };
+constexpr int ExtFaceHelper::coeffs[4][8];
 class IntFaceHelper : public Helper
 {
 	private:
@@ -349,6 +351,7 @@ class IntFaceHelper : public Helper
 		}
 	}
 };
+constexpr int IntFaceHelper::coeffs[4][8];
 class EdgeHelper : public Helper
 {
 	private:
