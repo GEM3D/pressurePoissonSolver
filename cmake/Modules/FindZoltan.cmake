@@ -1,14 +1,14 @@
 # - Try to find Zoltan
 #
 
-find_path (ZOLTAN_DIR include/zoltan.h HINTS ENV ZOLTAN_DIR)
+find_path (ZOLTAN_DIR include/zoltan.h HINTS ENV ZOLTAN_DIR CPATH)
 
-IF(EXISTS ${ZOLTAN_DIR}/include/zoltan.h)
-  SET(Zoltan_FOUND YES)
   SET(Zoltan_INCLUDES ${ZOLTAN_DIR})
   find_path (Zoltan_INCLUDE_DIR zoltan.h HINTS "${ZOLTAN_DIR}/include" PATH_SUFFIXES include NO_DEFAULT_PATH)
   list(APPEND Zoltan_INCLUDES ${Zoltan_INCLUDE_DIR})
   find_library(Zoltan_LIBRARIES zoltan PATHS "${ZOLTAN_DIR}/lib" ${ZOLTAN_DIR})
+IF(EXISTS ${ZOLTAN_DIR}/include/zoltan.h)
+  SET(Zoltan_FOUND YES)
 ELSE(EXISTS ${ZOLTAN_DIR}/include/zoltan.h)
   SET(Zoltan_FOUND NO)
 ENDIF(EXISTS ${ZOLTAN_DIR}/include/zoltan.h)

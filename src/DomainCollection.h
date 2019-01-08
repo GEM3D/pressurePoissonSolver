@@ -12,6 +12,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <cmath>
 /**
  * @brief A collection of Domain Signatures
  *
