@@ -1,4 +1,5 @@
 # thunderegg
+![alt text](https://github.com/GEM3D/pressurePoissonSolver/blob/master/icon.png)
 
 This is a library for solving Poisson's equation on adaptively refined block-structured Cartesian grids in two and three dimensions in a distributive parallel environment.
 
