@@ -1,0 +1,40 @@
+\documentclass{standalone}
+
+\usepackage{booktabs}
+\usepackage{siunitx}
+
+\begin{document}
+\begin{tabular}{
+S[zero-decimal-to-integer=true, table-format=2, table-alignment=right]
+*4{S[round-mode=places, round-precision=2, scientific-notation=fixed, 
+ table-alignment=right]
+S[zero-decimal-to-integer=true, table-format=5, table-alignment=right]}
+}
+\toprule
+\multicolumn{1}{c}{} &  
+\multicolumn{2}{c}{Full (AMGX)} & 
+\multicolumn{2}{c}{Full (HYPRE)} & 
+\multicolumn{2}{c}{Schur (AMGX)} & 
+\multicolumn{2}{c}{Schur (HYPRE)} \\
+\midrule
+\multicolumn{1}{c}{p} 
+& \multicolumn{1}{c}{Time (s)}
+& \multicolumn{1}{c}{Iterations} 
+& \multicolumn{1}{c}{Time (s)}
+& \multicolumn{1}{c}{Iterations}
+& \multicolumn{1}{c}{Time (s)}
+& \multicolumn{1}{c}{Iterations}
+& \multicolumn{1}{c}{Time (s)}
+& \multicolumn{1}{c}{Iterations} \\
+\midrule
+      1 &               {---} &               {---} &      68.0680601461 &               27.0 &       1.6905478806 &              19.0 &       26.9077451058 &               17.0 \\
+      2 &               {---} &               {---} &      40.4927931763 &               25.0 &        1.013778522 &              20.0 &       14.3824872351 &               17.0 \\
+      4 &      3.1688130379 &              53.0 &       29.408291536 &               26.0 &       0.6331196053 &              20.0 &        8.9939953395 &               16.0 \\
+      8 &      2.4354128055 &              54.0 &      24.1182497637 &               26.0 &       0.8258673021 &              41.0 &        7.6712551782 &               16.0 \\
+     16 &      3.4661210478 &             100.0 &      17.5584340833 &               25.0 &       0.6856942482 &              43.0 &        7.2538566353 &               16.0 \\
+     32 &               {---} &               {---} &      10.2716404851 &               25.0 &                {---} &               {---} &        5.2004614297 &               16.0 \\
+     64 &               {---} &               {---} &       8.4316525948 &               25.0 &                {---} &               {---} &        1.1060020951 &               16.0 \\
+\bottomrule
+\end{tabular}
+\end{document}
+

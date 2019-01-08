@@ -1,0 +1,2 @@
+mx=my=32;  minlevel=1; maxlevel=4; smooth-refine=F
+mx=my=32;  minlevel-1; maxlevel=4; smooth-refine=F
