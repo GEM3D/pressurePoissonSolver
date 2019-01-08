@@ -1,20 +1,36 @@
 # pressurePoissonSolver
 
-This site organizes our efforts to develop a pressure Poisson
-solver for the GEM3d site.   So far, there are two approaches
-we are considering :
+This is a library for solving Poisson's equation. 
 
-* Using HYPRE (LLNL) along with a PCG or AMG solver.
+There are two approaches
+* Using BoomerAMG as a preconditioner on Schur compliment Matrix.
 
-* Using a domain decompostion approach.
+* Using a geometric multigrid method.
 
 # Members of the team :
 
 * Grady Wright
 * Donna Calhoun
-* Joseph McNeal
 * Scott Aiton
 
-# Examples to date :
+# Required Software
+* FFTW
+* Zoltan
+* PETSc
+* CMake
 
-* hypre/two_part/Gem3d/ex3.c  : Two part example with Neumann boundary conditions.
+# Compiling
+Create a seperate source directory and run cmake in the build directory:
+```
+cmake /path/to/source
+```
+Then compile with make:
+```
+make
+```
+
+# Examples:
+
+Both of these examples support both the Schur compliment and geometric multigrid methods:
+* apps/2d/steady2d  : Two dimensional example for Poisson's equation
+* apps/3d/steady    : Three dimensional example for Poisson's equation

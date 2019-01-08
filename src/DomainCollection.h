@@ -177,6 +177,7 @@ template <size_t D> class DomainCollection
 	PW_explicit<Vec> getNewDomainVec() const
 	{
 		PW<Vec> u;
+        std::cerr << "N: " << n <<std::endl;
 		VecCreateMPI(MPI_COMM_WORLD, domains.size() * std::pow(n, D), PETSC_DETERMINE, &u);
 		return u;
 	}

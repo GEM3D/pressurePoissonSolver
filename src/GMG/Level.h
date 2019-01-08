@@ -11,7 +11,7 @@ namespace GMG
 class VectorGenerator
 {
 	public:
-	virtual PW<Vec> getNewVector() = 0;
+	virtual PW_explicit<Vec> getNewVector() = 0;
 };
 template <size_t D> class DCVG : public VectorGenerator
 {
@@ -23,7 +23,7 @@ template <size_t D> class DCVG : public VectorGenerator
 	{
 		this->dc = dc;
 	}
-	PW<Vec> getNewVector()
+	PW_explicit<Vec> getNewVector()
 	{
 		return dc->getNewDomainVec();
 	}
