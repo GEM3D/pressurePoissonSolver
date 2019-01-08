@@ -150,8 +150,8 @@ inline SchurHelper<D>::SchurHelper(DomainCollection<D> dc, std::shared_ptr<Patch
 		sd.enumerateIfaces(ifaces, off_proc_ifaces);
 		solver->addDomain(sd);
 	}
-	/*
 	{
+        using namespace std;
 	    // send info
 	    deque<char *>       buffers;
 	    deque<char *>       recv_buffers;
@@ -159,7 +159,7 @@ inline SchurHelper<D>::SchurHelper(DomainCollection<D> dc, std::shared_ptr<Patch
 	    vector<MPI_Request> send_requests;
 	    for (auto &p : off_proc_ifaces) {
 	        int       dest   = p.second.first;
-	        IfaceSet &iface  = p.second.second;
+	        IfaceSet<D> &iface  = p.second.second;
 	        int       size   = iface.serialize(nullptr);
 	        char *    buffer = new char[size];
 	        buffers.push_back(buffer);
@@ -197,14 +197,13 @@ inline SchurHelper<D>::SchurHelper(DomainCollection<D> dc, std::shared_ptr<Patch
 	    }
 	    // process received objects
 	    for (char *buffer : recv_buffers) {
-	        IfaceSet ifs;
+	        IfaceSet<D> ifs;
 	        ifs.deserialize(buffer);
 	        ifaces[ifs.id].insert(ifs);
 	        delete[] buffer;
 	    }
 	    MPI_Barrier(MPI_COMM_WORLD);
 	}
-	*/
 	indexDomainIfacesLocal();
 	indexIfacesLocal();
 	this->solver       = solver;
