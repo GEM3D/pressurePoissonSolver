@@ -1,3 +1,24 @@
+/***************************************************************************
+ *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  refined block-structured Cartesian grids
+ *
+ *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
+ *  top-level directory.
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ ***************************************************************************/
+
 #include "TriLinIntp.h"
 #include <algorithm>
 #include <functional>
@@ -157,6 +178,7 @@ class InteriorHelper : public Helper
 		}
 	}
 };
+constexpr int InteriorHelper::center_coeffs[8][8];
 class ExtFaceHelper : public Helper
 {
 	private:
@@ -253,6 +275,7 @@ class ExtFaceHelper : public Helper
 		}
 	}
 };
+constexpr int ExtFaceHelper::coeffs[4][8];
 class IntFaceHelper : public Helper
 {
 	private:
@@ -349,6 +372,7 @@ class IntFaceHelper : public Helper
 		}
 	}
 };
+constexpr int IntFaceHelper::coeffs[4][8];
 class EdgeHelper : public Helper
 {
 	private:

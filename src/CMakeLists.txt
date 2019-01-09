@@ -44,7 +44,7 @@ include_directories(${FFTW_INCLUDES})
 # libraries (TPLs) with which Trilinos was built.
 #
 find_package(FFTW REQUIRED)
-add_library(PPS "")
+add_library(Thunderegg "")
 include_directories(".")
 include_directories(${FFTW_INCLUDES})
 include_directories(SYSTEM ${Trilinos_TPL_INCLUDE_DIRS})
@@ -56,7 +56,7 @@ endif()
 if(AMGX_FOUND)
     include_directories(${AMGX_INCLUDE_DIRS})
 endif()
-target_include_directories(PPS PRIVATE ${PETSC_INCLUDES})
+target_include_directories(Thunderegg PRIVATE ${PETSC_INCLUDES})
 include_directories(${Zoltan_INCLUDES})
 
 # Add to the library path Trilinos' library path, and the library
@@ -72,14 +72,14 @@ link_directories("${Zoltan_DIR}/lib")
 # file that you want to build.  This line tells CMake which source
 # file(s) to use to build the executable.
 #
-target_include_directories(PPS PUBLIC ".")
-target_sources_local(PPS PRIVATE SchurMatrixHelper.cpp SchurMatrixHelper2d.cpp)
-target_sources_local(PPS PRIVATE MatrixHelper.cpp MatrixHelper2d.cpp)
-target_sources_local(PPS PRIVATE TriLinInterp.cpp BilinearInterpolator.cpp)
-target_sources_local(PPS PRIVATE PBMatrix.cpp)
-target_sources_local(PPS PRIVATE PolyChebPrec.cpp)
+target_include_directories(Thunderegg PUBLIC ".")
+target_sources_local(Thunderegg PRIVATE SchurMatrixHelper.cpp SchurMatrixHelper2d.cpp)
+target_sources_local(Thunderegg PRIVATE MatrixHelper.cpp MatrixHelper2d.cpp)
+target_sources_local(Thunderegg PRIVATE TriLinInterp.cpp BilinearInterpolator.cpp)
+target_sources_local(Thunderegg PRIVATE PBMatrix.cpp)
+target_sources_local(Thunderegg PRIVATE PolyChebPrec.cpp)
 target_link_libraries(
-    PPS PRIVATE
+    Thunderegg PRIVATE
   ${MPI_CXX_LIBRARIES} 
   ${PETSC_LIBRARIES} 
   ${FFTW_LIBRARIES} 

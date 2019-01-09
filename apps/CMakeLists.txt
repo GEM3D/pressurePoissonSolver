@@ -1,4 +1,5 @@
 project(DomainDecomp)
+set (CMAKE_CXX_FLAGS "-Wall --std=c++11 -O3 -march=native ${CMAKE_CXX_FLAGS}")
 add_subdirectory(shared)
 add_subdirectory(2d)
 add_subdirectory(3d)

@@ -43,7 +43,7 @@ link_directories("${Zoltan_DIR}/lib")
 #
 add_library(UTILS "")
 target_sources_local(UTILS PRIVATE Init.cpp)
-target_link_libraries(UTILS PPS)
+target_link_libraries(UTILS Thunderegg)
 target_include_directories(UTILS PUBLIC ".")
 
 include(Writers/CMakeLists.txt)
