@@ -1,17 +1,19 @@
-# pressurePoissonSolver
+# thunderegg
 
-This is a library for solving Poisson's equation. 
+This is a library for solving Poisson's equation on adaptively refined block-structured Cartesian grids in two and three dimensions in a distributive parallel environment.
 
-There are two approaches
-* Using BoomerAMG as a preconditioner on Schur compliment Matrix.
+The code offers two solvers:
+* Domain decomposition using a Schur complement, which is solved using GMRES preconditioned with BoomerAMG.
+ 
+* Geometric multigrid method using a Fast Adaptive Composite (FAC) type algorithm.
 
-* Using a geometric multigrid method.
+The Schur complement method works well for 2D problems, but not 3D.  The Geometric multigrid method works well for both 2D and 3D.
 
 # Members of the team :
 
-* Grady Wright
-* Donna Calhoun
 * Scott Aiton
+* Donna Calhoun
+* Grady Wright
 
 # Required Software
 * FFTW
