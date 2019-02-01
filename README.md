@@ -25,7 +25,18 @@ The Schur complement method works well for 2D problems, but not 3D.  The Geometr
 # Compiling
 Create a seperate source directory and run cmake in the build directory:
 ```
-cmake /path/to/source
+$ cd build_dir
+$ cmake /path/to/source
+```
+Compilers can be specified in the following way
+```
+$ cmake -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER /path/to/source
+```
+Paths to libraries can be specified with the following cmake options
+```
+-DFFTW_DIR=/path/to/library
+-DPETSC_DIR=/path/to/library
+-DZOLTAN_DIR=/path/to/library
 ```
 Then compile with make:
 ```
