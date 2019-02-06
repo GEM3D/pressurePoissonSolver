@@ -21,6 +21,9 @@
 
 #include "PBMatrix.h"
 #include "SchurHelper.h"
+#include <functional>
+#include <petscmat.h>
+#include <valarray>
 struct Block;
 class SchurMatrixHelper
 {

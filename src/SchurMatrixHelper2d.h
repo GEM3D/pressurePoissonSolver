@@ -26,6 +26,7 @@
 #include "PatchSolvers/PatchSolver.h"
 #include "SchurHelper.h"
 #include <memory>
+#include <functional>
 #include <petscmat.h>
 #include <valarray>
 /**
