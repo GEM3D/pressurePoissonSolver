@@ -164,7 +164,7 @@ template <size_t D> class NormalNbrInfo : public NbrInfo<D>
 template <size_t D> class CoarseNbrInfo : public NbrInfo<D>
 {
 	public:
-	std::shared_ptr<Domain<D>> ptr  = nullptr;
+	std::shared_ptr<Domain<D>> ptr;
 	int                        rank = 0;
 	int                        id;
 	int                        local_index;

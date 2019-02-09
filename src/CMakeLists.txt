@@ -56,7 +56,10 @@ endif()
 if(AMGX_FOUND)
     include_directories(${AMGX_INCLUDE_DIRS})
 endif()
-target_include_directories(Thunderegg PRIVATE ${PETSC_INCLUDES})
+target_include_directories(Thunderegg PUBLIC ${PETSC_INCLUDES}
+    ${FFTW_INCLUDES} 
+    ${Zoltan_INCLUDES}
+    )
 include_directories(${Zoltan_INCLUDES})
 
 # Add to the library path Trilinos' library path, and the library
@@ -80,9 +83,9 @@ target_sources_local(Thunderegg PRIVATE PBMatrix.cpp)
 target_sources_local(Thunderegg PRIVATE PolyChebPrec.cpp)
 target_link_libraries(
     Thunderegg PRIVATE
-  ${MPI_CXX_LIBRARIES} 
-  ${PETSC_LIBRARIES} 
-  ${FFTW_LIBRARIES} 
+    ${MPI_CXX_LIBRARIES} 
+    ${PETSC_LIBRARIES} 
+    ${FFTW_LIBRARIES} 
     ${Zoltan_LIBRARIES}
 )
 #
