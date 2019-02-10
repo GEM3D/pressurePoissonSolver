@@ -35,7 +35,7 @@ enum class DftType { DCT_II, DCT_III, DCT_IV, DST_II, DST_III, DST_IV };
 #ifndef DOMAINK
 #define DOMAINK
 template <size_t D> struct DomainK {
-	ulong  neumann = 0;
+	unsigned long  neumann = 0;
 	double h_x     = 0;
 
 	DomainK() {}
