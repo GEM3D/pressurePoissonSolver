@@ -1,7 +1,7 @@
 # - Try to find Zoltan
 #
 
-find_path (ZOLTAN_DIR include/zoltan.h HINTS ENV ZOLTAN_DIR CPATH)
+find_path (ZOLTAN_DIR include/zoltan.h HINTS ZOLTAN_DIR ENV ZOLTAN_DIR CPATH)
 
   SET(Zoltan_INCLUDES ${ZOLTAN_DIR})
   find_path (Zoltan_INCLUDE_DIR zoltan.h HINTS "${ZOLTAN_DIR}/include" PATH_SUFFIXES include NO_DEFAULT_PATH)

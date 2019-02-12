@@ -1,17 +1,20 @@
-# pressurePoissonSolver
+# thunderegg
+![alt text](https://github.com/GEM3D/pressurePoissonSolver/blob/master/icon.png)
 
-This is a library for solving Poisson's equation. 
+This is a library for solving Poisson's equation on adaptively refined block-structured Cartesian grids in two and three dimensions in a distributive parallel environment.
 
-There are two approaches
-* Using BoomerAMG as a preconditioner on Schur compliment Matrix.
+The code offers two solvers:
+* Domain decomposition using a Schur complement, which is solved using GMRES preconditioned with BoomerAMG.
+ 
+* Geometric multigrid method using a Fast Adaptive Composite (FAC) type algorithm.
 
-* Using a geometric multigrid method.
+The Schur complement method works well for 2D problems, but not 3D.  The Geometric multigrid method works well for both 2D and 3D.
 
 # Members of the team :
 
-* Grady Wright
-* Donna Calhoun
 * Scott Aiton
+* Donna Calhoun
+* Grady Wright
 
 # Required Software
 * FFTW
@@ -22,7 +25,18 @@ There are two approaches
 # Compiling
 Create a seperate source directory and run cmake in the build directory:
 ```
-cmake /path/to/source
+$ cd build_dir
+$ cmake /path/to/source
+```
+Compilers can be specified in the following way
+```
+$ cmake -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER /path/to/source
+```
+Paths to libraries can be specified with the following cmake options
+```
+-DFFTW_DIR=/path/to/library
+-DPETSC_DIR=/path/to/library
+-DZOLTAN_DIR=/path/to/library
 ```
 Then compile with make:
 ```
