@@ -7,6 +7,14 @@ project(DomainDecomp)
 #
 # NOTE: This helper function assumes no generator expressions are used
 #       for the source files
+#  if(COMMAND cmake_policy)
+#    cmake_policy(SET CMP0003 NEW)
+#  endif(COMMAND cmake_policy)
+
+cmake_minimum_required(VERSION 3.0)
+enable_language(CXX)
+enable_language(C)
+
 function(target_sources_local target)
   if(POLICY CMP0076)
     # New behavior is available, so just forward to it by ensuring
@@ -43,9 +51,6 @@ function(add_library _target)
     endif()
 endfunction(add_library)
 # You need CMake version >= 2.8 to use this example.
-cmake_minimum_required(VERSION 3.0)
-enable_language(CXX)
-enable_language(C)
 
 # Your "do-configure" script that invokes CMake should set
 # TRILINOS_PATH to the path to your Trilinos install.

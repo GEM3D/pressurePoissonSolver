@@ -15,32 +15,13 @@ set (CMAKE_CXX_FLAGS_DEBUG  "-Wall --std=c++11 -g -O3  -DDD_DEBUG")
 
 find_package(VTK)
 IF(VTK_FOUND)
-    SET(CMAKE_CXX_FLAGS "-DHAVE_VTK ${CMAKE_CXX_FLAGS}")
+    SET(CMAKE_CXX_FLAGS "-DHAVE_VTK ${CMAKE_CXX_FLAGS}" PARENT_SCOPE)
     MESSAGE("VTK found, enabling vtk output")
 ELSE()
     MESSAGE("VTK not found, disabling vtk output")
 ENDIF()
 
-include_directories(".")
-include_directories(${MPI_CXX_INCLUDE_PATH})
-if(VTK_FOUND)
-include_directories(SYSTEM ${VTK_INCLUDE_DIRS})
-endif()
-include_directories(${PETSC_INCLUDES})
 
-# Add to the library path Trilinos' library path, and the library
-# paths of the third-party libraries (TPLs) with which Trilinos was
-# built.  
-if(AMGX_FOUND)
-link_directories("${AMGX_DIR}/lib")
-endif()
-link_directories("${Zoltan_DIR}/lib")
-
-# 
-# EDIT HERE: Change trilinosExample to the name of the executable
-# file that you want to build.  This line tells CMake which source
-# file(s) to use to build the executable.
-#
 add_library(UTILS "")
 target_sources_local(UTILS PRIVATE Init.cpp)
 target_link_libraries(UTILS Thunderegg)

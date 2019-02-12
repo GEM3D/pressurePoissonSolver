@@ -77,6 +77,8 @@ struct Node {
 	{
 		this->parent = parent.id;
 		level        = parent.level + 1;
+		nbr_id.fill(-1);
+		child_id.fill(-1);
 		for (size_t i = 0; i < D; i++) {
 			lengths[i] = parent.lengths[i] / 2;
 			starts[i]

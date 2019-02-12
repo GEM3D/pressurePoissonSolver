@@ -236,18 +236,19 @@ int main(int argc, char *argv[])
 			return exp(cos(10 * M_PI * x)) - exp(cos(11 * M_PI * y)) + exp(cos(12 * M_PI * z));
 		};
 		ffun = [](double x, double y, double z) {
-			return -M_PI * M_PI
+            constexpr double pi2 = M_PI*M_PI;
+			return
+                -M_PI * M_PI
 			       * (100 * exp(cos(10 * M_PI * x)) * cos(10 * M_PI * x)
-			          - 121 * exp(cos(11 * M_PI * y)) * cos(11 * M_PI * y)
-			          + 144 * exp(cos(12 * M_PI * z)) * cos(12 * M_PI * z)
 			          - 100 * exp(cos(10 * M_PI * x)) * pow(sin(10 * M_PI * x), 2)
+			          - 121 * exp(cos(11 * M_PI * y)) * cos(11 * M_PI * y)
 			          + 121 * exp(cos(11 * M_PI * y)) * pow(sin(11 * M_PI * y), 2)
+			          + 144 * exp(cos(12 * M_PI * z)) * cos(12 * M_PI * z)
 			          - 144 * exp(cos(12 * M_PI * z)) * pow(sin(12 * M_PI * z), 2));
 		};
 		nfunx = [](double x, double y, double z) {
 			return -10 * M_PI * sin(10 * M_PI * x) * exp(cos(10 * M_PI * x));
 		};
-
 		nfuny = [](double x, double y, double z) {
 			return 11 * M_PI * sin(11 * M_PI * y) * exp(cos(11 * M_PI * y));
 		};
@@ -256,20 +257,35 @@ int main(int argc, char *argv[])
 		};
 	} else {
 		ffun = [](double x, double y, double z) {
+            x+=.3;
+            y+=.3;
+            z+=.3;
 			return -77.0 / 36 * M_PI * M_PI * sin(M_PI * x) * cos(2.0 / 3 * M_PI * y)
 			       * sin(5.0 / 6 * M_PI * z);
 		};
 		gfun = [](double x, double y, double z) {
+            x+=.3;
+            y+=.3;
+            z+=.3;
 			return sin(M_PI * x) * cos(2.0 / 3 * M_PI * y) * sin(5.0 / 6 * M_PI * z);
 		};
 		nfunx = [](double x, double y, double z) {
+            x+=.3;
+            y+=.3;
+            z+=.3;
 			return M_PI * cos(M_PI * x) * cos(2.0 / 3 * M_PI * y) * sin(5.0 / 6 * M_PI * z);
 		};
 		nfuny = [](double x, double y, double z) {
+            x+=.3;
+            y+=.3;
+            z+=.3;
 			return -2.0 / 3 * M_PI * sin(M_PI * x) * sin(2.0 / 3 * M_PI * y)
 			       * sin(5.0 / 6 * M_PI * z);
 		};
 		nfunz = [](double x, double y, double z) {
+            x+=.3;
+            y+=.3;
+            z+=.3;
 			return 5.0 / 6 * M_PI * sin(M_PI * x) * cos(2.0 / 3 * M_PI * y)
 			       * cos(5.0 / 6 * M_PI * z);
 		};

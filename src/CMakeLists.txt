@@ -82,7 +82,8 @@ target_sources_local(Thunderegg PRIVATE TriLinInterp.cpp BilinearInterpolator.cp
 target_sources_local(Thunderegg PRIVATE PBMatrix.cpp)
 target_sources_local(Thunderegg PRIVATE PolyChebPrec.cpp)
 target_link_libraries(
-    Thunderegg PRIVATE
+    Thunderegg PUBLIC
+    tpl
     ${MPI_CXX_LIBRARIES} 
     ${PETSC_LIBRARIES} 
     ${FFTW_LIBRARIES} 
