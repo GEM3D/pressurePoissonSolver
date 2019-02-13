@@ -162,6 +162,7 @@ int main(int argc, char *argv[])
 	args::Flag              f_ibd(parser, "", "use GMG preconditioner", {"ibd"});
 	args::Flag              f_cheb(parser, "", "cheb preconditioner", {"cheb"});
 	args::Flag              f_dft(parser, "", "dft", {"dft"});
+	args::Flag              f_setrow(parser, "", "set row of matrix", {"setrow"});
 
 	int num_procs;
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
@@ -402,6 +403,10 @@ int main(int argc, char *argv[])
 						A = smh.formCRSMatrix();
 					}
 				}
+                if(f_setrow){
+                    int row = 0;
+                    MatZeroRows(A,1,&row,1.0,nullptr,nullptr);
+                }
 
 				timer.stop("Matrix Formation");
 
