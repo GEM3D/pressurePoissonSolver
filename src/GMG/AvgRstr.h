@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -45,6 +45,10 @@ template <size_t D> class AvgRstr : public Restrictor
 	 * @brief The communication package for restricting between levels.
 	 */
 	std::shared_ptr<InterLevelComm<D>> ilc;
+	/**
+	 * @brief pre-calculated powers of n
+	 */
+	std::array<int, D + 1> npow;
 
 	public:
 	/**
@@ -73,6 +77,9 @@ inline AvgRstr<D>::AvgRstr(std::shared_ptr<DomainCollection<D>> coarse_dc,
 	this->coarse_dc = coarse_dc;
 	this->fine_dc   = fine_dc;
 	this->ilc       = ilc;
+	for (size_t i = 0; i <= D; i++) {
+		npow[i] = (int) std::pow(fine_dc->getN(), i);
+	}
 }
 template <size_t D> inline void AvgRstr<D>::restrict(PW<Vec> coarse, PW<Vec> fine) const
 {
@@ -88,17 +95,17 @@ template <size_t D> inline void AvgRstr<D>::restrict(PW<Vec> coarse, PW<Vec> fin
 	for (ILCFineToCoarseMetadata<D> data : ilc->getFineDomains()) {
 		Domain<D> &d          = *data.d;
 		int        n          = d.n;
-		int        coarse_idx = data.local_index * pow(n, D);
-		int        fine_idx   = d.id_local * pow(n, D);
+		int        coarse_idx = data.local_index * npow[D];
+		int        fine_idx   = d.id_local * npow[D];
 		Orthant<D> orth       = d.oct_on_parent;
 		if (d.id != d.parent_id) {
 			std::array<int, D> strides;
 			std::array<int, D> starts;
 			for (size_t i = 0; i < D; i++) {
-				strides[i] = pow(n, i);
+				strides[i] = npow[i];
 				starts[i]  = orth.isOnSide(2 * i) ? 0 : n;
 			}
-			for (int i = 0; i < (int) pow(n, D); i++) {
+			for (int i = 0; i < npow[D]; i++) {
 				std::array<int, D> coord;
 				int                idx = 0;
 				for (size_t x = 0; x < D; x++) {
@@ -108,7 +115,7 @@ template <size_t D> inline void AvgRstr<D>::restrict(PW<Vec> coarse, PW<Vec> fin
 				f_coarse[coarse_idx + idx] += r_fine[fine_idx + i] / (1 << D);
 			}
 		} else {
-			for (int i = 0; i < pow(n, D); i++) {
+			for (int i = 0; i < npow[D]; i++) {
 				f_coarse[coarse_idx + i] += r_fine[fine_idx + i];
 			}
 		}

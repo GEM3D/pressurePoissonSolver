@@ -171,6 +171,7 @@ inline SchurHelper<D>::SchurHelper(DomainCollection<D> dc, std::shared_ptr<Patch
 		sd.enumerateIfaces(ifaces, off_proc_ifaces);
 		solver->addDomain(sd);
 	}
+    /*
 	{
         using namespace std;
 	    // send info
@@ -225,6 +226,7 @@ inline SchurHelper<D>::SchurHelper(DomainCollection<D> dc, std::shared_ptr<Patch
 	    }
 	    MPI_Barrier(MPI_COMM_WORLD);
 	}
+    */
 	indexDomainIfacesLocal();
 	indexIfacesLocal();
 	this->solver       = solver;

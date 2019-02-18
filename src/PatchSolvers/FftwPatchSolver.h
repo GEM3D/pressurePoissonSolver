@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -31,8 +31,8 @@
 #ifndef DOMAINK
 #define DOMAINK
 template <size_t D> struct DomainK {
-	unsigned long  neumann = 0;
-	double h_x     = 0;
+	unsigned long neumann = 0;
+	double        h_x     = 0;
 
 	DomainK() {}
 	DomainK(const SchurDomain<D> &d)
@@ -59,6 +59,7 @@ template <size_t D> class FftwPatchSolver : public PatchSolver<D>
 	std::valarray<double>                       f_copy;
 	std::valarray<double>                       tmp;
 	std::valarray<double>                       sol;
+	std::array<int, D + 1>                      npow;
 	std::map<DomainK<D>, std::valarray<double>> denoms;
 
 	public:
@@ -95,6 +96,9 @@ template <size_t D> void FftwPatchSolver<D>::addDomain(SchurDomain<D> &d)
 		f_copy.resize(pow(n, D));
 		tmp.resize(pow(n, D));
 		sol.resize(pow(n, D));
+		for (size_t i = 0; i <= D; i++) {
+			npow[i] = (int) std::pow(n, i);
+		}
 	}
 
 	int           ns[D];
@@ -102,20 +106,20 @@ template <size_t D> void FftwPatchSolver<D>::addDomain(SchurDomain<D> &d)
 	fftw_r2r_kind transforms_inv[D];
 	if (!plan1.count(d)) {
 		for (size_t i = 0; i < D; i++) {
-			ns[D-1-i] = n;
+			ns[D - 1 - i] = n;
 			// x direction
 			if (d.isNeumann(2 * i) && d.isNeumann(2 * i + 1)) {
-				transforms[D-1-i]     = FFTW_REDFT10;
-				transforms_inv[D-1-i] = FFTW_REDFT01;
+				transforms[D - 1 - i]     = FFTW_REDFT10;
+				transforms_inv[D - 1 - i] = FFTW_REDFT01;
 			} else if (d.isNeumann(2 * i)) {
-				transforms[D-1-i]     = FFTW_REDFT11;
-				transforms_inv[D-1-i] = FFTW_REDFT11;
+				transforms[D - 1 - i]     = FFTW_REDFT11;
+				transforms_inv[D - 1 - i] = FFTW_REDFT11;
 			} else if (d.isNeumann(2 * i + 1)) {
-				transforms[D-1-i]     = FFTW_RODFT11;
-				transforms_inv[D-1-i] = FFTW_RODFT11;
+				transforms[D - 1 - i]     = FFTW_RODFT11;
+				transforms_inv[D - 1 - i] = FFTW_RODFT11;
 			} else {
-				transforms[D-1-i]     = FFTW_RODFT10;
-				transforms_inv[D-1-i] = FFTW_RODFT01;
+				transforms[D - 1 - i]     = FFTW_RODFT10;
+				transforms_inv[D - 1 - i] = FFTW_RODFT01;
 			}
 		}
 
@@ -171,20 +175,20 @@ void FftwPatchSolver<D>::solve(SchurDomain<D> &d, const Vec f, Vec u, const Vec 
 	VecGetArrayRead(f, &f_view);
 	VecGetArrayRead(gamma, &gamma_view);
 
-	int start = d.local_index * pow(n, D);
-	for (int i = 0; i < pow(n, D); i++) {
+	int start = d.local_index * npow[D];
+	for (int i = 0; i < npow[D]; i++) {
 		f_copy[i] = f_view[start + i];
 	}
 
 	for (Side<D> s : Side<D>::getValues()) {
 		if (d.hasNbr(s)) {
-			int          idx = pow(n, D - 1) * d.getIfaceLocalIndex(s);
-			Slice<D - 1> sl  = getSlice<D - 1>(&f_copy[0], n, s);
+			int          idx = npow[D - 1] * d.getIfaceLocalIndex(s);
+			Slice<D - 1> sl  = getSlice<D - 1>(&f_copy[0], n, s, &npow[0]);
 			double       h2  = pow(d.domain.lengths[s.toInt() / 2] / n, 2);
-			for (int i = 0; i < (int) pow(n, D - 1); i++) {
+			for (int i = 0; i < npow[D - 1]; i++) {
 				std::array<int, D - 1> coord;
 				for (size_t x = 0; x < D - 1; x++) {
-					coord[x] = (i / (int) pow(n, x)) % n;
+					coord[x] = (i / npow[x]) % n;
 				}
 				sl(coord) -= 2.0 / h2 * gamma_view[idx + i];
 			}
@@ -203,7 +207,7 @@ void FftwPatchSolver<D>::solve(SchurDomain<D> &d, const Vec f, Vec u, const Vec 
 
 	double *u_view;
 	VecGetArray(u, &u_view);
-	for (int i = 0; i < pow(n, D); i++) {
+	for (int i = 0; i < npow[D]; i++) {
 		u_view[start + i] = sol[i];
 	}
 	VecRestoreArray(u, &u_view);
