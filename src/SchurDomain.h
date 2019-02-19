@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -34,7 +34,7 @@ template <size_t D> class IfaceInfo
 	virtual void getIds(std::vector<int> &ids) = 0;
 	virtual void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types,
 	                            std::deque<Side<D>> &sides, std::deque<int> &ranks,
-	                            std::deque<bool> &own, Side<D> s)
+	                            std::deque<bool> &own, Side<D> s, std::set<int> &incoming_procs)
 	= 0;
 	virtual void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType> &types) = 0;
 	virtual void setLocalIndexes(const std::map<int, int> &rev_map)                 = 0;
@@ -66,13 +66,14 @@ template <size_t D> class NormalIfaceInfo : public IfaceInfo<D>
 	}
 	void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types,
 	                    std::deque<Side<D>> &sides, std::deque<int> &ranks, std::deque<bool> &own,
-	                    Side<D> s)
+	                    Side<D> s, std::set<int> &incoming_procs)
 	{
 		ids.push_back(this->id);
 		types.push_back(IfaceType::normal);
 		sides.push_back(s);
 		ranks.push_back(nbr_info.rank);
 		own.push_back((s.toInt() & 0x1) || nbr_info.ptr != nullptr);
+		if ((s.toInt() & 0x1) && nbr_info.ptr == nullptr) { incoming_procs.insert(nbr_info.rank); }
 	}
 	void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType> &types)
 	{
@@ -106,7 +107,7 @@ template <size_t D> class CoarseIfaceInfo : public IfaceInfo<D>
 	}
 	void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types,
 	                    std::deque<Side<D>> &sides, std::deque<int> &ranks, std::deque<bool> &own,
-	                    Side<D> s)
+	                    Side<D> s, std::set<int> &incoming_procs)
 	{
 		ids.push_back(this->id);
 		ids.push_back(coarse_id);
@@ -120,6 +121,7 @@ template <size_t D> class CoarseIfaceInfo : public IfaceInfo<D>
 		ranks.push_back(nbr_info.rank);
 		own.push_back(true);
 		own.push_back(nbr_info.ptr != nullptr);
+		if (nbr_info.ptr == nullptr) { incoming_procs.insert(nbr_info.rank); }
 	}
 	void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType> &types)
 	{
@@ -163,7 +165,7 @@ template <size_t D> class FineIfaceInfo : public IfaceInfo<D>
 	}
 	void getIdsAndTypes(std::deque<int> &ids, std::deque<IfaceType> &types,
 	                    std::deque<Side<D>> &sides, std::deque<int> &ranks, std::deque<bool> &own,
-	                    Side<D> s)
+	                    Side<D> s, std::set<int> &incoming_procs)
 	{
 		ids.push_back(this->id);
 		types.push_back(IfaceType::coarse_to_coarse);
@@ -177,6 +179,7 @@ template <size_t D> class FineIfaceInfo : public IfaceInfo<D>
 			sides.push_back(s);
 			ranks.push_back(nbr_info.ranks[i]);
 			own.push_back(nbr_info.ptrs[i] != nullptr);
+			if (nbr_info.ptrs[i] == nullptr) { incoming_procs.insert(nbr_info.ranks[i]); }
 		}
 	}
 	void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType> &types)
@@ -259,8 +262,9 @@ template <size_t D> struct SchurDomain {
 	{
 		return iface_info[s.toInt()] != nullptr;
 	}
-	void enumerateIfaces(std::map<int, IfaceSet<D>> &                ifaces,
-	                     std::map<int, std::pair<int, IfaceSet<D>>> &off_proc_ifaces)
+	void enumerateIfaces(std::map<int, IfaceSet<D>> &               ifaces,
+	                     std::map<int, std::map<int, IfaceSet<D>>> &off_proc_ifaces,
+	                     std::set<int> &                            incoming_procs)
 	{
 		std::array<int, Side<D>::num_sides> ids;
 		for (Side<D> s : Side<D>::getValues()) {
@@ -278,7 +282,7 @@ template <size_t D> struct SchurDomain {
 		for (Side<D> s : Side<D>::getValues()) {
 			if (hasNbr(s)) {
 				getIfaceInfoPtr(s)->getIdsAndTypes(iface_ids, iface_types, iface_sides, iface_ranks,
-				                                   iface_own, s);
+				                                   iface_own, s, incoming_procs);
 			}
 		}
 		for (size_t i = 0; i < iface_ids.size(); i++) {
@@ -291,9 +295,8 @@ template <size_t D> struct SchurDomain {
 				ifs.id           = id;
 				ifs.insert(Iface<D>(ids, type, s, neumann));
 			} else {
-				IfaceSet<D> &ifs          = off_proc_ifaces[id].second;
-				off_proc_ifaces[id].first = rank;
-				ifs.id                    = id;
+				IfaceSet<D> &ifs = off_proc_ifaces[rank][id];
+				ifs.id           = id;
 				ifs.insert(Iface<D>(ids, type, s, neumann));
 			}
 		}

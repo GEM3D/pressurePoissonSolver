@@ -25,7 +25,7 @@ ENDIF()
 
 
 add_library(UTILS "")
-target_sources_local(UTILS PRIVATE Init.cpp)
+target_sources_local(UTILS PRIVATE Init.cpp Init.h)
 target_link_libraries(UTILS Thunderegg)
 target_include_directories(UTILS PUBLIC ".")
 

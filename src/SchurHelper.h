@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -166,67 +166,66 @@ inline SchurHelper<D>::SchurHelper(DomainCollection<D> dc, std::shared_ptr<Patch
 	for (auto &p : dc.domains) {
 		domains.push_back(*p.second);
 	}
-	std::map<int, std::pair<int, IfaceSet<D>>> off_proc_ifaces;
+	std::map<int, std::map<int, IfaceSet<D>>> off_proc_ifaces;
+	std::set<int>                             incoming_procs;
 	for (SchurDomain<D> &sd : domains) {
-		sd.enumerateIfaces(ifaces, off_proc_ifaces);
+		sd.enumerateIfaces(ifaces, off_proc_ifaces, incoming_procs);
 		solver->addDomain(sd);
 	}
-    /*
 	{
-        using namespace std;
-	    // send info
-	    deque<char *>       buffers;
-	    deque<char *>       recv_buffers;
-	    vector<MPI_Request> requests;
-	    vector<MPI_Request> send_requests;
-	    for (auto &p : off_proc_ifaces) {
-	        int       dest   = p.second.first;
-	        IfaceSet<D> &iface  = p.second.second;
-	        int       size   = iface.serialize(nullptr);
-	        char *    buffer = new char[size];
-	        buffers.push_back(buffer);
-	        iface.serialize(buffer);
-	        MPI_Request request;
-	        MPI_Isend(buffer, size, MPI_CHAR, dest, 0, MPI_COMM_WORLD, &request);
-	        send_requests.push_back(request);
-	    }
-	    MPI_Barrier(MPI_COMM_WORLD);
-	    int        is_message;
-	    MPI_Status status;
-	    MPI_Iprobe(MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &is_message, &status);
-	    // recv info
-	    while (is_message) {
-	        int size;
-	        MPI_Get_count(&status, MPI_CHAR, &size);
-	        char *buffer = new char[size];
-	        recv_buffers.push_back(buffer);
+		using namespace std;
+		// send info
+		deque<char *>       buffers;
+		vector<MPI_Request> send_requests;
+		for (auto &p : off_proc_ifaces) {
+			int dest = p.first;
+			int size = 0;
+			for (auto q : p.second) {
+				IfaceSet<D> &iface = q.second;
+				size += iface.serialize(nullptr);
+			}
+			char *buffer = new char[size];
+			buffers.push_back(buffer);
+			int pos = 0;
+			for (auto q : p.second) {
+				IfaceSet<D> &iface = q.second;
+				pos += iface.serialize(buffer + pos);
+			}
+			MPI_Request request;
+			MPI_Isend(buffer, size, MPI_CHAR, dest, 0, MPI_COMM_WORLD, &request);
+			send_requests.push_back(request);
+		}
+		MPI_Barrier(MPI_COMM_WORLD);
+		// recv info
+		for (int src : incoming_procs) {
+			MPI_Status status;
+			MPI_Probe(src, 0, MPI_COMM_WORLD, &status);
+			int size;
+			MPI_Get_count(&status, MPI_CHAR, &size);
+			char *buffer = new char[size];
 
-	        MPI_Request request;
-	        MPI_Irecv(buffer, size, MPI_CHAR, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD,
-	                  &request);
-	        MPI_Iprobe(MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &is_message, &status);
-	        requests.push_back(request);
-	    }
-	    // wait for all
-	    MPI_Barrier(MPI_COMM_WORLD);
-	    MPI_Startall(send_requests.size(), &send_requests[0]);
-	    MPI_Startall(requests.size(), &requests[0]);
-	    MPI_Waitall(requests.size(), &requests[0], MPI_STATUSES_IGNORE);
-	    MPI_Barrier(MPI_COMM_WORLD);
-	    // delete send buffers
-	    for (char *buffer : buffers) {
-	        delete[] buffer;
-	    }
-	    // process received objects
-	    for (char *buffer : recv_buffers) {
-	        IfaceSet<D> ifs;
-	        ifs.deserialize(buffer);
-	        ifaces[ifs.id].insert(ifs);
-	        delete[] buffer;
-	    }
-	    MPI_Barrier(MPI_COMM_WORLD);
+			MPI_Recv(buffer, size, MPI_CHAR, src, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+			int pos = 0;
+			while (pos < size) {
+				IfaceSet<D> ifs;
+				pos += ifs.deserialize(buffer + pos);
+				ifaces[ifs.id].insert(ifs);
+			}
+
+			delete[] buffer;
+		}
+		// wait for all
+		MPI_Barrier(MPI_COMM_WORLD);
+		MPI_Startall(send_requests.size(), &send_requests[0]);
+		MPI_Waitall(send_requests.size(), &send_requests[0], MPI_STATUSES_IGNORE);
+		MPI_Barrier(MPI_COMM_WORLD);
+		// delete send buffers
+		for (char *buffer : buffers) {
+			delete[] buffer;
+		}
+		MPI_Barrier(MPI_COMM_WORLD);
 	}
-    */
 	indexDomainIfacesLocal();
 	indexIfacesLocal();
 	this->solver       = solver;
