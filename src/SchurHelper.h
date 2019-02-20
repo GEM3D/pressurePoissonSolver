@@ -192,7 +192,7 @@ inline SchurHelper<D>::SchurHelper(DomainCollection<D> dc, std::shared_ptr<Patch
 				pos += iface.serialize(buffer + pos);
 			}
 			MPI_Request request;
-			MPI_Isend(buffer, size, MPI_CHAR, dest, 0, MPI_COMM_WORLD, &request);
+			MPI_Isend(buffer, size, MPI_BYTE, dest, 0, MPI_COMM_WORLD, &request);
 			send_requests.push_back(request);
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
@@ -201,25 +201,23 @@ inline SchurHelper<D>::SchurHelper(DomainCollection<D> dc, std::shared_ptr<Patch
 			MPI_Status status;
 			MPI_Probe(src, 0, MPI_COMM_WORLD, &status);
 			int size;
-			MPI_Get_count(&status, MPI_CHAR, &size);
+			MPI_Get_count(&status, MPI_BYTE, &size);
 			char *buffer = new char[size];
 
-			MPI_Recv(buffer, size, MPI_CHAR, src, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			MPI_Recv(buffer, size, MPI_BYTE, src, 0, MPI_COMM_WORLD, &status);
 
 			int pos = 0;
-			while (pos < size) {
+            BufferReader reader(buffer);
+			while (reader.getPos() < size) {
 				IfaceSet<D> ifs;
-				pos += ifs.deserialize(buffer + pos);
+                reader >> ifs;
 				ifaces[ifs.id].insert(ifs);
 			}
 
 			delete[] buffer;
 		}
 		// wait for all
-		MPI_Barrier(MPI_COMM_WORLD);
-		MPI_Startall(send_requests.size(), &send_requests[0]);
 		MPI_Waitall(send_requests.size(), &send_requests[0], MPI_STATUSES_IGNORE);
-		MPI_Barrier(MPI_COMM_WORLD);
 		// delete send buffers
 		for (char *buffer : buffers) {
 			delete[] buffer;

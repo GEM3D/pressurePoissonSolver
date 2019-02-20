@@ -239,6 +239,8 @@ template <size_t D> class FineNbrInfo : public NbrInfo<D>
 	~FineNbrInfo() = default;
 	FineNbrInfo(std::array<int, Orthant<D>::num_orthants / 2> ids)
 	{
+		ptrs.fill(nullptr);
+		ranks.fill(0);
 		this->ids = ids;
 	}
 	NbrType getNbrType()
@@ -455,6 +457,7 @@ template <size_t D> inline void Domain<D>::setPtrs(std::map<int, std::shared_ptr
 }
 template <size_t D> inline void Domain<D>::updateRank(int rank)
 {
+    rank=rank;
 	for (Side<D> s : Side<D>::getValues()) {
 		if (hasNbr(s)) { getNbrInfoPtr(s)->updateRankOnNeighbors(rank, s); }
 	}
