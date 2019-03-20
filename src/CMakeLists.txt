@@ -2,6 +2,7 @@ project(DomainDecomp)
 
 find_package(Zoltan REQUIRED)
 find_package(PETSc REQUIRED)
+find_package(p4est REQUIRED)
 find_package(MPI REQUIRED)
 # If you haven't already set the C++ compiler, use the same compiler
 # that was used to build Trilinos on your machine.  You do _not_ need

@@ -29,4 +29,9 @@ target_sources_local(UTILS PRIVATE Init.cpp Init.h)
 target_link_libraries(UTILS Thunderegg)
 target_include_directories(UTILS PUBLIC ".")
 
+find_package(p4est REQUIRED)
+target_sources_local(UTILS PRIVATE TreeToP4est.cpp TreeToP4est.h)
+target_include_directories(UTILS PUBLIC ${p4est_INCLUDES})
+target_link_libraries(UTILS ${p4est_LIBRARIES})
+
 include(Writers/CMakeLists.txt)

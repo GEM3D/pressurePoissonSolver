@@ -37,6 +37,7 @@
 #include "SchurMatrixHelper2d.h"
 #include "Writers/ClawWriter.h"
 #include "Writers/MMWriter.h"
+#include "TreeToP4est.h"
 #ifdef ENABLE_AMGX
 #include "AmgxWrapper.h"
 #endif
@@ -162,6 +163,7 @@ int main(int argc, char *argv[])
 	args::Flag f_cheb(parser, "", "cheb preconditioner", {"cheb"});
 	args::Flag f_dft(parser, "", "dft", {"dft"});
 	args::Flag              f_setrow(parser, "", "set row of matrix", {"setrow"});
+	args::Flag              f_p4est(parser, "", "use p4est", {"p4est"});
 
 	int num_procs;
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
@@ -217,8 +219,12 @@ int main(int argc, char *argv[])
 			t.refineLeaves();
 		}
 	}
-	BalancedLevelsGenerator<2> blg(t, n);
+	if (f_p4est) {
+        TreeToP4est ttp(t);
+    }else{
+    }
 
+	BalancedLevelsGenerator<2> blg(t, n);
 	// partition domains if running in parallel
 	if (num_procs > 1) { blg.zoltanBalance(); }
 
