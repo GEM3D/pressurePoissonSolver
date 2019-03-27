@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -23,6 +23,7 @@
 #include "DomainCollection.h"
 #include "FivePtPatchOperator.h"
 #include "FunctionWrapper.h"
+#include "p4estBLG.h"
 //#include "IfaceMatrixHelper.h"
 #include "BilinearInterpolator.h"
 #include "GMG/Helper2d.h"
@@ -35,9 +36,9 @@
 #include "QuadInterpolator.h"
 #include "SchurHelper.h"
 #include "SchurMatrixHelper2d.h"
+#include "TreeToP4est.h"
 #include "Writers/ClawWriter.h"
 #include "Writers/MMWriter.h"
-#include "TreeToP4est.h"
 #ifdef ENABLE_AMGX
 #include "AmgxWrapper.h"
 #endif
@@ -162,8 +163,8 @@ int main(int argc, char *argv[])
 #endif
 	args::Flag f_cheb(parser, "", "cheb preconditioner", {"cheb"});
 	args::Flag f_dft(parser, "", "dft", {"dft"});
-	args::Flag              f_setrow(parser, "", "set row of matrix", {"setrow"});
-	args::Flag              f_p4est(parser, "", "use p4est", {"p4est"});
+	args::Flag f_setrow(parser, "", "set row of matrix", {"setrow"});
+	args::Flag f_p4est(parser, "", "use p4est", {"p4est"});
 
 	int num_procs;
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
@@ -219,16 +220,19 @@ int main(int argc, char *argv[])
 			t.refineLeaves();
 		}
 	}
+	std::vector<std::map<int, std::shared_ptr<Domain<2>>>> levels;
 	if (f_p4est) {
-        TreeToP4est ttp(t);
-    }else{
-    }
+		TreeToP4est ttp(t);
+		p4estBLG    blg(ttp.p4est, n);
+		levels = blg.levels;
+	} else {
+		BalancedLevelsGenerator<2> blg(t, n);
+		// partition domains if running in parallel
+		if (num_procs > 1) { blg.zoltanBalance(); }
+		levels = blg.levels;
+	}
 
-	BalancedLevelsGenerator<2> blg(t, n);
-	// partition domains if running in parallel
-	if (num_procs > 1) { blg.zoltanBalance(); }
-
-	dc.reset(new DomainCollection<2>(blg.levels[t.num_levels - 1], n));
+	dc.reset(new DomainCollection<2>(levels[t.num_levels - 1], n));
 	if (f_neumann) { dc->setNeumann(); }
 
 	// the functions that we are using
@@ -410,10 +414,10 @@ int main(int argc, char *argv[])
 					SchurMatrixHelper2d mh(sch);
 					A = mh.formCRSMatrix();
 				}
-                if(f_setrow){
-                    int row = 0;
-                    MatZeroRows(A,1,&row,1.0,nullptr,nullptr);
-                }
+				if (f_setrow) {
+					int row = 0;
+					MatZeroRows(A, 1, &row, 1.0, nullptr, nullptr);
+				}
 
 				timer.stop("Matrix Formation");
 			}
@@ -465,7 +469,7 @@ int main(int argc, char *argv[])
 					vector<shared_ptr<DomainCollection<2>>> dcs(t.num_levels);
 					dcs[0] = dc;
 					for (int i = 1; i < t.num_levels; i++) {
-						dcs[i].reset(new DomainCollection<2>(blg.levels[t.num_levels - 1 - i], n));
+						dcs[i].reset(new DomainCollection<2>(levels[t.num_levels - 1 - i], n));
 					}
 
 					gh.reset(new GMG::Helper2d(n, dcs, sch, args::get(f_gmg)));

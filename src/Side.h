@@ -359,7 +359,34 @@ template <size_t D> inline std::array<Orthant<D>, Orthant<D>::num_orthants> Orth
 	std::iota(retval.begin(), retval.end(), 0);
 	return retval;
 }
-
+/**
+ * @brief ostream operator that prints a string representation of side enum.
+ *
+ * For example, Side::west will print out "Side::west".
+ *
+ * @param os the ostream
+ * @param s the side to print out.
+ *
+ * @return  the ostream
+ */
+inline std::ostream &operator<<(std::ostream &os, const Side<2> &s)
+{
+	switch (s.toInt()) {
+		case Side<2>::west:
+			os << "Side::west";
+			break;
+		case Side<2>::east:
+			os << "Side::east";
+			break;
+		case Side<2>::south:
+			os << "Side::south";
+			break;
+		case Side<2>::north:
+			os << "Side::north";
+			break;
+	}
+	return os;
+}
 /**
  * @brief ostream operator that prints a string representation of side enum.
  *

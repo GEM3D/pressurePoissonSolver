@@ -82,6 +82,7 @@ target_sources_local(Thunderegg PRIVATE MatrixHelper.cpp MatrixHelper2d.cpp)
 target_sources_local(Thunderegg PRIVATE TriLinInterp.cpp BilinearInterpolator.cpp)
 target_sources_local(Thunderegg PRIVATE PBMatrix.cpp)
 target_sources_local(Thunderegg PRIVATE PolyChebPrec.cpp)
+target_sources_local(Thunderegg PRIVATE p4estBLG.cpp)
 target_link_libraries(
     Thunderegg PUBLIC
     tpl
@@ -120,6 +121,9 @@ target_link_libraries(AmgxWrapper
 )
 endif()
 
+find_package(p4est REQUIRED)
+target_include_directories(Thunderegg PUBLIC ${p4est_INCLUDES})
+target_link_libraries(Thunderegg PUBLIC ${p4est_LIBRARIES})
 
 add_subdirectory(PatchSolvers)
 include(GMG/CMakeLists.txt)

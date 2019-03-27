@@ -10,7 +10,7 @@ int refine_fn(p4est_t *p4est, p4est_topidx_t which_tree, p4est_quadrant_t *quadr
 		if (node.hasChildren()) {
 			int quad = (quadrant->x / P4EST_QUADRANT_LEN(i)) & 0x1;
 			quad |= ((quadrant->y / P4EST_QUADRANT_LEN(i)) & 0x1) << 1;
-            node = t.nodes[node.child_id[quad]];
+			node = t.nodes[node.child_id[quad]];
 		} else {
 			break;
 		}
@@ -22,4 +22,7 @@ TreeToP4est::TreeToP4est(Tree<2> t)
 	conn  = p4est_connectivity_new_unitsquare();
 	p4est = p4est_new_ext(MPI_COMM_WORLD, conn, 0, 0, 0, 0, nullptr, &t);
 	p4est_refine(p4est, true, refine_fn, nullptr);
+	p4est_partition(p4est, false, nullptr);
+	ghost = p4est_ghost_new(p4est, P4EST_CONNECT_FULL);
+	mesh  = p4est_mesh_new_ext(p4est, ghost, 1, 1, P4EST_CONNECT_FULL);
 }
