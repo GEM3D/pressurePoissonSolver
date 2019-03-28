@@ -78,18 +78,17 @@ inline void BalancedLevelsGenerator<D>::extractLevel(const Tree<D> &t, int level
 			d.id           = n.id;
 			d.lengths      = n.lengths;
 			d.starts       = n.starts;
-			d.child_id     = n.child_id;
 			d.refine_level = n.level;
 			if (n.level < level) {
 				d.parent_id = n.id;
 			} else {
 				d.parent_id = n.parent;
-			}
 			if (d.parent_id != -1) {
 				d.oct_on_parent = 0;
 				while (t.nodes.at(n.parent).child_id[d.oct_on_parent] != n.id) {
 					d.oct_on_parent++;
 				}
+			}
 			}
 
 			// set and enqueue nbrs

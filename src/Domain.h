@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -47,8 +47,6 @@ template <size_t D> struct Domain : public Serializable {
 	int parent_id     = -1;
 	int oct_on_parent = -1;
 
-	std::array<int, Orthant<D>::num_orthants> child_id;
-
 	std::bitset<2 * D> neumann;
 	bool               zero_patch = false;
 
@@ -62,7 +60,6 @@ template <size_t D> struct Domain : public Serializable {
 		starts.fill(0);
 		lengths.fill(1);
 		nbr_info.fill(nullptr);
-		child_id.fill(-1);
 	}
 	~Domain();
 	friend bool operator<(const Domain &l, const Domain &r)
@@ -75,6 +72,7 @@ template <size_t D> struct Domain : public Serializable {
 	CoarseNbrInfo<D> &getCoarseNbrInfo(Side<D> s) const;
 	FineNbrInfo<D> &  getFineNbrInfo(Side<D> s) const;
 	inline bool       hasNbr(Side<D> s) const;
+	inline bool       hasCoarseParent() const;
 	inline bool       isNeumann(Side<D> s) const;
 	void              setLocalNeighborIndexes(std::map<int, int> &rev_map);
 	void              setGlobalNeighborIndexes(std::map<int, int> &rev_map);
@@ -84,10 +82,6 @@ template <size_t D> struct Domain : public Serializable {
 	int               deserialize(char *buffer);
 	void              setPtrs(std::map<int, std::shared_ptr<Domain>> &domains);
 	void              updateRank(int rank);
-	inline bool       hasChildren()
-	{
-		return child_id[0] != -1;
-	}
 };
 template <size_t D> class NbrInfo : virtual public Serializable
 {
@@ -337,6 +331,10 @@ template <size_t D> inline bool Domain<D>::hasNbr(Side<D> s) const
 {
 	return nbr_info[s.toInt()] != nullptr;
 }
+template <size_t D> inline bool Domain<D>::hasCoarseParent() const
+{
+	return oct_on_parent != -1;
+}
 template <size_t D> inline bool Domain<D>::isNeumann(Side<D> s) const
 {
 	return neumann[s.toInt()];
@@ -378,7 +376,6 @@ template <size_t D> inline int Domain<D>::serialize(char *buffer) const
 	writer << refine_level;
 	writer << parent_id;
 	writer << oct_on_parent;
-	writer << child_id;
 	writer << neumann;
 	writer << zero_patch;
 	writer << starts;
@@ -418,7 +415,6 @@ template <size_t D> inline int Domain<D>::deserialize(char *buffer)
 	reader >> refine_level;
 	reader >> parent_id;
 	reader >> oct_on_parent;
-	reader >> child_id;
 	reader >> neumann;
 	reader >> zero_patch;
 	reader >> starts;
@@ -457,7 +453,7 @@ template <size_t D> inline void Domain<D>::setPtrs(std::map<int, std::shared_ptr
 }
 template <size_t D> inline void Domain<D>::updateRank(int rank)
 {
-    rank=rank;
+	rank = rank;
 	for (Side<D> s : Side<D>::getValues()) {
 		if (hasNbr(s)) { getNbrInfoPtr(s)->updateRankOnNeighbors(rank, s); }
 	}

@@ -97,8 +97,8 @@ template <size_t D> inline void AvgRstr<D>::restrict(PW<Vec> coarse, PW<Vec> fin
 		int        n          = d.n;
 		int        coarse_idx = data.local_index * npow[D];
 		int        fine_idx   = d.id_local * npow[D];
-		Orthant<D> orth       = d.oct_on_parent;
-		if (d.id != d.parent_id) {
+		if (d.hasCoarseParent()) {
+			Orthant<D>         orth = d.oct_on_parent;
 			std::array<int, D> strides;
 			std::array<int, D> starts;
 			for (size_t i = 0; i < D; i++) {

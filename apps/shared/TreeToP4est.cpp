@@ -22,7 +22,7 @@ TreeToP4est::TreeToP4est(Tree<2> t)
 	conn  = p4est_connectivity_new_unitsquare();
 	p4est = p4est_new_ext(MPI_COMM_WORLD, conn, 0, 0, 0, 0, nullptr, &t);
 	p4est_refine(p4est, true, refine_fn, nullptr);
-	p4est_partition(p4est, false, nullptr);
+	p4est_partition(p4est, true, nullptr);
 	ghost = p4est_ghost_new(p4est, P4EST_CONNECT_FULL);
 	mesh  = p4est_mesh_new_ext(p4est, ghost, 1, 1, P4EST_CONNECT_FULL);
 }

@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -637,7 +637,7 @@ void TriLinIntp::interpolate(PW<Vec> coarse, PW<Vec> fine) const
 		Orthant<3> oct      = d.oct_on_parent;
 		int        fine_idx = d.id_local * n * n * n;
 
-		if (d.id == d.parent_id) {
+		if (!d.hasCoarseParent()) {
 			for (int zi = 0; zi < n; zi++) {
 				for (int yi = 0; yi < n; yi++) {
 					for (int xi = 0; xi < n; xi++) {

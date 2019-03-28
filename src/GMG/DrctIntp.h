@@ -100,8 +100,8 @@ template <size_t D> inline void DrctIntp<D>::interpolate(PW<Vec> coarse, PW<Vec>
 		int        coarse_idx = p.local_index * npow[D];
 		int        fine_idx   = d.id_local * npow[D];
 
+		if (d.hasCoarseParent()) {
 		Orthant<D> orth = d.oct_on_parent;
-		if (d.id != d.parent_id) {
 			std::array<int, D> strides;
 			std::array<int, D> starts;
 			for (size_t i = 0; i < D; i++) {
