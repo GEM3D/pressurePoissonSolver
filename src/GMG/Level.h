@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -21,11 +21,11 @@
 
 #ifndef GMGLEVEL_H
 #define GMGLEVEL_H
-#include "DomainCollection.h"
-#include "Interpolator.h"
-#include "Operator.h"
-#include "Restrictor.h"
-#include "Smoother.h"
+#include <DomainCollection.h>
+#include <GMG/Interpolator.h>
+#include <GMG/Operator.h>
+#include <GMG/Restrictor.h>
+#include <GMG/Smoother.h>
 #include <memory>
 namespace GMG
 {

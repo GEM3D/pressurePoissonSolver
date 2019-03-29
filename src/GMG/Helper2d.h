@@ -21,9 +21,9 @@
 
 #ifndef GMGHELPER_H
 #define GMGHELPER_H
-#include "Cycle.h"
-#include "DomainCollection.h"
-#include "SchurHelper.h"
+#include <GMG/Cycle.h>
+#include <DomainCollection.h>
+#include <SchurHelper.h>
 #include <petscpc.h>
 namespace GMG
 {

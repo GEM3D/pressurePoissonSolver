@@ -21,7 +21,7 @@
 
 #ifndef GMGWrapOp_H
 #define GMGWrapOp_H
-#include "Operator.h"
+#include <GMG/Operator.h>
 #include <memory>
 namespace GMG
 {

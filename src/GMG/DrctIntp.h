@@ -21,9 +21,9 @@
 
 #ifndef GMGDrctIntp_H
 #define GMGDrctIntp_H
-#include "DomainCollection.h"
-#include "InterLevelComm.h"
-#include "Interpolator.h"
+#include <DomainCollection.h>
+#include <GMG/InterLevelComm.h>
+#include <GMG/Interpolator.h>
 #include <memory>
 namespace GMG
 {

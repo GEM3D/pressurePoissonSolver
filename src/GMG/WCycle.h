@@ -21,7 +21,7 @@
 
 #ifndef GMGWCycle_H
 #define GMGWCycle_H
-#include "GMG/Cycle.h"
+#include <GMG/Cycle.h>
 #include <json.hpp>
 namespace GMG
 {

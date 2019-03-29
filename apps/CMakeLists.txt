@@ -1,4 +1,15 @@
-project(DomainDecomp)
+project(Thunderegg_Apps)
+
+find_package(VTK)
+IF(VTK_FOUND)
+    SET(CMAKE_CXX_FLAGS "-DHAVE_VTK ${CMAKE_CXX_FLAGS}")
+    MESSAGE("-- VTK found, enabling vtk output")
+ENDIF()
+find_package(p4est)
+IF(p4est_FOUND)
+    SET(CMAKE_CXX_FLAGS "-DHAVE_P4EST ${CMAKE_CXX_FLAGS}")
+ENDIF()
+
 add_subdirectory(shared)
 add_subdirectory(2d)
 add_subdirectory(3d)

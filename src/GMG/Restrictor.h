@@ -21,8 +21,8 @@
 
 #ifndef GMGRestrictor_H
 #define GMGRestrictor_H
-#include "PW.h"
-#include "petscvec.h"
+#include <PW.h>
+#include <petscvec.h>
 namespace GMG
 {
 /**

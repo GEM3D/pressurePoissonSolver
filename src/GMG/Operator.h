@@ -21,8 +21,8 @@
 
 #ifndef GMGOperator_H
 #define GMGOperator_H
-#include "PW.h"
-#include "petscvec.h"
+#include <PW.h>
+#include <petscvec.h>
 namespace GMG
 {
 /**

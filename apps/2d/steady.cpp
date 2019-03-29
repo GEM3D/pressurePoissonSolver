@@ -23,7 +23,6 @@
 #include "DomainCollection.h"
 #include "FivePtPatchOperator.h"
 #include "FunctionWrapper.h"
-#include "p4estBLG.h"
 //#include "IfaceMatrixHelper.h"
 #include "BilinearInterpolator.h"
 #include "GMG/Helper2d.h"
@@ -36,20 +35,14 @@
 #include "QuadInterpolator.h"
 #include "SchurHelper.h"
 #include "SchurMatrixHelper2d.h"
-#include "TreeToP4est.h"
 #include "Writers/ClawWriter.h"
 #include "Writers/MMWriter.h"
-#ifdef ENABLE_AMGX
-#include "AmgxWrapper.h"
-#endif
-#ifdef ENABLE_MUELU
-#include <MueLuWrapper.h>
-#endif
-#ifdef ENABLE_MUELU_CUDA
-#include <MueLuCudaWrapper.h>
-#endif
 #ifdef HAVE_VTK
 #include "Writers/VtkWriter2d.h"
+#endif
+#ifdef HAVE_P4EST
+#include "TreeToP4est.h"
+#include "p4estBLG.h"
 #endif
 #include "Timer.h"
 #include "args.hxx"
@@ -148,23 +141,12 @@ int main(int argc, char *argv[])
 #ifdef __NVCC__
 	args::Flag f_cufft(parser, "cufft", "use CuFFT as the patch solver", {"cufft"});
 #endif
-
-// third-party preconditioners
-#ifdef ENABLE_AMGX
-	args::ValueFlag<string> f_amgx(parser, "", "solve schur compliment system with amgx", {"amgx"});
-#endif
-#ifdef ENABLE_MUELU
-	args::ValueFlag<string> f_meulu(parser, "", "solve schur compliment system with muelu",
-	                                {"muelu"});
-#endif
-#ifdef ENABLE_MUELU_CUDA
-	args::ValueFlag<string> f_meulucuda(parser, "", "solve schur compliment system with muelu",
-	                                    {"muelucuda"});
-#endif
 	args::Flag f_cheb(parser, "", "cheb preconditioner", {"cheb"});
 	args::Flag f_dft(parser, "", "dft", {"dft"});
 	args::Flag f_setrow(parser, "", "set row of matrix", {"setrow"});
+#ifdef HAVE_P4EST
 	args::Flag f_p4est(parser, "", "use p4est", {"p4est"});
+#endif
 
 	int num_procs;
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
@@ -221,10 +203,14 @@ int main(int argc, char *argv[])
 		}
 	}
 	std::vector<std::map<int, std::shared_ptr<Domain<2>>>> levels;
+#ifdef HAVE_P4EST
 	if (f_p4est) {
 		TreeToP4est ttp(t);
 		p4estBLG    blg(ttp.p4est, n);
 		levels = blg.levels;
+#else
+    if (false) {
+#endif
 	} else {
 		BalancedLevelsGenerator<2> blg(t, n);
 		// partition domains if running in parallel

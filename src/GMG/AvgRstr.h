@@ -21,9 +21,9 @@
 
 #ifndef GMGAVGRSTR_H
 #define GMGAVGRSTR_H
-#include "DomainCollection.h"
-#include "InterLevelComm.h"
-#include "Restrictor.h"
+#include <DomainCollection.h>
+#include <GMG/InterLevelComm.h>
+#include <GMG/Restrictor.h>
 #include <memory>
 namespace GMG
 {

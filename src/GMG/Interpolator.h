@@ -21,8 +21,8 @@
 
 #ifndef GMGInterpolator_H
 #define GMGInterpolator_H
-#include "PW.h"
-#include "petscvec.h"
+#include <PW.h>
+#include <petscvec.h>
 namespace GMG
 {
 /**

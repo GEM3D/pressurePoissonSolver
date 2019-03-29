@@ -21,7 +21,7 @@
 
 #ifndef CLAWWRITER_H
 #define CLAWWRITER_H
-#include "DomainCollection.h"
+#include <DomainCollection.h>
 class ClawWriter
 {
 	private:

@@ -21,8 +21,8 @@
 
 #ifndef GMGMatOp_H
 #define GMGMatOp_H
-#include "Operator.h"
-#include "petscmat.h"
+#include <GMG/Operator.h>
+#include <petscmat.h>
 #include <memory>
 namespace GMG
 {
