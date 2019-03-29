@@ -31,12 +31,13 @@ class FivePtPatchOperator : public PatchOperator<2>
 		double  h_x   = d.domain.lengths[0] / n;
 		double  h_y   = d.domain.lengths[1] / n;
 		int     start = n * n * d.domain.id_local;
-		double *u_view, *f_view, *gamma_view;
-		VecGetArray(u, &u_view);
+		const double *u_view, *gamma_view;
+		double *f_view;
+		VecGetArrayRead(u, &u_view);
 		VecGetArray(f, &f_view);
 		double *f_ptr = f_view + start;
-		double *u_ptr = u_view + start;
-		VecGetArray(gamma, &gamma_view);
+		const double *u_ptr = u_view + start;
+		VecGetArrayRead(gamma, &gamma_view);
 		const double *boundary_north = nullptr;
 		if (d.hasNbr(Side<2>::north)) {
 			boundary_north = &gamma_view[d.n * d.getIfaceLocalIndex(Side<2>::north)];
@@ -123,8 +124,8 @@ class FivePtPatchOperator : public PatchOperator<2>
 				f_ptr[(n - 1) * n + i] += (south - 3 * center + 2 * north) / (h_y * h_y);
 			}
 		}
-		VecRestoreArray(gamma, &gamma_view);
-		VecRestoreArray(u, &u_view);
+		VecRestoreArrayRead(gamma, &gamma_view);
+		VecRestoreArrayRead(u, &u_view);
 		VecRestoreArray(f, &f_view);
 	}
 };
