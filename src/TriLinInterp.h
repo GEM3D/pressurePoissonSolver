@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -25,8 +25,9 @@
 class TriLinInterp : public Interpolator<3>
 {
 	public:
-	void interpolate(SchurDomain<3> &d, const Vec u, Vec interp);
-	void interpolate(SchurDomain<3> &d, Side<3> s, int local_index, IfaceType itype, const Vec u,
-	                 Vec interp);
+	void interpolate(SchurDomain<3> &d, std::shared_ptr<const Vector<3>> u,
+	                 std::shared_ptr<Vector<2>> interp);
+	void interpolate(SchurDomain<3> &d, Side<3> s, int local_index, IfaceType itype,
+	                 std::shared_ptr<const Vector<3>> u, std::shared_ptr<Vector<2>> interp);
 };
 #endif

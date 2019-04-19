@@ -21,7 +21,8 @@
 
 #ifndef UTILS_H
 #define UTILS_H
-#include "SchurDomain.h"
+#include <SchurDomain.h>
+#include <Vector.h>
 #include <array>
 #include <cmath>
 #include <numeric>

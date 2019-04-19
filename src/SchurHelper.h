@@ -21,12 +21,13 @@
 
 #ifndef SCHURHELPER_H
 #define SCHURHELPER_H
-#include "DomainCollection.h"
-#include "Iface.h"
-#include "Interpolator.h"
-#include "PatchOperator.h"
-#include "PatchSolvers/PatchSolver.h"
-#include "SchurDomain.h"
+#include <DomainCollection.h>
+#include <Iface.h>
+#include <Interpolator.h>
+#include <PatchOperator.h>
+#include <PatchSolvers/PatchSolver.h>
+#include <SchurDomain.h>
+#include <PetscVector.h>
 #include <deque>
 #include <memory>
 #include <petscmat.h>
@@ -206,11 +207,10 @@ inline SchurHelper<D>::SchurHelper(DomainCollection<D> dc, std::shared_ptr<Patch
 
 			MPI_Recv(buffer, size, MPI_BYTE, src, 0, MPI_COMM_WORLD, &status);
 
-			int pos = 0;
-            BufferReader reader(buffer);
+			BufferReader reader(buffer);
 			while (reader.getPos() < size) {
 				IfaceSet<D> ifs;
-                reader >> ifs;
+				reader >> ifs;
 				ifaces[ifs.id].insert(ifs);
 			}
 
@@ -247,11 +247,14 @@ inline void SchurHelper<D>::solveWithInterface(const Vec f, Vec u, const Vec gam
 	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 
+	std::shared_ptr<Vector<D>> u_vec(new PetscVector<D>(u, n));
+	std::shared_ptr<Vector<D-1>> local_interp_vec(new PetscVector<D-1>(local_interp, n));
+
 	VecScale(local_interp, 0);
 	// solve over domains on this proc
 	solver->domainSolve(domains, f, u, local_gamma);
 	for (SchurDomain<D> &sd : domains) {
-		interpolator->interpolate(sd, u, local_interp);
+		interpolator->interpolate(sd, u_vec, local_interp_vec);
 	}
 
 	// export diff vector
@@ -268,11 +271,14 @@ inline void SchurHelper<D>::solveAndInterpolateWithInterface(const Vec f, Vec u,
 	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 
+	std::shared_ptr<Vector<D>> u_vec(new PetscVector<D>(u, n));
+	std::shared_ptr<Vector<D-1>> local_interp_vec(new PetscVector<D-1>(local_interp, n));
+
 	VecScale(local_interp, 0);
 	// solve over domains on this proc
 	solver->domainSolve(domains, f, u, local_gamma);
 	for (SchurDomain<D> &sd : domains) {
-		interpolator->interpolate(sd, u, local_interp);
+		interpolator->interpolate(sd, u_vec, local_interp_vec);
 	}
 
 	// export diff vector
@@ -285,8 +291,10 @@ template <size_t D> inline void SchurHelper<D>::solveWithSolution(const Vec f, V
 	// initilize our local variables
 	VecScale(local_gamma, 0);
 	VecScale(local_interp, 0);
+	std::shared_ptr<Vector<D>> u_vec(new PetscVector<D>(u, n));
+	std::shared_ptr<Vector<D-1>> local_interp_vec(new PetscVector<D-1>(local_interp, n));
 	for (SchurDomain<D> &sd : domains) {
-		interpolator->interpolate(sd, u, local_interp);
+		interpolator->interpolate(sd, u_vec, local_interp_vec);
 	}
 	VecScale(gamma, 0);
 	VecScatterBegin(scatter, local_interp, gamma, ADD_VALUES, SCATTER_REVERSE);
@@ -314,24 +322,35 @@ inline void SchurHelper<D>::applyWithInterface(const Vec u, const Vec gamma, Vec
 {
 	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
+
+	VecScale(f, 0);
+	std::shared_ptr<Vector<D>> f_vec(new PetscVector<D>(f, n));
+	std::shared_ptr<const Vector<D>> u_vec(new PetscVector<D>(u, n));
+	std::shared_ptr<const Vector<D-1>> local_gamma_vec(new PetscVector<D-1>(local_gamma, n));
+
 	for (SchurDomain<D> &sd : domains) {
-		op->apply(sd, u, local_gamma, f);
+		op->apply(sd, u_vec, local_gamma_vec, f_vec);
 	}
 }
 template <size_t D> inline void SchurHelper<D>::apply(const Vec u, Vec f)
 {
 	VecScale(local_interp, 0);
+	std::shared_ptr<const Vector<D>> u_vec(new PetscVector<D>(u, n));
+	std::shared_ptr<Vector<D-1>> local_interp_vec(new PetscVector<D-1>(local_interp, n));
 	for (SchurDomain<D> &sd : domains) {
-		interpolator->interpolate(sd, u, local_interp);
+		interpolator->interpolate(sd, u_vec, local_interp_vec);
 	}
 	VecScale(gamma, 0);
+	VecScale(f, 0);
 	VecScatterBegin(scatter, local_interp, gamma, ADD_VALUES, SCATTER_REVERSE);
 	VecScatterEnd(scatter, local_interp, gamma, ADD_VALUES, SCATTER_REVERSE);
 	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 
+	std::shared_ptr<Vector<D>> f_vec(new PetscVector<D>(f, n));
+	std::shared_ptr<const Vector<D-1>> local_gamma_vec(new PetscVector<D-1>(local_gamma, n));
 	for (SchurDomain<D> &sd : domains) {
-		op->apply(sd, u, local_gamma, f);
+		op->apply(sd, u_vec, local_gamma_vec, f_vec);
 	}
 }
 template <size_t D> inline void SchurHelper<D>::indexDomainIfacesLocal()

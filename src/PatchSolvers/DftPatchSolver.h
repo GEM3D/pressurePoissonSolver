@@ -21,9 +21,10 @@
 
 #ifndef DFTPATCHSOLVER_H
 #define DFTPATCHSOLVER_H
-#include "DomainCollection.h"
-#include "PatchSolvers/PatchSolver.h"
-#include "Utils.h"
+#include <DomainCollection.h>
+#include <PatchSolvers/PatchSolver.h>
+#include <Utils.h>
+#include <Vector.h>
 #include <bitset>
 #include <fftw3.h>
 #include <map>

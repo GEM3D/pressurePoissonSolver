@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -22,7 +22,8 @@
 #include "TriLinInterp.h"
 #include "Utils.h"
 using namespace Utils;
-void TriLinInterp::interpolate(SchurDomain<3> &d, const Vec u, Vec interp)
+void TriLinInterp::interpolate(SchurDomain<3> &d, std::shared_ptr<const Vector<3>> u,
+                               std::shared_ptr<Vector<2>> interp)
 {
 	for (Side<3> s : Side<3>::getValues()) {
 		if (d.hasNbr(s)) {
@@ -36,128 +37,106 @@ void TriLinInterp::interpolate(SchurDomain<3> &d, const Vec u, Vec interp)
 	}
 }
 void TriLinInterp::interpolate(SchurDomain<3> &d, Side<3> s, int local_index, IfaceType itype,
-                               const Vec u, Vec interp)
+                               std::shared_ptr<const Vector<3>> u,
+                               std::shared_ptr<Vector<2>>       interp)
 {
-	int     n = d.n;
-	double *interp_view;
-	VecGetArray(interp, &interp_view);
-	double *      u_view;
-	const double *const_u_view;
-	VecGetArrayRead(u, &const_u_view);
-	u_view  = const_cast<double *>(const_u_view);
-	int idx = local_index * n * n;
+	int n = d.n;
+
+	LocalData<2>       interp_data = interp->getLocalData(local_index);
+	const LocalData<2> sl          = u->getLocalData(d.local_index).getSliceOnSide(s);
+
 	switch (itype.toInt()) {
 		case IfaceType::normal: {
-			Slice<2> sl = getSlice(d, u_view, s);
 			for (int yi = 0; yi < n; yi++) {
 				for (int xi = 0; xi < n; xi++) {
-					interp_view[idx + xi + yi * n] += 0.5 * sl({xi, yi});
+					interp_data[{xi, yi}] += 0.5 * sl[{xi, yi}];
 				}
 			}
 		} break;
 		case IfaceType::fine_to_fine: {
-			Slice<2> sl = getSlice(d, u_view, s);
 			for (int yi = 0; yi < n / 2; yi++) {
 				for (int xi = 0; xi < n / 2; xi++) {
-					double a = sl({xi * 2, yi * 2});
-					double b = sl({xi * 2 + 1, yi * 2});
-					double c = sl({xi * 2, yi * 2 + 1});
-					double d = sl({xi * 2 + 1, yi * 2 + 1});
-					interp_view[idx + (xi * 2) + (yi * 2) * n] += (11 * a - b - c - d) / 12.0;
-					interp_view[idx + (xi * 2 + 1) + (yi * 2) * n] += (-a + 11 * b - c - d) / 12.0;
-					interp_view[idx + (xi * 2) + (yi * 2 + 1) * n] += (-a - b + 11 * c - d) / 12.0;
-					interp_view[idx + (xi * 2 + 1) + (yi * 2 + 1) * n]
-					+= (-a - b - c + 11 * d) / 12.0;
+					double a = sl[{xi * 2, yi * 2}];
+					double b = sl[{xi * 2 + 1, yi * 2}];
+					double c = sl[{xi * 2, yi * 2 + 1}];
+					double d = sl[{xi * 2 + 1, yi * 2 + 1}];
+					interp_data[{xi * 2, yi * 2}] += (11 * a - b - c - d) / 12.0;
+					interp_data[{xi * 2 + 1, yi * 2}] += (-a + 11 * b - c - d) / 12.0;
+					interp_data[{xi * 2, yi * 2 + 1}] += (-a - b + 11 * c - d) / 12.0;
+					interp_data[{xi * 2 + 1, yi * 2 + 1}] += (-a - b - c + 11 * d) / 12.0;
 				}
 			}
 		} break;
 		case IfaceType::coarse_to_fine:
 			switch (itype.getOrthant()) {
 				case 0: {
-					Slice<2> sl = getSlice(d, u_view, s);
 					for (int yi = 0; yi < n; yi++) {
 						for (int xi = 0; xi < n; xi++) {
-							interp_view[idx + xi + yi * n] += 4.0 * sl({(xi) / 2, (yi) / 2}) / 12.0;
+							interp_data[{xi, yi}] += 4.0 * sl[{(xi) / 2, (yi) / 2}] / 12.0;
 						}
 					}
 				} break;
 				case 1: {
-					Slice<2> sl = getSlice(d, u_view, s);
 					for (int yi = 0; yi < n; yi++) {
 						for (int xi = 0; xi < n; xi++) {
-							interp_view[idx + xi + yi * n]
-							+= 4.0 * sl({(xi + n) / 2, (yi) / 2}) / 12.0;
+							interp_data[{xi, yi}] += 4.0 * sl[{(xi + n) / 2, (yi) / 2}] / 12.0;
 						}
 					}
 				} break;
 				case 2: {
-					Slice<2> sl = getSlice(d, u_view, s);
 					for (int yi = 0; yi < n; yi++) {
 						for (int xi = 0; xi < n; xi++) {
-							interp_view[idx + xi + yi * n]
-							+= 4.0 * sl({(xi) / 2, (yi + n) / 2}) / 12.0;
+							interp_data[{xi, yi}] += 4.0 * sl[{(xi) / 2, (yi + n) / 2}] / 12.0;
 						}
 					}
 				} break;
 				case 3: {
-					Slice<2> sl = getSlice(d, u_view, s);
 					for (int yi = 0; yi < n; yi++) {
 						for (int xi = 0; xi < n; xi++) {
-							interp_view[idx + xi + yi * n]
-							+= 4.0 * sl({(xi + n) / 2, (yi + n) / 2}) / 12.0;
+							interp_data[{xi, yi}] += 4.0 * sl[{(xi + n) / 2, (yi + n) / 2}] / 12.0;
 						}
 					}
 				} break;
 			}
 			break;
 		case IfaceType::coarse_to_coarse: {
-			Slice<2> sl = getSlice(d, u_view, s);
 			for (int yi = 0; yi < n; yi++) {
 				for (int xi = 0; xi < n; xi++) {
-					interp_view[idx + xi + yi * n] += 2.0 / 6.0 * sl({xi, yi});
+					interp_data[{xi, yi}] += 2.0 / 6.0 * sl[{xi, yi}];
 				}
 			}
 		} break;
 		case IfaceType::fine_to_coarse:
 			switch (itype.getOrthant()) {
 				case 0: {
-					Slice<2> sl = getSlice(d, u_view, s);
 					for (int yi = 0; yi < n; yi++) {
 						for (int xi = 0; xi < n; xi++) {
-							interp_view[idx + (xi) / 2 + (yi) / 2 * n] += 1.0 / 6.0 * sl({xi, yi});
+							interp_data[{(xi) / 2, (yi) / 2}] += 1.0 / 6.0 * sl[{xi, yi}];
 						}
 					}
 				} break;
 				case 1: {
-					Slice<2> sl = getSlice(d, u_view, s);
 					for (int yi = 0; yi < n; yi++) {
 						for (int xi = 0; xi < n; xi++) {
-							interp_view[idx + (xi + n) / 2 + (yi) / 2 * n]
-							+= 1.0 / 6.0 * sl({xi, yi});
+							interp_data[{(xi + n) / 2, (yi) / 2}] += 1.0 / 6.0 * sl[{xi, yi}];
 						}
 					}
 				} break;
 				case 2: {
-					Slice<2> sl = getSlice(d, u_view, s);
 					for (int yi = 0; yi < n; yi++) {
 						for (int xi = 0; xi < n; xi++) {
-							interp_view[idx + (xi) / 2 + (yi + n) / 2 * n]
-							+= 1.0 / 6.0 * sl({xi, yi});
+							interp_data[{(xi) / 2, (yi + n) / 2}] += 1.0 / 6.0 * sl[{xi, yi}];
 						}
 					}
 				} break;
 				case 3: {
-					Slice<2> sl = getSlice(d, u_view, s);
 					for (int yi = 0; yi < n; yi++) {
 						for (int xi = 0; xi < n; xi++) {
-							interp_view[idx + (xi + n) / 2 + (yi + n) / 2 * n]
-							+= 1.0 / 6.0 * sl({xi, yi});
+							interp_data[{(xi + n) / 2, (yi + n) / 2}] += 1.0 / 6.0 * sl[{xi, yi}];
 						}
 					}
 				} break;
 			}
 			break;
 	}
-	VecRestoreArray(interp, &interp_view);
-	VecRestoreArrayRead(u, &const_u_view);
 }

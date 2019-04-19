@@ -158,7 +158,9 @@ void SchurMatrixHelper2d::assembleMatrix(inserter insertBlock)
 				Side<2>   s    = p.first.s;
 				IfaceType type = p.first.type;
 				VecScale(interp, 0);
-				interpolator->interpolate(sd, s, 0, type, u, interp);
+	            std::shared_ptr<Vector<2>> u_vec(new PetscVector<2>(u, n));
+	            std::shared_ptr<Vector<1>> interp_vec(new PetscVector<1>(interp, n));
+				interpolator->interpolate(sd, s, 0, type, u_vec, interp_vec);
 				valarray<double> &block = *p.second;
 				for (int i = 0; i < n; i++) {
 					block[i * n + j] = -interp_view[i];

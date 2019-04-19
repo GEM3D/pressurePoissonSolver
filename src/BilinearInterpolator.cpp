@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -23,7 +23,8 @@
 #include "Utils.h"
 using namespace std;
 using namespace Utils;
-void BilinearInterpolator::interpolate(SchurDomain<2> &d, const Vec u, Vec interp)
+void BilinearInterpolator::interpolate(SchurDomain<2> &d, std::shared_ptr<const Vector<2>> u,
+                                       std::shared_ptr<Vector<1>> interp)
 {
 	for (Side<2> s : Side<2>::getValues()) {
 		if (d.hasNbr(s)) {
@@ -37,67 +38,59 @@ void BilinearInterpolator::interpolate(SchurDomain<2> &d, const Vec u, Vec inter
 	}
 }
 void BilinearInterpolator::interpolate(SchurDomain<2> &d, Side<2> s, int local_index,
-                                       IfaceType itype, const Vec u, Vec interp)
+                                       IfaceType itype, std::shared_ptr<const Vector<2>> u,
+                                       std::shared_ptr<Vector<1>> interp)
 {
-	int     n = d.n;
-	double *interp_view;
-	VecGetArray(interp, &interp_view);
-	double *u_view;
-	VecGetArray(u, &u_view);
-	int idx = local_index * n;
+	int n = d.n;
+
+	LocalData<1>       interp_data = interp->getLocalData(local_index);
+	const LocalData<1> sl          = u->getLocalData(d.domain.id_local).getSliceOnSide(s);
+
 	switch (itype.toInt()) {
 		case IfaceType::normal: {
-			Slice<1> sl = getSlice<2>(d, u_view, s);
 			for (int i = 0; i < n; i++) {
-				interp_view[idx + i] += 0.5 * sl({i});
+				interp_data[{i}] += 0.5 * sl[{i}];
 			}
 		} break;
 		case IfaceType::coarse_to_coarse: {
-			Slice<1> sl = getSlice<2>(d, u_view, s);
 			// middle cases
 			for (int i = 0; i < n; i++) {
-				interp_view[idx + i] += 1.0 / 3 * sl({i});
+				interp_data[{i}] += 1.0 / 3 * sl[{i}];
 			}
 		} break;
 		case IfaceType::fine_to_coarse: {
-			Slice<1> sl = getSlice<2>(d, u_view, s);
 			if (itype.getOrthant() == 0) {
 				// middle cases
 				for (int i = 0; i < n; i += 2) {
-					interp_view[idx + i / 2] += 1.0 / 3 * sl({i}) + 1.0 / 3 * sl({i + 1});
+					interp_data[{i / 2}] += 1.0 / 3 * sl[{i}] + 1.0 / 3 * sl[{i + 1}];
 				}
 			} else {
 				// middle cases
 				for (int i = 0; i < n; i += 2) {
-					interp_view[idx + (n + i) / 2] += 1.0 / 3 * sl({i}) + 1.0 / 3 * sl({i + 1});
+					interp_data[{(n + i) / 2}] += 1.0 / 3 * sl[{i}] + 1.0 / 3 * sl[{i + 1}];
 				}
 			}
 		} break;
 		case IfaceType::fine_to_fine: {
-			Slice<1> sl = getSlice<2>(d, u_view, s);
 			// middle cases
 			for (int i = 0; i < n; i += 2) {
-				interp_view[idx + i] += 5.0 / 6 * sl({i}) - 1.0 / 6 * sl({i + 1});
+				interp_data[{i}] += 5.0 / 6 * sl[{i}] - 1.0 / 6 * sl[{i + 1}];
 			}
 			for (int i = 1; i < n; i += 2) {
-				interp_view[idx + i] += 5.0 / 6 * sl({i}) - 1.0 / 6 * sl({i - 1});
+				interp_data[{i}] += 5.0 / 6 * sl[{i}] - 1.0 / 6 * sl[{i - 1}];
 			}
 		} break;
 		case IfaceType::coarse_to_fine: {
-			Slice<1> sl = getSlice<2>(d, u_view, s);
 			if (itype.getOrthant() == 0) {
 				for (int i = 0; i < n; i++) {
-					interp_view[idx + i] += 2.0 / 6 * sl({i / 2});
+					interp_data[{i}] += 2.0 / 6 * sl[{i / 2}];
 				}
 			} else {
 				// middle cases
 				for (int i = 0; i < n; i++) {
-					interp_view[idx + i] += 2.0 / 6 * sl({(n + i) / 2});
+					interp_data[{i}] += 2.0 / 6 * sl[{(n + i) / 2}];
 				}
 			}
 		} break;
 	}
-
-	VecRestoreArray(interp, &interp_view);
-	VecRestoreArray(u, &u_view);
 }

@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -21,12 +21,14 @@
 
 #ifndef PATCHOPERATOR_H
 #define PATCHOPERATOR_H
-#include "SchurDomain.h"
-#include <petscvec.h>
+#include <SchurDomain.h>
+#include <Vector.h>
 template <size_t D> class PatchOperator
 {
 	public:
 	virtual ~PatchOperator() {}
-	virtual void apply(SchurDomain<D> &d, const Vec u, const Vec gamma, Vec f) = 0;
+	virtual void apply(SchurDomain<D> &d, std::shared_ptr<const Vector<D>> u,
+	                   std::shared_ptr<const Vector<D-1>> gamma, std::shared_ptr<Vector<D>> f)
+	= 0;
 };
 #endif
