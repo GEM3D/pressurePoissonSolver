@@ -21,13 +21,12 @@
 
 #ifndef FFTWPATCHSOLVER_H
 #define FFTWPATCHSOLVER_H
-#include "DomainCollection.h"
-#include "PatchSolvers/PatchSolver.h"
-#include "Utils.h"
+#include <DomainCollection.h>
+#include <PatchSolvers/PatchSolver.h>
+#include <ValVector.h>
 #include <bitset>
 #include <fftw3.h>
 #include <map>
-#include <valarray>
 #ifndef DOMAINK
 #define DOMAINK
 template <size_t D> struct DomainK {
@@ -56,17 +55,19 @@ template <size_t D> class FftwPatchSolver : public PatchSolver<D>
 	double                                      lambda;
 	std::map<DomainK<D>, fftw_plan>             plan1;
 	std::map<DomainK<D>, fftw_plan>             plan2;
-	std::valarray<double>                       f_copy;
-	std::valarray<double>                       tmp;
-	std::valarray<double>                       sol;
+	ValVector<D>                                f_copy;
+	ValVector<D>                                tmp;
+	ValVector<D>                                sol;
 	std::array<int, D + 1>                      npow;
 	std::map<DomainK<D>, std::valarray<double>> denoms;
 
 	public:
 	FftwPatchSolver(DomainCollection<D> &dsc, double lambda = 0);
 	~FftwPatchSolver();
-	void solve(SchurDomain<D> &d, const Vec f, Vec u, const Vec gamma);
-	void domainSolve(std::deque<SchurDomain<D>> &domains, const Vec f, Vec u, const Vec gamma)
+	void solve(SchurDomain<D> &d, std::shared_ptr<const Vector<D>> f, std::shared_ptr<Vector<D>> u,
+	           std::shared_ptr<const Vector<D - 1>> gamma);
+	void domainSolve(std::deque<SchurDomain<D>> &domains, std::shared_ptr<const Vector<D>> f,
+	                 std::shared_ptr<Vector<D>> u, std::shared_ptr<const Vector<D - 1>> gamma)
 	{
 		for (SchurDomain<D> &d : domains) {
 			solve(d, f, u, gamma);
@@ -93,12 +94,14 @@ template <size_t D> void FftwPatchSolver<D>::addDomain(SchurDomain<D> &d)
 	using namespace std;
 	if (!initialized) {
 		initialized = true;
-		f_copy.resize(pow(n, D));
-		tmp.resize(pow(n, D));
-		sol.resize(pow(n, D));
 		for (size_t i = 0; i <= D; i++) {
 			npow[i] = (int) std::pow(n, i);
 		}
+		std::array<int, D> lengths;
+		lengths.fill(n);
+		f_copy = ValVector<D>(lengths);
+		tmp    = ValVector<D>(lengths);
+		sol    = ValVector<D>(lengths);
 	}
 
 	int           ns[D];
@@ -123,10 +126,10 @@ template <size_t D> void FftwPatchSolver<D>::addDomain(SchurDomain<D> &d)
 			}
 		}
 
-		plan1[d]
-		= fftw_plan_r2r(D, ns, &f_copy[0], &tmp[0], transforms, FFTW_MEASURE | FFTW_DESTROY_INPUT);
-		plan2[d]
-		= fftw_plan_r2r(D, ns, &tmp[0], &sol[0], transforms_inv, FFTW_MEASURE | FFTW_DESTROY_INPUT);
+		plan1[d] = fftw_plan_r2r(D, ns, &f_copy.vec[0], &tmp.vec[0], transforms,
+		                         FFTW_MEASURE | FFTW_DESTROY_INPUT);
+		plan2[d] = fftw_plan_r2r(D, ns, &tmp.vec[0], &sol.vec[0], transforms_inv,
+		                         FFTW_MEASURE | FFTW_DESTROY_INPUT);
 	}
 
 	if (!denoms.count(d)) {
@@ -167,51 +170,50 @@ template <size_t D> void FftwPatchSolver<D>::addDomain(SchurDomain<D> &d)
 	}
 }
 template <size_t D>
-void FftwPatchSolver<D>::solve(SchurDomain<D> &d, const Vec f, Vec u, const Vec gamma)
+void FftwPatchSolver<D>::solve(SchurDomain<D> &d, std::shared_ptr<const Vector<D>> f,
+                               std::shared_ptr<Vector<D>>           u,
+                               std::shared_ptr<const Vector<D - 1>> gamma)
 {
 	using namespace std;
 	using namespace Utils;
-	const double *f_view, *gamma_view;
-	VecGetArrayRead(f, &f_view);
-	VecGetArrayRead(gamma, &gamma_view);
+	const LocalData<D> f_view      = f->getLocalData(d.local_index);
+	LocalData<D>       f_copy_view = f_copy.getLocalData(0);
+	LocalData<D>       tmp_view    = tmp.getLocalData(0);
 
-	int start = d.local_index * npow[D];
-	for (int i = 0; i < npow[D]; i++) {
-		f_copy[i] = f_view[start + i];
-	}
+	std::array<int, D> start, end;
+	start.fill(0);
+	end.fill(n - 1);
 
-	for (Side<D> s : Side<D>::getValues()) {
+	nested_loop<D>(start, end,
+	               [&](std::array<int, D> coord) { f_copy_view[coord] = f_view[coord]; });
+
+    for (Side<D> s : Side<D>::getValues()) {
+		std::array<int, D - 1> start, end;
+		start.fill(0);
+		end.fill(n - 1);
+
 		if (d.hasNbr(s)) {
-			int          idx = npow[D - 1] * d.getIfaceLocalIndex(s);
-			Slice<D - 1> sl  = getSlice<D - 1>(&f_copy[0], n, s, &npow[0]);
-			double       h2  = pow(d.domain.lengths[s.toInt() / 2] / n, 2);
-			for (int i = 0; i < npow[D - 1]; i++) {
-				std::array<int, D - 1> coord;
-				for (size_t x = 0; x < D - 1; x++) {
-					coord[x] = (i / npow[x]) % n;
-				}
-				sl(coord) -= 2.0 / h2 * gamma_view[idx + i];
-			}
+			const LocalData<D - 1> gamma_view = gamma->getLocalData(d.getIfaceLocalIndex(s));
+			LocalData<D - 1>       slice      = f_copy.getLocalData(0).getSliceOnSide(s);
+			double                 h2         = pow(d.domain.lengths[s.toInt() / 2] / n, 2);
+			nested_loop<D - 1>(start, end, [&](std::array<int, D - 1> coord) {
+				slice[coord] -= 2.0 / h2 * gamma_view[coord];
+			});
 		}
 	}
 
 	fftw_execute(plan1[d]);
 
-	tmp /= denoms[d];
+	tmp.vec /= denoms[d];
 
-	if (d.neumann.all()) { tmp[0] = 0; }
+	if (d.neumann.all()) { tmp.vec[0] = 0; }
 
 	fftw_execute(plan2[d]);
 
-	sol /= pow(2.0 * n, D);
+	sol.vec /= pow(2.0 * n, D);
 
-	double *u_view;
-	VecGetArray(u, &u_view);
-	for (int i = 0; i < npow[D]; i++) {
-		u_view[start + i] = sol[i];
-	}
-	VecRestoreArray(u, &u_view);
-	VecRestoreArrayRead(f, &f_view);
-	VecRestoreArrayRead(gamma, &gamma_view);
+	LocalData<D> u_view = u->getLocalData(d.local_index);
+	LocalData<D> sol_view = sol.getLocalData(0);
+	nested_loop<D>(start, end, [&](std::array<int, D> coord) { u_view[coord] = sol_view[coord]; });
 }
 #endif

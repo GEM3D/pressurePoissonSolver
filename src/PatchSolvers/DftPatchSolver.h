@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -24,9 +24,8 @@
 #include <DomainCollection.h>
 #include <PatchSolvers/PatchSolver.h>
 #include <Utils.h>
-#include <Vector.h>
+#include <ValVector.h>
 #include <bitset>
-#include <fftw3.h>
 #include <map>
 #include <valarray>
 extern "C" void dgemv_(char &, int &, int &, double &, double *, int &, double *, int &, double &,
@@ -36,8 +35,8 @@ enum class DftType { DCT_II, DCT_III, DCT_IV, DST_II, DST_III, DST_IV };
 #ifndef DOMAINK
 #define DOMAINK
 template <size_t D> struct DomainK {
-	unsigned long  neumann = 0;
-	double h_x     = 0;
+	unsigned long neumann = 0;
+	double        h_x     = 0;
 
 	DomainK() {}
 	DomainK(const SchurDomain<D> &d)
@@ -61,8 +60,9 @@ template <size_t D> class DftPatchSolver : public PatchSolver<D>
 	double                                                                      lambda;
 	std::map<DomainK<D>, std::array<std::shared_ptr<std::valarray<double>>, D>> plan1;
 	std::map<DomainK<D>, std::array<std::shared_ptr<std::valarray<double>>, D>> plan2;
-	std::valarray<double>                                                       f_copy;
-	std::valarray<double>                                                       tmp;
+	ValVector<D>                                                                f_copy;
+	ValVector<D>                                                                tmp;
+	ValVector<D>                                                                local_tmp;
 	std::map<DomainK<D>, std::valarray<double>>                                 eigen_vals;
 	std::array<std::shared_ptr<std::valarray<double>>, 6>                       transforms
 	= {{nullptr, nullptr, nullptr, nullptr, nullptr, nullptr}};
@@ -70,13 +70,15 @@ template <size_t D> class DftPatchSolver : public PatchSolver<D>
 	std::array<std::shared_ptr<std::valarray<double>>, D> plan(DftType *types);
 
 	std::shared_ptr<std::valarray<double>> getTransformArray(DftType type);
-	void execute_plan(std::array<std::shared_ptr<std::valarray<double>>, D> plan, double *in,
-	                  double *out, const bool inverse);
+	void execute_plan(std::array<std::shared_ptr<std::valarray<double>>, D> plan, LocalData<D> in,
+	                  LocalData<D> out, const bool inverse);
 
 	public:
 	DftPatchSolver(DomainCollection<D> &dsc, double lambda = 0);
-	void solve(SchurDomain<D> &d, const Vec f, Vec u, const Vec gamma);
-	void domainSolve(std::deque<SchurDomain<D>> &domains, const Vec f, Vec u, const Vec gamma)
+	void solve(SchurDomain<D> &d, std::shared_ptr<const Vector<D>> f, std::shared_ptr<Vector<D>> u,
+	           std::shared_ptr<const Vector<D - 1>> gamma);
+	void domainSolve(std::deque<SchurDomain<D>> &domains, std::shared_ptr<const Vector<D>> f,
+	                 std::shared_ptr<Vector<D>> u, std::shared_ptr<const Vector<D - 1>> gamma)
 	{
 		for (SchurDomain<D> &d : domains) {
 			solve(d, f, u, gamma);
@@ -95,8 +97,11 @@ template <size_t D> inline void DftPatchSolver<D>::addDomain(SchurDomain<D> &d)
 	using namespace std;
 	if (!initialized) {
 		initialized = true;
-		f_copy.resize(pow(n, D));
-		tmp.resize(pow(n, D));
+		std::array<int, D> lengths;
+		lengths.fill(n);
+		f_copy = ValVector<D>(lengths);
+		tmp    = ValVector<D>(lengths);
+		if (!(D % 2)) { local_tmp = ValVector<D>(lengths); }
 	}
 
 	DftType transforms[D];
@@ -160,57 +165,53 @@ template <size_t D> inline void DftPatchSolver<D>::addDomain(SchurDomain<D> &d)
 		denom += lambda;
 	}
 }
+
+
 template <size_t D>
-inline void DftPatchSolver<D>::solve(SchurDomain<D> &d, const Vec f, Vec u, const Vec gamma)
+inline void DftPatchSolver<D>::solve(SchurDomain<D> &d, std::shared_ptr<const Vector<D>> f,
+                                     std::shared_ptr<Vector<D>>           u,
+                                     std::shared_ptr<const Vector<D - 1>> gamma)
 {
 	using namespace std;
 	using namespace Utils;
-	const double *f_view, *gamma_view;
-	VecGetArrayRead(f, &f_view);
-	VecGetArrayRead(gamma, &gamma_view);
+	const LocalData<D> f_view      = f->getLocalData(d.local_index);
+	LocalData<D>       f_copy_view = f_copy.getLocalData(0);
+	LocalData<D>       tmp_view    = tmp.getLocalData(0);
 
-	int start = d.local_index * pow(n, D);
-	for (int i = 0; i < (const int) pow(n, D); i++) {
-		f_copy[i] = f_view[start + i];
-	}
+	std::array<int, D> start, end;
+	start.fill(0);
+	end.fill(n - 1);
+
+	nested_loop<D>(start, end,
+	               [&](std::array<int, D> coord) { f_copy_view[coord] = f_view[coord]; });
 
 	for (Side<D> s : Side<D>::getValues()) {
+		std::array<int, D - 1> start, end;
+		start.fill(0);
+		end.fill(n - 1);
+
 		if (d.hasNbr(s)) {
-			int          idx = pow(n, D - 1) * d.getIfaceLocalIndex(s);
-			Slice<D - 1> sl  = getSlice<D - 1>(&f_copy[0], n, s);
-			double       h2  = pow(d.domain.lengths[s.toInt() / 2] / n, 2);
-			int          strides[D - 1];
-			for (size_t i = 0; i < D - 1; i++) {
-				strides[i] = pow(n, i);
-			}
-			for (int i = 0; i < (const int) pow(n, D - 1); i++) {
-				std::array<int, D - 1> coord;
-				for (size_t x = 0; x < D - 1; x++) {
-					coord[x] = (i / strides[x]) % n;
-				}
-				sl(coord) -= 2.0 / h2 * gamma_view[idx + i];
-			}
+			const LocalData<D - 1> gamma_view = gamma->getLocalData(d.getIfaceLocalIndex(s));
+			LocalData<D - 1>       slice      = f_copy.getLocalData(0).getSliceOnSide(s);
+			double                 h2         = pow(d.domain.lengths[s.toInt() / 2] / n, 2);
+			nested_loop<D - 1>(start, end, [&](std::array<int, D - 1> coord) {
+				slice[coord] -= 2.0 / h2 * gamma_view[coord];
+			});
 		}
 	}
 
-	execute_plan(plan1[d], &f_copy[0], &tmp[0], false);
+	execute_plan(plan1[d], f_copy_view, tmp_view, false);
 
-	tmp /= eigen_vals[d];
+	tmp.vec /= eigen_vals[d];
 
-	if (d.neumann.all()) { tmp[0] = 0; }
+	if (d.neumann.all()) { tmp.vec[0] = 0; }
 
-	double *u_view;
-	VecGetArray(u, &u_view);
-	double *u_local_view = u_view + start;
-	execute_plan(plan2[d], &tmp[0], u_local_view, true);
+	LocalData<D> u_view = u->getLocalData(d.local_index);
+
+	execute_plan(plan2[d], tmp_view, u_view, false);
 
 	double scale = pow(2.0 / n, D);
-	for (int i = 0; i < (const int) pow(n, D); i++) {
-		u_local_view[i] *= scale;
-	}
-	VecRestoreArray(u, &u_view);
-	VecRestoreArrayRead(f, &f_view);
-	VecRestoreArrayRead(gamma, &gamma_view);
+	nested_loop<D>(start, end, [&](std::array<int, D> coord) { u_view[coord] *= scale; });
 }
 template <size_t D>
 inline std::array<std::shared_ptr<std::valarray<double>>, D> DftPatchSolver<D>::plan(DftType *types)
@@ -293,45 +294,54 @@ inline std::shared_ptr<std::valarray<double>> DftPatchSolver<D>::getTransformArr
 template <size_t D>
 inline void
 DftPatchSolver<D>::execute_plan(std::array<std::shared_ptr<std::valarray<double>>, D> plan,
-                                double *in, double *out, const bool inverse)
+                                LocalData<D> in, LocalData<D> out, const bool inverse)
 {
-	double *prev_result = in;
-	int     strides[D];
+	LocalData<D> prev_result = in;
+
+	std::array<int, D> start;
+	start.fill(0);
+	std::array<int, D> end = in.getLengths();
 	for (size_t i = 0; i < D; i++) {
-		strides[i] = pow(n, i);
+		end[i]--;
 	}
+
 	for (size_t dim = 0; dim < D; dim++) {
-		int other_strides[D - 1];
-		for (size_t i = 0; i < dim; i++) {
-			other_strides[i] = strides[i];
-		}
-		int dft_stride = strides[dim];
-		for (size_t i = dim + 1; i < D; i++) {
-			other_strides[i - 1] = strides[i];
-		}
-
+		int old_end                   = end[dim];
+		end[dim]                      = 0;
 		std::valarray<double> &matrix = *plan[dim];
-		double *               new_result;
-		if (dim != D-1) {
-			new_result = new double[(int)pow(n,D)];
+
+		LocalData<D> new_result;
+		if (D % 2) {
+			if (dim % 2) {
+				new_result = in;
+			} else {
+				new_result = out;
+			}
 		} else {
-			new_result = out;
+			if (dim == D - 1) {
+				new_result = out;
+			} else if (dim == D - 2) {
+				new_result = local_tmp.getLocalData(0);
+			} else if (dim % 2) {
+				new_result = in;
+			} else {
+				new_result = out;
+			}
 		}
 
-		for (int i = 0; i < (const int) pow(n, D - 1); i++) {
-			std::array<int, D - 1> coord;
-			for (size_t x = 0; x < D - 1; x++) {
-				coord[x] = (i / strides[x]) % n;
-			}
-			int    idx = std::inner_product(other_strides, other_strides + D - 1, coord.begin(), 0);
-			char   T   = 'T';
-			double one = 1;
-			double zero = 0;
-			dgemv_(T, n, n, one, &matrix[0], n, &prev_result[idx], dft_stride, zero,
-			       &new_result[idx], dft_stride);
-		}
-		if (dim != 0) { delete[] prev_result; }
+		int pstride = prev_result.getStrides()[dim];
+		int nstride = new_result.getStrides()[dim];
+
+		char   T    = 'T';
+		double one  = 1;
+		double zero = 0;
+		nested_loop<D>(start, end, [&](std::array<int, D> coord) {
+			dgemv_(T, n, n, one, &matrix[0], n, &prev_result[coord], pstride, zero,
+			       &new_result[coord], nstride);
+		});
+
 		prev_result = new_result;
+		end[dim]    = old_end;
 	}
 }
 #endif

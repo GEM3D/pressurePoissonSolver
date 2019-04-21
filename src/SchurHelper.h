@@ -247,12 +247,14 @@ inline void SchurHelper<D>::solveWithInterface(const Vec f, Vec u, const Vec gam
 	VecScatterBegin(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 
+	std::shared_ptr<Vector<D>> f_vec(new PetscVector<D>(f, n));
 	std::shared_ptr<Vector<D>> u_vec(new PetscVector<D>(u, n));
 	std::shared_ptr<Vector<D-1>> local_interp_vec(new PetscVector<D-1>(local_interp, n));
+	std::shared_ptr<Vector<D-1>> local_gamma_vec(new PetscVector<D-1>(local_gamma, n));
 
 	VecScale(local_interp, 0);
 	// solve over domains on this proc
-	solver->domainSolve(domains, f, u, local_gamma);
+	solver->domainSolve(domains, f_vec, u_vec, local_gamma_vec);
 	for (SchurDomain<D> &sd : domains) {
 		interpolator->interpolate(sd, u_vec, local_interp_vec);
 	}
@@ -272,11 +274,13 @@ inline void SchurHelper<D>::solveAndInterpolateWithInterface(const Vec f, Vec u,
 	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 
 	std::shared_ptr<Vector<D>> u_vec(new PetscVector<D>(u, n));
+	std::shared_ptr<Vector<D>> f_vec(new PetscVector<D>(f, n));
 	std::shared_ptr<Vector<D-1>> local_interp_vec(new PetscVector<D-1>(local_interp, n));
+	std::shared_ptr<Vector<D-1>> local_gamma_vec(new PetscVector<D-1>(local_gamma, n));
 
 	VecScale(local_interp, 0);
 	// solve over domains on this proc
-	solver->domainSolve(domains, f, u, local_gamma);
+	solver->domainSolve(domains, f_vec, u_vec, local_gamma_vec);
 	for (SchurDomain<D> &sd : domains) {
 		interpolator->interpolate(sd, u_vec, local_interp_vec);
 	}
@@ -292,7 +296,9 @@ template <size_t D> inline void SchurHelper<D>::solveWithSolution(const Vec f, V
 	VecScale(local_gamma, 0);
 	VecScale(local_interp, 0);
 	std::shared_ptr<Vector<D>> u_vec(new PetscVector<D>(u, n));
+	std::shared_ptr<Vector<D>> f_vec(new PetscVector<D>(f, n));
 	std::shared_ptr<Vector<D-1>> local_interp_vec(new PetscVector<D-1>(local_interp, n));
+	std::shared_ptr<Vector<D-1>> local_gamma_vec(new PetscVector<D-1>(local_gamma, n));
 	for (SchurDomain<D> &sd : domains) {
 		interpolator->interpolate(sd, u_vec, local_interp_vec);
 	}
@@ -303,7 +309,7 @@ template <size_t D> inline void SchurHelper<D>::solveWithSolution(const Vec f, V
 	VecScatterEnd(scatter, gamma, local_gamma, INSERT_VALUES, SCATTER_FORWARD);
 
 	// solve over domains on this proc
-	solver->domainSolve(domains, f, u, local_gamma);
+	solver->domainSolve(domains, f_vec, u_vec, local_gamma_vec);
 }
 template <size_t D>
 inline void SchurHelper<D>::interpolateToInterface(const Vec f, Vec u, Vec gamma)

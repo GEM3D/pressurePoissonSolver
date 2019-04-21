@@ -29,6 +29,35 @@ class LocalDataManager
 	public:
 	virtual ~LocalDataManager(){};
 };
+template <size_t D, size_t Dir, typename T> class NestedLoop
+{
+	public:
+	static void inline nested_loop_loop(std::array<int, D> &coord, std::array<int, D> &start,
+	                                    std::array<int, D> &end, T lambda)
+	{
+		for (coord[Dir] = start[Dir]; coord[Dir] <= end[Dir]; coord[Dir]++) {
+			NestedLoop<D, Dir - 1, T>::nested_loop_loop(coord, start, end, lambda);
+		}
+	}
+};
+
+template <size_t D, typename T> class NestedLoop<D, 0, T>
+{
+	public:
+	static void inline nested_loop_loop(std::array<int, D> &coord, std::array<int, D> &start,
+	                                    std::array<int, D> &end, T lambda)
+	{
+		for (coord[0] = start[0]; coord[0] <= end[0]; coord[0]++) {
+			lambda(coord);
+		}
+	}
+};
+template <size_t D, typename T>
+inline void nested_loop(std::array<int, D> start, std::array<int, D> end, T lambda)
+{
+	std::array<int, D> coord = start;
+	NestedLoop<D, D - 1, T>::nested_loop_loop(coord, start, end, lambda);
+}
 template <size_t D> class LocalData
 {
 	private:
@@ -40,6 +69,7 @@ template <size_t D> class LocalData
 	LocalData<D - 1> getSliceOnSidePriv(Side<D> s) const;
 
 	public:
+	LocalData() = default;
 	LocalData(double *data, const std::array<int, D> &strides, const std::array<int, D> &lengths,
 
 	          std::shared_ptr<LocalDataManager> ldm)
@@ -73,22 +103,34 @@ template <size_t D> class LocalData
 	{
 		return getSliceOnSidePriv(s);
 	}
+	const std::array<int, D> &getLengths() const
+	{
+		return lengths;
+	}
+	const std::array<int, D> &getStrides() const
+	{
+		return strides;
+	}
+	double *getPtr() const
+	{
+		return data;
+	}
 };
-template  <size_t D> inline LocalData<D - 1> LocalData<D>::getSliceOnSidePriv(Side<D> s) const
+template <size_t D> inline LocalData<D - 1> LocalData<D>::getSliceOnSidePriv(Side<D> s) const
 {
-	size_t             axis = s.toInt() / 2;
-	std::array<int, D-1> new_strides;
+	size_t                 axis = s.toInt() / 2;
+	std::array<int, D - 1> new_strides;
 	for (size_t i = 0; i < axis; i++) {
 		new_strides[i] = strides[i];
 	}
-	for (size_t i = axis; i < D-1; i++) {
+	for (size_t i = axis; i < D - 1; i++) {
 		new_strides[i] = strides[i + 1];
 	}
-	std::array<int, D-1> new_lengths;
+	std::array<int, D - 1> new_lengths;
 	for (size_t i = 0; i < axis; i++) {
 		new_lengths[i] = lengths[i];
 	}
-	for (size_t i = axis; i < D-1; i++) {
+	for (size_t i = axis; i < D - 1; i++) {
 		new_lengths[i] = lengths[i + 1];
 	}
 	if (s.isLowerOnAxis()) {

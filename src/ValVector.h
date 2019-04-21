@@ -19,18 +19,42 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef PATCHSOLVER_H
-#define PATCHSOLVER_H
-#include <SchurDomain.h>
+#ifndef VALVECTOR_H
+#define VALVECTOR_H
 #include <Vector.h>
-template <size_t D> class PatchSolver
+template <size_t D> class ValVector : public Vector<D>
+
 {
+	private:
+	int                patch_stride;
+	std::array<int, D> lengths;
+	std::array<int, D> strides;
+
 	public:
-	virtual ~PatchSolver() {}
-	virtual void addDomain(SchurDomain<D> &d) = 0;
-	virtual void domainSolve(std::deque<SchurDomain<D>> &     domains,
-	                         std::shared_ptr<const Vector<D>> f, std::shared_ptr<Vector<D>> u,
-	                         std::shared_ptr<const Vector<D - 1>> gamma)
-	= 0;
+	std::valarray<double>   vec;
+    ValVector()=default;
+	ValVector(const std::array<int, D> &lengths, int num_patches = 1)
+	{
+		int size = 1;
+		for (size_t i = 0; i < D; i++) {
+            strides[i]=size;
+			size *= lengths[i];
+		}
+		patch_stride = size;
+		size *= num_patches;
+		vec.resize(size);
+		this->lengths = lengths;
+	}
+	~ValVector() = default;
+	LocalData<D> getLocalData(int local_patch_id)
+	{
+		double *data = &vec[patch_stride * local_patch_id];
+		return LocalData<D>(data, strides, lengths, nullptr);
+	}
+	const LocalData<D> getLocalData(int local_patch_id) const
+	{
+		double *data = const_cast<double*>(&vec[patch_stride * local_patch_id]);
+		return LocalData<D>(data, strides, lengths, nullptr);
+	}
 };
 #endif
