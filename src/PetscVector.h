@@ -62,10 +62,10 @@ template <size_t D> class PetscVector : public Vector<D>
 	int                patch_stride;
 	std::array<int, D> strides;
 	std::array<int, D> lengths;
-	//    PW<Vec> vec;
-	Vec vec;
 
 	public:
+	//    PW<Vec> vec;
+	Vec vec;
 	PetscVector(Vec vec, int n)
 	{
 		this->vec = vec;
@@ -73,20 +73,26 @@ template <size_t D> class PetscVector : public Vector<D>
 			strides[i] = std::pow(n, i);
 		}
 		patch_stride = std::pow(n, D);
-        lengths.fill(n);
+		lengths.fill(n);
+		VecGetLocalSize(vec, &this->num_local_patches);
+		this->num_local_patches /= patch_stride;
 	}
 	~PetscVector() = default;
 	LocalData<D> getLocalData(int local_patch_id)
 	{
 		std::shared_ptr<PetscLDM> ldm(new PetscLDM(vec, true));
-		double *                     data = ldm->getVecView() + patch_stride * local_patch_id;
-		return LocalData<D>(data, strides,lengths, ldm);
+		double *                  data = ldm->getVecView() + patch_stride * local_patch_id;
+		return LocalData<D>(data, strides, lengths, ldm);
 	}
 	const LocalData<D> getLocalData(int local_patch_id) const
 	{
 		std::shared_ptr<PetscLDM> ldm(new PetscLDM(vec, false));
-		double *                     data = ldm->getVecView() + patch_stride * local_patch_id;
-		return LocalData<D>(data, strides,lengths, std::move(ldm));
+		double *                  data = ldm->getVecView() + patch_stride * local_patch_id;
+		return LocalData<D>(data, strides, lengths, std::move(ldm));
+	}
+	void scale(double alpha)
+	{
+		VecScale(vec, alpha);
 	}
 };
 #endif

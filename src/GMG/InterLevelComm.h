@@ -22,6 +22,7 @@
 #ifndef InterLevelComm_H
 #define InterLevelComm_H
 #include <DomainCollection.h>
+#include <PetscVector.h>
 namespace GMG
 {
 /**
@@ -71,7 +72,7 @@ template <size_t D> class InterLevelComm
 	 * @brief The PETSc VecScatter object that scatters the values of the coarse vector to each
 	 * process that needs them for interpolation / restriction.
 	 */
-	PW<VecScatter> scatter;
+	PW<VecScatter> p_scatter;
 
 	public:
 	/**
@@ -88,7 +89,7 @@ template <size_t D> class InterLevelComm
 	 *
 	 * @return the newly allocated vector.
 	 */
-	PW_explicit<Vec> getNewCoarseDistVec();
+	std::shared_ptr<Vector<D>> getNewCoarseDistVec();
 
 	/**
 	 * @brief Get a PETSc VecScatter object that will scatter values from the coarse vector to the
@@ -96,7 +97,8 @@ template <size_t D> class InterLevelComm
 	 *
 	 * @return the VecScatter object
 	 */
-	PW_explicit<VecScatter> getScatter();
+	void scatter(std::shared_ptr<Vector<D>> dist, std::shared_ptr<const Vector<D>> global);
+	void scatterReverse(std::shared_ptr<const Vector<D>> dist, std::shared_ptr<Vector<D>> global);
 
 	/**
 	 * @brief get a set of domains on the finer level that contains meta-data for how the values in
@@ -151,20 +153,39 @@ inline InterLevelComm<D>::InterLevelComm(std::shared_ptr<DomainCollection<D>> co
 
 	local_vec_size = coarse_parent_global_index_map_vec.size() * pow(n, D);
 
-	PW<Vec> u_local = getNewCoarseDistVec();
-	PW<Vec> u       = coarse_dc->getNewDomainVec();
-	VecScatterCreate(u, dist_is, u_local, nullptr, &scatter);
+	PW<Vec> u_local;
+	VecCreateSeq(PETSC_COMM_SELF, local_vec_size, &u_local);
+	PW<Vec> u = coarse_dc->getNewDomainVec();
+	VecScatterCreate(u, dist_is, u_local, nullptr, &p_scatter);
 }
 
-template <size_t D> inline PW_explicit<Vec> InterLevelComm<D>::getNewCoarseDistVec()
+template <size_t D> inline std::shared_ptr<Vector<D>> InterLevelComm<D>::getNewCoarseDistVec()
 {
-	PW<Vec> u;
+	Vec u;
 	VecCreateSeq(PETSC_COMM_SELF, local_vec_size, &u);
-	return u;
+	return std::shared_ptr<Vector<D>>(new PetscVector<D>(u, n));
 }
-template <size_t D> inline PW_explicit<VecScatter> InterLevelComm<D>::getScatter()
+template <size_t D>
+inline void InterLevelComm<D>::scatter(std::shared_ptr<Vector<D>>       dist,
+                                       std::shared_ptr<const Vector<D>> global)
 {
-	return scatter;
+	// TODO make this general;
+	PetscVector<D> *      p_dist   = dynamic_cast<PetscVector<D> *>(dist.get());
+	const PetscVector<D> *p_global = dynamic_cast<const PetscVector<D> *>(global.get());
+	if (p_dist == nullptr || p_global == nullptr) { throw 3; }
+	VecScatterBegin(p_scatter, p_global->vec, p_dist->vec, INSERT_VALUES, SCATTER_FORWARD);
+	VecScatterEnd(p_scatter, p_global->vec, p_dist->vec, INSERT_VALUES, SCATTER_FORWARD);
+}
+template <size_t D>
+inline void InterLevelComm<D>::scatterReverse(std::shared_ptr<const Vector<D>> dist,
+                                              std::shared_ptr<Vector<D>>       global)
+{
+	// TODO make this general;
+	const PetscVector<D> *      p_dist   = dynamic_cast<const PetscVector<D> *>(dist.get());
+	PetscVector<D> *p_global = dynamic_cast<PetscVector<D> *>(global.get());
+	if (p_dist == nullptr || p_global == nullptr) { throw 3; }
+	VecScatterBegin(p_scatter, p_dist->vec, p_global->vec, ADD_VALUES, SCATTER_REVERSE);
+	VecScatterEnd(p_scatter, p_dist->vec, p_global->vec, ADD_VALUES, SCATTER_REVERSE);
 }
 } // namespace GMG
 #endif

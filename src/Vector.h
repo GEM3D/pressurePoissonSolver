@@ -64,6 +64,8 @@ template <size_t D> class LocalData
 	double *                          data;
 	std::array<int, D>                strides;
 	std::array<int, D>                lengths;
+	std::array<int, D>                start;
+	std::array<int, D>                end;
 	std::shared_ptr<LocalDataManager> ldm;
 
 	LocalData<D - 1> getSliceOnSidePriv(Side<D> s) const;
@@ -78,6 +80,11 @@ template <size_t D> class LocalData
 		this->strides = strides;
 		this->lengths = lengths;
 		this->ldm     = ldm;
+		start.fill(0);
+		end = lengths;
+		for (size_t i = 0; i < D; i++) {
+			end[i]--;
+		}
 	}
 	inline double &operator[](const std::array<int, D> &coord)
 	{
@@ -111,6 +118,14 @@ template <size_t D> class LocalData
 	{
 		return strides;
 	}
+	const std::array<int, D> &getStart() const
+	{
+		return start;
+	}
+	const std::array<int, D> &getEnd() const
+	{
+		return end;
+	}
 	double *getPtr() const
 	{
 		return data;
@@ -142,9 +157,32 @@ template <size_t D> inline LocalData<D - 1> LocalData<D>::getSliceOnSidePriv(Sid
 }
 template <size_t D> class Vector
 {
+	protected:
+	int num_local_patches;
+
 	public:
 	virtual ~Vector(){};
 	virtual LocalData<D>       getLocalData(int local_patch_id)       = 0;
 	virtual const LocalData<D> getLocalData(int local_patch_id) const = 0;
+	virtual void               set(double alpha)
+	{
+		for (int i = 0; i < num_local_patches; i++) {
+			LocalData<D> ld = getLocalData(i);
+			nested_loop<D>(ld.getStart(), ld.getEnd(),
+			               [&](std::array<int, D> coord) { ld[coord] = alpha; });
+		}
+	}
+	virtual void scale(double alpha)
+	{
+		for (int i = 0; i < num_local_patches; i++) {
+			LocalData<D> ld = getLocalData(i);
+			nested_loop<D>(ld.getStart(), ld.getEnd(),
+			               [&](std::array<int, D> coord) { ld[coord] *= alpha; });
+		}
+	}
+	virtual void add(std::shared_ptr<Vector<D>> b)
+	{
+		//
+	}
 };
 #endif

@@ -52,7 +52,7 @@ template <size_t D> class DCVG : public VectorGenerator
 /**
  * @brief Represents a level in geometric multi-grid.
  */
-class Level
+template <size_t D> class Level
 {
 	private:
 	/**
@@ -66,11 +66,11 @@ class Level
 	/**
 	 * @brief The restrictor from this level to the coarser level.
 	 */
-	std::shared_ptr<Restrictor> restrictor;
+	std::shared_ptr<Restrictor<D>> restrictor;
 	/**
 	 * @brief The interpolator from this level to the finer level.
 	 */
-	std::shared_ptr<Interpolator> interpolator;
+	std::shared_ptr<Interpolator<D>> interpolator;
 	/**
 	 * @brief The smoother for this level.
 	 */
@@ -99,7 +99,7 @@ class Level
 	 *
 	 * @param restrictor the restriction operator.
 	 */
-	void setRestrictor(std::shared_ptr<Restrictor> restrictor)
+	void setRestrictor(std::shared_ptr<Restrictor<D>> restrictor)
 	{
 		this->restrictor = restrictor;
 	}
@@ -108,7 +108,7 @@ class Level
 	 *
 	 * @return reference to the restrictor
 	 */
-	const Restrictor &getRestrictor() const
+	const Restrictor<D> &getRestrictor() const
 	{
 		return *restrictor;
 	}
@@ -117,7 +117,7 @@ class Level
 	 *
 	 * @param interpolator the interpolation operator.
 	 */
-	void setInterpolator(std::shared_ptr<Interpolator> interpolator)
+	void setInterpolator(std::shared_ptr<Interpolator<D>> interpolator)
 	{
 		this->interpolator = interpolator;
 	}
@@ -126,7 +126,7 @@ class Level
 	 *
 	 * @return Reference to the interpolator.
 	 */
-	const Interpolator &getInterpolator() const
+	const Interpolator<D> &getInterpolator() const
 	{
 		return *interpolator;
 	}

@@ -30,7 +30,7 @@ namespace GMG
 class Helper
 {
 	private:
-	std::unique_ptr<Cycle> cycle;
+	std::unique_ptr<Cycle<3>> cycle;
 
 	void apply(Vec f, Vec u);
 

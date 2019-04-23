@@ -30,7 +30,7 @@ namespace GMG
 class Helper2d
 {
 	private:
-	std::unique_ptr<Cycle> cycle;
+	std::unique_ptr<Cycle<2>> cycle;
 
 	void apply(Vec f, Vec u);
 

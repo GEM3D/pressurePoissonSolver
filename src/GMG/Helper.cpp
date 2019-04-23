@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -29,8 +29,8 @@
 #include "VCycle.h"
 #include "WCycle.h"
 #include "WrapOp.h"
-#include <json.hpp>
 #include <fstream>
+#include <json.hpp>
 using namespace std;
 using namespace GMG;
 using nlohmann::json;
@@ -95,18 +95,18 @@ Helper::Helper(int n, std::vector<std::shared_ptr<DomainCollection<3>>> dcs,
 
 	// generate inter-level comms, restrictors, interpolators
 	vector<shared_ptr<InterLevelComm<3>>> comms(num_levels - 1);
-	vector<shared_ptr<Restrictor>>        restrictors(num_levels - 1);
-	vector<shared_ptr<Interpolator>>      interpolators(num_levels - 1);
+	vector<shared_ptr<Restrictor<3>>>     restrictors(num_levels - 1);
+	vector<shared_ptr<Interpolator<3>>>   interpolators(num_levels - 1);
 	for (int i = 0; i < num_levels - 1; i++) {
 		comms[i].reset(new InterLevelComm<3>(dcs[i + 1], dcs[i]));
 		restrictors[i].reset(new AvgRstr<3>(dcs[i + 1], dcs[i], comms[i]));
 	}
 
 	// create  level objects
-	vector<shared_ptr<Level>> levels(num_levels);
+	vector<shared_ptr<Level<3>>> levels(num_levels);
 	for (int i = 0; i < num_levels; i++) {
 		std::shared_ptr<DCVG<3>> vg(new DCVG<3>(dcs[i]));
-		levels[i].reset(new Level(vg));
+		levels[i].reset(new Level<3>(vg));
 		levels[i]->setOperator(ops[i]);
 		levels[i]->setSmoother(smoothers[i]);
 	}
@@ -124,12 +124,12 @@ Helper::Helper(int n, std::vector<std::shared_ptr<DomainCollection<3>>> dcs,
 	if (interpolator == "constant") {
 		for (int i = 0; i < num_levels - 1; i++) {
 			levels[i + 1]->setInterpolator(
-			shared_ptr<Interpolator>(new DrctIntp<3>(dcs[i + 1], dcs[i], comms[i])));
+			shared_ptr<Interpolator<3>>(new DrctIntp<3>(dcs[i + 1], dcs[i], comms[i])));
 		}
 	} else if (interpolator == "trilinear") {
 		for (int i = 0; i < num_levels - 1; i++) {
-			levels[i + 1]->setInterpolator(
-			shared_ptr<Interpolator>(new TriLinIntp(dcs[i + 1], dcs[i], comms[i])));
+			//levels[i + 1]->setInterpolator(
+			//shared_ptr<Interpolator<3>>(new TriLinIntp(dcs[i + 1], dcs[i], comms[i])));
 		}
 	} else {
 		// TODO throw error
@@ -152,9 +152,9 @@ Helper::Helper(int n, std::vector<std::shared_ptr<DomainCollection<3>>> dcs,
 	}
 
 	if (cycle_type == "V") {
-		cycle.reset(new VCycle(levels[0], config_j));
+		cycle.reset(new VCycle<3>(levels[0], config_j));
 	} else if (cycle_type == "W") {
-		cycle.reset(new WCycle(levels[0], config_j));
+		cycle.reset(new WCycle<3>(levels[0], config_j));
 	} else {
 		// TODO throw error
 		throw 343;

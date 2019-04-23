@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -25,7 +25,6 @@
 #include "FFTBlockJacobiSmoother.h"
 #include "MatOp.h"
 #include "MatrixHelper2d.h"
-#include "TriLinIntp.h"
 #include "VCycle.h"
 #include "WCycle.h"
 #include "WrapOp.h"
@@ -95,18 +94,18 @@ Helper2d::Helper2d(int n, std::vector<std::shared_ptr<DomainCollection<2>>> dcs,
 
 	// generate inter-level comms, restrictors, interpolators
 	vector<shared_ptr<InterLevelComm<2>>> comms(num_levels - 1);
-	vector<shared_ptr<Restrictor>>        restrictors(num_levels - 1);
-	vector<shared_ptr<Interpolator>>      interpolators(num_levels - 1);
+	vector<shared_ptr<Restrictor<2>>>     restrictors(num_levels - 1);
+	vector<shared_ptr<Interpolator<2>>>   interpolators(num_levels - 1);
 	for (int i = 0; i < num_levels - 1; i++) {
 		comms[i].reset(new InterLevelComm<2>(dcs[i + 1], dcs[i]));
 		restrictors[i].reset(new AvgRstr<2>(dcs[i + 1], dcs[i], comms[i]));
 	}
 
 	// create  level objects
-	vector<shared_ptr<Level>> levels(num_levels);
+	vector<shared_ptr<Level<2>>> levels(num_levels);
 	for (int i = 0; i < num_levels; i++) {
 		std::shared_ptr<DCVG<2>> vg(new DCVG<2>(dcs[i]));
-		levels[i].reset(new Level(vg));
+		levels[i].reset(new Level<2>(vg));
 		levels[i]->setOperator(ops[i]);
 		levels[i]->setSmoother(smoothers[i]);
 	}
@@ -124,7 +123,7 @@ Helper2d::Helper2d(int n, std::vector<std::shared_ptr<DomainCollection<2>>> dcs,
 	if (interpolator == "constant") {
 		for (int i = 0; i < num_levels - 1; i++) {
 			levels[i + 1]->setInterpolator(
-			shared_ptr<Interpolator>(new DrctIntp<2>(dcs[i + 1], dcs[i], comms[i])));
+			shared_ptr<Interpolator<2>>(new DrctIntp<2>(dcs[i + 1], dcs[i], comms[i])));
 		}
 	} else {
 		// TODO throw error
@@ -146,9 +145,9 @@ Helper2d::Helper2d(int n, std::vector<std::shared_ptr<DomainCollection<2>>> dcs,
 	}
 
 	if (cycle_type == "V") {
-		cycle.reset(new VCycle(levels[0], config_j));
+		cycle.reset(new VCycle<2>(levels[0], config_j));
 	} else if (cycle_type == "W") {
-		cycle.reset(new WCycle(levels[0], config_j));
+		cycle.reset(new WCycle<2>(levels[0], config_j));
 	} else {
 		// TODO throw error
 	}

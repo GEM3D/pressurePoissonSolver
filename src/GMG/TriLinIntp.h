@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -31,7 +31,7 @@ namespace GMG
  * @brief Simple class that directly places values from coarse vector to fine vector. (This is
  * O(0) accuracy, need to replace with bi-linear interpolation.
  */
-class TriLinIntp : public Interpolator
+class TriLinIntp : public Interpolator<3>
 {
 	private:
 	/**
@@ -64,7 +64,8 @@ class TriLinIntp : public Interpolator
 	 * @param coarse the input vector from the coarser level
 	 * @param fine the output vector for the finer level
 	 */
-	void interpolate(PW<Vec> coarse, PW<Vec> fine) const;
+	void interpolate(std::shared_ptr<const Vector<3>> coarse,
+	                 std::shared_ptr<Vector<3>>       fine) const;
 };
 } // namespace GMG
 #endif

@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -22,13 +22,13 @@
 #ifndef GMGRestrictor_H
 #define GMGRestrictor_H
 #include <PW.h>
-#include <petscvec.h>
+#include <Vector.h>
 namespace GMG
 {
 /**
  * @brief Base class for multi-grid restriction operators.
  */
-class Restrictor
+template <size_t D> class Restrictor
 {
 	public:
 	/**
@@ -37,7 +37,8 @@ class Restrictor
 	 * @param coarse the output vector that is restricted to.
 	 * @param fine the input vector that is restricted.
 	 */
-	virtual void restrict(PW<Vec> coarse, PW<Vec> fine) const = 0;
+	virtual void restrict(std::shared_ptr<Vector<D>>       coarse,
+	                      std::shared_ptr<const Vector<D>> fine) const = 0;
 };
 } // namespace GMG
 #endif

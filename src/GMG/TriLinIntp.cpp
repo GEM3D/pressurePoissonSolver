@@ -616,19 +616,13 @@ class CornerHelper : public Helper
 };
 constexpr int CornerHelper::coeffs[4][8];
 
-void TriLinIntp::interpolate(PW<Vec> coarse, PW<Vec> fine) const
+void TriLinIntp::interpolate(std::shared_ptr<const Vector<3>> coarse,
+                             std::shared_ptr<Vector<3>>       fine) const
 {
-	// get vectors
-	double *u_fine;
-	double *u_coarse;
-	PW<Vec> coarse_tmp = ilc->getNewCoarseDistVec();
 	// scatter
-	PW<VecScatter> scatter = ilc->getScatter();
-	VecScatterBegin(scatter, coarse, coarse_tmp, INSERT_VALUES, SCATTER_FORWARD);
-	VecScatterEnd(scatter, coarse, coarse_tmp, INSERT_VALUES, SCATTER_FORWARD);
+	std::shared_ptr<Vector<D>> coarse_local = ilc->getNewCoarseDistVec();
+	ilc->scatterReverse(coarse_local, coarse);
 
-	VecGetArray(fine, &u_fine);
-	VecGetArray(coarse_tmp, &u_coarse);
 	for (auto p : ilc->getFineDomains()) {
 		Domain<3> &d          = *p.d;
 		int        n          = d.n;

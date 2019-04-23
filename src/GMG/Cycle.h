@@ -23,6 +23,7 @@
 #define GMGCycle_H
 #include <GMG/Level.h>
 #include <list>
+#include <PetscVector.h>
 namespace GMG
 {
 /**
@@ -30,7 +31,7 @@ namespace GMG
  * levels, and a function to run an iteration of smoothing on a level. Derived cycle classes
  * need to implement the visit function.
  */
-class Cycle
+template <size_t D> class Cycle
 {
 	private:
 	/**
@@ -44,7 +45,7 @@ class Cycle
 	/**
 	 * @brief pointer to the finest level
 	 */
-	std::shared_ptr<Level> finest_level;
+	std::shared_ptr<Level<D>> finest_level;
 
 	protected:
 	/**
@@ -52,27 +53,52 @@ class Cycle
 	 *
 	 * @param level the current level
 	 */
-	void prepCoarser(const Level &level);
+	void prepCoarser(const Level<D> &level)
+	{
+		// calculate residual
+		PW<Vec> r = level.getVectorGenerator()->getNewVector();
+		level.getOperator().apply(u_vectors.front(), r);
+		VecAYPX(r, -1, f_vectors.front());
+		// create vectors for coarser levels
+		PW<Vec> new_u = level.getCoarser().getVectorGenerator()->getNewVector();
+		PW<Vec> new_f = level.getCoarser().getVectorGenerator()->getNewVector();
+        std::shared_ptr<Vector<D>> r_vec(new PetscVector<D>(r,16));
+        std::shared_ptr<Vector<D>> f_vec(new PetscVector<D>(new_f,16));
+		level.getRestrictor().restrict(f_vec, r_vec);
+		u_vectors.push_front(new_u);
+		f_vectors.push_front(new_f);
+	}
 	/**
 	 * @brief Prepare vectors for finer level
 	 *
 	 * @param level the current level
 	 */
-	void prepFiner(const Level &level);
+	void prepFiner(const Level<D> &level)
+	{
+		PW<Vec> old_u = u_vectors.front();
+		u_vectors.pop_front();
+		f_vectors.pop_front();
+        std::shared_ptr<Vector<D>> old_u_vec(new PetscVector<D>(old_u,16));
+        std::shared_ptr<Vector<D>> u_vec(new PetscVector<D>(u_vectors.front(),16));
+		level.getInterpolator().interpolate(old_u_vec, u_vec);
+	}
 
 	/**
 	 * @brief run iteration of smoother on solution
 	 *
 	 * @param level the current level
 	 */
-	void smooth(const Level &level);
+	void smooth(const Level<D> &level)
+	{
+		level.getSmoother().smooth(f_vectors.front(), u_vectors.front());
+	}
 
 	/**
 	 * @brief Virtual visit function that needs to be implemented in derived classes.
 	 *
 	 * @param level the level currently begin visited.
 	 */
-	virtual void visit(const Level &level) = 0;
+	virtual void visit(const Level<D> &level) = 0;
 
 	public:
 	/**
@@ -80,7 +106,7 @@ class Cycle
 	 *
 	 * @param finest_level pointer to the finest level object.
 	 */
-	Cycle(std::shared_ptr<Level> finest_level)
+	Cycle(std::shared_ptr<Level<D>> finest_level)
 	{
 		this->finest_level = finest_level;
 	}

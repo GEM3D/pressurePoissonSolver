@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -28,42 +28,43 @@ namespace GMG
 /**
  * @brief Implementation of a W-cycle
  */
-class WCycle : public Cycle
+template <size_t D> class WCycle : public Cycle<D>
 {
 	private:
 	int num_pre_sweeps    = 1;
 	int num_post_sweeps   = 1;
 	int num_coarse_sweeps = 1;
-	int num_mid_sweeps = 1;
+	int num_mid_sweeps    = 1;
 
 	protected:
 	/**
-	 * @brief Implements W-cycle. Pre-smooth, visit coarser level, smooth, visit coarse level, and then post-smooth.
+	 * @brief Implements W-cycle. Pre-smooth, visit coarser level, smooth, visit coarse level, and
+	 * then post-smooth.
 	 *
 	 * @param level the current level that is being visited.
 	 */
-	void visit(const Level &level)
+	void visit(const Level<D> &level)
 	{
 		if (level.coarsest()) {
 			for (int i = 0; i < num_coarse_sweeps; i++) {
-				smooth(level);
+				this->smooth(level);
 			}
 		} else {
 			for (int i = 0; i < num_pre_sweeps; i++) {
-				smooth(level);
+				this->smooth(level);
 			}
-			prepCoarser(level);
-			visit(level.getCoarser());
+			this->prepCoarser(level);
+			this->visit(level.getCoarser());
 			for (int i = 0; i < num_mid_sweeps; i++) {
-				smooth(level);
+				this->smooth(level);
 			}
-			prepCoarser(level);
-			visit(level.getCoarser());
+			this->prepCoarser(level);
+			this->visit(level.getCoarser());
 			for (int i = 0; i < num_post_sweeps; i++) {
-				smooth(level);
+				this->smooth(level);
 			}
 		}
-		if (!level.finest()) { prepFiner(level); }
+		if (!level.finest()) { this->prepFiner(level); }
 	}
 
 	public:
@@ -72,7 +73,7 @@ class WCycle : public Cycle
 	 *
 	 * @param finest_level a pointer to the finest level
 	 */
-	WCycle(std::shared_ptr<Level> finest_level, nlohmann::json config_j) : Cycle(finest_level)
+	WCycle(std::shared_ptr<Level<D>> finest_level, nlohmann::json config_j) : Cycle<D>(finest_level)
 	{
 		try {
 			num_pre_sweeps = config_j.at("pre_sweeps");

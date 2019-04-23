@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -28,7 +28,7 @@ namespace GMG
 /**
  * @brief Implementation of a V-cycle
  */
-class VCycle : public Cycle
+template <size_t D> class VCycle : public Cycle<D>
 {
 	private:
 	int num_pre_sweeps    = 1;
@@ -41,23 +41,23 @@ class VCycle : public Cycle
 	 *
 	 * @param level the current level that is being visited.
 	 */
-	void visit(const Level &level)
+	void visit(const Level<D> &level)
 	{
 		if (level.coarsest()) {
 			for (int i = 0; i < num_coarse_sweeps; i++) {
-				smooth(level);
+				this->smooth(level);
 			}
 		} else {
 			for (int i = 0; i < num_pre_sweeps; i++) {
-				smooth(level);
+				this->smooth(level);
 			}
-			prepCoarser(level);
-			visit(level.getCoarser());
+			this->prepCoarser(level);
+			this->visit(level.getCoarser());
 			for (int i = 0; i < num_post_sweeps; i++) {
-				smooth(level);
+				this->smooth(level);
 			}
 		}
-		if (!level.finest()) { prepFiner(level); }
+		if (!level.finest()) { this->prepFiner(level); }
 	}
 
 	public:
@@ -66,22 +66,22 @@ class VCycle : public Cycle
 	 *
 	 * @param finest_level a pointer to the finest level
 	 */
-	VCycle(std::shared_ptr<Level> finest_level, nlohmann::json config_j) : Cycle(finest_level)
+	VCycle(std::shared_ptr<Level<D>> finest_level, nlohmann::json config_j) : Cycle<D>(finest_level)
 	{
 		try {
 			num_pre_sweeps = config_j.at("pre_sweeps");
 		} catch (nlohmann::detail::out_of_range oor) {
-            throw 0;
+			throw 0;
 		}
 		try {
 			num_post_sweeps = config_j.at("post_sweeps");
 		} catch (nlohmann::detail::out_of_range oor) {
-            throw 0;
+			throw 0;
 		}
 		try {
 			num_coarse_sweeps = config_j.at("coarse_sweeps");
 		} catch (nlohmann::detail::out_of_range oor) {
-            throw 0;
+			throw 0;
 		}
 	}
 };

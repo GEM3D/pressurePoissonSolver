@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -22,13 +22,13 @@
 #ifndef GMGInterpolator_H
 #define GMGInterpolator_H
 #include <PW.h>
-#include <petscvec.h>
+#include <Vector.h>
 namespace GMG
 {
 /**
  * @brief base class for interpolation operators from finer levels to coarser levels.
  */
-class Interpolator
+template <size_t D> class Interpolator
 {
 	public:
 	/**
@@ -37,7 +37,8 @@ class Interpolator
 	 * @param coarse the input vector from the coarser level.
 	 * @param fine the output vector for the fine level.
 	 */
-	virtual void interpolate(PW<Vec> coarse, PW<Vec> fine) const = 0;
+	virtual void interpolate(std::shared_ptr<const Vector<D>> coarse,
+	                         std::shared_ptr<Vector<D>>       fine) const = 0;
 };
 } // namespace GMG
 #endif

@@ -30,7 +30,7 @@ namespace GMG
 /**
  * @brief Restrictor that averages the 8 corresponding fine cells into each coarse cell.
  */
-template <size_t D> class AvgRstr : public Restrictor
+template <size_t D> class AvgRstr : public Restrictor<D>
 {
 	private:
 	/**
@@ -66,7 +66,7 @@ template <size_t D> class AvgRstr : public Restrictor
 	 * @param coarse the output vector that is restricted to.
 	 * @param fine the input vector that is restricted.
 	 */
-	void restrict(PW<Vec> coarse, PW<Vec> fine) const;
+	void restrict(std::shared_ptr<Vector<D>> coarse, std::shared_ptr<const Vector<D>> fine) const;
 };
 
 template <size_t D>
@@ -81,51 +81,42 @@ inline AvgRstr<D>::AvgRstr(std::shared_ptr<DomainCollection<D>> coarse_dc,
 		npow[i] = (int) std::pow(fine_dc->getN(), i);
 	}
 }
-template <size_t D> inline void AvgRstr<D>::restrict(PW<Vec> coarse, PW<Vec> fine) const
+template <size_t D>
+inline void AvgRstr<D>::restrict(std::shared_ptr<Vector<D>>       coarse,
+                                 std::shared_ptr<const Vector<D>> fine) const
 {
-	// get vectors
-	VecSet(coarse, 0);
-	double *r_fine;
-	double *f_coarse;
-	// store in tmp vector for fine level
-	PW<Vec> coarse_tmp = ilc->getNewCoarseDistVec();
-	VecSet(coarse_tmp, 0);
-	VecGetArray(fine, &r_fine);
-	VecGetArray(coarse_tmp, &f_coarse);
+	std::shared_ptr<Vector<D>> coarse_local = ilc->getNewCoarseDistVec();
+
 	for (ILCFineToCoarseMetadata<D> data : ilc->getFineDomains()) {
-		Domain<D> &d          = *data.d;
-		int        n          = d.n;
-		int        coarse_idx = data.local_index * npow[D];
-		int        fine_idx   = d.id_local * npow[D];
+		Domain<D> &  d                 = *data.d;
+		LocalData<D> coarse_local_data = coarse_local->getLocalData(data.local_index);
+		LocalData<D> fine_data         = fine->getLocalData(d.id_local);
+
 		if (d.hasCoarseParent()) {
 			Orthant<D>         orth = d.oct_on_parent;
-			std::array<int, D> strides;
 			std::array<int, D> starts;
 			for (size_t i = 0; i < D; i++) {
-				strides[i] = npow[i];
-				starts[i]  = orth.isOnSide(2 * i) ? 0 : n;
+				starts[i]  = orth.isOnSide(2 * i) ? 0 : coarse_local_data.getLengths()[i];
 			}
-			for (int i = 0; i < npow[D]; i++) {
-				std::array<int, D> coord;
-				int                idx = 0;
-				for (size_t x = 0; x < D; x++) {
-					coord[x] = (i / strides[x]) % n;
-					idx += (coord[x] + starts[x]) / 2 * strides[x];
-				}
-				f_coarse[coarse_idx + idx] += r_fine[fine_idx + i] / (1 << D);
-			}
+
+			nested_loop<D>(fine_data.getStart(), fine_data.getEnd(),
+			               [&](const std::array<int, D> &coord) {
+				               std::array<int, D> coarse_coord;
+				               for (size_t x = 0; x < D; x++) {
+					               coarse_coord[x] = (coord[x] + starts[x]) / 2;
+				               }
+				               coarse_local_data[coarse_coord] += fine_data[coord] / (1 << D);
+			               });
 		} else {
-			for (int i = 0; i < npow[D]; i++) {
-				f_coarse[coarse_idx + i] += r_fine[fine_idx + i];
-			}
+			nested_loop<D>(
+			fine_data.getStart(), fine_data.getEnd(),
+			[&](const std::array<int, D> &coord) { coarse_local_data[coord] += fine_data[coord]; });
 		}
 	}
-	VecRestoreArray(fine, &r_fine);
-	VecRestoreArray(coarse_tmp, &f_coarse);
+
 	// scatter
-	PW<VecScatter> scatter = ilc->getScatter();
-	VecScatterBegin(scatter, coarse_tmp, coarse, ADD_VALUES, SCATTER_REVERSE);
-	VecScatterEnd(scatter, coarse_tmp, coarse, ADD_VALUES, SCATTER_REVERSE);
+	coarse->set(0);
+	ilc->scatterReverse(coarse_local, coarse);
 }
 } // namespace GMG
 #endif

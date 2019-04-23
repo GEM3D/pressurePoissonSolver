@@ -31,7 +31,7 @@ namespace GMG
  * @brief Simple class that directly places values from coarse vector to fine vector. (This is
  * O(0) accuracy, need to replace with bi-linear interpolation.
  */
-template <size_t D> class DrctIntp : public Interpolator
+template <size_t D> class DrctIntp : public Interpolator<D>
 {
 	private:
 	/**
@@ -67,7 +67,7 @@ template <size_t D> class DrctIntp : public Interpolator
 	 * @param coarse the input vector from the coarser level
 	 * @param fine the output vector for the finer level
 	 */
-	void interpolate(PW<Vec> coarse, PW<Vec> fine) const;
+	void interpolate(std::shared_ptr<const Vector<D>> coarse, std::shared_ptr<Vector<D>> fine)const;
 };
 template <size_t D>
 inline DrctIntp<D>::DrctIntp(std::shared_ptr<DomainCollection<D>> coarse_dc,
@@ -81,50 +81,41 @@ inline DrctIntp<D>::DrctIntp(std::shared_ptr<DomainCollection<D>> coarse_dc,
 		npow[i] = (int) std::pow(fine_dc->getN(), i);
 	}
 }
-template <size_t D> inline void DrctIntp<D>::interpolate(PW<Vec> coarse, PW<Vec> fine) const
-{
-	// get vectors
-	double *u_fine;
-	double *u_coarse;
-	PW<Vec> coarse_tmp = ilc->getNewCoarseDistVec();
-	// scatter
-	PW<VecScatter> scatter = ilc->getScatter();
-	VecScatterBegin(scatter, coarse, coarse_tmp, INSERT_VALUES, SCATTER_FORWARD);
-	VecScatterEnd(scatter, coarse, coarse_tmp, INSERT_VALUES, SCATTER_FORWARD);
 
-	VecGetArray(fine, &u_fine);
-	VecGetArray(coarse_tmp, &u_coarse);
-	for (auto p : ilc->getFineDomains()) {
-		Domain<D> &d          = *p.d;
-		int        n          = d.n;
-		int        coarse_idx = p.local_index * npow[D];
-		int        fine_idx   = d.id_local * npow[D];
+template <size_t D>
+inline void DrctIntp<D>::interpolate(std::shared_ptr<const Vector<D>> coarse,
+                                     std::shared_ptr<Vector<D>>       fine) const
+{
+	// scatter
+	std::shared_ptr<Vector<D>> coarse_local = ilc->getNewCoarseDistVec();
+	ilc->scatter(coarse_local, coarse);
+
+	for (auto data : ilc->getFineDomains()) {
+		Domain<D> &d          = *data.d;
+		LocalData<D> coarse_local_data = coarse_local->getLocalData(data.local_index);
+		LocalData<D> fine_data         = fine->getLocalData(d.id_local);
 
 		if (d.hasCoarseParent()) {
-		Orthant<D> orth = d.oct_on_parent;
-			std::array<int, D> strides;
+			Orthant<D>         orth = d.oct_on_parent;
 			std::array<int, D> starts;
 			for (size_t i = 0; i < D; i++) {
-				strides[i] = npow[i];
-				starts[i]  = orth.isOnSide(2 * i) ? 0 : n;
+				starts[i]  = orth.isOnSide(2 * i) ? 0 : coarse_local_data.getLengths()[i];
 			}
-			for (int i = 0; i < npow[D]; i++) {
-				std::array<int, D> coord;
-				int                idx = 0;
-				for (size_t x = 0; x < D; x++) {
-					coord[x] = (i / strides[x]) % n;
-					idx += (coord[x] + starts[x]) / 2 * strides[x];
-				}
-				u_fine[fine_idx + i] += u_coarse[coarse_idx + idx];
-			}
+
+			nested_loop<D>(fine_data.getStart(), fine_data.getEnd(),
+			               [&](const std::array<int, D> &coord) {
+				               std::array<int, D> coarse_coord;
+				               for (size_t x = 0; x < D; x++) {
+					               coarse_coord[x] = (coord[x] + starts[x]) / 2;
+				               }
+				               fine_data[coord] += coarse_local_data[coarse_coord];
+			               });
 		} else {
-			for (int i = 0; i < npow[D]; i++) {
-				u_fine[fine_idx + i] += u_coarse[coarse_idx + i];
-			}
+			nested_loop<D>(
+			fine_data.getStart(), fine_data.getEnd(),
+			[&](const std::array<int, D> &coord) { fine_data[coord] += coarse_local_data[coord]; });
 		}
 	}
-	VecRestoreArray(fine, &u_fine);
-	VecRestoreArray(coarse_tmp, &u_coarse);
 }
 } // namespace GMG
 #endif
