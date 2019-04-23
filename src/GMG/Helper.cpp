@@ -76,11 +76,11 @@ Helper::Helper(int n, std::vector<std::shared_ptr<DomainCollection<3>>> dcs,
 	} catch (nlohmann::detail::out_of_range oor) {
 		op_type = "crs_matrix";
 	}
-	vector<shared_ptr<Operator>> ops(num_levels);
+	vector<shared_ptr<Operator<3>>> ops(num_levels);
 	for (int i = 0; i < num_levels; i++) {
 		if (op_type == "crs_matrix") {
 			MatrixHelper mh(*dcs[i]);
-			ops[i].reset(new MatOp(mh.formCRSMatrix()));
+			ops[i].reset(new MatOp<3>(mh.formCRSMatrix()));
 		} else if (op_type == "matrix_free") {
 			ops[i].reset(new WrapOp<3>(helpers[i]));
 		}
@@ -128,8 +128,8 @@ Helper::Helper(int n, std::vector<std::shared_ptr<DomainCollection<3>>> dcs,
 		}
 	} else if (interpolator == "trilinear") {
 		for (int i = 0; i < num_levels - 1; i++) {
-			//levels[i + 1]->setInterpolator(
-			//shared_ptr<Interpolator<3>>(new TriLinIntp(dcs[i + 1], dcs[i], comms[i])));
+			// levels[i + 1]->setInterpolator(
+			// shared_ptr<Interpolator<3>>(new TriLinIntp(dcs[i + 1], dcs[i], comms[i])));
 		}
 	} else {
 		// TODO throw error

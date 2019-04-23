@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -22,14 +22,14 @@
 #ifndef GMGMatOp_H
 #define GMGMatOp_H
 #include <GMG/Operator.h>
-#include <petscmat.h>
 #include <memory>
+#include <petscmat.h>
 namespace GMG
 {
 /**
  * @brief Wrapper for PETSc Matrix
  */
-class MatOp : public Operator
+template <size_t D> class MatOp : public Operator<D>
 {
 	private:
 	/**
@@ -53,9 +53,12 @@ class MatOp : public Operator
 	 * @param x the input vector.
 	 * @param b the output vector.
 	 */
-	void apply(PW<Vec> x, PW<Vec> b) const
+	void apply(std::shared_ptr<const Vector<D>> x, std::shared_ptr<Vector<D>> b) const
 	{
-		MatMult(matrix, x, b);
+		const PetscVector<D> *x_vec = dynamic_cast<const PetscVector<D> *>(x.get());
+		PetscVector<D> *      b_vec = dynamic_cast<PetscVector<D> *>(b.get());
+		if (x_vec == nullptr || b_vec == nullptr) { throw 3; }
+		MatMult(matrix, x_vec->vec, b_vec->vec);
 	}
 };
 } // namespace GMG

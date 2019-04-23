@@ -181,8 +181,8 @@ inline void InterLevelComm<D>::scatterReverse(std::shared_ptr<const Vector<D>> d
                                               std::shared_ptr<Vector<D>>       global)
 {
 	// TODO make this general;
-	const PetscVector<D> *      p_dist   = dynamic_cast<const PetscVector<D> *>(dist.get());
-	PetscVector<D> *p_global = dynamic_cast<PetscVector<D> *>(global.get());
+	const PetscVector<D> *p_dist   = dynamic_cast<const PetscVector<D> *>(dist.get());
+	PetscVector<D> *      p_global = dynamic_cast<PetscVector<D> *>(global.get());
 	if (p_dist == nullptr || p_global == nullptr) { throw 3; }
 	VecScatterBegin(p_scatter, p_dist->vec, p_global->vec, ADD_VALUES, SCATTER_REVERSE);
 	VecScatterEnd(p_scatter, p_dist->vec, p_global->vec, ADD_VALUES, SCATTER_REVERSE);

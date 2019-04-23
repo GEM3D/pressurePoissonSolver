@@ -57,12 +57,13 @@ template <size_t D> class Cycle
 	{
 		// calculate residual
 		PW<Vec> r = level.getVectorGenerator()->getNewVector();
-		level.getOperator().apply(u_vectors.front(), r);
+        std::shared_ptr<Vector<D>> u_vec(new PetscVector<D>(u_vectors.front(),16));
+        std::shared_ptr<Vector<D>> r_vec(new PetscVector<D>(r,16));
+		level.getOperator().apply(u_vec, r_vec);
 		VecAYPX(r, -1, f_vectors.front());
 		// create vectors for coarser levels
 		PW<Vec> new_u = level.getCoarser().getVectorGenerator()->getNewVector();
 		PW<Vec> new_f = level.getCoarser().getVectorGenerator()->getNewVector();
-        std::shared_ptr<Vector<D>> r_vec(new PetscVector<D>(r,16));
         std::shared_ptr<Vector<D>> f_vec(new PetscVector<D>(new_f,16));
 		level.getRestrictor().restrict(f_vec, r_vec);
 		u_vectors.push_front(new_u);

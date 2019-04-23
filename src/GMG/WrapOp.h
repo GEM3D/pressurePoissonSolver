@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -28,7 +28,7 @@ namespace GMG
 /**
  * @brief Wrapper for Matrix free operation
  */
-template <size_t D> class WrapOp : public Operator
+template <size_t D> class WrapOp : public Operator<D>
 {
 	private:
 	/**
@@ -52,9 +52,11 @@ template <size_t D> class WrapOp : public Operator
 	 * @param x the input vector.
 	 * @param b the output vector.
 	 */
-	void apply(PW<Vec> x, PW<Vec> b) const
+	void apply(std::shared_ptr<const Vector<D>> x, std::shared_ptr<Vector<D>> b) const
 	{
-		helper->apply(x, b);
+		const PetscVector<D> *x_vec = dynamic_cast<const PetscVector<D> *>(x.get());
+		PetscVector<D> *      b_vec = dynamic_cast<PetscVector<D> *>(b.get());
+		helper->apply(x_vec->vec, b_vec->vec);
 	}
 };
 } // namespace GMG

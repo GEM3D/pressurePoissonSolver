@@ -22,12 +22,13 @@
 #ifndef GMGOperator_H
 #define GMGOperator_H
 #include <PW.h>
-#include <petscvec.h>
+#include <Vector.h>
 namespace GMG
 {
 /**
  * @brief Base class for operators on each level.
  */
+template<size_t D>
 class Operator
 {
 	public:
@@ -37,7 +38,7 @@ class Operator
 	 * @param x the input vector.
 	 * @param b the output vector.
 	 */
-	virtual void apply(PW<Vec> x, PW<Vec> b) const = 0;
+	virtual void apply(std::shared_ptr<const Vector<D>> x, std::shared_ptr<Vector<D>> b) const = 0;
 };
 } // namespace GMG
 #endif

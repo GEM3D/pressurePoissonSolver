@@ -62,7 +62,7 @@ template <size_t D> class Level
 	/**
 	 * @brief The operator (matrix) for this level.
 	 */
-	std::shared_ptr<Operator> op;
+	std::shared_ptr<Operator<D>> op;
 	/**
 	 * @brief The restrictor from this level to the coarser level.
 	 */
@@ -135,7 +135,7 @@ template <size_t D> class Level
 	 *
 	 * @param op the operator
 	 */
-	void setOperator(std::shared_ptr<Operator> op)
+	void setOperator(std::shared_ptr<Operator<D>> op)
 	{
 		this->op = op;
 	}
@@ -144,7 +144,7 @@ template <size_t D> class Level
 	 *
 	 * @return Reference to the operator.
 	 */
-	const Operator &getOperator() const
+	const Operator<D> &getOperator() const
 	{
 		return *op;
 	}

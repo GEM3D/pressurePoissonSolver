@@ -75,11 +75,11 @@ Helper2d::Helper2d(int n, std::vector<std::shared_ptr<DomainCollection<2>>> dcs,
 	} catch (nlohmann::detail::out_of_range oor) {
 		op_type = "crs_matrix";
 	}
-	vector<shared_ptr<Operator>> ops(num_levels);
+	vector<shared_ptr<Operator<2>>> ops(num_levels);
 	for (int i = 0; i < num_levels; i++) {
 		if (op_type == "crs_matrix") {
 			MatrixHelper2d mh(*dcs[i]);
-			ops[i].reset(new MatOp(mh.formCRSMatrix()));
+			ops[i].reset(new MatOp<2>(mh.formCRSMatrix()));
 		} else if (op_type == "matrix_free") {
 			ops[i].reset(new WrapOp<2>(helpers[i]));
 		}
