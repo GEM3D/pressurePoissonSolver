@@ -77,7 +77,7 @@ template <size_t D> class FftwPatchSolver : public PatchSolver<D>
 };
 template <size_t D> FftwPatchSolver<D>::FftwPatchSolver(DomainCollection<D> &dc, double lambda)
 {
-	n            = dc.getN();
+	n            = dc.getLengths()[0];
 	this->lambda = lambda;
 }
 template <size_t D> FftwPatchSolver<D>::~FftwPatchSolver()

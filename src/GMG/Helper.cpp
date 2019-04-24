@@ -37,6 +37,7 @@ using nlohmann::json;
 Helper::Helper(int n, std::vector<std::shared_ptr<DomainCollection<3>>> dcs,
                std::shared_ptr<SchurHelper<3>> sh, std::string config_file)
 {
+    lengths=dcs.front()->getLengths();
 	ifstream config_stream(config_file);
 	json     config_j;
 	config_stream >> config_j;
@@ -66,7 +67,7 @@ Helper::Helper(int n, std::vector<std::shared_ptr<DomainCollection<3>>> dcs,
 		}
 		if (dcs[0]->neumann) { dcs[i]->setNeumann(); }
 		helpers[i].reset(
-		new SchurHelper<3>(*dcs[i], sh->getSolver(), sh->getOp(), sh->getInterpolator()));
+		new SchurHelper<3>(dcs[i], sh->getSolver(), sh->getOp(), sh->getInterpolator()));
 	}
 
 	// generate operators
@@ -87,7 +88,7 @@ Helper::Helper(int n, std::vector<std::shared_ptr<DomainCollection<3>>> dcs,
 	}
 
 	// generate smoothers
-	vector<shared_ptr<Smoother>> smoothers(num_levels);
+	vector<shared_ptr<Smoother<3>>> smoothers(num_levels);
 	smoothers[0].reset(new FFTBlockJacobiSmoother<3>(sh));
 	for (int i = 1; i < num_levels; i++) {
 		smoothers[i].reset(new FFTBlockJacobiSmoother<3>(helpers[i]));
@@ -162,5 +163,7 @@ Helper::Helper(int n, std::vector<std::shared_ptr<DomainCollection<3>>> dcs,
 }
 void Helper::apply(Vec f, Vec u)
 {
-	cycle->apply(f, u);
+    std::shared_ptr<Vector<3>> f_vec(new PetscVector<3>(f,lengths,false));
+    std::shared_ptr<Vector<3>> u_vec(new PetscVector<3>(u,lengths,false));
+	cycle->apply(f_vec, u_vec);
 }

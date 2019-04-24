@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -228,13 +228,13 @@ void SchurMatrixHelper::assembleMatrix(inserter insertBlock)
 	VecCreateSeq(PETSC_COMM_SELF, n * n * n, &e);
 	VecCreateSeq(PETSC_COMM_SELF, n * n, &gamma);
 	VecCreateSeq(PETSC_COMM_SELF, n * n, &interp);
-	std::shared_ptr<Vector<3>> u_vec(new PetscVector<3>(u, n));
-	std::shared_ptr<Vector<3>> f_vec(new PetscVector<3>(f, n));
-	std::shared_ptr<Vector<3>> r_vec(new PetscVector<3>(r, n));
-	std::shared_ptr<Vector<3>> e_vec(new PetscVector<3>(e, n));
-	std::shared_ptr<Vector<2>> interp_vec(new PetscVector<2>(interp, n));
-	std::shared_ptr<Vector<2>> gamma_vec(new PetscVector<2>(gamma, n));
-	double *interp_view, *gamma_view;
+	std::shared_ptr<Vector<3>> u_vec(new PetscVector<3>(u, {n, n, n}));
+	std::shared_ptr<Vector<3>> f_vec(new PetscVector<3>(f, {n, n, n}));
+	std::shared_ptr<Vector<3>> r_vec(new PetscVector<3>(r, {n, n, n}));
+	std::shared_ptr<Vector<3>> e_vec(new PetscVector<3>(e, {n, n, n}));
+	std::shared_ptr<Vector<2>> interp_vec(new PetscVector<2>(interp, {n, n}));
+	std::shared_ptr<Vector<2>> gamma_vec(new PetscVector<2>(gamma, {n, n}));
+	double *                   interp_view, *gamma_view;
 	VecGetArray(interp, &interp_view);
 	VecGetArray(gamma, &gamma_view);
 	while (!blocks.empty()) {
@@ -297,7 +297,7 @@ void SchurMatrixHelper::assembleMatrix(inserter insertBlock)
 							block[n * n * j + j] += 0.5;
 							break;
 						case IfaceType::coarse_to_coarse:
-                        case IfaceType::fine_to_fine:
+						case IfaceType::fine_to_fine:
 							block[n * n * j + j] += 1.0;
 							break;
 						default:

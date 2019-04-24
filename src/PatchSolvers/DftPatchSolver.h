@@ -54,7 +54,9 @@ template <size_t D> struct DomainK {
 template <size_t D> class DftPatchSolver : public PatchSolver<D>
 {
 	private:
+	std::array<int, D>                                                          ns;
 	int                                                                         n;
+	int                                                                         patch_stride;
 	bool                                                                        initialized = false;
 	static bool                                                                 compareDomains();
 	double                                                                      lambda;
@@ -89,7 +91,9 @@ template <size_t D> class DftPatchSolver : public PatchSolver<D>
 
 template <size_t D> inline DftPatchSolver<D>::DftPatchSolver(DomainCollection<D> &dc, double lambda)
 {
-	n            = dc.getN();
+	ns           = dc.getLengths();
+	n            = ns[0];
+	patch_stride = dc.getNumElementsInDomain();
 	this->lambda = lambda;
 }
 template <size_t D> inline void DftPatchSolver<D>::addDomain(SchurDomain<D> &d)
@@ -98,7 +102,6 @@ template <size_t D> inline void DftPatchSolver<D>::addDomain(SchurDomain<D> &d)
 	if (!initialized) {
 		initialized = true;
 		std::array<int, D> lengths;
-		lengths.fill(n);
 		f_copy = ValVector<D>(lengths);
 		tmp    = ValVector<D>(lengths);
 		if (!(D % 2)) { local_tmp = ValVector<D>(lengths); }
@@ -130,7 +133,7 @@ template <size_t D> inline void DftPatchSolver<D>::addDomain(SchurDomain<D> &d)
 
 	if (!eigen_vals.count(d)) {
 		valarray<double> &denom = eigen_vals[d];
-		denom.resize(pow(n, D));
+		denom.resize(patch_stride);
 
 		valarray<double> ones(pow(n, D - 1));
 		ones = 1;
@@ -165,7 +168,6 @@ template <size_t D> inline void DftPatchSolver<D>::addDomain(SchurDomain<D> &d)
 		denom += lambda;
 	}
 }
-
 
 template <size_t D>
 inline void DftPatchSolver<D>::solve(SchurDomain<D> &d, std::shared_ptr<const Vector<D>> f,

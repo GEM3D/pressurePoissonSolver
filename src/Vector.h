@@ -164,7 +164,8 @@ template <size_t D> class Vector
 	virtual ~Vector(){};
 	virtual LocalData<D>       getLocalData(int local_patch_id)       = 0;
 	virtual const LocalData<D> getLocalData(int local_patch_id) const = 0;
-	virtual void               set(double alpha)
+
+	virtual void set(double alpha)
 	{
 		for (int i = 0; i < num_local_patches; i++) {
 			LocalData<D> ld = getLocalData(i);
@@ -180,9 +181,41 @@ template <size_t D> class Vector
 			               [&](std::array<int, D> coord) { ld[coord] *= alpha; });
 		}
 	}
-	virtual void add(std::shared_ptr<Vector<D>> b)
+	virtual void shift(double delta)
 	{
-		//
+		for (int i = 0; i < num_local_patches; i++) {
+			LocalData<D> ld = getLocalData(i);
+			nested_loop<D>(ld.getStart(), ld.getEnd(),
+			               [&](std::array<int, D> coord) { ld[coord] += delta; });
+		}
+	}
+	virtual void add(std::shared_ptr<const Vector<D>> b)
+	{
+		for (int i = 0; i < num_local_patches; i++) {
+			LocalData<D>       ld   = getLocalData(i);
+			const LocalData<D> ld_b = b->getLocalData(i);
+			nested_loop<D>(ld.getStart(), ld.getEnd(),
+			               [&](std::array<int, D> coord) { ld[coord] += ld_b[coord]; });
+		}
+	}
+	virtual void addScaled(double alpha, std::shared_ptr<const Vector<D>> b)
+	{
+		for (int i = 0; i < num_local_patches; i++) {
+			LocalData<D>       ld   = getLocalData(i);
+			const LocalData<D> ld_b = b->getLocalData(i);
+			nested_loop<D>(ld.getStart(), ld.getEnd(),
+			               [&](std::array<int, D> coord) { ld[coord] += ld_b[coord] * alpha; });
+		}
+	}
+	virtual void scaleThenAdd(double alpha, std::shared_ptr<const Vector<D>> b)
+	{
+		for (int i = 0; i < num_local_patches; i++) {
+			LocalData<D>       ld   = getLocalData(i);
+			const LocalData<D> ld_b = b->getLocalData(i);
+			nested_loop<D>(ld.getStart(), ld.getEnd(), [&](std::array<int, D> coord) {
+				ld[coord] = alpha * ld[coord] + ld_b[coord];
+			});
+		}
 	}
 };
 #endif

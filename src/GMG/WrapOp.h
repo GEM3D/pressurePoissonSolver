@@ -54,9 +54,7 @@ template <size_t D> class WrapOp : public Operator<D>
 	 */
 	void apply(std::shared_ptr<const Vector<D>> x, std::shared_ptr<Vector<D>> b) const
 	{
-		const PetscVector<D> *x_vec = dynamic_cast<const PetscVector<D> *>(x.get());
-		PetscVector<D> *      b_vec = dynamic_cast<PetscVector<D> *>(b.get());
-		helper->apply(x_vec->vec, b_vec->vec);
+		helper->apply(x, b);
 	}
 };
 } // namespace GMG

@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -28,7 +28,7 @@ namespace GMG
 /**
  * @brief Base class for multi-grid smoothing operators.
  */
-class Smoother
+template <size_t D> class Smoother
 {
 	public:
 	/**
@@ -37,7 +37,7 @@ class Smoother
 	 * @param f the RHS vector
 	 * @param u the solution vector, updated upon return.
 	 */
-	virtual void smooth(PW<Vec> f, PW<Vec> u) const = 0;
+	virtual void smooth(std::shared_ptr<const Vector<D>> f, std::shared_ptr<Vector<D>> u) const = 0;
 };
 } // namespace GMG
 #endif

@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -27,11 +27,11 @@
 template <size_t D> class FuncWrap
 {
 	public:
-	PW<Vec>              u;
-	PW<Vec>              f;
-	SchurHelper<D> *     sh = nullptr;
-	DomainCollection<D> *dc = nullptr;
-	FuncWrap()              = default;
+	std::shared_ptr<Vector<D>> u;
+	std::shared_ptr<Vector<D>> f;
+	SchurHelper<D> *           sh = nullptr;
+	DomainCollection<D> *      dc = nullptr;
+	FuncWrap()                    = default;
 	FuncWrap(SchurHelper<D> *sh, DomainCollection<D> *dc)
 	{
 		f        = dc->getNewDomainVec();
@@ -43,7 +43,9 @@ template <size_t D> class FuncWrap
 	{
 		FuncWrap *w = nullptr;
 		MatShellGetContext(A, &w);
-		w->sh->solveWithInterface(w->f, w->u, x, y);
+		std::shared_ptr<Vector<D - 1>> x_vec(new PetscVector<D - 1>(x, w->sh->getLengths(), false));
+		std::shared_ptr<Vector<D - 1>> y_vec(new PetscVector<D - 1>(y, w->sh->getLengths(), false));
+		w->sh->solveWithInterface(w->f, w->u, x_vec, y_vec);
 		return 0;
 	}
 	static PW_explicit<Mat> getMatrix(SchurHelper<D> *sh, DomainCollection<D> *dc)
@@ -57,8 +59,7 @@ template <size_t D> class FuncWrap
 		return A;
 	}
 };
-template <size_t D> 
-class FullFuncWrap
+template <size_t D> class FullFuncWrap
 {
 	public:
 	SchurHelper<D> *     sh = nullptr;
@@ -72,7 +73,9 @@ class FullFuncWrap
 	{
 		FullFuncWrap *w = nullptr;
 		MatShellGetContext(A, &w);
-		w->sh->apply(x, y);
+		std::shared_ptr<Vector<D>> x_vec(new PetscVector<D>(x, w->dc->getLengths(), false));
+		std::shared_ptr<Vector<D>> y_vec(new PetscVector<D>(y, w->dc->getLengths(), false));
+		w->sh->apply(x_vec, y_vec);
 		return 0;
 	}
 	static PW_explicit<Mat> getMatrix(SchurHelper<D> *sh, DomainCollection<D> *dc)
@@ -99,7 +102,9 @@ class SchwarzPrec
 	}
 	void apply(Vec f, Vec u)
 	{
-		sh->solveWithSolution(f, u);
+		std::shared_ptr<Vector<3>> f_vec(new PetscVector<3>(f, dc->getLengths(), false));
+		std::shared_ptr<Vector<3>> u_vec(new PetscVector<3>(u, dc->getLengths(), false));
+		sh->solveWithSolution(f_vec, u_vec);
 	}
 	static int multiply(PC A, Vec f, Vec u)
 	{

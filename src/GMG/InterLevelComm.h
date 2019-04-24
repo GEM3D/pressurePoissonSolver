@@ -55,10 +55,7 @@ template <size_t D> struct ILCFineToCoarseMetadata {
 template <size_t D> class InterLevelComm
 {
 	private:
-	/**
-	 * @brief The number of cells in each direction on a patch
-	 */
-	int n;
+        std::array<int,D> lengths;
 	/**
 	 * @brief the number of elements in the local distributed vector.
 	 */
@@ -116,7 +113,8 @@ inline InterLevelComm<D>::InterLevelComm(std::shared_ptr<DomainCollection<D>> co
                                          std::shared_ptr<DomainCollection<D>> fine_dc)
 {
 	using namespace std;
-	n = coarse_dc->getN();
+	int patch_stride = coarse_dc->getNumElementsInDomain();
+	lengths = coarse_dc->getLengths();
 	set<int> parent_ids;
 	for (auto &p : fine_dc->domains) {
 		Domain<D> &d = *p.second;
@@ -148,22 +146,22 @@ inline InterLevelComm<D>::InterLevelComm(std::shared_ptr<DomainCollection<D>> co
 	}
 
 	PW<IS> dist_is;
-	ISCreateBlock(MPI_COMM_SELF, (int) pow(n, D), coarse_parent_global_index_map_vec.size(),
+	ISCreateBlock(MPI_COMM_SELF, patch_stride, coarse_parent_global_index_map_vec.size(),
 	              &coarse_parent_global_index_map_vec[0], PETSC_COPY_VALUES, &dist_is);
 
-	local_vec_size = coarse_parent_global_index_map_vec.size() * pow(n, D);
+	local_vec_size = coarse_parent_global_index_map_vec.size() * patch_stride;
 
 	PW<Vec> u_local;
 	VecCreateSeq(PETSC_COMM_SELF, local_vec_size, &u_local);
-	PW<Vec> u = coarse_dc->getNewDomainVec();
-	VecScatterCreate(u, dist_is, u_local, nullptr, &p_scatter);
+    std::shared_ptr<PetscVector<D>> u = coarse_dc->getNewDomainVec();
+	VecScatterCreate(u->vec, dist_is, u_local, nullptr, &p_scatter);
 }
 
 template <size_t D> inline std::shared_ptr<Vector<D>> InterLevelComm<D>::getNewCoarseDistVec()
 {
 	Vec u;
 	VecCreateSeq(PETSC_COMM_SELF, local_vec_size, &u);
-	return std::shared_ptr<Vector<D>>(new PetscVector<D>(u, n));
+	return std::shared_ptr<Vector<D>>(new PetscVector<D>(u, lengths));
 }
 template <size_t D>
 inline void InterLevelComm<D>::scatter(std::shared_ptr<Vector<D>>       dist,

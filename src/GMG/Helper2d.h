@@ -31,6 +31,7 @@ class Helper2d
 {
 	private:
 	std::unique_ptr<Cycle<2>> cycle;
+    std::array<int,2> lengths;
 
 	void apply(Vec f, Vec u);
 

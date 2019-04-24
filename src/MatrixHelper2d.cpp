@@ -28,8 +28,9 @@ PW_explicit<Mat> MatrixHelper2d::formCRSMatrix(double lambda)
 {
 	PW<Mat> A;
 	MatCreate(MPI_COMM_WORLD, &A);
-	int local_size  = dc.domains.size() * dc.getN() * dc.getN();
-	int global_size = dc.num_global_domains * dc.getN() * dc.getN();
+    int n = dc.getLengths()[0];
+	int local_size  = dc.domains.size() * n*n;
+	int global_size = dc.num_global_domains * n*n;
 	MatSetSizes(A, local_size, local_size, global_size, global_size);
 	MatSetType(A, MATMPIAIJ);
 	MatMPIAIJSetPreallocation(A, 19, nullptr, 19, nullptr);

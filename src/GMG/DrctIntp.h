@@ -46,10 +46,6 @@ template <size_t D> class DrctIntp : public Interpolator<D>
 	 * @brief The comm package between the levels.
 	 */
 	std::shared_ptr<InterLevelComm<D>> ilc;
-	/**
-	 * @brief pre-calculated powers of n
-	 */
-	std::array<int, D + 1> npow;
 
 	public:
 	/**
@@ -77,9 +73,6 @@ inline DrctIntp<D>::DrctIntp(std::shared_ptr<DomainCollection<D>> coarse_dc,
 	this->coarse_dc = coarse_dc;
 	this->fine_dc   = fine_dc;
 	this->ilc       = ilc;
-	for (size_t i = 0; i <= D; i++) {
-		npow[i] = (int) std::pow(fine_dc->getN(), i);
-	}
 }
 
 template <size_t D>

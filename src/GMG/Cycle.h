@@ -22,8 +22,8 @@
 #ifndef GMGCycle_H
 #define GMGCycle_H
 #include <GMG/Level.h>
-#include <list>
 #include <PetscVector.h>
+#include <list>
 namespace GMG
 {
 /**
@@ -37,11 +37,11 @@ template <size_t D> class Cycle
 	/**
 	 * @brief stack of LHS vectors in use. Coarsest at beginning, finest at end.
 	 */
-	std::list<PW<Vec>> u_vectors;
+	std::list<std::shared_ptr<Vector<D>>> u_vectors;
 	/**
 	 * @brief stack of RHS vectors in use. Coarsest at beginning, finest at end.
 	 */
-	std::list<PW<Vec>> f_vectors;
+	std::list<std::shared_ptr<const Vector<D>>> f_vectors;
 	/**
 	 * @brief pointer to the finest level
 	 */
@@ -56,16 +56,13 @@ template <size_t D> class Cycle
 	void prepCoarser(const Level<D> &level)
 	{
 		// calculate residual
-		PW<Vec> r = level.getVectorGenerator()->getNewVector();
-        std::shared_ptr<Vector<D>> u_vec(new PetscVector<D>(u_vectors.front(),16));
-        std::shared_ptr<Vector<D>> r_vec(new PetscVector<D>(r,16));
-		level.getOperator().apply(u_vec, r_vec);
-		VecAYPX(r, -1, f_vectors.front());
+		std::shared_ptr<Vector<D>> r = level.getVectorGenerator()->getNewVector();
+		level.getOperator().apply(u_vectors.front(), r);
+		r->scaleThenAdd(-1, f_vectors.front());
 		// create vectors for coarser levels
-		PW<Vec> new_u = level.getCoarser().getVectorGenerator()->getNewVector();
-		PW<Vec> new_f = level.getCoarser().getVectorGenerator()->getNewVector();
-        std::shared_ptr<Vector<D>> f_vec(new PetscVector<D>(new_f,16));
-		level.getRestrictor().restrict(f_vec, r_vec);
+		std::shared_ptr<Vector<D>> new_u = level.getCoarser().getVectorGenerator()->getNewVector();
+		std::shared_ptr<Vector<D>> new_f = level.getCoarser().getVectorGenerator()->getNewVector();
+		level.getRestrictor().restrict(new_f, r);
 		u_vectors.push_front(new_u);
 		f_vectors.push_front(new_f);
 	}
@@ -76,12 +73,10 @@ template <size_t D> class Cycle
 	 */
 	void prepFiner(const Level<D> &level)
 	{
-		PW<Vec> old_u = u_vectors.front();
+		std::shared_ptr<Vector<D>> old_u = u_vectors.front();
 		u_vectors.pop_front();
 		f_vectors.pop_front();
-        std::shared_ptr<Vector<D>> old_u_vec(new PetscVector<D>(old_u,16));
-        std::shared_ptr<Vector<D>> u_vec(new PetscVector<D>(u_vectors.front(),16));
-		level.getInterpolator().interpolate(old_u_vec, u_vec);
+		level.getInterpolator().interpolate(old_u, u_vectors.front());
 	}
 
 	/**
@@ -117,10 +112,10 @@ template <size_t D> class Cycle
 	 * @param f the RHS vector.
 	 * @param u the current solution vector. Output will be updated solution vector.
 	 */
-	void apply(Vec f, Vec u)
+	void apply(std::shared_ptr<const Vector<D>> f, std::shared_ptr<Vector<D>> u)
 	{
-		f_vectors.push_back(PW<Vec>(f, false));
-		u_vectors.push_back(PW<Vec>(u, false));
+		f_vectors.push_back(f);
+		u_vectors.push_back(u);
 		visit(*finest_level);
 		f_vectors.pop_front();
 		u_vectors.pop_front();

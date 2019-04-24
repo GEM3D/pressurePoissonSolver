@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -193,7 +193,9 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	// Set the number of discretization points in the x and y direction.
+    std::array<int,3> ns;
 	int n = args::get(f_n);
+    ns.fill(n);
 
 	double tol = 1e-12;
 	if (f_t) { tol = args::get(f_t); }
@@ -237,9 +239,8 @@ int main(int argc, char *argv[])
 			return exp(cos(10 * M_PI * x)) - exp(cos(11 * M_PI * y)) + exp(cos(12 * M_PI * z));
 		};
 		ffun = [](double x, double y, double z) {
-            constexpr double pi2 = M_PI*M_PI;
-			return
-                -M_PI * M_PI
+			constexpr double pi2 = M_PI * M_PI;
+			return -M_PI * M_PI
 			       * (100 * exp(cos(10 * M_PI * x)) * cos(10 * M_PI * x)
 			          - 100 * exp(cos(10 * M_PI * x)) * pow(sin(10 * M_PI * x), 2)
 			          - 121 * exp(cos(11 * M_PI * y)) * cos(11 * M_PI * y)
@@ -258,35 +259,35 @@ int main(int argc, char *argv[])
 		};
 	} else {
 		ffun = [](double x, double y, double z) {
-            x+=.3;
-            y+=.3;
-            z+=.3;
+			x += .3;
+			y += .3;
+			z += .3;
 			return -77.0 / 36 * M_PI * M_PI * sin(M_PI * x) * cos(2.0 / 3 * M_PI * y)
 			       * sin(5.0 / 6 * M_PI * z);
 		};
 		gfun = [](double x, double y, double z) {
-            x+=.3;
-            y+=.3;
-            z+=.3;
+			x += .3;
+			y += .3;
+			z += .3;
 			return sin(M_PI * x) * cos(2.0 / 3 * M_PI * y) * sin(5.0 / 6 * M_PI * z);
 		};
 		nfunx = [](double x, double y, double z) {
-            x+=.3;
-            y+=.3;
-            z+=.3;
+			x += .3;
+			y += .3;
+			z += .3;
 			return M_PI * cos(M_PI * x) * cos(2.0 / 3 * M_PI * y) * sin(5.0 / 6 * M_PI * z);
 		};
 		nfuny = [](double x, double y, double z) {
-            x+=.3;
-            y+=.3;
-            z+=.3;
+			x += .3;
+			y += .3;
+			z += .3;
 			return -2.0 / 3 * M_PI * sin(M_PI * x) * sin(2.0 / 3 * M_PI * y)
 			       * sin(5.0 / 6 * M_PI * z);
 		};
 		nfunz = [](double x, double y, double z) {
-            x+=.3;
-            y+=.3;
-            z+=.3;
+			x += .3;
+			y += .3;
+			z += .3;
 			return 5.0 / 6 * M_PI * sin(M_PI * x) * cos(2.0 / 3 * M_PI * y)
 			       * cos(5.0 / 6 * M_PI * z);
 		};
@@ -318,7 +319,7 @@ int main(int argc, char *argv[])
 			timer.stop("Zoltan Balance");
 		}
 
-		dc.reset(new DomainCollection<3>(blg.levels[t.num_levels - 1], n));
+		dc.reset(new DomainCollection<3>(blg.levels[t.num_levels - 1], ns));
 		if (f_neumann) { dc->setNeumann(); }
 
 		if (f_dft) {
@@ -326,29 +327,29 @@ int main(int argc, char *argv[])
 		} else {
 			p_solver.reset(new FftwPatchSolver<3>(*dc));
 		}
-		shared_ptr<SchurHelper<3>> sch(new SchurHelper<3>(*dc, p_solver, p_operator, p_interp));
+		shared_ptr<SchurHelper<3>> sch(new SchurHelper<3>(dc, p_solver, p_operator, p_interp));
 		MatrixHelper               mh(*dc);
 
-		PW<Vec> u     = dc->getNewDomainVec();
-		PW<Vec> exact = dc->getNewDomainVec();
-		PW<Vec> f     = dc->getNewDomainVec();
+		shared_ptr<PetscVector<3>> u     = dc->getNewDomainVec();
+		shared_ptr<PetscVector<3>> exact = dc->getNewDomainVec();
+		shared_ptr<PetscVector<3>> f     = dc->getNewDomainVec();
 
 		if (f_neumann) {
-			Init::initNeumann(*dc, n, f, exact, ffun, gfun, nfunx, nfuny, nfunz);
+			Init::initNeumann(*dc, n, f->vec, exact->vec, ffun, gfun, nfunx, nfuny, nfunz);
 		} else {
-			Init::initDirichlet(*dc, n, f, exact, ffun, gfun);
+			Init::initDirichlet(*dc, n, f->vec, exact->vec, ffun, gfun);
 		}
 
 		timer.stop("Domain Initialization");
 
 		// Create the gamma and diff vectors
-		PW<Vec>                 gamma = sch->getNewSchurVec();
-		PW<Vec>                 diff  = sch->getNewSchurVec();
-		PW<Vec>                 b     = sch->getNewSchurVec();
-		PW<Mat>                 A;
-		shared_ptr<FuncWrap<3>> w;
-		shared_ptr<SchwarzPrec> sp;
-		shared_ptr<GMG::Helper> gh;
+		shared_ptr<PetscVector<2>> gamma = sch->getNewSchurVec();
+		shared_ptr<PetscVector<2>> diff  = sch->getNewSchurVec();
+		shared_ptr<PetscVector<2>> b     = sch->getNewSchurVec();
+		PW<Mat>                    A;
+		shared_ptr<FuncWrap<3>>    w;
+		shared_ptr<SchwarzPrec>    sp;
+		shared_ptr<GMG::Helper>    gh;
 
 		// Create linear problem for the Belos solver
 		PW<KSP> solver;
@@ -358,7 +359,7 @@ int main(int argc, char *argv[])
 		if (f_neumann && !f_nozerof) {
 			double fdiff = dc->integrate(f) / dc->volume();
 			if (my_global_rank == 0) cout << "Fdiff: " << fdiff << endl;
-			VecShift(f, -fdiff);
+            f->shift(-fdiff);
 		}
 
 		if (f_noschur || dc->num_global_domains != 1) {
@@ -366,15 +367,15 @@ int main(int argc, char *argv[])
 
 			if (!f_noschur) {
 				// Get the b vector
-				VecScale(gamma, 0);
+                gamma->set(0);
 				sch->solveWithInterface(f, u, gamma, b);
-				VecScale(b, -1.0);
+                b->scale(-1);
 
 				if (f_rhs) {
 					PetscViewer viewer;
 					PetscViewerBinaryOpen(PETSC_COMM_WORLD, args::get(f_rhs).c_str(),
 					                      FILE_MODE_WRITE, &viewer);
-					VecView(b, viewer);
+					VecView(b->vec, viewer);
 					PetscViewerDestroy(&viewer);
 				}
 			}
@@ -403,10 +404,10 @@ int main(int argc, char *argv[])
 						A = smh.formCRSMatrix();
 					}
 				}
-                if(f_setrow){
-                    int row = 0;
-                    MatZeroRows(A,1,&row,1.0,nullptr,nullptr);
-                }
+				if (f_setrow) {
+					int row = 0;
+					MatZeroRows(A, 1, &row, 1.0, nullptr, nullptr);
+				}
 
 				timer.stop("Matrix Formation");
 
@@ -443,7 +444,7 @@ int main(int argc, char *argv[])
 					vector<shared_ptr<DomainCollection<3>>> dcs(t.num_levels);
 					dcs[0] = dc;
 					for (int i = 1; i < t.num_levels; i++) {
-						dcs[i].reset(new DomainCollection<3>(blg.levels[t.num_levels - 1 - i], n));
+						dcs[i].reset(new DomainCollection<3>(blg.levels[t.num_levels - 1 - i], ns));
 					}
 					timer.stop("GMG Domain Collection Setup");
 
@@ -484,9 +485,9 @@ int main(int argc, char *argv[])
 			} else {
 				KSPSetTolerances(solver, tol, PETSC_DEFAULT, PETSC_DEFAULT, 5000);
 				if (f_noschur) {
-					KSPSolve(solver, f, u);
+					KSPSolve(solver, f->vec, u->vec);
 				} else {
-					KSPSolve(solver, b, gamma);
+					KSPSolve(solver, b->vec, gamma->vec);
 				}
 				int its;
 				KSPGetIterationNumber(solver, &its);
@@ -510,22 +511,22 @@ int main(int argc, char *argv[])
 		timer.stop("Complete Solve");
 
 		// residual
-		PW<Vec> resid = dc->getNewDomainVec();
-		PW<Vec> au    = dc->getNewDomainVec();
+		shared_ptr<PetscVector<3>> resid = dc->getNewDomainVec();
+		shared_ptr<PetscVector<3>> au    = dc->getNewDomainVec();
 		if (f_noschur) {
-			MatMult(A, u, au);
+			MatMult(A, u->vec, au->vec);
 		} else {
 			sch->applyWithInterface(u, gamma, au);
 		}
-		VecAXPBYPCZ(resid, -1.0, 1.0, 0.0, au, f);
+		VecAXPBYPCZ(resid->vec, -1.0, 1.0, 0.0, au->vec, f->vec);
 		double residual;
-		VecNorm(resid, NORM_2, &residual);
+		VecNorm(resid->vec, NORM_2, &residual);
 		double fnorm;
-		VecNorm(f, NORM_2, &fnorm);
+		VecNorm(f->vec, NORM_2, &fnorm);
 
 		// error
-		PW<Vec> error = dc->getNewDomainVec();
-		VecAXPBYPCZ(error, -1.0, 1.0, 0.0, exact, u);
+		shared_ptr<PetscVector<3>> error = dc->getNewDomainVec();
+		VecAXPBYPCZ(error->vec, -1.0, 1.0, 0.0, exact->vec, u->vec);
 		if (f_neumann) {
 			double uavg = dc->integrate(u) / dc->volume();
 			double eavg = dc->integrate(exact) / dc->volume();
@@ -535,14 +536,14 @@ int main(int argc, char *argv[])
 				cout << "Average of exact solution: " << eavg << endl;
 			}
 
-			VecShift(error, eavg - uavg);
+            error->shift(eavg-uavg);
 		}
 		double error_norm;
-		VecNorm(error, NORM_2, &error_norm);
+		VecNorm(error->vec, NORM_2, &error_norm);
 		double error_norm_inf;
-		VecNorm(error, NORM_INFINITY, &error_norm_inf);
+		VecNorm(error->vec, NORM_INFINITY, &error_norm_inf);
 		double exact_norm;
-		VecNorm(exact, NORM_2, &exact_norm);
+		VecNorm(exact->vec, NORM_2, &exact_norm);
 
 		double ausum = dc->integrate(au);
 		double fsum  = dc->integrate(f);
@@ -563,16 +564,16 @@ int main(int argc, char *argv[])
 		if (f_g) {
 			PetscViewer viewer;
 			PetscViewerASCIIOpen(PETSC_COMM_WORLD, args::get(f_g).c_str(), &viewer);
-			VecView(gamma, viewer);
+			VecView(gamma->vec, viewer);
 		}
 #ifdef HAVE_VTK
 		if (f_outvtk) {
 			VtkWriter writer(*dc, args::get(f_outvtk));
-			writer.add(u, "Solution");
-			writer.add(error, "Error");
-			writer.add(exact, "Exact");
-			writer.add(resid, "Residual");
-			writer.add(f, "RHS");
+			writer.add(u->vec, "Solution");
+			writer.add(error->vec, "Error");
+			writer.add(exact->vec, "Exact");
+			writer.add(resid->vec, "Residual");
+			writer.add(f->vec, "RHS");
 			writer.write();
 		}
 #endif

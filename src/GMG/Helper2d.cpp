@@ -36,6 +36,7 @@ using nlohmann::json;
 Helper2d::Helper2d(int n, std::vector<std::shared_ptr<DomainCollection<2>>> dcs,
                    std::shared_ptr<SchurHelper<2>> sh, std::string config_file)
 {
+	lengths = dcs.front()->getLengths();
 	ifstream config_stream(config_file);
 	json     config_j;
 	config_stream >> config_j;
@@ -65,7 +66,7 @@ Helper2d::Helper2d(int n, std::vector<std::shared_ptr<DomainCollection<2>>> dcs,
 		}
 		if (dcs[0]->neumann) { dcs[i]->setNeumann(); }
 		helpers[i].reset(
-		new SchurHelper<2>(*dcs[i], sh->getSolver(), sh->getOp(), sh->getInterpolator()));
+		new SchurHelper<2>(dcs[i], sh->getSolver(), sh->getOp(), sh->getInterpolator()));
 	}
 
 	// generate operators
@@ -86,7 +87,7 @@ Helper2d::Helper2d(int n, std::vector<std::shared_ptr<DomainCollection<2>>> dcs,
 	}
 
 	// generate smoothers
-	vector<shared_ptr<Smoother>> smoothers(num_levels);
+	vector<shared_ptr<Smoother<2>>> smoothers(num_levels);
 	smoothers[0].reset(new FFTBlockJacobiSmoother<2>(sh));
 	for (int i = 1; i < num_levels; i++) {
 		smoothers[i].reset(new FFTBlockJacobiSmoother<2>(helpers[i]));
@@ -154,5 +155,7 @@ Helper2d::Helper2d(int n, std::vector<std::shared_ptr<DomainCollection<2>>> dcs,
 }
 void Helper2d::apply(Vec f, Vec u)
 {
-	cycle->apply(f, u);
+	std::shared_ptr<Vector<2>> f_vec(new PetscVector<2>(f, lengths, false));
+	std::shared_ptr<Vector<2>> u_vec(new PetscVector<2>(u, lengths, false));
+	cycle->apply(f_vec, u_vec);
 }

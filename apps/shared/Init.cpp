@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -63,7 +63,7 @@ void Init::initNeumann(DomainCollection<3> &dc, int n, Vec f, Vec exact,
                        function<double(double, double, double)> nfuny,
                        function<double(double, double, double)> nfunz)
 {
-	n = dc.getN();
+	n = dc.getLengths()[0];
 	double *f_ptr;
 	VecGetArray(f, &f_ptr);
 	double *exact_ptr;
@@ -157,7 +157,7 @@ void Init::initDirichlet(DomainCollection<3> &dc, int n, Vec f, Vec exact,
                          function<double(double, double, double)> ffun,
                          function<double(double, double, double)> efun)
 {
-	n = dc.getN();
+	n = dc.getLengths()[0];
 	double *f_ptr;
 	VecGetArray(f, &f_ptr);
 	double *exact_ptr;
@@ -255,7 +255,7 @@ void Init::initNeumann2d(DomainCollection<2> &dc, int n, Vec f, Vec exact,
                          function<double(double, double)> nfunx,
                          function<double(double, double)> nfuny)
 {
-	n = dc.getN();
+	n = dc.getLengths()[0];
 	double *f_ptr;
 	VecGetArray(f, &f_ptr);
 	double *exact_ptr;
@@ -314,7 +314,7 @@ void Init::initDirichlet2d(DomainCollection<2> &dc, int n, Vec f, Vec exact,
                            function<double(double, double)> ffun,
                            function<double(double, double)> efun)
 {
-	n = dc.getN();
+	n = dc.getLengths()[0];
 	double *f_ptr;
 	VecGetArray(f, &f_ptr);
 	double *exact_ptr;
@@ -373,7 +373,7 @@ void Init::fillSolution2d(DomainCollection<2> &dc, Vec u,
 {
 	double *vec;
 	VecGetArray(u, &vec);
-	int n = dc.getN();
+	int n = dc.getLengths()[0];
 	for (auto &p : dc.domains) {
 		Domain<2> &d = *p.second;
 

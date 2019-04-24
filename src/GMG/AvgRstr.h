@@ -45,10 +45,6 @@ template <size_t D> class AvgRstr : public Restrictor<D>
 	 * @brief The communication package for restricting between levels.
 	 */
 	std::shared_ptr<InterLevelComm<D>> ilc;
-	/**
-	 * @brief pre-calculated powers of n
-	 */
-	std::array<int, D + 1> npow;
 
 	public:
 	/**
@@ -77,9 +73,6 @@ inline AvgRstr<D>::AvgRstr(std::shared_ptr<DomainCollection<D>> coarse_dc,
 	this->coarse_dc = coarse_dc;
 	this->fine_dc   = fine_dc;
 	this->ilc       = ilc;
-	for (size_t i = 0; i <= D; i++) {
-		npow[i] = (int) std::pow(fine_dc->getN(), i);
-	}
 }
 template <size_t D>
 inline void AvgRstr<D>::restrict(std::shared_ptr<Vector<D>>       coarse,
@@ -96,7 +89,7 @@ inline void AvgRstr<D>::restrict(std::shared_ptr<Vector<D>>       coarse,
 			Orthant<D>         orth = d.oct_on_parent;
 			std::array<int, D> starts;
 			for (size_t i = 0; i < D; i++) {
-				starts[i]  = orth.isOnSide(2 * i) ? 0 : coarse_local_data.getLengths()[i];
+				starts[i] = orth.isOnSide(2 * i) ? 0 : coarse_local_data.getLengths()[i];
 			}
 
 			nested_loop<D>(fine_data.getStart(), fine_data.getEnd(),

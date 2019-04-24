@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -21,10 +21,12 @@
 
 #ifndef DOMAINSIGNATURECOLLECTION_H
 #define DOMAINSIGNATURECOLLECTION_H
-#include "Domain.h"
-#include "InterpCase.h"
-#include "OctTree.h"
-#include "PW.h"
+#include <Domain.h>
+#include <InterpCase.h>
+#include <OctTree.h>
+#include <PW.h>
+#include <PetscVector.h>
+#include <cmath>
 #include <deque>
 #include <map>
 #include <memory>
@@ -33,7 +35,6 @@
 #include <set>
 #include <string>
 #include <vector>
-#include <cmath>
 /**
  * @brief A collection of Domain Signatures
  *
@@ -44,8 +45,9 @@
 template <size_t D> class DomainCollection
 {
 	private:
-	int  n = -1;
-	void indexDomainsLocal()
+	std::array<int, D> lengths;
+	int                patch_stride;
+	void               indexDomainsLocal()
 	{
 		int                curr_i = 0;
 		std::vector<int>   map_vec;
@@ -165,17 +167,24 @@ template <size_t D> class DomainCollection
 	std::vector<int> domain_map_vec;
 	std::vector<int> domain_off_proc_map_vec;
 
-	int getN()
+	const std::array<int, D> &getLengths()
 	{
-		return n;
+		return lengths;
 	}
 	/**
 	 * @brief Default empty constructor.
 	 */
 	DomainCollection() = default;
-	DomainCollection(std::map<int, std::shared_ptr<Domain<D>>> domain_set, int n)
+	DomainCollection(std::map<int, std::shared_ptr<Domain<D>>> domain_set,
+	                 const std::array<int, D> &                lengths)
 	{
-		this->n = n;
+		this->lengths = lengths;
+
+		patch_stride = 1;
+		for (int i = 0; i < D; i++) {
+			patch_stride *= lengths[i];
+		}
+
 		domains = domain_set;
 
 		int num_local_domains = domains.size();
@@ -195,11 +204,11 @@ template <size_t D> class DomainCollection
 			p.second->setNeumann();
 		}
 	}
-	PW_explicit<Vec> getNewDomainVec() const
+	std::shared_ptr<PetscVector<D>> getNewDomainVec() const
 	{
-		PW<Vec> u;
-		VecCreateMPI(MPI_COMM_WORLD, domains.size() * std::pow(n, D), PETSC_DETERMINE, &u);
-		return u;
+		Vec u;
+		VecCreateMPI(MPI_COMM_WORLD, domains.size() * patch_stride, PETSC_DETERMINE, &u);
+		return std::shared_ptr<PetscVector<D>>(new PetscVector<D>(u, lengths));
 	}
 
 	int getGlobalNumDomains()
@@ -208,11 +217,15 @@ template <size_t D> class DomainCollection
 	}
 	int getGlobalNumCells()
 	{
-		return num_global_domains * std::pow(n, D);
+		return num_global_domains * patch_stride;
 	}
 	int getLocalNumCells()
 	{
-		return domains.size() * std::pow(n, D);
+		return domains.size() * patch_stride;
+	}
+	int getNumElementsInDomain()
+	{
+		return patch_stride;
 	}
 	double volume()
 	{
@@ -226,20 +239,17 @@ template <size_t D> class DomainCollection
 		MPI_Allreduce(&sum, &retval, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 		return retval;
 	}
-	double integrate(const Vec u)
+	double integrate(std::shared_ptr<const Vector<D>> u) const
 	{
-		double  sum = 0;
-		double *u_view;
-		VecGetArray(u, &u_view);
+		double sum = 0;
 
 		for (auto &p : domains) {
-			Domain<D> &d     = *p.second;
-			int        start = std::pow(n, D) * d.id_local;
+			Domain<D> &        d      = *p.second;
+			const LocalData<D> u_data = u->getLocalData(d.id_local);
 
 			double patch_sum = 0;
-			for (int i = 0; i < std::pow(n, D); i++) {
-				patch_sum += u_view[start + i];
-			}
+			nested_loop<D>(u_data.getStart(), u_data.getEnd(),
+			               [&](std::array<int, D> coord) { patch_sum += u_data[coord]; });
 
 			patch_sum
 			*= std::accumulate(d.lengths.begin(), d.lengths.end(), 1.0, std::multiplies<double>())
@@ -249,7 +259,6 @@ template <size_t D> class DomainCollection
 		}
 		double retval;
 		MPI_Allreduce(&sum, &retval, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-		VecRestoreArray(u, &u_view);
 		return retval;
 	}
 };

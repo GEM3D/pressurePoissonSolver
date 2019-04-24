@@ -30,7 +30,7 @@ namespace GMG
  * @brief A block Jacobi smoother that uses FFTW solves on each patch. Implemented using the
  * SchurHelper class.
  */
-template <size_t D> class FFTBlockJacobiSmoother : public Smoother
+template <size_t D> class FFTBlockJacobiSmoother : public Smoother<D>
 {
 	private:
 	/**
@@ -54,7 +54,7 @@ template <size_t D> class FFTBlockJacobiSmoother : public Smoother
 	 * @param f the RHS vector
 	 * @param u the solution vector, updated upon return.
 	 */
-	void smooth(PW<Vec> f, PW<Vec> u) const
+	void smooth(std::shared_ptr<const Vector<D>> f, std::shared_ptr<Vector<D>> u) const
 	{
 		sh->solveWithSolution(f, u);
 	}

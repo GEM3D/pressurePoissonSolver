@@ -26,15 +26,16 @@
 #include <GMG/Operator.h>
 #include <GMG/Restrictor.h>
 #include <GMG/Smoother.h>
+#include <PetscVector.h>
 #include <memory>
 namespace GMG
 {
-class VectorGenerator
+template <size_t D> class VectorGenerator
 {
 	public:
-	virtual PW_explicit<Vec> getNewVector() = 0;
+	virtual std::shared_ptr<Vector<D>> getNewVector() = 0;
 };
-template <size_t D> class DCVG : public VectorGenerator
+template <size_t D> class DCVG : public VectorGenerator<D>
 {
 	private:
 	std::shared_ptr<DomainCollection<D>> dc;
@@ -44,7 +45,7 @@ template <size_t D> class DCVG : public VectorGenerator
 	{
 		this->dc = dc;
 	}
-	PW_explicit<Vec> getNewVector()
+	std::shared_ptr<Vector<D>> getNewVector()
 	{
 		return dc->getNewDomainVec();
 	}
@@ -58,7 +59,7 @@ template <size_t D> class Level
 	/**
 	 * @brief the VectorGenerator for this level.
 	 */
-	std::shared_ptr<VectorGenerator> vg;
+	std::shared_ptr<VectorGenerator<D>> vg;
 	/**
 	 * @brief The operator (matrix) for this level.
 	 */
@@ -74,7 +75,7 @@ template <size_t D> class Level
 	/**
 	 * @brief The smoother for this level.
 	 */
-	std::shared_ptr<Smoother> smoother;
+	std::shared_ptr<Smoother<D>> smoother;
 	/**
 	 * @brief Pointer to coarser level
 	 */
@@ -90,7 +91,7 @@ template <size_t D> class Level
 	 *
 	 * @param dc pointer to the DomainCollection for this level
 	 */
-	Level(std::shared_ptr<VectorGenerator> vg)
+	Level(std::shared_ptr<VectorGenerator<D>> vg)
 	{
 		this->vg = vg;
 	}
@@ -153,7 +154,7 @@ template <size_t D> class Level
 	 *
 	 * @param smoother the smoother
 	 */
-	void setSmoother(std::shared_ptr<Smoother> smoother)
+	void setSmoother(std::shared_ptr<Smoother<D>> smoother)
 	{
 		this->smoother = smoother;
 	}
@@ -162,7 +163,7 @@ template <size_t D> class Level
 	 *
 	 * @return Reference to the smoother operator.
 	 */
-	const Smoother &getSmoother() const
+	const Smoother<D> &getSmoother() const
 	{
 		return *smoother;
 	}
@@ -171,7 +172,7 @@ template <size_t D> class Level
 	 *
 	 * @return DomainCollection for this level.
 	 */
-	const std::shared_ptr<VectorGenerator> &getVectorGenerator() const
+	const std::shared_ptr<VectorGenerator<D>> &getVectorGenerator() const
 	{
 		return vg;
 	}

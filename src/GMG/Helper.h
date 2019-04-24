@@ -31,6 +31,7 @@ class Helper
 {
 	private:
 	std::unique_ptr<Cycle<3>> cycle;
+    std::array<int,3> lengths;
 
 	void apply(Vec f, Vec u);
 

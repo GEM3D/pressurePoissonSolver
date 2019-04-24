@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -44,18 +44,16 @@ struct Block {
 
 	Block(Side<2> main, int j, Side<2> aux, int i, bitset<4> neumann, IfaceType type)
 	{
-		s       = rot_table[main.toInt()][aux.toInt()];
-		this->i = i;
-		this->j = j;
-        this->type = type;
-        for(int s=0;s<4;s++){
-            this->neumann[rot_table[main.toInt()][s].toInt()]=neumann[s];
-        }
-		flip_j  = flip_j_table[main.toInt()];
-		flip_i  = flip_i_table[main.toInt()][s.toInt()];
-        if(flip_i){
-            this->type.setOrthant(!type.getOrthant());
-        }
+		s          = rot_table[main.toInt()][aux.toInt()];
+		this->i    = i;
+		this->j    = j;
+		this->type = type;
+		for (int s = 0; s < 4; s++) {
+			this->neumann[rot_table[main.toInt()][s].toInt()] = neumann[s];
+		}
+		flip_j = flip_j_table[main.toInt()];
+		flip_i = flip_i_table[main.toInt()][s.toInt()];
+		if (flip_i) { this->type.setOrthant(!type.getOrthant()); }
 	}
 	bool operator==(const Block &b) const
 	{
@@ -63,7 +61,7 @@ struct Block {
 	}
 	bool operator<(const Block &b) const
 	{
-		return std::tie(i, j, flip_j) < std::tie(b.i, b.j,b.flip_j);
+		return std::tie(i, j, flip_j) < std::tie(b.i, b.j, b.flip_j);
 	}
 };
 struct BlockKey {
@@ -106,13 +104,13 @@ void SchurMatrixHelper2d::assembleMatrix(inserter insertBlock)
 	VecCreateSeq(PETSC_COMM_SELF, n * n, &e);
 	VecCreateSeq(PETSC_COMM_SELF, n, &gamma);
 	VecCreateSeq(PETSC_COMM_SELF, n, &interp);
-	std::shared_ptr<Vector<2>> u_vec(new PetscVector<2>(u, n));
-	std::shared_ptr<Vector<2>> f_vec(new PetscVector<2>(f, n));
-	std::shared_ptr<Vector<2>> r_vec(new PetscVector<2>(r, n));
-	std::shared_ptr<Vector<2>> e_vec(new PetscVector<2>(e, n));
-	std::shared_ptr<Vector<1>> interp_vec(new PetscVector<1>(interp, n));
-	std::shared_ptr<Vector<1>> gamma_vec(new PetscVector<1>(gamma, n));
-	double *interp_view, *gamma_view;
+	std::shared_ptr<Vector<2>> u_vec(new PetscVector<2>(u, {n, n}));
+	std::shared_ptr<Vector<2>> f_vec(new PetscVector<2>(f, {n, n}));
+	std::shared_ptr<Vector<2>> r_vec(new PetscVector<2>(r, {n, n}));
+	std::shared_ptr<Vector<2>> e_vec(new PetscVector<2>(e, {n, n}));
+	std::shared_ptr<Vector<1>> interp_vec(new PetscVector<1>(interp, {n}));
+	std::shared_ptr<Vector<1>> gamma_vec(new PetscVector<1>(gamma, {n}));
+	double *                   interp_view, *gamma_view;
 	VecGetArray(interp, &interp_view);
 	VecGetArray(gamma, &gamma_view);
 	while (!blocks.empty()) {
@@ -137,8 +135,8 @@ void SchurMatrixHelper2d::assembleMatrix(inserter insertBlock)
 		auto interpolator = sh->getInterpolator();
 		// create domain representing curr_type
 		SchurDomain<2> sd;
-		sd.n = n;
-		sd.domain.n = n;
+		sd.n                              = n;
+		sd.domain.n                       = n;
 		sd.neumann                        = curr_type.neumann;
 		sd.getIfaceInfoPtr(Side<2>::west) = new NormalIfaceInfo<2>();
 		solver->addDomain(sd);

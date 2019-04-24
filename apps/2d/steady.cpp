@@ -177,6 +177,8 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	// Set the number of discretization points in the x and y direction.
+    std::array<int,2> ns;
+    ns.fill(args::get(f_n));
 	int n = args::get(f_n);
 
 	double tol = 1e-12;
@@ -209,7 +211,7 @@ int main(int argc, char *argv[])
 		p4estBLG    blg(ttp.p4est, n);
 		levels = blg.levels;
 #else
-    if (false) {
+	if (false) {
 #endif
 	} else {
 		BalancedLevelsGenerator<2> blg(t, n);
@@ -218,7 +220,7 @@ int main(int argc, char *argv[])
 		levels = blg.levels;
 	}
 
-	dc.reset(new DomainCollection<2>(levels[t.num_levels - 1], n));
+	dc.reset(new DomainCollection<2>(levels[t.num_levels - 1], ns));
 	if (f_neumann) { dc->setNeumann(); }
 
 	// the functions that we are using
@@ -310,7 +312,7 @@ int main(int argc, char *argv[])
 	for (int loop = 0; loop < loop_count; loop++) {
 		timer.start("Domain Initialization");
 
-		shared_ptr<SchurHelper<2>> sch(new SchurHelper<2>(*dc, p_solver, p_operator, p_interp));
+		shared_ptr<SchurHelper<2>> sch(new SchurHelper<2>(dc, p_solver, p_operator, p_interp));
 		/*
 		if (f_outim) {
 		    IfaceMatrixHelper imh(dc);
@@ -323,24 +325,24 @@ int main(int argc, char *argv[])
 		}
 		*/
 
-		PW<Vec> u     = dc->getNewDomainVec();
-		PW<Vec> exact = dc->getNewDomainVec();
-		PW<Vec> f     = dc->getNewDomainVec();
+		shared_ptr<PetscVector<2>> u     = dc->getNewDomainVec();
+		shared_ptr<PetscVector<2>> exact = dc->getNewDomainVec();
+		shared_ptr<PetscVector<2>> f     = dc->getNewDomainVec();
 
 		if (f_neumann) {
-			Init::initNeumann2d(*dc, n, f, exact, ffun, gfun, nfun, nfuny);
+			Init::initNeumann2d(*dc, n, f->vec, exact->vec, ffun, gfun, nfun, nfuny);
 		} else {
-			Init::initDirichlet2d(*dc, n, f, exact, ffun, gfun);
+			Init::initDirichlet2d(*dc, n, f->vec, exact->vec, ffun, gfun);
 		}
 
 		timer.stop("Domain Initialization");
 
 		// Create the gamma and diff vectors
-		PW<Vec>                   gamma = sch->getNewSchurVec();
-		PW<Vec>                   diff  = sch->getNewSchurVec();
-		PW<Vec>                   b     = sch->getNewSchurVec();
-		PW<Mat>                   A;
-		shared_ptr<GMG::Helper2d> gh;
+		shared_ptr<PetscVector<1>> gamma = sch->getNewSchurVec();
+		shared_ptr<PetscVector<1>> diff  = sch->getNewSchurVec();
+		shared_ptr<PetscVector<1>> b     = sch->getNewSchurVec();
+		PW<Mat>                    A;
+		shared_ptr<GMG::Helper2d>  gh;
 
 		// Create linear problem for the Belos solver
 		PW<KSP> solver;
@@ -350,7 +352,7 @@ int main(int argc, char *argv[])
 		if (f_neumann && !f_nozerof) {
 			double fdiff = dc->integrate(f) / dc->volume();
 			if (my_global_rank == 0) cout << "Fdiff: " << fdiff << endl;
-			VecShift(f, -fdiff);
+			f->shift(-fdiff);
 		}
 
 #ifdef ENABLE_MUELU
@@ -365,15 +367,15 @@ int main(int argc, char *argv[])
 
 			if (!f_noschur) {
 				// Get the b vector
-				VecScale(gamma, 0);
+				gamma->set(0);
 				sch->solveWithInterface(f, u, gamma, b);
-				VecScale(b, -1.0);
+				b->scale(-1);
 
 				if (f_rhs) {
 					PetscViewer viewer;
 					PetscViewerBinaryOpen(PETSC_COMM_WORLD, args::get(f_rhs).c_str(),
 					                      FILE_MODE_WRITE, &viewer);
-					VecView(b, viewer);
+					VecView(b->vec, viewer);
 					PetscViewerDestroy(&viewer);
 				}
 			}
@@ -455,7 +457,7 @@ int main(int argc, char *argv[])
 					vector<shared_ptr<DomainCollection<2>>> dcs(t.num_levels);
 					dcs[0] = dc;
 					for (int i = 1; i < t.num_levels; i++) {
-						dcs[i].reset(new DomainCollection<2>(levels[t.num_levels - 1 - i], n));
+						dcs[i].reset(new DomainCollection<2>(levels[t.num_levels - 1 - i], ns));
 					}
 
 					gh.reset(new GMG::Helper2d(n, dcs, sch, args::get(f_gmg)));
@@ -507,9 +509,9 @@ int main(int argc, char *argv[])
 			} else {
 				KSPSetTolerances(solver, tol, tol, PETSC_DEFAULT, 5000);
 				if (f_noschur) {
-					KSPSolve(solver, f, u);
+					KSPSolve(solver, f->vec, u->vec);
 				} else {
-					KSPSolve(solver, b, gamma);
+					KSPSolve(solver, b->vec, gamma->vec);
 				}
 				int its;
 				KSPGetIterationNumber(solver, &its);
@@ -533,22 +535,22 @@ int main(int argc, char *argv[])
 		timer.stop("Complete Solve");
 
 		// residual
-		PW<Vec> resid = dc->getNewDomainVec();
-		PW<Vec> au    = dc->getNewDomainVec();
+		shared_ptr<PetscVector<2>> resid = dc->getNewDomainVec();
+		shared_ptr<PetscVector<2>> au    = dc->getNewDomainVec();
 		if (f_noschur) {
-			MatMult(A, u, au);
+			MatMult(A, u->vec, au->vec);
 		} else {
 			sch->applyWithInterface(u, gamma, au);
 		}
-		VecAXPBYPCZ(resid, -1.0, 1.0, 0.0, au, f);
+		VecAXPBYPCZ(resid->vec, -1.0, 1.0, 0.0, au->vec, f->vec);
 		double residual;
-		VecNorm(resid, NORM_2, &residual);
+		VecNorm(resid->vec, NORM_2, &residual);
 		double fnorm;
-		VecNorm(f, NORM_2, &fnorm);
+		VecNorm(f->vec, NORM_2, &fnorm);
 
 		// error
-		PW<Vec> error = dc->getNewDomainVec();
-		VecAXPBYPCZ(error, -1.0, 1.0, 0.0, exact, u);
+		shared_ptr<PetscVector<2>> error = dc->getNewDomainVec();
+		VecAXPBYPCZ(error->vec, -1.0, 1.0, 0.0, exact->vec, u->vec);
 		if (f_neumann) {
 			double uavg = dc->integrate(u) / dc->volume();
 			double eavg = dc->integrate(exact) / dc->volume();
@@ -558,12 +560,12 @@ int main(int argc, char *argv[])
 				cout << "Average of exact solution: " << eavg << endl;
 			}
 
-			VecShift(error, eavg - uavg);
+			VecShift(error->vec, eavg - uavg);
 		}
 		double error_norm;
-		VecNorm(error, NORM_2, &error_norm);
+		VecNorm(error->vec, NORM_2, &error_norm);
 		double exact_norm;
-		VecNorm(exact, NORM_2, &exact_norm);
+		VecNorm(exact->vec, NORM_2, &exact_norm);
 
 		double ausum = dc->integrate(au);
 		double fsum  = dc->integrate(f);
@@ -581,16 +583,16 @@ int main(int argc, char *argv[])
 		// output
 		if (f_outclaw) {
 			ClawWriter writer(*dc);
-			writer.write(u, resid);
+			writer.write(u->vec, resid->vec);
 		}
 #ifdef HAVE_VTK
 		if (f_outvtk) {
 			VtkWriter2d writer(*dc, args::get(f_outvtk));
-			writer.add(u, "Solution");
-			writer.add(error, "Error");
-			writer.add(resid, "Residual");
-			writer.add(f, "RHS");
-			writer.add(exact, "Exact");
+			writer.add(u->vec, "Solution");
+			writer.add(error->vec, "Error");
+			writer.add(resid->vec, "Residual");
+			writer.add(f->vec, "RHS");
+			writer.add(exact->vec, "Exact");
 			writer.write();
 		}
 #endif

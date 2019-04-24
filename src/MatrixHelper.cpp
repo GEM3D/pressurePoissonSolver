@@ -31,7 +31,7 @@ PW_explicit<Mat> MatrixHelper::formCRSMatrix(double lambda)
 {
 	PW<Mat> A;
 	MatCreate(MPI_COMM_WORLD, &A);
-	int n           = dc.getN();
+	int n           = dc.getLengths()[0];
 	int local_size  = dc.domains.size() * n * n * n;
 	int global_size = dc.num_global_domains * n * n * n;
 	MatSetSizes(A, local_size, local_size, global_size, global_size);

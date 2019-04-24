@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -25,8 +25,8 @@
 #include "PatchOperator.h"
 #include "PatchSolvers/PatchSolver.h"
 #include "SchurHelper.h"
-#include <memory>
 #include <functional>
+#include <memory>
 #include <petscmat.h>
 #include <valarray>
 /**
@@ -52,7 +52,7 @@ class SchurMatrixHelper2d
 	SchurMatrixHelper2d(std::shared_ptr<SchurHelper<2>> sh)
 	{
 		this->sh = sh;
-		n        = sh->getN();
+		n        = sh->getLengths()[0];
 	}
 	/**
 	 * @brief Form the Schur complement matrix
