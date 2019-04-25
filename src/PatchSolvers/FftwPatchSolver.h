@@ -175,7 +175,6 @@ void FftwPatchSolver<D>::solve(SchurDomain<D> &d, std::shared_ptr<const Vector<D
                                std::shared_ptr<const Vector<D - 1>> gamma)
 {
 	using namespace std;
-	using namespace Utils;
 	const LocalData<D> f_view      = f->getLocalData(d.local_index);
 	LocalData<D>       f_copy_view = f_copy.getLocalData(0);
 	LocalData<D>       tmp_view    = tmp.getLocalData(0);
@@ -187,7 +186,7 @@ void FftwPatchSolver<D>::solve(SchurDomain<D> &d, std::shared_ptr<const Vector<D
 	nested_loop<D>(start, end,
 	               [&](std::array<int, D> coord) { f_copy_view[coord] = f_view[coord]; });
 
-    for (Side<D> s : Side<D>::getValues()) {
+	for (Side<D> s : Side<D>::getValues()) {
 		std::array<int, D - 1> start, end;
 		start.fill(0);
 		end.fill(n - 1);
@@ -212,8 +211,10 @@ void FftwPatchSolver<D>::solve(SchurDomain<D> &d, std::shared_ptr<const Vector<D
 
 	sol.vec /= pow(2.0 * n, D);
 
-	LocalData<D> u_view = u->getLocalData(d.local_index);
+	LocalData<D> u_view   = u->getLocalData(d.local_index);
 	LocalData<D> sol_view = sol.getLocalData(0);
 	nested_loop<D>(start, end, [&](std::array<int, D> coord) { u_view[coord] = sol_view[coord]; });
 }
+extern template class FftwPatchSolver<2>;
+extern template class FftwPatchSolver<3>;
 #endif

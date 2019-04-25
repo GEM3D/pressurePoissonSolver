@@ -508,4 +508,6 @@ template <size_t D> inline void SchurHelper<D>::indexIfacesGlobal()
 		}
 	}
 }
+extern template class SchurHelper<2>;
+extern template class SchurHelper<3>;
 #endif

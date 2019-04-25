@@ -102,6 +102,7 @@ template <size_t D> inline void DftPatchSolver<D>::addDomain(SchurDomain<D> &d)
 	if (!initialized) {
 		initialized = true;
 		std::array<int, D> lengths;
+        lengths.fill(n);
 		f_copy = ValVector<D>(lengths);
 		tmp    = ValVector<D>(lengths);
 		if (!(D % 2)) { local_tmp = ValVector<D>(lengths); }
@@ -346,4 +347,6 @@ DftPatchSolver<D>::execute_plan(std::array<std::shared_ptr<std::valarray<double>
 		end[dim]    = old_end;
 	}
 }
+extern template class DftPatchSolver<2>;
+extern template class DftPatchSolver<3>;
 #endif

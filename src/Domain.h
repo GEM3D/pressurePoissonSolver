@@ -458,4 +458,6 @@ template <size_t D> inline void Domain<D>::updateRank(int rank)
 		if (hasNbr(s)) { getNbrInfoPtr(s)->updateRankOnNeighbors(rank, s); }
 	}
 }
+extern template class Domain<2>;
+extern template class Domain<3>;
 #endif

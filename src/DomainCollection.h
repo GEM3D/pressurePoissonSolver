@@ -181,7 +181,7 @@ template <size_t D> class DomainCollection
 		this->lengths = lengths;
 
 		patch_stride = 1;
-		for (int i = 0; i < D; i++) {
+		for (size_t i = 0; i < D; i++) {
 			patch_stride *= lengths[i];
 		}
 
@@ -262,4 +262,6 @@ template <size_t D> class DomainCollection
 		return retval;
 	}
 };
+extern template class DomainCollection<2>;
+extern template class DomainCollection<3>;
 #endif

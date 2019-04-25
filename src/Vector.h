@@ -255,4 +255,10 @@ template <size_t D> class Vector
 		return retval;
 	}
 };
+extern template class LocalData<1>;
+extern template class LocalData<2>;
+extern template class LocalData<3>;
+extern template class Vector<1>;
+extern template class Vector<2>;
+extern template class Vector<3>;
 #endif

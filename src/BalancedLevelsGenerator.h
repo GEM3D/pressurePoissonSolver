@@ -561,4 +561,6 @@ template <size_t D> inline void BalancedLevelsGenerator<D>::balanceLevelWithLowe
 		p.second->setPtrs(this->levels[level - 1]);
 	}
 }
+extern template class BalancedLevelsGenerator<2>;
+extern template class BalancedLevelsGenerator<3>;
 #endif

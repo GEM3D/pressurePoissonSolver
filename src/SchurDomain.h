@@ -330,4 +330,6 @@ template <size_t D> struct SchurDomain {
 		return iface_info[s.toInt()]->local_index;
 	}
 };
+extern template struct SchurDomain<2>;
+extern template struct SchurDomain<3>;
 #endif
