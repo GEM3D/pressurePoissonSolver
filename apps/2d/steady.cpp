@@ -177,8 +177,8 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	// Set the number of discretization points in the x and y direction.
-    std::array<int,2> ns;
-    ns.fill(args::get(f_n));
+	std::array<int, 2> ns;
+	ns.fill(args::get(f_n));
 	int n = args::get(f_n);
 
 	double tol = 1e-12;
@@ -543,10 +543,8 @@ int main(int argc, char *argv[])
 			sch->applyWithInterface(u, gamma, au);
 		}
 		VecAXPBYPCZ(resid->vec, -1.0, 1.0, 0.0, au->vec, f->vec);
-		double residual;
-		VecNorm(resid->vec, NORM_2, &residual);
-		double fnorm;
-		VecNorm(f->vec, NORM_2, &fnorm);
+		double residual = resid->twoNorm();
+		double fnorm    = f->twoNorm();
 
 		// error
 		shared_ptr<PetscVector<2>> error = dc->getNewDomainVec();
@@ -562,10 +560,8 @@ int main(int argc, char *argv[])
 
 			VecShift(error->vec, eavg - uavg);
 		}
-		double error_norm;
-		VecNorm(error->vec, NORM_2, &error_norm);
-		double exact_norm;
-		VecNorm(exact->vec, NORM_2, &exact_norm);
+		double error_norm = error->twoNorm();
+		double exact_norm = exact->twoNorm();
 
 		double ausum = dc->integrate(au);
 		double fsum  = dc->integrate(f);

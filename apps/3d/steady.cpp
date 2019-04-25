@@ -519,10 +519,9 @@ int main(int argc, char *argv[])
 			sch->applyWithInterface(u, gamma, au);
 		}
 		VecAXPBYPCZ(resid->vec, -1.0, 1.0, 0.0, au->vec, f->vec);
-		double residual;
-		VecNorm(resid->vec, NORM_2, &residual);
-		double fnorm;
-		VecNorm(f->vec, NORM_2, &fnorm);
+
+		double residual=resid->twoNorm();
+		double fnorm=f->twoNorm();
 
 		// error
 		shared_ptr<PetscVector<3>> error = dc->getNewDomainVec();
@@ -538,12 +537,9 @@ int main(int argc, char *argv[])
 
             error->shift(eavg-uavg);
 		}
-		double error_norm;
-		VecNorm(error->vec, NORM_2, &error_norm);
-		double error_norm_inf;
-		VecNorm(error->vec, NORM_INFINITY, &error_norm_inf);
-		double exact_norm;
-		VecNorm(exact->vec, NORM_2, &exact_norm);
+		double error_norm=error->twoNorm();
+		double error_norm_inf=error->infNorm();
+		double exact_norm=exact->twoNorm();
 
 		double ausum = dc->integrate(au);
 		double fsum  = dc->integrate(f);

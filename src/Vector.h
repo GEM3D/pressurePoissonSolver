@@ -23,6 +23,8 @@
 #define VECTOR_H
 #include <SchurDomain.h>
 #include <algorithm>
+#include <cmath>
+#include <mpi.h>
 #include <numeric>
 class LocalDataManager
 {
@@ -158,7 +160,8 @@ template <size_t D> inline LocalData<D - 1> LocalData<D>::getSliceOnSidePriv(Sid
 template <size_t D> class Vector
 {
 	protected:
-	int num_local_patches;
+	int      num_local_patches;
+	MPI_Comm comm = MPI_COMM_WORLD;
 
 	public:
 	virtual ~Vector(){};
@@ -216,6 +219,40 @@ template <size_t D> class Vector
 				ld[coord] = alpha * ld[coord] + ld_b[coord];
 			});
 		}
+	}
+	virtual double twoNorm() const
+	{
+		double sum = 0;
+		for (int i = 0; i < num_local_patches; i++) {
+			const LocalData<D> ld = getLocalData(i);
+			nested_loop<D>(ld.getStart(), ld.getEnd(),
+			               [&](std::array<int, D> coord) { sum += ld[coord] * ld[coord]; });
+		}
+        MPI_Allreduce(&sum,&sum,1,MPI_DOUBLE,MPI_SUM,comm);
+		return sqrt(sum);
+	}
+	virtual double infNorm() const
+	{
+		double max = 0;
+		for (int i = 0; i < num_local_patches; i++) {
+			const LocalData<D> ld = getLocalData(i);
+			nested_loop<D>(ld.getStart(), ld.getEnd(),
+			               [&](std::array<int, D> coord) { max = fmax(abs(ld[coord]), max); });
+		}
+        MPI_Allreduce(&max,&max,1,MPI_DOUBLE,MPI_MAX,comm);
+		return max;
+	}
+	virtual double dot(std::shared_ptr<const Vector<D>> b) const
+	{
+		double retval = 0;
+		for (int i = 0; i < num_local_patches; i++) {
+			const LocalData<D> ld   = getLocalData(i);
+			const LocalData<D> ld_b = b->getLocalData(i);
+			nested_loop<D>(ld.getStart(), ld.getEnd(),
+			               [&](std::array<int, D> coord) { retval += ld[coord] * ld_b[coord]; });
+		}
+        MPI_Allreduce(&retval,&retval,1,MPI_DOUBLE,MPI_SUM,comm);
+		return retval;
 	}
 };
 #endif
