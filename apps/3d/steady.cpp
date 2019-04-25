@@ -82,7 +82,8 @@ int main(int argc, char *argv[])
 	app.add_option("-l", loop_count, "Number of times to run program");
 
 	string matrix_type = "wrap";
-	app.add_option("--matrix_type", matrix_type, "Which type of matrix operator to use");
+	app.add_set_ignore_case("--matrix_type", matrix_type, {"wrap", "crs", "pbm"},
+	                        "Which type of matrix operator to use");
 
 	int div = 0;
 	app.add_option("--divide", div, "Number of levels to add to octtree");
@@ -106,10 +107,13 @@ int main(int argc, char *argv[])
 	->check(CLI::ExistingFile);
 
 	string problem = "trig";
-	app.add_option("--problem", problem, "Which problem to solve");
+	app.add_set_ignore_case("--problem", problem, {"trig", "gauss", "zero"},
+	                        "Which problem to solve");
 
 	string preconditioner = "";
-	auto   prec_opt       = app.add_option("--prec", preconditioner, "Which Preconditoner to use");
+	auto   prec_opt
+	= app.add_set_ignore_case("--prec", preconditioner, {"GMG", "Schwarz", "BlockJacobi", "cheb"},
+	                          "Which Preconditoner to use");
 
 	string gmg_filename = "";
 	app.add_option("--gmg_config", gmg_filename, "Which problem to solve")->needs(prec_opt);
@@ -145,7 +149,19 @@ int main(int argc, char *argv[])
 	string gamma_filename = "";
 	app.add_option("--out_gamma", gamma_filename, "Filename of gamma output");
 
+	string config_out_filename = "";
+	auto   out_config_opt
+	= app.add_option("--output_config", config_out_filename, "Save CLI options to config file");
+
 	CLI11_PARSE(app, argc, argv);
+
+	if (config_out_filename != "") {
+		app.remove_option(out_config_opt);
+		ofstream file_out(config_out_filename);
+		file_out << app.config_to_str(true, true);
+		file_out.close();
+	}
+
 	PetscOptionsInsertString(nullptr, petsc_opts.c_str());
 
 	int num_procs;
@@ -369,7 +385,7 @@ int main(int argc, char *argv[])
 			KSPSetUp(solver);
 			PC pc;
 			KSPGetPC(solver, &pc);
-			if (preconditioner == "scwharz") {
+			if (preconditioner == "Scwharz") {
 				sp.reset(new SchwarzPrec(sch.get(), &*dc));
 				sp->getPrec(pc);
 			} else if (preconditioner == "GMG") {

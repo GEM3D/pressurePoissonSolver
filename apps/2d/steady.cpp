@@ -44,8 +44,8 @@
 #include "TreeToP4est.h"
 #include "p4estBLG.h"
 #endif
+#include "CLI11.hpp"
 #include "Timer.h"
-#include "args.hxx"
 #include <cmath>
 #include <iostream>
 #include <memory>
@@ -64,89 +64,106 @@ using namespace std;
 
 int main(int argc, char *argv[])
 {
-	int     petsc_argc;
-	int *   petsc_argc_ptr = nullptr;
-	char ** petsc_argv;
-	char ***petsc_argv_ptr = nullptr;
-	string  delim          = "::";
-	for (int i = 0; i < argc; i++) {
-		if (argv[i] == delim) {
-			int tmp        = argc;
-			argc           = i;
-			petsc_argc     = tmp - i;
-			petsc_argc_ptr = &petsc_argc;
-			petsc_argv     = &argv[i];
-			petsc_argv_ptr = &petsc_argv;
-		}
-	}
-	// use :: to delimit petsc options at end
-	PetscInitialize(petsc_argc_ptr, petsc_argv_ptr, nullptr, nullptr);
+	PetscInitialize(nullptr, nullptr, nullptr, nullptr);
+
 	// parse input
-	args::ArgumentParser parser("");
+	CLI::App app{"Thunderegg 3d poisson solver example"};
 
+	app.set_config("--config", "", "Read an ini file", false);
 	// program options
-	args::HelpFlag       help(parser, "help", "Display this help menu", {'h', "help"});
-	args::ValueFlag<int> f_n(parser, "n", "number of cells in the x direction, in each domain",
-	                         {'n'});
-	args::ValueFlag<int> f_l(parser, "n", "run the program n times and print out the average",
-	                         {'l'});
-	args::Flag           f_wrapper(parser, "wrapper", "use a function wrapper", {"wrap"});
-	args::ValueFlag<int> f_div(parser, "divide", "use iterative method", {"divide"});
-	args::Flag f_nozerof(parser, "zerou", "don't  make the rhs match the boundary conditions",
-	                     {"nozerof"});
-	args::ValueFlag<double> f_t(
-	parser, "tolerance", "set the tolerance of the iterative solver (default is 1e-10)", {'t'});
-	args::Flag f_neumann(parser, "", "use neumann boundary conditions", {"neumann"});
-	args::Flag f_noschur(parser, "", "don't use schur compliment method", {"noschur"});
+	int n;
+	app.add_option("-n,--num_cells", n, "Number of cells in each direction, on each patch")
+	->required();
 
-	// mesh options
-	args::ValueFlag<string> f_mesh(parser, "file_name", "read in a mesh", {"mesh"});
-	args::ValueFlag<int>    f_square(parser, "num_domains",
-                                  "create a num_domains x num_domains square of grids", {"square"});
-	args::ValueFlag<int>    f_amr(parser, "num_domains",
-                               "create a num_domains x num_domains square "
-                               "of grids, and a num_domains*2 x "
-                               "num_domains*2 refined square next to it",
-                               {"amr"});
+	int loop_count = 1;
+	app.add_option("-l", loop_count, "Number of times to run program");
 
+	string matrix_type = "wrap";
+	app.add_set_ignore_case("--matrix_type", matrix_type, {"wrap", "crs"},
+	                        "Which type of matrix operator to use");
+
+	int div = 0;
+	app.add_option("--divide", div, "Number of levels to add to quadtree");
+
+	bool no_zero_rhs_avg = false;
+	app.add_flag("--nozerof", no_zero_rhs_avg,
+	             "Make the average of the rhs on neumann problems zero");
+
+	double tolerance = 1e-12;
+	app.add_option("-t,--tolerance", tolerance, "Tolerance of Krylov solver");
+
+	bool neumann;
+	app.add_flag("--neumann", neumann, "Use neumann boundary conditions");
+
+	bool solve_schur = false;
+	app.add_flag("--schur", solve_schur, "Solve the schur compliment system");
+
+	string mesh_filename = "";
+	app.add_option("--mesh", mesh_filename, "Filename of mesh to use")
+	->required()
+	->check(CLI::ExistingFile);
+
+	string problem = "trig";
+	app.add_set_ignore_case("--problem", problem, {"trig", "gauss", "zero", "circle"},
+	                        "Which problem to solve");
+
+	string preconditioner = "";
+	auto   prec_opt
+	= app.add_set_ignore_case("--prec", preconditioner, {"GMG"}, "Which Preconditoner to use");
+
+	string gmg_filename = "";
+	app.add_option("--gmg_config", gmg_filename, "Which problem to solve")->needs(prec_opt);
+
+	string patch_solver = "fftw";
+	app.add_option("--patch_solver", patch_solver, "Which patch solver to use");
+
+	bool setrow = false;
+	app.add_flag("--setrow", setrow, "Set row in matrix");
+
+	string petsc_opts = "";
+	app.add_option("--petsc_opts", petsc_opts, "petsc options");
 	// output options
-	args::Flag f_outclaw(parser, "outclaw", "output amrclaw ascii file", {"outclaw"});
+
+	string claw_filename = "";
+	app.add_option("--out_claw", claw_filename, "Filename of clawpack output");
+
 #ifdef HAVE_VTK
-	args::ValueFlag<string> f_outvtk(parser, "", "output to vtk format", {"outvtk"});
+	string vtk_filename = "";
+	app.add_option("--out_vtk", vtk_filename, "Filename of vtk output");
 #endif
-	args::ValueFlag<string> f_outim(parser, "filename", "output full interface matrix", {"outim"});
-	args::ValueFlag<string> f_m(parser, "matrix filename", "the file to write the matrix to",
-	                            {'m'});
-	args::ValueFlag<string> f_s(parser, "solution filename", "the file to write the solution to",
-	                            {'s'});
-	args::ValueFlag<string> f_resid(parser, "residual filename",
-	                                "the file to write the residual to", {"residual"});
-	args::ValueFlag<string> f_error(parser, "error filename", "the file to write the error to",
-	                                {"error"});
-	args::ValueFlag<string> f_rhs(parser, "rhs filename", "the file to write the rhs vector to",
-	                              {'r'});
-	args::ValueFlag<string> f_g(parser, "gamma filename", "the file to write the gamma vector to",
-	                            {'g'});
-	args::ValueFlag<string> f_read_gamma(parser, "gamma filename",
-	                                     "the file to read gamma vector from", {"readgamma"});
 
-	// problem options
-	args::Flag f_gauss(parser, "gauss", "solve gaussian function", {"gauss"});
-	args::Flag f_circle(parser, "circle", "circle functions for circle meshes", {"circle"});
-	args::Flag f_zero(parser, "zero", "solve zero function", {"zero"});
+	string matrix_filename = "";
+	app.add_option("--out_matrix", matrix_filename, "Filename of matrix output");
+	string solution_filename = "";
+	app.add_option("--out_solution", solution_filename, "Filename of solution output");
+	string resid_filename = "";
+	app.add_option("--out_resid", resid_filename, "Filename of residual output");
+	string error_filename = "";
+	app.add_option("--out_error", error_filename, "Filename of error output");
+	string rhs_filename = "";
+	app.add_option("--out_rhs", rhs_filename, "Filename of rhs output");
+	string gamma_filename = "";
+	app.add_option("--out_gamma", gamma_filename, "Filename of gamma output");
 
-	// patch solvers
-	args::Flag f_fish(parser, "fishpack", "use fishpack as the patch solver", {"fishpack"});
-	args::ValueFlag<string> f_gmg(parser, "config_file", "use GMG preconditioner", {"gmg"});
-#ifdef __NVCC__
-	args::Flag f_cufft(parser, "cufft", "use CuFFT as the patch solver", {"cufft"});
-#endif
-	args::Flag f_cheb(parser, "", "cheb preconditioner", {"cheb"});
-	args::Flag f_dft(parser, "", "dft", {"dft"});
-	args::Flag f_setrow(parser, "", "set row of matrix", {"setrow"});
 #ifdef HAVE_P4EST
-	args::Flag f_p4est(parser, "", "use p4est", {"p4est"});
+	bool use_p4est = false;
+	app.add_flag("--p4est", use_p4est, "use p4est");
 #endif
+
+	string config_out_filename = "";
+	auto   out_config_opt
+	= app.add_option("--output_config", config_out_filename, "Save CLI options to config file");
+
+	CLI11_PARSE(app, argc, argv);
+
+	if (config_out_filename != "") {
+		app.remove_option(out_config_opt);
+		ofstream file_out(config_out_filename);
+		file_out << app.config_to_str(true, true);
+		file_out.close();
+	}
+
+	PetscOptionsInsertString(nullptr, petsc_opts.c_str());
 
 	int num_procs;
 	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
@@ -154,59 +171,22 @@ int main(int argc, char *argv[])
 	int my_global_rank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &my_global_rank);
 
-	if (argc < 1) {
-		if (my_global_rank == 0) std::cout << parser;
-		return 0;
-	}
-	try {
-		parser.ParseCLI(argc, argv);
-	} catch (args::Help) {
-		if (my_global_rank == 0) std::cout << parser;
-		return 0;
-	} catch (args::ParseError e) {
-		if (my_global_rank == 0) {
-			std::cerr << e.what() << std::endl;
-			std::cerr << parser;
-		}
-		return 1;
-	} catch (args::ValidationError e) {
-		if (my_global_rank == 0) {
-			std::cerr << e.what() << std::endl;
-			std::cerr << parser;
-		}
-		return 1;
-	}
 	// Set the number of discretization points in the x and y direction.
 	std::array<int, 2> ns;
-	ns.fill(args::get(f_n));
-	int n = args::get(f_n);
-
-	double tol = 1e-12;
-	if (f_t) { tol = args::get(f_t); }
-
-	int loop_count = 1;
-	if (f_l) { loop_count = args::get(f_l); }
-	/***********
-	 * Input parsing done
-	 **********/
+	ns.fill(n);
 
 	///////////////
 	// Create Mesh
 	///////////////
 	shared_ptr<DomainCollection<2>> dc;
 	Tree<2>                         t;
-	if (f_mesh) {
-		string d = args::get(f_mesh);
-		t        = Tree<2>(d);
-	}
-	if (f_div) {
-		for (int i = 0; i < args::get(f_div); i++) {
-			t.refineLeaves();
-		}
+	t = Tree<2>(mesh_filename);
+	for (int i = 0; i < div; i++) {
+		t.refineLeaves();
 	}
 	std::vector<std::map<int, std::shared_ptr<Domain<2>>>> levels;
 #ifdef HAVE_P4EST
-	if (f_p4est) {
+	if (use_p4est) {
 		TreeToP4est ttp(t);
 		p4estBLG    blg(ttp.p4est, n);
 		levels = blg.levels;
@@ -221,7 +201,7 @@ int main(int argc, char *argv[])
 	}
 
 	dc.reset(new DomainCollection<2>(levels[t.num_levels - 1], ns));
-	if (f_neumann) { dc->setNeumann(); }
+	if (neumann) { dc->setNeumann(); }
 
 	// the functions that we are using
 	function<double(double, double)> ffun;
@@ -229,12 +209,12 @@ int main(int argc, char *argv[])
 	function<double(double, double)> nfun;
 	function<double(double, double)> nfuny;
 
-	if (f_zero) {
+	if (problem == "zero") {
 		ffun  = [](double x, double y) { return 0; };
 		gfun  = [](double x, double y) { return 0; };
 		nfun  = [](double x, double y) { return 0; };
 		nfuny = [](double x, double y) { return 0; };
-	} else if (f_circle) {
+	} else if (problem == "circle") {
 		ffun = [](double x, double y) {
 			double xdist, ydist, dist;
 			// distance form center circle
@@ -261,7 +241,7 @@ int main(int argc, char *argv[])
 		gfun  = [](double x, double y) { return 0; };
 		nfun  = [](double x, double y) { return 0; };
 		nfuny = [](double x, double y) { return 0; };
-	} else if (f_gauss) {
+	} else if (problem == "gauss") {
 		gfun = [](double x, double y) { return exp(cos(10 * M_PI * x)) - exp(cos(11 * M_PI * y)); };
 		ffun = [](double x, double y) {
 			return 100 * M_PI * M_PI * (pow(sin(10 * M_PI * x), 2) - cos(10 * M_PI * x))
@@ -286,10 +266,8 @@ int main(int argc, char *argv[])
 
 	// set the patch solver
 	shared_ptr<PatchSolver<2>> p_solver;
-	if (f_dft) {
+	if (patch_solver == "dft") {
 		p_solver.reset(new DftPatchSolver<2>(*dc));
-	} else if (f_fish) {
-		//	p_solver.reset(new FishpackPatchSolver());
 	} else {
 		p_solver.reset(new FftwPatchSolver<2>(*dc));
 	}
@@ -329,7 +307,7 @@ int main(int argc, char *argv[])
 		shared_ptr<PetscVector<2>> exact = dc->getNewDomainVec();
 		shared_ptr<PetscVector<2>> f     = dc->getNewDomainVec();
 
-		if (f_neumann) {
+		if (neumann) {
 			Init::initNeumann2d(*dc, n, f->vec, exact->vec, ffun, gfun, nfun, nfuny);
 		} else {
 			Init::initDirichlet2d(*dc, n, f->vec, exact->vec, ffun, gfun);
@@ -349,7 +327,7 @@ int main(int argc, char *argv[])
 		KSPCreate(MPI_COMM_WORLD, &solver);
 		KSPSetFromOptions(solver);
 
-		if (f_neumann && !f_nozerof) {
+		if (neumann && !no_zero_rhs_avg) {
 			double fdiff = dc->integrate(f) / dc->volume();
 			if (my_global_rank == 0) cout << "Fdiff: " << fdiff << endl;
 			f->shift(-fdiff);
@@ -362,19 +340,19 @@ int main(int argc, char *argv[])
 		MueLuCudaWrapper *meulucudasolver = nullptr;
 #endif
 
-		if (f_noschur || dc->num_global_domains != 1) {
+		if (!solve_schur || dc->num_global_domains != 1) {
 			// do iterative solve
 
-			if (!f_noschur) {
+			if (solve_schur) {
 				// Get the b vector
 				gamma->set(0);
 				sch->solveWithInterface(f, u, gamma, b);
 				b->scale(-1);
 
-				if (f_rhs) {
+				if (rhs_filename != "") {
 					PetscViewer viewer;
-					PetscViewerBinaryOpen(PETSC_COMM_WORLD, args::get(f_rhs).c_str(),
-					                      FILE_MODE_WRITE, &viewer);
+					PetscViewerBinaryOpen(PETSC_COMM_WORLD, rhs_filename.c_str(), FILE_MODE_WRITE,
+					                      &viewer);
 					VecView(b->vec, viewer);
 					PetscViewerDestroy(&viewer);
 				}
@@ -385,87 +363,56 @@ int main(int argc, char *argv[])
 			///////////////////
 			timer.start("Linear System Setup");
 
-			if (f_wrapper) {
+			timer.start("Matrix Formation");
+			if (matrix_type == "wrap") {
 				// Create a function wrapper
-				if (f_noschur) {
-					A = FullFuncWrap<2>::getMatrix(sch.get(), dc.get());
-				} else {
+				if (solve_schur) {
 					A = FuncWrap<2>::getMatrix(sch.get(), dc.get());
+				} else {
+					A = FullFuncWrap<2>::getMatrix(sch.get(), dc.get());
 				}
 			} else {
-				timer.start("Matrix Formation");
-
-				if (f_noschur) {
-					MatrixHelper2d mh(*dc);
-					A = mh.formCRSMatrix();
-				} else {
+				if (solve_schur) {
 					SchurMatrixHelper2d mh(sch);
 					A = mh.formCRSMatrix();
+				} else {
+					MatrixHelper2d mh(*dc);
+					A = mh.formCRSMatrix();
 				}
-				if (f_setrow) {
+				if (setrow) {
 					int row = 0;
 					MatZeroRows(A, 1, &row, 1.0, nullptr, nullptr);
 				}
-
-				timer.stop("Matrix Formation");
 			}
+			timer.stop("Matrix Formation");
 
-			if (f_m) {
+			if (matrix_filename != "") {
 				PW<Mat> A_copy;
 				MatConvert(A, MATMPIAIJ, MAT_INITIAL_MATRIX, &A_copy);
 				PetscViewer viewer;
-				PetscViewerBinaryOpen(PETSC_COMM_WORLD, args::get(f_m).c_str(), FILE_MODE_WRITE,
+				PetscViewerBinaryOpen(PETSC_COMM_WORLD, matrix_filename.c_str(), FILE_MODE_WRITE,
 				                      &viewer);
 				MatView(A_copy, viewer);
 				PetscViewerDestroy(&viewer);
 			}
 
-			if (false) {
-#ifdef ENABLE_MUELU
-			} else if (f_meulu) {
-				timer.start("MeuLu Setup");
-				meulusolver = new MueLuWrapper(A, tol, args::get(f_meulu));
-				timer.stop("MeuLu Setup");
-#endif
-#ifdef ENABLE_MUELU_CUDA
-			} else if (f_meulucuda) {
-				timer.start("MeuLu Setup");
-				meulucudasolver = new MueLuCudaWrapper(A, tol, args::get(f_meulucuda));
-				timer.stop("MeuLu Setup");
-#endif
-#ifdef ENABLE_AMGX
-			} else if (f_amgx) {
-				timer.start("AMGX Setup");
-				amgxsolver->setMatrix(A);
-				timer.stop("AMGX Setup");
-#endif
-			} else {
-				// preconditoners
-				timer.start("Petsc Setup");
-				KSPSetOperators(solver, A, A);
-				KSPSetUp(solver);
-				PC pc;
-				KSPGetPC(solver, &pc);
-				/*
-				if (f_cheb) {
-				    PolyChebPrec *pcp = new PolyChebPrec(sch, dc);
-				    pcp->getPrec(pc);
-				    PCSetUp(pc);
+			// preconditoners
+			timer.start("Petsc Setup");
+			KSPSetOperators(solver, A, A);
+			KSPSetUp(solver);
+			PC pc;
+			KSPGetPC(solver, &pc);
+			if (preconditioner == "GMG") {
+				vector<shared_ptr<DomainCollection<2>>> dcs(t.num_levels);
+				dcs[0] = dc;
+				for (int i = 1; i < t.num_levels; i++) {
+					dcs[i].reset(new DomainCollection<2>(levels[t.num_levels - 1 - i], ns));
 				}
-				*/
-				if (f_gmg) {
-					vector<shared_ptr<DomainCollection<2>>> dcs(t.num_levels);
-					dcs[0] = dc;
-					for (int i = 1; i < t.num_levels; i++) {
-						dcs[i].reset(new DomainCollection<2>(levels[t.num_levels - 1 - i], ns));
-					}
-
-					gh.reset(new GMG::Helper2d(n, dcs, sch, args::get(f_gmg)));
-					gh->getPrec(pc);
-				}
-				PCSetUp(pc);
-				timer.stop("Petsc Setup");
+				gh.reset(new GMG::Helper2d(n, dcs, sch, gmg_filename));
+				gh->getPrec(pc);
 			}
+			PCSetUp(pc);
+			timer.stop("Petsc Setup");
 			///////////////////
 			// setup end
 			///////////////////
@@ -476,51 +423,21 @@ int main(int argc, char *argv[])
 		///////////////////
 		timer.start("Complete Solve");
 
-		if (f_noschur || dc->num_global_domains != 1) {
+		if (!solve_schur || dc->num_global_domains != 1) {
 			timer.start("Linear Solve");
-			if (false) {
-#ifdef ENABLE_MUELU
-			} else if (f_meulu) {
-				// solve
-				if (f_noschur) {
-					meulusolver->solve(u, f);
-				} else {
-					meulusolver->solve(gamma, b);
-				}
-#endif
-#ifdef ENABLE_MUELU_CUDA
-			} else if (f_meulucuda) {
-				// solve
-				if (f_noschur) {
-					meulucudasolver->solve(u, f);
-				} else {
-					meulucudasolver->solve(gamma, b);
-				}
-#endif
-#ifdef ENABLE_AMGX
-			} else if (f_amgx) {
-				// solve
-				if (f_noschur) {
-					amgxsolver->solve(u, f);
-				} else {
-					amgxsolver->solve(gamma, b);
-				}
-#endif
+			KSPSetTolerances(solver, tolerance, tolerance, PETSC_DEFAULT, 5000);
+			if (solve_schur) {
+				KSPSolve(solver, b->vec, gamma->vec);
 			} else {
-				KSPSetTolerances(solver, tol, tol, PETSC_DEFAULT, 5000);
-				if (f_noschur) {
-					KSPSolve(solver, f->vec, u->vec);
-				} else {
-					KSPSolve(solver, b->vec, gamma->vec);
-				}
-				int its;
-				KSPGetIterationNumber(solver, &its);
-				if (my_global_rank == 0) { cout << "Iterations: " << its << endl; }
+				KSPSolve(solver, f->vec, u->vec);
 			}
+			int its;
+			KSPGetIterationNumber(solver, &its);
+			if (my_global_rank == 0) { cout << "Iterations: " << its << endl; }
 			timer.stop("Linear Solve");
 		}
 
-		if (!f_noschur) {
+		if (solve_schur) {
 			// Do one last solve
 			timer.start("Patch Solve");
 
@@ -537,10 +454,10 @@ int main(int argc, char *argv[])
 		// residual
 		shared_ptr<PetscVector<2>> resid = dc->getNewDomainVec();
 		shared_ptr<PetscVector<2>> au    = dc->getNewDomainVec();
-		if (f_noschur) {
-			MatMult(A, u->vec, au->vec);
-		} else {
+		if (solve_schur) {
 			sch->applyWithInterface(u, gamma, au);
+		} else {
+			MatMult(A, u->vec, au->vec);
 		}
 		VecAXPBYPCZ(resid->vec, -1.0, 1.0, 0.0, au->vec, f->vec);
 		double residual = resid->twoNorm();
@@ -549,7 +466,7 @@ int main(int argc, char *argv[])
 		// error
 		shared_ptr<PetscVector<2>> error = dc->getNewDomainVec();
 		VecAXPBYPCZ(error->vec, -1.0, 1.0, 0.0, exact->vec, u->vec);
-		if (f_neumann) {
+		if (neumann) {
 			double uavg = dc->integrate(u) / dc->volume();
 			double eavg = dc->integrate(exact) / dc->volume();
 
@@ -577,13 +494,13 @@ int main(int argc, char *argv[])
 		}
 
 		// output
-		if (f_outclaw) {
+		if (claw_filename != "") {
 			ClawWriter writer(*dc);
 			writer.write(u->vec, resid->vec);
 		}
 #ifdef HAVE_VTK
-		if (f_outvtk) {
-			VtkWriter2d writer(*dc, args::get(f_outvtk));
+		if (vtk_filename != "") {
+			VtkWriter2d writer(*dc, vtk_filename);
 			writer.add(u->vec, "Solution");
 			writer.add(error->vec, "Error");
 			writer.add(resid->vec, "Residual");
