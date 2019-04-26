@@ -41,25 +41,25 @@ template <size_t D> struct Domain : public Serializable {
 	int id        = 0;
 	int id_local  = 0;
 	int id_global = 0;
-	int n         = 10;
 
 	int refine_level  = 1;
 	int parent_id     = -1;
 	int oct_on_parent = -1;
 
-	std::bitset<2 * D> neumann;
-	bool               zero_patch = false;
+	std::bitset<Side<D>::num_sides> neumann;
 
+	std::array<int, D>    ns;
 	std::array<double, D> starts;
-	std::array<double, D> lengths;
+	std::array<double, D> spacings;
 
 	std::array<NbrInfo<D> *, Side<D>::num_sides> nbr_info;
 
 	Domain()
 	{
 		starts.fill(0);
-		lengths.fill(1);
 		nbr_info.fill(nullptr);
+		ns.fill(0);
+		spacings.fill(0);
 	}
 	~Domain();
 	friend bool operator<(const Domain &l, const Domain &r)
@@ -372,14 +372,13 @@ template <size_t D> inline int Domain<D>::serialize(char *buffer) const
 {
 	BufferWriter writer(buffer);
 	writer << id;
-	writer << n;
+	writer << ns;
 	writer << refine_level;
 	writer << parent_id;
 	writer << oct_on_parent;
 	writer << neumann;
-	writer << zero_patch;
 	writer << starts;
-	writer << lengths;
+	writer << spacings;
 	std::bitset<Side<D>::num_sides> has_nbr;
 	for (size_t i = 0; i < Side<D>::num_sides; i++) {
 		has_nbr[i] = nbr_info[i] != nullptr;
@@ -411,14 +410,13 @@ template <size_t D> inline int Domain<D>::deserialize(char *buffer)
 {
 	BufferReader reader(buffer);
 	reader >> id;
-	reader >> n;
+	reader >> ns;
 	reader >> refine_level;
 	reader >> parent_id;
 	reader >> oct_on_parent;
 	reader >> neumann;
-	reader >> zero_patch;
 	reader >> starts;
-	reader >> lengths;
+	reader >> spacings;
 	std::bitset<Side<D>::num_sides> has_nbr;
 	reader >> has_nbr;
 	for (size_t i = 0; i < Side<D>::num_sides; i++) {

@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -58,21 +58,19 @@ void ClawWriter::writePatch(Domain<2> &d, std::ostream &os, double *u_view, doub
 	os << d.refine_level << tab << "AMR_level" << endl;
 	os << 0 << tab << "block_number" << endl;
 	os << 0 << tab << "mpi_rank" << endl;
-	os << d.n << tab << "mx" << endl;
-	os << d.n << tab << "my" << endl;
+	os << d.ns[0] << tab << "mx" << endl;
+	os << d.ns[1] << tab << "my" << endl;
 	os << d.starts[0] << tab << "xlow" << endl;
 	os << d.starts[1] << tab << "ylow" << endl;
-	int    n   = d.n;
-	double h_x = d.lengths[0] / n;
-	double h_y = d.lengths[1] / n;
-	os << h_x << tab << "dx" << endl;
-	os << h_y << tab << "dy" << endl;
+	os << d.spacings[0] << tab << "dx" << endl;
+	os << d.spacings[1] << tab << "dy" << endl;
 	os << endl;
-	int start = d.id * n * n;
-	for (int i = 0; i < n; i++) {
-		for (int j = 0; j < n; j++) {
-			int loc = j + i * n;
-			os << u_view[start + loc] << tab << resid_view[start + loc] * h_x * h_y << endl;
+	int start = d.id * d.ns[0] * d.ns[1];
+	for (int i = 0; i < d.ns[0]; i++) {
+		for (int j = 0; j < d.ns[1]; j++) {
+			int loc = j + i * d.ns[1];
+			os << u_view[start + loc] << tab
+			   << resid_view[start + loc] * d.spacings[0] * d.spacings[1] << endl;
 		}
 		os << endl;
 	}

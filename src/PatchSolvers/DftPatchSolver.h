@@ -42,7 +42,7 @@ template <size_t D> struct DomainK {
 	DomainK(const SchurDomain<D> &d)
 	{
 		this->neumann = d.neumann.to_ulong();
-		this->h_x     = d.domain.lengths[0];
+		this->h_x     = d.domain.spacings[0];
 	}
 	friend bool operator<(const DomainK &l, const DomainK &r)
 	{
@@ -102,7 +102,7 @@ template <size_t D> inline void DftPatchSolver<D>::addDomain(SchurDomain<D> &d)
 	if (!initialized) {
 		initialized = true;
 		std::array<int, D> lengths;
-        lengths.fill(n);
+		lengths.fill(n);
 		f_copy = ValVector<D>(lengths);
 		tmp    = ValVector<D>(lengths);
 		if (!(D % 2)) { local_tmp = ValVector<D>(lengths); }
@@ -146,7 +146,7 @@ template <size_t D> inline void DftPatchSolver<D>::addDomain(SchurDomain<D> &d)
 			for (size_t d = 1; d < D; d++) {
 				strides[d - 1] = pow(n, (i + d) % D);
 			}
-			double h = d.domain.lengths[i] / n;
+			double h = d.domain.spacings[0];
 
 			if (d.isNeumann(i * 2) && d.isNeumann(i * 2 + 1)) {
 				for (int xi = 0; xi < n; xi++) {
@@ -196,7 +196,7 @@ inline void DftPatchSolver<D>::solve(SchurDomain<D> &d, std::shared_ptr<const Ve
 		if (d.hasNbr(s)) {
 			const LocalData<D - 1> gamma_view = gamma->getLocalData(d.getIfaceLocalIndex(s));
 			LocalData<D - 1>       slice      = f_copy.getLocalData(0).getSliceOnSide(s);
-			double                 h2         = pow(d.domain.lengths[s.toInt() / 2] / n, 2);
+			double                 h2         = pow(d.domain.spacings[s.toInt() / 2], 2);
 			nested_loop<D - 1>(start, end, [&](std::array<int, D - 1> coord) {
 				slice[coord] -= 2.0 / h2 * gamma_view[coord];
 			});

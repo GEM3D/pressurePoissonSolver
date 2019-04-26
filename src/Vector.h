@@ -75,8 +75,7 @@ template <size_t D> class LocalData
 	public:
 	LocalData() = default;
 	LocalData(double *data, const std::array<int, D> &strides, const std::array<int, D> &lengths,
-
-	          std::shared_ptr<LocalDataManager> ldm)
+	          std::shared_ptr<LocalDataManager> ldm = nullptr)
 	{
 		this->data    = data;
 		this->strides = strides;
@@ -228,7 +227,7 @@ template <size_t D> class Vector
 			nested_loop<D>(ld.getStart(), ld.getEnd(),
 			               [&](std::array<int, D> coord) { sum += ld[coord] * ld[coord]; });
 		}
-        MPI_Allreduce(&sum,&sum,1,MPI_DOUBLE,MPI_SUM,comm);
+		MPI_Allreduce(&sum, &sum, 1, MPI_DOUBLE, MPI_SUM, comm);
 		return sqrt(sum);
 	}
 	virtual double infNorm() const
@@ -239,7 +238,7 @@ template <size_t D> class Vector
 			nested_loop<D>(ld.getStart(), ld.getEnd(),
 			               [&](std::array<int, D> coord) { max = fmax(abs(ld[coord]), max); });
 		}
-        MPI_Allreduce(&max,&max,1,MPI_DOUBLE,MPI_MAX,comm);
+		MPI_Allreduce(&max, &max, 1, MPI_DOUBLE, MPI_MAX, comm);
 		return max;
 	}
 	virtual double dot(std::shared_ptr<const Vector<D>> b) const
@@ -251,7 +250,7 @@ template <size_t D> class Vector
 			nested_loop<D>(ld.getStart(), ld.getEnd(),
 			               [&](std::array<int, D> coord) { retval += ld[coord] * ld_b[coord]; });
 		}
-        MPI_Allreduce(&retval,&retval,1,MPI_DOUBLE,MPI_SUM,comm);
+		MPI_Allreduce(&retval, &retval, 1, MPI_DOUBLE, MPI_SUM, comm);
 		return retval;
 	}
 };

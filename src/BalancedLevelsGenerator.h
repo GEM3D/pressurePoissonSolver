@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -33,18 +33,18 @@
 template <size_t D> class BalancedLevelsGenerator
 {
 	private:
-	void extractLevel(const Tree<D> &t, int level, int n);
+	void extractLevel(const Tree<D> &t, int level, const std::array<int, D> &ns);
 	void balanceLevel(int level);
 	void balanceLevelWithLower(int level);
 
 	public:
 	using DomainMap = std::map<int, std::shared_ptr<Domain<D>>>;
 	std::vector<DomainMap> levels;
-	BalancedLevelsGenerator(const Tree<D> &t, int n)
+	BalancedLevelsGenerator(const Tree<D> &t, const std::array<int, D> &ns)
 	{
 		levels.resize(t.num_levels);
 		for (int i = 1; i <= t.num_levels; i++) {
-			extractLevel(t, i, n);
+			extractLevel(t, i, ns);
 		}
 	}
 	void zoltanBalance()
@@ -57,7 +57,8 @@ template <size_t D> class BalancedLevelsGenerator
 };
 
 template <size_t D>
-inline void BalancedLevelsGenerator<D>::extractLevel(const Tree<D> &t, int level, int nx)
+inline void BalancedLevelsGenerator<D>::extractLevel(const Tree<D> &t, int level,
+                                                     const std::array<int, D> &ns)
 {
 	int rank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -74,21 +75,23 @@ inline void BalancedLevelsGenerator<D>::extractLevel(const Tree<D> &t, int level
 			Node<D>                    n = t.nodes.at(q.front());
 			q.pop_front();
 
-			d.n            = nx;
-			d.id           = n.id;
-			d.lengths      = n.lengths;
+			d.ns = ns;
+			d.id = n.id;
+			for (size_t i = 0; i < D; i++) {
+				d.spacings[i] = n.lengths[i] / ns[i];
+			}
 			d.starts       = n.starts;
 			d.refine_level = n.level;
 			if (n.level < level) {
 				d.parent_id = n.id;
 			} else {
 				d.parent_id = n.parent;
-			if (d.parent_id != -1) {
-				d.oct_on_parent = 0;
-				while (t.nodes.at(n.parent).child_id[d.oct_on_parent] != n.id) {
-					d.oct_on_parent++;
+				if (d.parent_id != -1) {
+					d.oct_on_parent = 0;
+					while (t.nodes.at(n.parent).child_id[d.oct_on_parent] != n.id) {
+						d.oct_on_parent++;
+					}
 				}
-			}
 			}
 
 			// set and enqueue nbrs

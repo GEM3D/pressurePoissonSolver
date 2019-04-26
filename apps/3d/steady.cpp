@@ -272,7 +272,7 @@ int main(int argc, char *argv[])
 	Tools::Timer timer;
 	for (int loop = 0; loop < loop_count; loop++) {
 		timer.start("Domain Initialization");
-		BalancedLevelsGenerator<3> blg(t, n);
+		BalancedLevelsGenerator<3> blg(t, ns);
 
 		// partition domains if running in parallel
 		if (num_procs > 1) {
@@ -296,9 +296,9 @@ int main(int argc, char *argv[])
 		shared_ptr<PetscVector<3>> f     = dc->getNewDomainVec();
 
 		if (neumann) {
-			Init::initNeumann(*dc, n, f->vec, exact->vec, ffun, gfun, nfunx, nfuny, nfunz);
+			Init::initNeumann(*dc, f->vec, exact->vec, ffun, gfun, nfunx, nfuny, nfunz);
 		} else {
-			Init::initDirichlet(*dc, n, f->vec, exact->vec, ffun, gfun);
+			Init::initDirichlet(*dc, f->vec, exact->vec, ffun, gfun);
 		}
 
 		timer.stop("Domain Initialization");

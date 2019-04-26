@@ -29,9 +29,9 @@ class SevenPtPatchOperator : public PatchOperator<3>
 	                   std::shared_ptr<const Vector<2>> gamma, std::shared_ptr<Vector<3>> f)
 	{
 		int    n   = d.n;
-		double h_x = d.domain.lengths[0] / n;
-		double h_y = d.domain.lengths[1] / n;
-		double h_z = d.domain.lengths[2] / n;
+		double h_x = d.domain.spacings[0];
+		double h_y = d.domain.spacings[1];
+		double h_z = d.domain.spacings[2];
 
 		LocalData<3>       f_data = f->getLocalData(d.domain.id_local);
 		const LocalData<3> u_data = u->getLocalData(d.domain.id_local);

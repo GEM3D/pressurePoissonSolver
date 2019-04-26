@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -98,6 +98,13 @@ template <size_t D> class Side
 	{
 		// is least-significant bit set?
 		return !(val & 0x1);
+	}
+	/**
+	 * @brief Return the axis that the side lies on.
+	 */
+	inline bool axis() const
+	{
+		return val / 2;
 	}
 	/**
 	 * @brief Return the opposite side of the cube.
@@ -269,7 +276,7 @@ template <size_t D> class Orthant
 			int side = 2 * i;
 			if ((1 << i) & val) { side |= 1; }
 			retval[i] = side;
-        }
+		}
 		return retval;
 	}
 	/**

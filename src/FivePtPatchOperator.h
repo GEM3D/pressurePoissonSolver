@@ -29,8 +29,8 @@ class FivePtPatchOperator : public PatchOperator<2>
 	           std::shared_ptr<const Vector<1>> gamma, std::shared_ptr<Vector<2>> f)
 	{
 		int    n   = d.n;
-		double h_x = d.domain.lengths[0] / n;
-		double h_y = d.domain.lengths[1] / n;
+		double h_x = d.domain.spacings[0];
+		double h_y = d.domain.spacings[1];
 
 		LocalData<2>       f_data = f->getLocalData(d.domain.id_local);
 		const LocalData<2> u_data = u->getLocalData(d.domain.id_local);

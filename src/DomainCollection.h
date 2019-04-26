@@ -231,9 +231,12 @@ template <size_t D> class DomainCollection
 	{
 		double sum = 0;
 		for (auto &p : domains) {
-			Domain<D> &d = *p.second;
-			sum
-			+= std::accumulate(d.lengths.begin(), d.lengths.end(), 1.0, std::multiplies<double>());
+			Domain<D> &d         = *p.second;
+			double     patch_vol = 1;
+			for (size_t i = 0; i < D; i++) {
+				patch_vol *= d.spacings[i] * d.ns[i];
+			}
+			sum += patch_vol;
 		}
 		double retval;
 		MPI_Allreduce(&sum, &retval, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
@@ -251,10 +254,9 @@ template <size_t D> class DomainCollection
 			nested_loop<D>(u_data.getStart(), u_data.getEnd(),
 			               [&](std::array<int, D> coord) { patch_sum += u_data[coord]; });
 
-			patch_sum
-			*= std::accumulate(d.lengths.begin(), d.lengths.end(), 1.0, std::multiplies<double>())
-			   / std::pow(d.n, D);
-
+			for (size_t i = 0; i < D; i++) {
+				patch_sum *= d.spacings[i];
+			}
 			sum += patch_sum;
 		}
 		double retval;

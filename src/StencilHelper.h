@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -26,6 +26,8 @@
 class StencilHelper
 {
 	public:
+	int nx;
+	int ny;
 	virtual ~StencilHelper() {}
 	virtual int     row(int xi, int yi)    = 0;
 	virtual int     size(int xi, int yi)   = 0;
@@ -45,43 +47,55 @@ class DirichletSH : public StencilHelper
 	DirichletSH(Domain<3> &d, Side<3> s)
 	{
 		double h   = 0;
-		int    idx = d.id_global * d.n * d.n * d.n;
+		int    idx = d.id_global * d.ns[0] * d.ns[1] * d.ns[2];
 		switch (s.toInt()) {
 			case Side<3>::west:
-				h       = d.lengths[0] / d.n;
+				h       = d.spacings[0];
 				start   = idx;
-				stridex = d.n;
-				stridey = d.n * d.n;
+				stridex = d.ns[0];
+				stridey = d.ns[0] * d.ns[1];
+				nx      = d.ns[1];
+				ny      = d.ns[2];
 				break;
 			case Side<3>::east:
-				h       = d.lengths[0] / d.n;
-				start   = idx + (d.n - 1);
-				stridex = d.n;
-				stridey = d.n * d.n;
+				h       = d.spacings[0];
+				start   = idx + (d.ns[0] - 1);
+				stridex = d.ns[0];
+				stridey = d.ns[0] * d.ns[1];
+				nx      = d.ns[1];
+				ny      = d.ns[2];
 				break;
 			case Side<3>::south:
-				h       = d.lengths[1] / d.n;
+				h       = d.spacings[1];
 				start   = idx;
 				stridex = 1;
-				stridey = d.n * d.n;
+				stridey = d.ns[0] * d.ns[1];
+				nx      = d.ns[0];
+				ny      = d.ns[2];
 				break;
 			case Side<3>::north:
-				h       = d.lengths[1] / d.n;
-				start   = idx + (d.n - 1) * d.n;
+				h       = d.spacings[1];
+				start   = idx + (d.ns[1] - 1) * d.ns[0];
 				stridex = 1;
-				stridey = d.n * d.n;
+				stridey = d.ns[0] * d.ns[1];
+				nx      = d.ns[0];
+				ny      = d.ns[2];
 				break;
 			case Side<3>::bottom:
-				h       = d.lengths[2] / d.n;
+				h       = d.spacings[2];
 				start   = idx;
 				stridex = 1;
-				stridey = d.n;
+				stridey = d.ns[0];
+				nx      = d.ns[0];
+				ny      = d.ns[1];
 				break;
 			case Side<3>::top:
-				h       = d.lengths[2] / d.n;
-				start   = idx + (d.n - 1) * d.n * d.n;
+				h       = d.spacings[2];
+				start   = idx + (d.ns[2] - 1) * d.ns[1] * d.ns[0];
 				stridex = 1;
-				stridey = d.n;
+				stridey = d.ns[0];
+				nx      = d.ns[0];
+				ny      = d.ns[1];
 				break;
 		}
 		coeff = -1.0 / (h * h);
@@ -117,43 +131,55 @@ class NeumannSH : public StencilHelper
 	NeumannSH(Domain<3> &d, Side<3> s)
 	{
 		double h   = 0;
-		int    idx = d.id_global * d.n * d.n * d.n;
+		int    idx = d.id_global * d.ns[0] * d.ns[1] * d.ns[2];
 		switch (s.toInt()) {
 			case Side<3>::west:
-				h       = d.lengths[0] / d.n;
+				h       = d.spacings[0];
 				start   = idx;
-				stridex = d.n;
-				stridey = d.n * d.n;
+				stridex = d.ns[0];
+				stridey = d.ns[0] * d.ns[1];
+				nx      = d.ns[1];
+				ny      = d.ns[2];
 				break;
 			case Side<3>::east:
-				h       = d.lengths[0] / d.n;
-				start   = idx + (d.n - 1);
-				stridex = d.n;
-				stridey = d.n * d.n;
+				h       = d.spacings[0];
+				start   = idx + (d.ns[0] - 1);
+				stridex = d.ns[0];
+				stridey = d.ns[0] * d.ns[1];
+				nx      = d.ns[1];
+				ny      = d.ns[2];
 				break;
 			case Side<3>::south:
-				h       = d.lengths[1] / d.n;
+				h       = d.spacings[1];
 				start   = idx;
 				stridex = 1;
-				stridey = d.n * d.n;
+				stridey = d.ns[0] * d.ns[1];
+				nx      = d.ns[0];
+				ny      = d.ns[2];
 				break;
 			case Side<3>::north:
-				h       = d.lengths[1] / d.n;
-				start   = idx + (d.n - 1) * d.n;
+				h       = d.spacings[1];
+				start   = idx + (d.ns[1] - 1) * d.ns[0];
 				stridex = 1;
-				stridey = d.n * d.n;
+				stridey = d.ns[0] * d.ns[1];
+				nx      = d.ns[0];
+				ny      = d.ns[2];
 				break;
 			case Side<3>::bottom:
-				h       = d.lengths[2] / d.n;
+				h       = d.spacings[2];
 				start   = idx;
 				stridex = 1;
-				stridey = d.n;
+				stridey = d.ns[0];
+				nx      = d.ns[0];
+				ny      = d.ns[1];
 				break;
 			case Side<3>::top:
-				h       = d.lengths[2] / d.n;
-				start   = idx + (d.n - 1) * d.n * d.n;
+				h       = d.spacings[2];
+				start   = idx + (d.ns[2] - 1) * d.ns[1] * d.ns[0];
 				stridex = 1;
-				stridey = d.n;
+				stridey = d.ns[0];
+				nx      = d.ns[0];
+				ny      = d.ns[1];
 				break;
 		}
 		coeff = 1.0 / (h * h);
@@ -191,50 +217,62 @@ class NormalSH : public StencilHelper
 	{
 		NormalNbrInfo<3> &nbr_info = d.getNormalNbrInfo(s);
 		double            h        = 0;
-		int               idx      = d.id_global * d.n * d.n * d.n;
-		int               nbr_idx  = nbr_info.global_index * d.n * d.n * d.n;
+		int               idx      = d.id_global * d.ns[0] * d.ns[1] * d.ns[2];
+		int               nbr_idx  = nbr_info.global_index * d.ns[0] * d.ns[1] * d.ns[2];
 		switch (s.toInt()) {
 			case Side<3>::west:
-				h         = d.lengths[0] / d.n;
+				h         = d.spacings[0];
 				start     = idx;
-				nbr_start = nbr_idx + (d.n - 1);
-				stridex   = d.n;
-				stridey   = d.n * d.n;
+				nbr_start = nbr_idx + (d.ns[0] - 1);
+				stridex   = d.ns[0];
+				stridey   = d.ns[0] * d.ns[1];
+				nx        = d.ns[1];
+				ny        = d.ns[2];
 				break;
 			case Side<3>::east:
-				h         = d.lengths[0] / d.n;
-				start     = idx + (d.n - 1);
+				h         = d.spacings[0];
+				start     = idx + (d.ns[0] - 1);
 				nbr_start = nbr_idx;
-				stridex   = d.n;
-				stridey   = d.n * d.n;
+				stridex   = d.ns[0];
+				stridey   = d.ns[0] * d.ns[1];
+				nx        = d.ns[1];
+				ny        = d.ns[2];
 				break;
 			case Side<3>::south:
-				h         = d.lengths[1] / d.n;
+				h         = d.spacings[1];
 				start     = idx;
-				nbr_start = nbr_idx + (d.n - 1) * d.n;
+				nbr_start = nbr_idx + (d.ns[1] - 1) * d.ns[0];
 				stridex   = 1;
-				stridey   = d.n * d.n;
+				stridey   = d.ns[0] * d.ns[1];
+				nx        = d.ns[0];
+				ny        = d.ns[2];
 				break;
 			case Side<3>::north:
-				h         = d.lengths[1] / d.n;
-				start     = idx + (d.n - 1) * d.n;
+				h         = d.spacings[1];
+				start     = idx + (d.ns[1] - 1) * d.ns[0];
 				nbr_start = nbr_idx;
 				stridex   = 1;
-				stridey   = d.n * d.n;
+				stridey   = d.ns[0] * d.ns[1];
+				nx        = d.ns[0];
+				ny        = d.ns[2];
 				break;
 			case Side<3>::bottom:
-				h         = d.lengths[2] / d.n;
+				h         = d.spacings[2];
 				start     = idx;
-				nbr_start = nbr_idx + (d.n - 1) * d.n * d.n;
+				nbr_start = nbr_idx + (d.ns[2] - 1) * d.ns[1] * d.ns[0];
 				stridex   = 1;
-				stridey   = d.n;
+				stridey   = d.ns[0];
+				nx        = d.ns[0];
+				ny        = d.ns[1];
 				break;
 			case Side<3>::top:
-				h         = d.lengths[2] / d.n;
-				start     = idx + (d.n - 1) * d.n * d.n;
+				h         = d.spacings[2];
+				start     = idx + (d.ns[2] - 1) * d.ns[1] * d.ns[0];
 				nbr_start = nbr_idx;
 				stridex   = 1;
-				stridey   = d.n;
+				stridey   = d.ns[0];
+				nx        = d.ns[0];
+				ny        = d.ns[1];
 				break;
 		}
 		coeff = 1.0 / (h * h);
@@ -267,59 +305,69 @@ class CoarseSH : public StencilHelper
 	int                   nbr_start;
 	int                   stridex;
 	int                   stridey;
-	int                   n;
 
 	public:
 	CoarseSH(Domain<3> &d, Side<3> s)
 	{
 		CoarseNbrInfo<3> &nbr_info = d.getCoarseNbrInfo(s);
 		double            h        = 0;
-		n                          = d.n;
-		int idx                    = d.id_global * d.n * d.n * d.n;
-		int nbr_idx                = nbr_info.global_index * d.n * d.n * d.n;
+		int               idx      = d.id_global * d.ns[0] * d.ns[1] * d.ns[2];
+		int               nbr_idx  = nbr_info.global_index * d.ns[0] * d.ns[1] * d.ns[2];
 		quad                       = nbr_info.quad_on_coarse;
 		switch (s.toInt()) {
 			case Side<3>::west:
-				h         = d.lengths[0] / d.n;
+				h         = d.spacings[0];
 				start     = idx;
-				nbr_start = nbr_idx + (d.n - 1);
-				stridex   = d.n;
-				stridey   = d.n * d.n;
+				nbr_start = nbr_idx + (d.ns[0] - 1);
+				stridex   = d.ns[0];
+				stridey   = d.ns[0] * d.ns[1];
+				nx        = d.ns[1];
+				ny        = d.ns[2];
 				break;
 			case Side<3>::east:
-				h         = d.lengths[0] / d.n;
-				start     = idx + (d.n - 1);
+				h         = d.spacings[0];
+				start     = idx + (d.ns[0] - 1);
 				nbr_start = nbr_idx;
-				stridex   = d.n;
-				stridey   = d.n * d.n;
+				stridex   = d.ns[0];
+				stridey   = d.ns[0] * d.ns[1];
+				nx        = d.ns[1];
+				ny        = d.ns[2];
 				break;
 			case Side<3>::south:
-				h         = d.lengths[1] / d.n;
+				h         = d.spacings[1];
 				start     = idx;
-				nbr_start = nbr_idx + (d.n - 1) * d.n;
+				nbr_start = nbr_idx + (d.ns[1] - 1) * d.ns[0];
 				stridex   = 1;
-				stridey   = d.n * d.n;
+				stridey   = d.ns[0] * d.ns[1];
+				nx        = d.ns[0];
+				ny        = d.ns[2];
 				break;
 			case Side<3>::north:
-				h         = d.lengths[1] / d.n;
-				start     = idx + (d.n - 1) * d.n;
+				h         = d.spacings[1];
+				start     = idx + (d.ns[1] - 1) * d.ns[0];
 				nbr_start = nbr_idx;
 				stridex   = 1;
-				stridey   = d.n * d.n;
+				stridey   = d.ns[0] * d.ns[1];
+				nx        = d.ns[0];
+				ny        = d.ns[2];
 				break;
 			case Side<3>::bottom:
-				h         = d.lengths[2] / d.n;
+				h         = d.spacings[2];
 				start     = idx;
-				nbr_start = nbr_idx + (d.n - 1) * d.n * d.n;
+				nbr_start = nbr_idx + (d.ns[2] - 1) * d.ns[1] * d.ns[0];
 				stridex   = 1;
-				stridey   = d.n;
+				stridey   = d.ns[0];
+				nx        = d.ns[0];
+				ny        = d.ns[1];
 				break;
 			case Side<3>::top:
-				h         = d.lengths[2] / d.n;
-				start     = idx + (d.n - 1) * d.n * d.n;
+				h         = d.spacings[2];
+				start     = idx + (d.ns[2] - 1) * d.ns[1] * d.ns[0];
 				nbr_start = nbr_idx;
 				stridex   = 1;
-				stridey   = d.n;
+				stridey   = d.ns[0];
+				nx        = d.ns[0];
+				ny        = d.ns[1];
 				break;
 		}
 		coeff /= (h * h);
@@ -343,13 +391,13 @@ class CoarseSH : public StencilHelper
 				colz[4] = nbr_start + stridex * (xi / 2) + stridey * (yi / 2);
 				break;
 			case 1:
-				colz[4] = nbr_start + stridex * ((xi + n) / 2) + stridey * (yi / 2);
+				colz[4] = nbr_start + stridex * ((xi + nx) / 2) + stridey * (yi / 2);
 				break;
 			case 2:
-				colz[4] = nbr_start + stridex * (xi / 2) + stridey * ((yi + n) / 2);
+				colz[4] = nbr_start + stridex * (xi / 2) + stridey * ((yi + ny) / 2);
 				break;
 			case 3:
-				colz[4] = nbr_start + stridex * ((xi + n) / 2) + stridey * ((yi + n) / 2);
+				colz[4] = nbr_start + stridex * ((xi + nx) / 2) + stridey * ((yi + ny) / 2);
 				break;
 			default:
 				break;
@@ -382,73 +430,84 @@ class FineSH : public StencilHelper
 	int                   nbr_start[4];
 	int                   stridex;
 	int                   stridey;
-	int                   n;
 
 	public:
 	FineSH(Domain<3> &d, Side<3> s)
 	{
 		FineNbrInfo<3> &nbr_info = d.getFineNbrInfo(s);
 		double          h        = 0;
-		n                        = d.n;
-		int idx                  = d.id_global * d.n * d.n * d.n;
-		int nbr_idx[4];
+		int             idx      = d.id_global * d.ns[0] * d.ns[1] * d.ns[2];
+		int             nbr_idx[4];
 		for (int i = 0; i < 4; i++) {
-			nbr_idx[i] = nbr_info.global_indexes[i] * d.n * d.n * d.n;
+			nbr_idx[i] = nbr_info.global_indexes[i] * d.ns[0] * d.ns[1] * d.ns[2];
 		}
 		switch (s.toInt()) {
 			case Side<3>::west:
-				h     = d.lengths[0] / d.n;
+				h     = d.spacings[0];
 				start = idx;
 				for (int i = 0; i < 4; i++) {
-					nbr_start[i] = nbr_idx[i] + (d.n - 1);
+					nbr_start[i] = nbr_idx[i] + (d.ns[0] - 1);
 				}
-				stridex = d.n;
-				stridey = d.n * d.n;
+				stridex = d.ns[0];
+				stridey = d.ns[0] * d.ns[1];
+				nx      = d.ns[1];
+				ny      = d.ns[2];
 				break;
 			case Side<3>::east:
-				h     = d.lengths[0] / d.n;
-				start = idx + (d.n - 1);
+				h     = d.spacings[0];
+				start = idx + (d.ns[0] - 1);
 				for (int i = 0; i < 4; i++) {
 					nbr_start[i] = nbr_idx[i];
 				}
-				stridex = d.n;
-				stridey = d.n * d.n;
+				stridex = d.ns[0];
+				stridey = d.ns[0] * d.ns[1];
+				nx      = d.ns[1];
+				ny      = d.ns[2];
 				break;
 			case Side<3>::south:
-				h     = d.lengths[1] / d.n;
+				h     = d.spacings[1];
 				start = idx;
 				for (int i = 0; i < 4; i++) {
-					nbr_start[i] = nbr_idx[i] + (d.n - 1) * d.n;
+					nbr_start[i] = nbr_idx[i] + (d.ns[1] - 1) * d.ns[0];
 				}
 				stridex = 1;
-				stridey = d.n * d.n;
+				stridey = d.ns[0] * d.ns[1];
+				nx      = d.ns[0];
+				ny      = d.ns[2];
 				break;
 			case Side<3>::north:
-				h     = d.lengths[1] / d.n;
-				start = idx + (d.n - 1) * d.n;
+				h     = d.spacings[1];
+				start = idx + (d.ns[1] - 1) * d.ns[0];
 				for (int i = 0; i < 4; i++) {
 					nbr_start[i] = nbr_idx[i];
 				}
 				stridex = 1;
-				stridey = d.n * d.n;
+				stridey = d.ns[0] * d.ns[1];
+				nx      = d.ns[0];
+				ny      = d.ns[2];
 				break;
 			case Side<3>::bottom:
-				h     = d.lengths[2] / d.n;
+				h     = d.spacings[2];
 				start = idx;
 				for (int i = 0; i < 4; i++) {
-					nbr_start[i] = nbr_idx[i] + (d.n - 1) * d.n * d.n;
+					nbr_start[i] = nbr_idx[i] + (d.ns[2] - 1) * d.ns[1] * d.ns[0];
 				}
 				stridex = 1;
-				stridey = d.n;
+				stridey = d.ns[0];
+				nx      = d.ns[0];
+				ny      = d.ns[1];
 				break;
 			case Side<3>::top:
-				h     = d.lengths[2] / d.n;
-				start = idx + (d.n - 1) * d.n * d.n;
+				h     = d.spacings[2];
+				start = idx + (d.ns[2] - 1) * d.ns[1] * d.ns[0];
 				for (int i = 0; i < 4; i++) {
 					nbr_start[i] = nbr_idx[i];
 				}
 				stridex = 1;
-				stridey = d.n;
+				stridex = 1;
+				stridey = d.ns[0];
+				nx      = d.ns[0];
+				ny      = d.ns[1];
 				break;
 		}
 		coeff /= (h * h);
@@ -468,9 +527,9 @@ class FineSH : public StencilHelper
 	int *cols(int xi, int yi)
 	{
 		colz[0]  = start + stridex * xi + stridey * yi;
-		int quad = (xi >= n / 2) | ((yi >= n / 2) << 1);
-		int nxi  = xi % (n / 2) * 2;
-		int nyi  = yi % (n / 2) * 2;
+		int quad = (xi >= nx / 2) | ((yi >= ny / 2) << 1);
+		int nxi  = xi % (nx / 2) * 2;
+		int nyi  = yi % (ny / 2) * 2;
 		colz[1]  = nbr_start[quad] + stridex * (nxi) + stridey * (nyi);
 		colz[2]  = nbr_start[quad] + stridex * (nxi + 1) + stridey * (nyi);
 		colz[3]  = nbr_start[quad] + stridex * (nxi) + stridey * (nyi + 1);

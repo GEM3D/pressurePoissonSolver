@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -31,90 +31,91 @@ PW_explicit<Mat> MatrixHelper::formCRSMatrix(double lambda)
 {
 	PW<Mat> A;
 	MatCreate(MPI_COMM_WORLD, &A);
-	int n           = dc.getLengths()[0];
-	int local_size  = dc.domains.size() * n * n * n;
-	int global_size = dc.num_global_domains * n * n * n;
+	int nx          = dc.getLengths()[0];
+	int ny          = dc.getLengths()[1];
+	int nz          = dc.getLengths()[2];
+	int local_size  = dc.domains.size() * nx * ny * nz;
+	int global_size = dc.num_global_domains * nx * ny * nz;
 	MatSetSizes(A, local_size, local_size, global_size, global_size);
 	MatSetType(A, MATMPIAIJ);
 	MatMPIAIJSetPreallocation(A, 19, nullptr, 19, nullptr);
 
 	for (auto &p : dc.domains) {
 		Domain<3> &d     = *p.second;
-		int        n     = d.n;
-		double     h_x   = d.lengths[0] / n;
-		double     h_y   = d.lengths[1] / n;
-		double     h_z   = d.lengths[2] / n;
-		int        start = n * n * n * d.id_global;
+		double     h_x   = d.spacings[0];
+		double     h_y   = d.spacings[1];
+		double     h_z   = d.spacings[2];
+		int        start = nx * ny * nz * d.id_global;
 
 		// center coeffs
 		double coeff = -2.0 / (h_x * h_x) - 2.0 / (h_y * h_y) - 2.0 / (h_z * h_z);
-		for (int z_i = 0; z_i < n; z_i++) {
-			for (int y_i = 0; y_i < n; y_i++) {
-				for (int x_i = 0; x_i < n; x_i++) {
-					int row = start + x_i + n * y_i + n * n * z_i;
+		for (int z_i = 0; z_i < nz; z_i++) {
+			for (int y_i = 0; y_i < ny; y_i++) {
+				for (int x_i = 0; x_i < nx; x_i++) {
+					int row = start + x_i + nx * y_i + nx * ny * z_i;
 					MatSetValues(A, 1, &row, 1, &row, &coeff, ADD_VALUES);
 				}
 			}
 		}
 		// west coeffs
 		coeff = 1.0 / (h_x * h_x);
-		for (int z_i = 0; z_i < n; z_i++) {
-			for (int y_i = 0; y_i < n; y_i++) {
-				for (int x_i = 1; x_i < n; x_i++) {
-					int row = start + x_i + n * y_i + n * n * z_i;
-					int col = start + x_i - 1 + n * y_i + n * n * z_i;
+		for (int z_i = 0; z_i < nz; z_i++) {
+			for (int y_i = 0; y_i < ny; y_i++) {
+				for (int x_i = 1; x_i < nx; x_i++) {
+					int row = start + x_i + nx * y_i + nx * ny * z_i;
+					int col = start + x_i - 1 + nx * y_i + nx * ny * z_i;
 					MatSetValues(A, 1, &row, 1, &col, &coeff, ADD_VALUES);
 				}
 			}
 		}
 		// east coeffs
-		for (int z_i = 0; z_i < n; z_i++) {
-			for (int y_i = 0; y_i < n; y_i++) {
-				for (int x_i = 0; x_i < n - 1; x_i++) {
-					int row = start + x_i + n * y_i + n * n * z_i;
-					int col = start + x_i + 1 + n * y_i + n * n * z_i;
+		for (int z_i = 0; z_i < nz; z_i++) {
+			for (int y_i = 0; y_i < ny; y_i++) {
+				for (int x_i = 0; x_i < nx - 1; x_i++) {
+					int row = start + x_i + nx * y_i + nx * ny * z_i;
+					int col = start + x_i + 1 + nx * y_i + nx * ny * z_i;
 					MatSetValues(A, 1, &row, 1, &col, &coeff, ADD_VALUES);
 				}
 			}
 		}
 		// north coeffs
 		coeff = 1.0 / (h_y * h_y);
-		for (int z_i = 0; z_i < n; z_i++) {
-			for (int y_i = 0; y_i < n - 1; y_i++) {
-				for (int x_i = 0; x_i < n; x_i++) {
-					int row = start + x_i + n * y_i + n * n * z_i;
-					int col = start + x_i + n * (y_i + 1) + n * n * z_i;
+		for (int z_i = 0; z_i < nz; z_i++) {
+			for (int y_i = 0; y_i < ny - 1; y_i++) {
+				for (int x_i = 0; x_i < nx; x_i++) {
+					int row = start + x_i + nx * y_i + nx * ny * z_i;
+					int col = start + x_i + nx * (y_i + 1) + nx * ny * z_i;
 					MatSetValues(A, 1, &row, 1, &col, &coeff, ADD_VALUES);
 				}
 			}
 		}
 		// south coeffs
-		for (int z_i = 0; z_i < n; z_i++) {
-			for (int y_i = 1; y_i < n; y_i++) {
-				for (int x_i = 0; x_i < n; x_i++) {
-					int row = start + x_i + n * y_i + n * n * z_i;
-					int col = start + x_i + n * (y_i - 1) + n * n * z_i;
+		for (int z_i = 0; z_i < nz; z_i++) {
+			for (int y_i = 1; y_i < ny; y_i++) {
+				for (int x_i = 0; x_i < nx; x_i++) {
+					int row = start + x_i + nx * y_i + nx * ny * z_i;
+					int col = start + x_i + nx * (y_i - 1) + nx * ny * z_i;
 					MatSetValues(A, 1, &row, 1, &col, &coeff, ADD_VALUES);
 				}
 			}
 		}
 		// top coeffs
 		coeff = 1.0 / (h_z * h_z);
-		for (int z_i = 0; z_i < n - 1; z_i++) {
-			for (int y_i = 0; y_i < n; y_i++) {
-				for (int x_i = 0; x_i < n; x_i++) {
-					int row = start + x_i + n * y_i + n * n * z_i;
-					int col = start + x_i + n * y_i + n * n * (z_i + 1);
+		for (int z_i = 0; z_i < nz - 1; z_i++) {
+			for (int y_i = 0; y_i < ny; y_i++) {
+				for (int x_i = 0; x_i < nx; x_i++) {
+					int row = start + x_i + nx * y_i + nx * ny * z_i;
+					int col = start + x_i + nx * y_i + nx * ny * (z_i + 1);
 					MatSetValues(A, 1, &row, 1, &col, &coeff, ADD_VALUES);
 				}
 			}
 		}
 		// bottom coeffs
-		for (int z_i = 1; z_i < n; z_i++) {
-			for (int y_i = 0; y_i < n; y_i++) {
-				for (int x_i = 0; x_i < n; x_i++) {
-					int row = start + x_i + n * y_i + n * n * z_i;
-					int col = start + x_i + n * y_i + n * n * (z_i - 1);
+		for (int z_i = 1; z_i < nz; z_i++) {
+			for (int y_i = 0; y_i < ny; y_i++) {
+				for (int x_i = 0; x_i < nx; x_i++) {
+					int row = start + x_i + nx * y_i + nx * ny * z_i;
+					int col = start + x_i + nx * y_i + nx * ny * (z_i - 1);
 					MatSetValues(A, 1, &row, 1, &col, &coeff, ADD_VALUES);
 				}
 			}
@@ -123,8 +124,8 @@ PW_explicit<Mat> MatrixHelper::formCRSMatrix(double lambda)
 		// boundaries
 		for (Side<3> s : Side<3>::getValues()) {
 			StencilHelper *sh = getStencilHelper(d, s);
-			for (int yi = 0; yi < n; yi++) {
-				for (int xi = 0; xi < n; xi++) {
+			for (int yi = 0; yi < sh->ny; yi++) {
+				for (int xi = 0; xi < sh->nx; xi++) {
 					int     row    = sh->row(xi, yi);
 					int     size   = sh->size(xi, yi);
 					double *coeffs = sh->coeffs(xi, yi);

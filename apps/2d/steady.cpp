@@ -194,7 +194,7 @@ int main(int argc, char *argv[])
 	if (false) {
 #endif
 	} else {
-		BalancedLevelsGenerator<2> blg(t, n);
+		BalancedLevelsGenerator<2> blg(t, ns);
 		// partition domains if running in parallel
 		if (num_procs > 1) { blg.zoltanBalance(); }
 		levels = blg.levels;
@@ -308,9 +308,9 @@ int main(int argc, char *argv[])
 		shared_ptr<PetscVector<2>> f     = dc->getNewDomainVec();
 
 		if (neumann) {
-			Init::initNeumann2d(*dc, n, f->vec, exact->vec, ffun, gfun, nfun, nfuny);
+			Init::initNeumann2d(*dc, f->vec, exact->vec, ffun, gfun, nfun, nfuny);
 		} else {
-			Init::initDirichlet2d(*dc, n, f->vec, exact->vec, ffun, gfun);
+			Init::initDirichlet2d(*dc, f->vec, exact->vec, ffun, gfun);
 		}
 
 		timer.stop("Domain Initialization");

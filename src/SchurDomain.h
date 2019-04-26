@@ -230,7 +230,7 @@ template <size_t D> struct SchurDomain {
 		iface_info.fill(nullptr);
 		domain      = d;
 		local_index = d.id_local;
-		n           = d.n;
+		n           = d.ns[0];
 		neumann     = d.neumann;
 
 		// create iface objects

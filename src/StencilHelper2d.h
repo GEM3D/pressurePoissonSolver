@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -26,6 +26,7 @@
 class StencilHelper
 {
 	public:
+	int n;
 	virtual ~StencilHelper() {}
 	virtual int     row(int i)    = 0;
 	virtual int     size(int i)   = 0;
@@ -44,27 +45,31 @@ class DirichletSH : public StencilHelper
 	DirichletSH(Domain<2> &d, Side<2> s)
 	{
 		double h   = 0;
-		int    idx = d.id_global * d.n * d.n;
+		int    idx = d.id_global * d.ns[0] * d.ns[1];
 		switch (s.toInt()) {
-			case Side<2>::north:
-				h      = d.lengths[0] / d.n;
-				start  = idx + (d.n - 1) * d.n;
-				stride = 1;
+			case Side<2>::west:
+				h      = d.spacings[1];
+				start  = idx;
+				stride = d.ns[0];
+				n      = d.ns[1];
 				break;
 			case Side<2>::east:
-				h      = d.lengths[1] / d.n;
-				start  = idx + (d.n - 1);
-				stride = d.n;
+				h      = d.spacings[1];
+				start  = idx + (d.ns[0] - 1);
+				stride = d.ns[0];
+				n      = d.ns[1];
 				break;
 			case Side<2>::south:
-				h      = d.lengths[0] / d.n;
+				h      = d.spacings[0];
 				start  = idx;
 				stride = 1;
+				n      = d.ns[0];
 				break;
-			case Side<2>::west:
-				h      = d.lengths[1] / d.n;
-				start  = idx;
-				stride = d.n;
+			case Side<2>::north:
+				h      = d.spacings[0];
+				start  = idx + (d.ns[1] - 1) * d.ns[0];
+				stride = 1;
+				n      = d.ns[0];
 				break;
 		}
 		coeff = -1.0 / (h * h);
@@ -99,27 +104,31 @@ class NeumannSH : public StencilHelper
 	NeumannSH(Domain<2> &d, Side<2> s)
 	{
 		double h   = 0;
-		int    idx = d.id_global * d.n * d.n;
+		int    idx = d.id_global * d.ns[0] * d.ns[1];
 		switch (s.toInt()) {
-			case Side<2>::north:
-				h      = d.lengths[0] / d.n;
-				start  = idx + (d.n - 1) * d.n;
-				stride = 1;
+			case Side<2>::west:
+				h      = d.spacings[1];
+				start  = idx;
+				stride = d.ns[0];
+				n      = d.ns[1];
 				break;
 			case Side<2>::east:
-				h      = d.lengths[1] / d.n;
-				start  = idx + (d.n - 1);
-				stride = d.n;
+				h      = d.spacings[1];
+				start  = idx + (d.ns[0] - 1);
+				stride = d.ns[0];
+				n      = d.ns[1];
 				break;
 			case Side<2>::south:
-				h      = d.lengths[0] / d.n;
+				h      = d.spacings[0];
 				start  = idx;
 				stride = 1;
+				n      = d.ns[0];
 				break;
-			case Side<2>::west:
-				h      = d.lengths[1] / d.n;
-				start  = idx;
-				stride = d.n;
+			case Side<2>::north:
+				h      = d.spacings[0];
+				start  = idx + (d.ns[1] - 1) * d.ns[0];
+				stride = 1;
+				n      = d.ns[0];
 				break;
 		}
 		coeff = 1.0 / (h * h);
@@ -155,32 +164,36 @@ class NormalSH : public StencilHelper
 	NormalSH(Domain<2> &d, Side<2> s)
 	{
 		double h       = 0;
-		int    idx     = d.id_global * d.n * d.n;
-		int    nbr_idx = d.getNormalNbrInfo(s).global_index * d.n * d.n;
+		int    idx     = d.id_global * d.ns[0] * d.ns[1];
+		int    nbr_idx = d.getNormalNbrInfo(s).global_index * d.ns[0] * d.ns[1];
 		switch (s.toInt()) {
-			case Side<2>::north:
-				h         = d.lengths[0] / d.n;
-				start     = idx + (d.n - 1) * d.n;
-				nbr_start = nbr_idx;
-				stride    = 1;
+			case Side<2>::west:
+				h         = d.spacings[1];
+				start     = idx;
+				nbr_start = nbr_idx + d.ns[0] - 1;
+				stride    = d.ns[0];
+				n         = d.ns[1];
 				break;
 			case Side<2>::east:
-				h         = d.lengths[1] / d.n;
-				start     = idx + (d.n - 1);
+				h         = d.spacings[1];
+				start     = idx + (d.ns[0] - 1);
 				nbr_start = nbr_idx;
-				stride    = d.n;
+				stride    = d.ns[0];
+				n         = d.ns[1];
 				break;
 			case Side<2>::south:
-				h         = d.lengths[0] / d.n;
+				h         = d.spacings[0];
 				start     = idx;
-				nbr_start = nbr_idx + (d.n - 1) * d.n;
+				nbr_start = nbr_idx + (d.ns[1] - 1) * d.ns[0];
 				stride    = 1;
+				n         = d.ns[0];
 				break;
-			case Side<2>::west:
-				h         = d.lengths[1] / d.n;
-				start     = idx;
-				nbr_start = nbr_idx + d.n - 1;
-				stride    = d.n;
+			case Side<2>::north:
+				h         = d.spacings[0];
+				start     = idx + (d.ns[1] - 1) * d.ns[0];
+				nbr_start = nbr_idx;
+				stride    = 1;
+				n         = d.ns[0];
 				break;
 		}
 		coeff = 1.0 / (h * h);
@@ -210,7 +223,6 @@ class CoarseSH : public StencilHelper
 	std::valarray<double> end_coeffs
 	= {{-1.0 / 30, 1.0 / 15, -1.0 / 10, 1.0 / 3, 1.0 / 3, 1.0 / 5, 1.0 / 5}};
 	int colz[7];
-	int n;
 	int start;
 	int bnbr_start;
 	int enbr_start;
@@ -221,47 +233,50 @@ class CoarseSH : public StencilHelper
 	public:
 	CoarseSH(Domain<2> &d, Side<2> s)
 	{
-		n                    = d.n;
 		double h             = 0;
-		int    idx           = d.id_global * d.n * d.n;
-		int    nbr_idx_left  = d.getFineNbrInfo(s).global_indexes[0] * d.n * d.n;
-		int    nbr_idx_right = d.getFineNbrInfo(s).global_indexes[1] * d.n * d.n;
+		int    idx           = d.id_global * d.ns[0] * d.ns[1];
+		int    nbr_idx_left  = d.getFineNbrInfo(s).global_indexes[0] * d.ns[0] * d.ns[1];
+		int    nbr_idx_right = d.getFineNbrInfo(s).global_indexes[1] * d.ns[0] * d.ns[1];
 		switch (s.toInt()) {
-			case Side<2>::north:
-				h             = d.lengths[0] / d.n;
-				start         = idx + (d.n - 1) * d.n;
-				bnbr_start    = nbr_idx_left;
-				bnbr_start_in = bnbr_start + d.n;
-				enbr_start    = nbr_idx_right;
-				enbr_start_in = enbr_start + d.n;
-				stride        = 1;
+			case Side<2>::west:
+				h             = d.spacings[1];
+				start         = idx;
+				bnbr_start    = nbr_idx_left + d.ns[0] - 1;
+				bnbr_start_in = bnbr_start - 1;
+				enbr_start    = nbr_idx_right + d.ns[0] - 1;
+				enbr_start_in = enbr_start - 1;
+				stride        = d.ns[0];
+				n             = d.ns[1];
 				break;
 			case Side<2>::east:
-				h             = d.lengths[1] / d.n;
-				start         = idx + (d.n - 1);
+				h             = d.spacings[1];
+				start         = idx + (d.ns[0] - 1);
 				bnbr_start    = nbr_idx_left;
 				bnbr_start_in = bnbr_start + 1;
 				enbr_start    = nbr_idx_right;
 				enbr_start_in = enbr_start + 1;
-				stride        = d.n;
+				stride        = d.ns[0];
+				n             = d.ns[1];
 				break;
 			case Side<2>::south:
-				h             = d.lengths[0] / d.n;
+				h             = d.spacings[0];
 				start         = idx;
-				bnbr_start    = nbr_idx_left + (d.n - 1) * d.n;
-				bnbr_start_in = bnbr_start - d.n;
-				enbr_start    = nbr_idx_right + (d.n - 1) * d.n;
-				enbr_start_in = enbr_start - d.n;
+				bnbr_start    = nbr_idx_left + (d.ns[1] - 1) * d.ns[0];
+				bnbr_start_in = bnbr_start - d.ns[0];
+				enbr_start    = nbr_idx_right + (d.ns[1] - 1) * d.ns[0];
+				enbr_start_in = enbr_start - d.ns[0];
 				stride        = 1;
+				n             = d.ns[0];
 				break;
-			case Side<2>::west:
-				h             = d.lengths[1] / d.n;
-				start         = idx;
-				bnbr_start    = nbr_idx_left + d.n - 1;
-				bnbr_start_in = bnbr_start - 1;
-				enbr_start    = nbr_idx_right + d.n - 1;
-				enbr_start_in = enbr_start - 1;
-				stride        = d.n;
+			case Side<2>::north:
+				h             = d.spacings[0];
+				start         = idx + (d.ns[1] - 1) * d.ns[0];
+				bnbr_start    = nbr_idx_left;
+				bnbr_start_in = bnbr_start + d.ns[0];
+				enbr_start    = nbr_idx_right;
+				enbr_start_in = enbr_start + d.ns[0];
+				stride        = 1;
+				n             = d.ns[0];
 				break;
 		}
 		mid_coeffs /= h * h;
@@ -331,7 +346,6 @@ class FineSH : public StencilHelper
 	std::valarray<double> pen_coeffs = {{-1.0 / 20, 7.0 / 30, 7.0 / 20, 2.0 / 3, -1.0 / 5}};
 	std::valarray<double> mid_coeffs = {{1.0 / 12, 1.0 / 2, -1.0 / 20, 2.0 / 3, -1.0 / 5}};
 	int                   colz[5];
-	int                   n;
 	int                   start;
 	int                   start_in;
 	int                   nbr_start;
@@ -341,39 +355,42 @@ class FineSH : public StencilHelper
 	public:
 	FineSH(Domain<2> &d, Side<2> s)
 	{
-		n              = d.n;
 		double h       = 0;
-		int    idx     = d.id_global * d.n * d.n;
-		int    nbr_idx = d.getCoarseNbrInfo(s).global_index * d.n * d.n;
+		int    idx     = d.id_global * d.ns[0] * d.ns[1];
+		int    nbr_idx = d.getCoarseNbrInfo(s).global_index * d.ns[0] * d.ns[1];
 		end            = d.getCoarseNbrInfo(s).quad_on_coarse == 1;
 		switch (s.toInt()) {
-			case Side<2>::north:
-				h         = d.lengths[0] / d.n;
-				start     = idx + (d.n - 1) * d.n;
-				start_in  = idx + (d.n - 2) * d.n;
-				nbr_start = nbr_idx;
-				stride    = 1;
-				break;
-			case Side<2>::east:
-				h         = d.lengths[1] / d.n;
-				start     = idx + (d.n - 1);
-				start_in  = idx + (d.n - 2);
-				nbr_start = nbr_idx;
-				stride    = d.n;
-				break;
-			case Side<2>::south:
-				h         = d.lengths[0] / d.n;
-				start     = idx;
-				start_in  = idx + d.n;
-				nbr_start = nbr_idx + (d.n - 1) * d.n;
-				stride    = 1;
-				break;
 			case Side<2>::west:
-				h         = d.lengths[1] / d.n;
+				h         = d.spacings[1];
 				start     = idx;
 				start_in  = idx + 1;
-				nbr_start = nbr_idx + d.n - 1;
-				stride    = d.n;
+				nbr_start = nbr_idx + d.ns[0] - 1;
+				stride    = d.ns[0];
+				n         = d.ns[1];
+				break;
+			case Side<2>::east:
+				h         = d.spacings[1];
+				start     = idx + (d.ns[0] - 1);
+				start_in  = idx + (d.ns[0] - 2);
+				nbr_start = nbr_idx;
+				stride    = d.ns[0];
+				n         = d.ns[1];
+				break;
+			case Side<2>::south:
+				h         = d.spacings[0];
+				start     = idx;
+				start_in  = idx + d.ns[0];
+				nbr_start = nbr_idx + (d.ns[1] - 1) * d.ns[0];
+				stride    = 1;
+				n         = d.ns[0];
+				break;
+			case Side<2>::north:
+				h         = d.spacings[0];
+				start     = idx + (d.ns[1] - 1) * d.ns[0];
+				start_in  = idx + (d.ns[1] - 2) * d.ns[0];
+				nbr_start = nbr_idx;
+				stride    = 1;
+				n         = d.ns[0];
 				break;
 		}
 		end_coeffs /= h * h;
