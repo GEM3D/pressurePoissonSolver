@@ -236,7 +236,7 @@ template <size_t D> class Vector
 		for (int i = 0; i < num_local_patches; i++) {
 			const LocalData<D> ld = getLocalData(i);
 			nested_loop<D>(ld.getStart(), ld.getEnd(),
-			               [&](std::array<int, D> coord) { max = fmax(abs(ld[coord]), max); });
+			               [&](std::array<int, D> coord) { max = fmax(fabs(ld[coord]), max); });
 		}
 		MPI_Allreduce(&max, &max, 1, MPI_DOUBLE, MPI_MAX, comm);
 		return max;

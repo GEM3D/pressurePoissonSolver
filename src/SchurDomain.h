@@ -214,24 +214,15 @@ template <size_t D> class FineIfaceInfo : public IfaceInfo<D>
 		}
 	}
 };
-template <size_t D> struct SchurDomain {
-	Domain<D>                                      domain;
-	int                                            local_index = 0;
-	int                                            n;
-	std::bitset<Side<D>::num_sides>                neumann;
+template <size_t D> struct SchurDomain : public Domain<D> {
 	std::array<IfaceInfo<D> *, Side<D>::num_sides> iface_info;
-	std::vector<int>                               nbr_ids;
 	SchurDomain()
 	{
 		iface_info.fill(nullptr);
 	}
-	SchurDomain(Domain<D> &d)
+	SchurDomain(Domain<D> &d) : Domain<D>(d)
 	{
 		iface_info.fill(nullptr);
-		domain      = d;
-		local_index = d.id_local;
-		n           = d.ns[0];
-		neumann     = d.neumann;
 
 		// create iface objects
 		for (Side<D> s : Side<D>::getValues()) {
@@ -258,17 +249,13 @@ template <size_t D> struct SchurDomain {
 	{
 		return *(NormalIfaceInfo<D> *) iface_info[s.toInt()];
 	}
-	bool hasNbr(Side<D> s)
-	{
-		return iface_info[s.toInt()] != nullptr;
-	}
 	void enumerateIfaces(std::map<int, IfaceSet<D>> &               ifaces,
 	                     std::map<int, std::map<int, IfaceSet<D>>> &off_proc_ifaces,
 	                     std::set<int> &                            incoming_procs)
 	{
 		std::array<int, Side<D>::num_sides> ids;
 		for (Side<D> s : Side<D>::getValues()) {
-			if (hasNbr(s)) {
+			if (this->hasNbr(s)) {
 				ids[s.toInt()] = getIfaceInfoPtr(s)->id;
 			} else {
 				ids[s.toInt()] = -1;
@@ -280,7 +267,7 @@ template <size_t D> struct SchurDomain {
 		std::deque<bool>      iface_own;
 		std::deque<int>       iface_ranks;
 		for (Side<D> s : Side<D>::getValues()) {
-			if (hasNbr(s)) {
+			if (this->hasNbr(s)) {
 				getIfaceInfoPtr(s)->getIdsAndTypes(iface_ids, iface_types, iface_sides, iface_ranks,
 				                                   iface_own, s, incoming_procs);
 			}
@@ -293,11 +280,11 @@ template <size_t D> struct SchurDomain {
 			if (iface_own[i]) {
 				IfaceSet<D> &ifs = ifaces[id];
 				ifs.id           = id;
-				ifs.insert(Iface<D>(ids, type, s, neumann));
+				ifs.insert(Iface<D>(ids, type, s, this->neumann));
 			} else {
 				IfaceSet<D> &ifs = off_proc_ifaces[rank][id];
 				ifs.id           = id;
-				ifs.insert(Iface<D>(ids, type, s, neumann));
+				ifs.insert(Iface<D>(ids, type, s, this->neumann));
 			}
 		}
 	}
@@ -305,25 +292,21 @@ template <size_t D> struct SchurDomain {
 	{
 		std::vector<int> retval;
 		for (Side<D> s : Side<D>::getValues()) {
-			if (hasNbr(s)) { getIfaceInfoPtr(s)->getIds(retval); }
+			if (this->hasNbr(s)) { getIfaceInfoPtr(s)->getIds(retval); }
 		}
 		return retval;
 	}
 	void setLocalIndexes(const std::map<int, int> &rev_map)
 	{
 		for (Side<D> s : Side<D>::getValues()) {
-			if (hasNbr(s)) { getIfaceInfoPtr(s)->setLocalIndexes(rev_map); }
+			if (this->hasNbr(s)) { getIfaceInfoPtr(s)->setLocalIndexes(rev_map); }
 		}
 	}
 	void setGlobalIndexes(const std::map<int, int> &rev_map)
 	{
 		for (Side<D> s : Side<D>::getValues()) {
-			if (hasNbr(s)) { getIfaceInfoPtr(s)->setGlobalIndexes(rev_map); }
+			if (this->hasNbr(s)) { getIfaceInfoPtr(s)->setGlobalIndexes(rev_map); }
 		}
-	}
-	bool isNeumann(Side<D> s)
-	{
-		return neumann[s.toInt()];
 	}
 	int getIfaceLocalIndex(Side<D> s)
 	{

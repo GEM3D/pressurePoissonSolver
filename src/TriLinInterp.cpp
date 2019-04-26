@@ -40,22 +40,30 @@ void TriLinInterp::interpolate(SchurDomain<3> &d, Side<3> s, int local_index, If
                                std::shared_ptr<const Vector<3>> u,
                                std::shared_ptr<Vector<2>>       interp)
 {
-	int n = d.n;
+	std::array<int, 2> ns;
+	for (int i = 0; i < s.axis(); i++) {
+		ns[i] = d.ns[i];
+	}
+	for (int i = s.axis(); i < 2; i++) {
+		ns[i] = d.ns[i + 1];
+	}
+	int nx = ns[0];
+	int ny = ns[1];
 
 	LocalData<2>       interp_data = interp->getLocalData(local_index);
-	const LocalData<2> sl          = u->getLocalData(d.local_index).getSliceOnSide(s);
+	const LocalData<2> sl          = u->getLocalData(d.id_local).getSliceOnSide(s);
 
 	switch (itype.toInt()) {
 		case IfaceType::normal: {
-			for (int yi = 0; yi < n; yi++) {
-				for (int xi = 0; xi < n; xi++) {
+			for (int yi = 0; yi < ny; yi++) {
+				for (int xi = 0; xi < nx; xi++) {
 					interp_data[{xi, yi}] += 0.5 * sl[{xi, yi}];
 				}
 			}
 		} break;
 		case IfaceType::fine_to_fine: {
-			for (int yi = 0; yi < n / 2; yi++) {
-				for (int xi = 0; xi < n / 2; xi++) {
+			for (int yi = 0; yi < ny / 2; yi++) {
+				for (int xi = 0; xi < nx / 2; xi++) {
 					double a = sl[{xi * 2, yi * 2}];
 					double b = sl[{xi * 2 + 1, yi * 2}];
 					double c = sl[{xi * 2, yi * 2 + 1}];
@@ -70,38 +78,39 @@ void TriLinInterp::interpolate(SchurDomain<3> &d, Side<3> s, int local_index, If
 		case IfaceType::coarse_to_fine:
 			switch (itype.getOrthant()) {
 				case 0: {
-					for (int yi = 0; yi < n; yi++) {
-						for (int xi = 0; xi < n; xi++) {
+					for (int yi = 0; yi < ny; yi++) {
+						for (int xi = 0; xi < nx; xi++) {
 							interp_data[{xi, yi}] += 4.0 * sl[{(xi) / 2, (yi) / 2}] / 12.0;
 						}
 					}
 				} break;
 				case 1: {
-					for (int yi = 0; yi < n; yi++) {
-						for (int xi = 0; xi < n; xi++) {
-							interp_data[{xi, yi}] += 4.0 * sl[{(xi + n) / 2, (yi) / 2}] / 12.0;
+					for (int yi = 0; yi < ny; yi++) {
+						for (int xi = 0; xi < nx; xi++) {
+							interp_data[{xi, yi}] += 4.0 * sl[{(xi + nx) / 2, (yi) / 2}] / 12.0;
 						}
 					}
 				} break;
 				case 2: {
-					for (int yi = 0; yi < n; yi++) {
-						for (int xi = 0; xi < n; xi++) {
-							interp_data[{xi, yi}] += 4.0 * sl[{(xi) / 2, (yi + n) / 2}] / 12.0;
+					for (int yi = 0; yi < ny; yi++) {
+						for (int xi = 0; xi < nx; xi++) {
+							interp_data[{xi, yi}] += 4.0 * sl[{(xi) / 2, (yi + ny) / 2}] / 12.0;
 						}
 					}
 				} break;
 				case 3: {
-					for (int yi = 0; yi < n; yi++) {
-						for (int xi = 0; xi < n; xi++) {
-							interp_data[{xi, yi}] += 4.0 * sl[{(xi + n) / 2, (yi + n) / 2}] / 12.0;
+					for (int yi = 0; yi < ny; yi++) {
+						for (int xi = 0; xi < nx; xi++) {
+							interp_data[{xi, yi}]
+							+= 4.0 * sl[{(xi + nx) / 2, (yi + ny) / 2}] / 12.0;
 						}
 					}
 				} break;
 			}
 			break;
 		case IfaceType::coarse_to_coarse: {
-			for (int yi = 0; yi < n; yi++) {
-				for (int xi = 0; xi < n; xi++) {
+			for (int yi = 0; yi < ny; yi++) {
+				for (int xi = 0; xi < nx; xi++) {
 					interp_data[{xi, yi}] += 2.0 / 6.0 * sl[{xi, yi}];
 				}
 			}
@@ -109,30 +118,30 @@ void TriLinInterp::interpolate(SchurDomain<3> &d, Side<3> s, int local_index, If
 		case IfaceType::fine_to_coarse:
 			switch (itype.getOrthant()) {
 				case 0: {
-					for (int yi = 0; yi < n; yi++) {
-						for (int xi = 0; xi < n; xi++) {
+					for (int yi = 0; yi < ny; yi++) {
+						for (int xi = 0; xi < nx; xi++) {
 							interp_data[{(xi) / 2, (yi) / 2}] += 1.0 / 6.0 * sl[{xi, yi}];
 						}
 					}
 				} break;
 				case 1: {
-					for (int yi = 0; yi < n; yi++) {
-						for (int xi = 0; xi < n; xi++) {
-							interp_data[{(xi + n) / 2, (yi) / 2}] += 1.0 / 6.0 * sl[{xi, yi}];
+					for (int yi = 0; yi < ny; yi++) {
+						for (int xi = 0; xi < nx; xi++) {
+							interp_data[{(xi + nx) / 2, (yi) / 2}] += 1.0 / 6.0 * sl[{xi, yi}];
 						}
 					}
 				} break;
 				case 2: {
-					for (int yi = 0; yi < n; yi++) {
-						for (int xi = 0; xi < n; xi++) {
-							interp_data[{(xi) / 2, (yi + n) / 2}] += 1.0 / 6.0 * sl[{xi, yi}];
+					for (int yi = 0; yi < ny; yi++) {
+						for (int xi = 0; xi < nx; xi++) {
+							interp_data[{(xi) / 2, (yi + ny) / 2}] += 1.0 / 6.0 * sl[{xi, yi}];
 						}
 					}
 				} break;
 				case 3: {
-					for (int yi = 0; yi < n; yi++) {
-						for (int xi = 0; xi < n; xi++) {
-							interp_data[{(xi + n) / 2, (yi + n) / 2}] += 1.0 / 6.0 * sl[{xi, yi}];
+					for (int yi = 0; yi < ny; yi++) {
+						for (int xi = 0; xi < nx; xi++) {
+							interp_data[{(xi + nx) / 2, (yi + ny) / 2}] += 1.0 / 6.0 * sl[{xi, yi}];
 						}
 					}
 				} break;

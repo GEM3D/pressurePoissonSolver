@@ -135,8 +135,7 @@ void SchurMatrixHelper2d::assembleMatrix(inserter insertBlock)
 		auto interpolator = sh->getInterpolator();
 		// create domain representing curr_type
 		SchurDomain<2> sd;
-		sd.n = n;
-		sd.domain.ns.fill(n);
+		sd.ns.fill(n);
 		sd.neumann                        = curr_type.neumann;
 		sd.getIfaceInfoPtr(Side<2>::west) = new NormalIfaceInfo<2>();
 		solver->addDomain(sd);

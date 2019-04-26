@@ -37,7 +37,7 @@ template <size_t D> struct DomainK {
 	DomainK(const SchurDomain<D> &d)
 	{
 		this->neumann = d.neumann.to_ulong();
-		this->h_x     = d.domain.spacings[0];
+		this->h_x     = d.spacings[0];
 	}
 	friend bool operator<(const DomainK &l, const DomainK &r)
 	{
@@ -67,7 +67,7 @@ template <size_t D> class FftwPatchSolver : public PatchSolver<D>
 	void solve(SchurDomain<D> &d, std::shared_ptr<const Vector<D>> f, std::shared_ptr<Vector<D>> u,
 	           std::shared_ptr<const Vector<D - 1>> gamma);
 	void domainSolve(std::deque<SchurDomain<D>> &domains, std::shared_ptr<const Vector<D>> f,
-	                 std::shared_ptr<Vector<D>> u, std::shared_ptr<const Vector<D - 1>> gamma)
+	          std::shared_ptr<Vector<D>> u, std::shared_ptr<const Vector<D - 1>> gamma)
 	{
 		for (SchurDomain<D> &d : domains) {
 			solve(d, f, u, gamma);
@@ -146,7 +146,7 @@ template <size_t D> void FftwPatchSolver<D>::addDomain(SchurDomain<D> &d)
 			for (size_t d = 1; d < D; d++) {
 				strides[d - 1] = pow(n, (i + d) % D);
 			}
-			double h = d.domain.spacings[i];
+			double h = d.spacings[i];
 
 			if (d.isNeumann(i * 2) && d.isNeumann(i * 2 + 1)) {
 				for (int xi = 0; xi < n; xi++) {
@@ -175,7 +175,7 @@ void FftwPatchSolver<D>::solve(SchurDomain<D> &d, std::shared_ptr<const Vector<D
                                std::shared_ptr<const Vector<D - 1>> gamma)
 {
 	using namespace std;
-	const LocalData<D> f_view      = f->getLocalData(d.local_index);
+	const LocalData<D> f_view      = f->getLocalData(d.id_local);
 	LocalData<D>       f_copy_view = f_copy.getLocalData(0);
 	LocalData<D>       tmp_view    = tmp.getLocalData(0);
 
@@ -194,7 +194,7 @@ void FftwPatchSolver<D>::solve(SchurDomain<D> &d, std::shared_ptr<const Vector<D
 		if (d.hasNbr(s)) {
 			const LocalData<D - 1> gamma_view = gamma->getLocalData(d.getIfaceLocalIndex(s));
 			LocalData<D - 1>       slice      = f_copy.getLocalData(0).getSliceOnSide(s);
-			double                 h2         = pow(d.domain.spacings[s.axis()], 2);
+			double                 h2         = pow(d.spacings[s.axis()], 2);
 			nested_loop<D - 1>(start, end, [&](std::array<int, D - 1> coord) {
 				slice[coord] -= 2.0 / h2 * gamma_view[coord];
 			});
@@ -211,7 +211,7 @@ void FftwPatchSolver<D>::solve(SchurDomain<D> &d, std::shared_ptr<const Vector<D
 
 	sol.vec /= pow(2.0 * n, D);
 
-	LocalData<D> u_view   = u->getLocalData(d.local_index);
+	LocalData<D> u_view   = u->getLocalData(d.id_local);
 	LocalData<D> sol_view = sol.getLocalData(0);
 	nested_loop<D>(start, end, [&](std::array<int, D> coord) { u_view[coord] = sol_view[coord]; });
 }

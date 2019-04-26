@@ -41,10 +41,10 @@ void BilinearInterpolator::interpolate(SchurDomain<2> &d, Side<2> s, int local_i
                                        IfaceType itype, std::shared_ptr<const Vector<2>> u,
                                        std::shared_ptr<Vector<1>> interp)
 {
-	int n = d.n;
+	int n = d.ns[!s.axis()];
 
 	LocalData<1>       interp_data = interp->getLocalData(local_index);
-	const LocalData<1> sl          = u->getLocalData(d.domain.id_local).getSliceOnSide(s);
+	const LocalData<1> sl          = u->getLocalData(d.id_local).getSliceOnSide(s);
 
 	switch (itype.toInt()) {
 		case IfaceType::normal: {
