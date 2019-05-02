@@ -24,10 +24,10 @@
 #include <Iface.h>
 #include <SchurDomain.h>
 #include <Vector.h>
-template <size_t D> class Interpolator
+template <size_t D> class IfaceInterp
 {
 	public:
-	virtual ~Interpolator() {}
+	virtual ~IfaceInterp() {}
 	virtual void interpolate(SchurDomain<D> &d, std::shared_ptr<const Vector<D>> u,
 	                         std::shared_ptr<Vector<D - 1>> interp)
 	= 0;

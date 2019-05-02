@@ -271,7 +271,7 @@ int main(int argc, char *argv[])
 	shared_ptr<PatchOperator<3>> p_operator(new SevenPtPatchOperator());
 
 	// interface interpolator
-	shared_ptr<Interpolator<3>> p_interp(new TriLinInterp());
+	shared_ptr<IfaceInterp<3>> p_interp(new TriLinInterp());
 
 	Tools::Timer timer;
 	for (int loop = 0; loop < loop_count; loop++) {

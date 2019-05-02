@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -23,22 +23,22 @@
 #define P4ESTBLG_H
 #include <Domain.h>
 #include <deque>
-#include <p4est.h>
-#include <p4est_mesh.h>
 #include <iostream>
 #include <memory>
 #include <mpi.h>
+#include <p4est.h>
+#include <p4est_mesh.h>
 #include <set>
 #include <vector>
 #include <zoltan.h>
 class p4estBLG
 {
 	private:
-	void extractLevel(p4est_t *p4est,int level, std::array<int,2> n);
+	void extractLevel(p4est_t *p4est, int level, std::array<int, 2> n);
 
 	public:
 	using DomainMap = std::map<int, std::shared_ptr<Domain<2>>>;
 	std::vector<DomainMap> levels;
-	p4estBLG(p4est_t *p4est, std::array<int,2> ns);
+	p4estBLG(p4est_t *p4est, std::array<int, 2> ns);
 };
 #endif

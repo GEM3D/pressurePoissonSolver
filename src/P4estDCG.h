@@ -19,15 +19,35 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef BILINEARINTERPOLATOR_H
-#define BILINEARINTERPOLATOR_H
-#include "Interpolator.h"
-class BilinearInterpolator : public IfaceInterp<2>
+#ifndef P4ESTDCG_H
+#define P4ESTDCG_H
+#include <DomainCollectionGenerator.h>
+#include <list>
+#include <p4est_extended.h>
+class P4estDCG : public DomainCollectionGenerator<2>
 {
+	private:
+	bool neumann;
+	/**
+	 * @brief copy of p4est tree
+	 */
+	p4est_t *my_p4est;
+	/**
+	 * @brief finest is stored in front
+	 */
+	std::list<std::shared_ptr<DomainCollection<2>>> dc_list;
+
+	int                curr_level;
+	int                num_levels;
+	std::array<int, 2> ns;
+
+	void extractLevel();
+
 	public:
-	void interpolate(SchurDomain<2> &d, std::shared_ptr<const Vector<2>> u,
-	                 std::shared_ptr<Vector<1>> interp);
-	void interpolate(SchurDomain<2> &d, Side<2> s, int local_index, IfaceType itype,
-	                 std::shared_ptr<const Vector<2>> u, std::shared_ptr<Vector<1>> interp);
+	P4estDCG(p4est_t *p4est, std::array<int, 2> ns, bool neumann = false);
+	~P4estDCG();
+	std::shared_ptr<DomainCollection<2>> getFinestDC();
+	bool                                 hasCoarserDC();
+	std::shared_ptr<DomainCollection<2>> getCoarserDC();
 };
 #endif

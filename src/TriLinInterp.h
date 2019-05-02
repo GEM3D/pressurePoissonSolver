@@ -22,7 +22,7 @@
 #ifndef TRILININTERP_H
 #define TRILININTERP_H
 #include "Interpolator.h"
-class TriLinInterp : public Interpolator<3>
+class TriLinInterp : public IfaceInterp<3>
 {
 	public:
 	void interpolate(SchurDomain<3> &d, std::shared_ptr<const Vector<3>> u,

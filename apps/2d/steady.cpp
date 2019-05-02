@@ -19,13 +19,14 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#include "BalancedLevelsGenerator.h"
 #include "DomainCollection.h"
 #include "FivePtPatchOperator.h"
 #include "FunctionWrapper.h"
+#include "ThundereggDCG.h"
 //#include "IfaceMatrixHelper.h"
 #include "BiCGStab.h"
 #include "BilinearInterpolator.h"
+#include "GMG/CycleFactory2d.h"
 #include "GMG/Helper2d.h"
 #include "Init.h"
 #include "MatrixHelper2d.h"
@@ -47,8 +48,8 @@
 #include "Writers/VtkWriter2d.h"
 #endif
 #ifdef HAVE_P4EST
+#include "P4estDCG.h"
 #include "TreeToP4est.h"
-#include "p4estBLG.h"
 #endif
 #include "CLI11.hpp"
 #include "Timer.h"
@@ -194,24 +195,20 @@ int main(int argc, char *argv[])
 	for (int i = 0; i < div; i++) {
 		t.refineLeaves();
 	}
-	std::vector<std::map<int, std::shared_ptr<Domain<2>>>> levels;
+
+	shared_ptr<DomainCollectionGenerator<2>> dcg;
 #ifdef HAVE_P4EST
 	if (use_p4est) {
 		TreeToP4est ttp(t);
-		p4estBLG    blg(ttp.p4est, ns);
-		levels = blg.levels;
+		dcg.reset(new P4estDCG(ttp.p4est, ns, neumann));
 #else
 	if (false) {
 #endif
 	} else {
-		BalancedLevelsGenerator<2> blg(t, ns);
-		// partition domains if running in parallel
-		if (num_procs > 1) { blg.zoltanBalance(); }
-		levels = blg.levels;
+		dcg.reset(new ThundereggDCG<2>(t, ns, neumann));
 	}
 
-	dc.reset(new DomainCollection<2>(levels[t.num_levels - 1], ns));
-	if (neumann) { dc->setNeumann(); }
+	dc = dcg->getFinestDC();
 
 	// the functions that we are using
 	function<double(double, double)> ffun;
@@ -286,7 +283,7 @@ int main(int argc, char *argv[])
 	shared_ptr<PatchOperator<2>> p_operator(new FivePtPatchOperator());
 
 	// interface interpolator
-	shared_ptr<Interpolator<2>> p_interp(new BilinearInterpolator());
+	shared_ptr<IfaceInterp<2>> p_interp(new BilinearInterpolator());
 
 	Tools::Timer timer;
 	for (int loop = 0; loop < loop_count; loop++) {
@@ -473,17 +470,11 @@ int main(int argc, char *argv[])
 				M.reset(new SchwarzPrec<2>(sch));
 			} else if (preconditioner == "GMG") {
 				timer.start("GMG Setup");
-				timer.start("GMG Domain Collection Setup");
-				vector<shared_ptr<DomainCollection<2>>> dcs(t.num_levels);
-				dcs[0] = dc;
-				for (int i = 1; i < t.num_levels; i++) {
-					dcs[i].reset(new DomainCollection<2>(levels[t.num_levels - 1 - i], ns));
-				}
-				timer.stop("GMG Domain Collection Setup");
 
-				GMG::Helper2d gh(n, dcs, sch, gmg_filename);
+				M
+				= GMG::CycleFactory2d::getCycle(gmg_filename, dcg, p_solver, p_operator, p_interp);
+
 				timer.stop("GMG Setup");
-				M = gh.cycle;
 			} else if (preconditioner == "cheb") {
 				throw 3;
 			}

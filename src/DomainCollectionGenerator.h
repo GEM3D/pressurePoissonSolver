@@ -19,15 +19,15 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef BILINEARINTERPOLATOR_H
-#define BILINEARINTERPOLATOR_H
-#include "Interpolator.h"
-class BilinearInterpolator : public IfaceInterp<2>
+#ifndef DOMAINCOLLECTIONGENERATOR_H
+#define DOMAINCOLLECTIONGENERATOR_H
+#include <DomainCollection.h>
+template <size_t D> class DomainCollectionGenerator
 {
 	public:
-	void interpolate(SchurDomain<2> &d, std::shared_ptr<const Vector<2>> u,
-	                 std::shared_ptr<Vector<1>> interp);
-	void interpolate(SchurDomain<2> &d, Side<2> s, int local_index, IfaceType itype,
-	                 std::shared_ptr<const Vector<2>> u, std::shared_ptr<Vector<1>> interp);
+	~DomainCollectionGenerator(){};
+	virtual std::shared_ptr<DomainCollection<D>> getFinestDC()  = 0;
+	virtual bool                                 hasCoarserDC() = 0;
+	virtual std::shared_ptr<DomainCollection<D>> getCoarserDC() = 0;
 };
 #endif

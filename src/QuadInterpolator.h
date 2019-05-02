@@ -22,7 +22,7 @@
 #ifndef QUADINTERPOLATOR_H
 #define QUADINTERPOLATOR_H
 #include "Interpolator.h"
-class QuadInterpolator : public Interpolator<2>
+class QuadInterpolator : public IfaceInterp<2>
 {
 	public:
 	void interpolate(Domain<2> &d, const Vec u, Vec interp);

@@ -54,7 +54,7 @@ template <size_t D> class SchurHelper
 	/**
 	 * @brief Interpolates to interface values
 	 */
-	std::shared_ptr<Interpolator<D>> interpolator;
+	std::shared_ptr<IfaceInterp<D>> interpolator;
 
 	/**
 	 * @brief The patch operator
@@ -90,7 +90,7 @@ template <size_t D> class SchurHelper
 	 */
 	SchurHelper(std::shared_ptr<DomainCollection<D>> dc, std::shared_ptr<PatchSolver<D>> solver,
 	            std::shared_ptr<PatchOperator<D>> op,
-	            std::shared_ptr<Interpolator<D>>  interpolator);
+	            std::shared_ptr<IfaceInterp<D>>  interpolator);
 
 	/**
 	 * @brief Solve with a given set of interface values
@@ -173,7 +173,7 @@ template <size_t D> class SchurHelper
 		return num_global_ifaces * iface_stride;
 	}
 	// getters
-	std::shared_ptr<Interpolator<D>> getInterpolator()
+	std::shared_ptr<IfaceInterp<D>> getIfaceInterp()
 	{
 		return interpolator;
 	}
@@ -198,7 +198,7 @@ template <size_t D>
 inline SchurHelper<D>::SchurHelper(std::shared_ptr<DomainCollection<D>> dc,
                                    std::shared_ptr<PatchSolver<D>>      solver,
                                    std::shared_ptr<PatchOperator<D>>    op,
-                                   std::shared_ptr<Interpolator<D>>     interpolator)
+                                   std::shared_ptr<IfaceInterp<D>>     interpolator)
 {
 	iface_stride = 1;
 	for (size_t i = 0; i < D - 1; i++) {

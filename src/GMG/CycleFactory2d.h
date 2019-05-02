@@ -19,15 +19,22 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef BILINEARINTERPOLATOR_H
-#define BILINEARINTERPOLATOR_H
-#include "Interpolator.h"
-class BilinearInterpolator : public IfaceInterp<2>
+#ifndef GMGCYCLEFACTORY2D_H
+#define GMGCYCLEFACTORY2D_H
+#include <DomainCollection.h>
+#include <DomainCollectionGenerator.h>
+#include <GMG/Cycle.h>
+#include <SchurHelper.h>
+namespace GMG
+{
+class CycleFactory2d
 {
 	public:
-	void interpolate(SchurDomain<2> &d, std::shared_ptr<const Vector<2>> u,
-	                 std::shared_ptr<Vector<1>> interp);
-	void interpolate(SchurDomain<2> &d, Side<2> s, int local_index, IfaceType itype,
-	                 std::shared_ptr<const Vector<2>> u, std::shared_ptr<Vector<1>> interp);
+	static std::shared_ptr<Cycle<2>> getCycle(std::string config_file,
+	                                          std::shared_ptr<DomainCollectionGenerator<2>> dcg,
+	                                          std::shared_ptr<PatchSolver<2>>               solver,
+	                                          std::shared_ptr<PatchOperator<2>>             op,
+	                                          std::shared_ptr<IfaceInterp<2>> interpolator);
 };
+} // namespace GMG
 #endif

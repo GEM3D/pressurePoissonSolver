@@ -66,7 +66,7 @@ Helper2d::Helper2d(int n, std::vector<std::shared_ptr<DomainCollection<2>>> dcs,
 		}
 		if (dcs[0]->neumann) { dcs[i]->setNeumann(); }
 		helpers[i].reset(
-		new SchurHelper<2>(dcs[i], sh->getSolver(), sh->getOp(), sh->getInterpolator()));
+		new SchurHelper<2>(dcs[i], sh->getSolver(), sh->getOp(), sh->getIfaceInterp()));
 	}
 
 	// generate operators

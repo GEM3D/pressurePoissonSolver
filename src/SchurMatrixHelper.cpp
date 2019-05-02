@@ -255,7 +255,7 @@ void SchurMatrixHelper::assembleMatrix(inserter insertBlock)
 		}
 
 		auto solver       = sh->getSolver();
-		auto interpolator = sh->getInterpolator();
+		auto interpolator = sh->getIfaceInterp();
 		// create domain representing curr_type
 		SchurDomain<3> sd;
 		sd.ns.fill(n);

@@ -74,7 +74,7 @@ template <size_t D> class DomainCollection
 						todo.erase(i);
 						queue.pop_front();
 						Domain<D> &d = *domains[i];
-						rev_map[i]   = curr_i;
+						rev_map[i]   = d.id_local;
 						for (int i : d.getNbrIds()) {
 							if (!enqueued.count(i)) {
 								enqueued.insert(i);
@@ -134,8 +134,10 @@ template <size_t D> class DomainCollection
 			rev_map[i] = curr_i;
 			curr_i++;
 		}
+		domain_vector.resize(domains.size());
 		for (auto &p : domains) {
 			p.second->setLocalNeighborIndexes(rev_map);
+			domain_vector[p.second->id_local] = p.second;
 		}
 		// domain_rev_map          = rev_map;
 		domain_map_vec          = map_vec;
@@ -183,7 +185,7 @@ template <size_t D> class DomainCollection
 	void zoltanBalanceDomains();
 	void reIndex(bool local_id_set, bool global_id_set)
 	{
-		indexDomainsLocal(local_id_set); 
+		indexDomainsLocal(local_id_set);
 		if (!global_id_set) { indexDomainsGlobal(); }
 	}
 
@@ -197,8 +199,13 @@ template <size_t D> class DomainCollection
 	/**
 	 * @brief A map that maps the id of a domain to its domain signature.
 	 */
-	std::map<int, std::shared_ptr<Domain<D>>>        domains;
-	const std::map<int, std::shared_ptr<Domain<D>>> &getDomainMap()
+	std::map<int, std::shared_ptr<Domain<D>>> domains;
+	std::vector<std::shared_ptr<Domain<D>>>   domain_vector;
+	std::vector<std::shared_ptr<Domain<D>>> & getDomainVector()
+	{
+		return domain_vector;
+	}
+	std::map<int, std::shared_ptr<Domain<D>>> &getDomainMap()
 	{
 		return domains;
 	}
