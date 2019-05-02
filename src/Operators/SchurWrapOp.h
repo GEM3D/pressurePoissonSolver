@@ -19,26 +19,36 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef GMGOperator_H
-#define GMGOperator_H
-#include <PW.h>
-#include <Vector.h>
-namespace GMG
-{
+#ifndef SCHURWRAPOP_H
+#define SCHURWRAPOP_H
+#include <Operators/Operator.h>
+#include <SchurHelper.h>
 /**
- * @brief Base class for operators on each level.
+ * @brief Base class for operators
  */
-template<size_t D>
-class Operator
+template <size_t D> class SchurWrapOp : public Operator<D - 1>
 {
+	private:
+	std::shared_ptr<DomainCollection<D>> dc;
+	std::shared_ptr<SchurHelper<D>>      sh;
+
 	public:
+	SchurWrapOp(std::shared_ptr<DomainCollection<D>> dc, std::shared_ptr<SchurHelper<D>> sh)
+	{
+		this->dc = dc;
+		this->sh = sh;
+	}
 	/**
-	 * @brief Virtual function that base classes have to implement.
+	 * @brief Apply Schur matrix
 	 *
 	 * @param x the input vector.
 	 * @param b the output vector.
 	 */
-	virtual void apply(std::shared_ptr<const Vector<D>> x, std::shared_ptr<Vector<D>> b) const = 0;
+	void apply(std::shared_ptr<const Vector<D - 1>> x, std::shared_ptr<Vector<D - 1>> b) const
+	{
+		auto f = dc->getNewDomainVec();
+		auto u = dc->getNewDomainVec();
+		sh->solveAndInterpolateWithInterface(f, u, x, b);
+	}
 };
-} // namespace GMG
 #endif

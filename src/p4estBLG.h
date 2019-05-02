@@ -21,8 +21,7 @@
 
 #ifndef P4ESTBLG_H
 #define P4ESTBLG_H
-#include "Domain.h"
-#include "OctTree.h"
+#include <Domain.h>
 #include <deque>
 #include <p4est.h>
 #include <p4est_mesh.h>
@@ -35,11 +34,11 @@
 class p4estBLG
 {
 	private:
-	void extractLevel(p4est_t *p4est,int level, int n);
+	void extractLevel(p4est_t *p4est,int level, std::array<int,2> n);
 
 	public:
 	using DomainMap = std::map<int, std::shared_ptr<Domain<2>>>;
 	std::vector<DomainMap> levels;
-	p4estBLG(p4est_t *p4est, int n);
+	p4estBLG(p4est_t *p4est, std::array<int,2> ns);
 };
 #endif

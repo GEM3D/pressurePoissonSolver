@@ -35,6 +35,7 @@
 #include <set>
 #include <string>
 #include <vector>
+
 /**
  * @brief A collection of Domain Signatures
  *
@@ -47,41 +48,80 @@ template <size_t D> class DomainCollection
 	private:
 	std::array<int, D> lengths;
 	int                patch_stride;
-	void               indexDomainsLocal()
+	void               indexDomainsLocal(bool local_id_set)
 	{
-		int                curr_i = 0;
 		std::vector<int>   map_vec;
 		std::vector<int>   off_proc_map_vec;
 		std::map<int, int> rev_map;
-		std::set<int>      offs;
-		if (!domains.empty()) {
-			std::set<int> todo;
-			for (auto &p : domains) {
-				todo.insert(p.first);
+		int                curr_i = local_id_set ? domains.size() : 0;
+		if (local_id_set) {
+			std::set<int> offs;
+			if (!domains.empty()) {
+				std::set<int> todo;
+				map_vec.resize(domains.size());
+				for (auto &p : domains) {
+					todo.insert(p.first);
+					Domain<D> &d        = *p.second;
+					map_vec[d.id_local] = d.id;
+				}
+				std::set<int> enqueued;
+				while (!todo.empty()) {
+					std::deque<int> queue;
+					queue.push_back(*todo.begin());
+					enqueued.insert(*todo.begin());
+					while (!queue.empty()) {
+						int i = queue.front();
+						todo.erase(i);
+						queue.pop_front();
+						Domain<D> &d = *domains[i];
+						rev_map[i]   = curr_i;
+						for (int i : d.getNbrIds()) {
+							if (!enqueued.count(i)) {
+								enqueued.insert(i);
+								if (domains.count(i)) {
+									queue.push_back(i);
+								} else {
+									if (!offs.count(i)) {
+										offs.insert(i);
+										off_proc_map_vec.push_back(i);
+									}
+								}
+							}
+						}
+					}
+				}
 			}
-			std::set<int> enqueued;
-			while (!todo.empty()) {
-				std::deque<int> queue;
-				queue.push_back(*todo.begin());
-				enqueued.insert(*todo.begin());
-				while (!queue.empty()) {
-					int i = queue.front();
-					todo.erase(i);
-					queue.pop_front();
-					map_vec.push_back(i);
-					Domain<D> &d = *domains[i];
-					rev_map[i]   = curr_i;
-					d.id_local   = curr_i;
-					curr_i++;
-					for (int i : d.getNbrIds()) {
-						if (!enqueued.count(i)) {
-							enqueued.insert(i);
-							if (domains.count(i)) {
-								queue.push_back(i);
-							} else {
-								if (!offs.count(i)) {
-									offs.insert(i);
-									off_proc_map_vec.push_back(i);
+		} else {
+			std::set<int> offs;
+			if (!domains.empty()) {
+				std::set<int> todo;
+				for (auto &p : domains) {
+					todo.insert(p.first);
+				}
+				std::set<int> enqueued;
+				while (!todo.empty()) {
+					std::deque<int> queue;
+					queue.push_back(*todo.begin());
+					enqueued.insert(*todo.begin());
+					while (!queue.empty()) {
+						int i = queue.front();
+						todo.erase(i);
+						queue.pop_front();
+						map_vec.push_back(i);
+						Domain<D> &d = *domains[i];
+						rev_map[i]   = curr_i;
+						d.id_local   = curr_i;
+						curr_i++;
+						for (int i : d.getNbrIds()) {
+							if (!enqueued.count(i)) {
+								enqueued.insert(i);
+								if (domains.count(i)) {
+									queue.push_back(i);
+								} else {
+									if (!offs.count(i)) {
+										offs.insert(i);
+										off_proc_map_vec.push_back(i);
+									}
 								}
 							}
 						}
@@ -101,7 +141,6 @@ template <size_t D> class DomainCollection
 		domain_map_vec          = map_vec;
 		domain_gid_map_vec      = map_vec;
 		domain_off_proc_map_vec = off_proc_map_vec;
-		indexDomainsGlobal();
 	}
 	void indexDomainsGlobal()
 	{
@@ -142,9 +181,10 @@ template <size_t D> class DomainCollection
 	}
 
 	void zoltanBalanceDomains();
-	void reIndex()
+	void reIndex(bool local_id_set, bool global_id_set)
 	{
-		indexDomainsLocal();
+		indexDomainsLocal(local_id_set); 
+		if (!global_id_set) { indexDomainsGlobal(); }
 	}
 
 	public:
@@ -176,7 +216,8 @@ template <size_t D> class DomainCollection
 	 */
 	DomainCollection() = default;
 	DomainCollection(std::map<int, std::shared_ptr<Domain<D>>> domain_set,
-	                 const std::array<int, D> &                lengths)
+	                 const std::array<int, D> &lengths, bool local_id_set = false,
+	                 bool global_id_set = false)
 	{
 		this->lengths = lengths;
 
@@ -190,7 +231,7 @@ template <size_t D> class DomainCollection
 		int num_local_domains = domains.size();
 		MPI_Allreduce(&num_local_domains, &num_global_domains, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
-		reIndex();
+		reIndex(local_id_set, global_id_set);
 
 		for (auto &p : domains) {
 			p.second->setPtrs(domains);
@@ -262,6 +303,21 @@ template <size_t D> class DomainCollection
 		double retval;
 		MPI_Allreduce(&sum, &retval, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 		return retval;
+	}
+};
+template <size_t D> class DomainCollectionVG : public VectorGenerator<D>
+{
+	private:
+	std::shared_ptr<DomainCollection<D>> dc;
+
+	public:
+	DomainCollectionVG(std::shared_ptr<DomainCollection<D>> dc)
+	{
+		this->dc = dc;
+	}
+	std::shared_ptr<Vector<D>> getNewVector()
+	{
+		return dc->getNewDomainVec();
 	}
 };
 extern template class DomainCollection<2>;

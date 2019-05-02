@@ -89,37 +89,5 @@ template <size_t D> class FullFuncWrap
 		return A;
 	}
 };
-class SchwarzPrec
-{
-	public:
-	SchurHelper<3> *     sh = nullptr;
-	DomainCollection<3> *dc = nullptr;
-	SchwarzPrec()           = default;
-	SchwarzPrec(SchurHelper<3> *sh, DomainCollection<3> *dc)
-	{
-		this->sh = sh;
-		this->dc = dc;
-	}
-	void apply(Vec f, Vec u)
-	{
-		std::shared_ptr<Vector<3>> f_vec(new PetscVector<3>(f, dc->getLengths(), false));
-		std::shared_ptr<Vector<3>> u_vec(new PetscVector<3>(u, dc->getLengths(), false));
-		sh->solveWithSolution(f_vec, u_vec);
-	}
-	static int multiply(PC A, Vec f, Vec u)
-	{
-		SchwarzPrec *w = nullptr;
-		PCShellGetContext(A, (void **) &w);
-		VecScale(u, 0);
-		w->apply(f, u);
-		return 0;
-	}
-	void getPrec(PC P)
-	{
-		PCSetType(P, PCSHELL);
-		PCShellSetContext(P, this);
-		PCShellSetApply(P, multiply);
-	}
-};
 
 #endif

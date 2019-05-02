@@ -20,6 +20,7 @@
  ***************************************************************************/
 
 #include "BalancedLevelsGenerator.h"
+#include "BiCGStab.h"
 #include "CLI11.hpp"
 #include "DomainCollection.h"
 #include "FunctionWrapper.h"
@@ -27,11 +28,16 @@
 #include "Init.h"
 #include "MatrixHelper.h"
 #include "OctTree.h"
+#include "Operators/DomainWrapOp.h"
+#include "Operators/PetscMatOp.h"
+#include "Operators/SchurWrapOp.h"
 #include "PatchSolvers/DftPatchSolver.h"
 #include "PatchSolvers/FftwPatchSolver.h"
+#include "PetscShellCreator.h"
 #include "PolyChebPrec.h"
 #include "SchurHelper.h"
 #include "SchurMatrixHelper.h"
+#include "SchwarzPrec.h"
 #include "SevenPtPatchOperator.h"
 #include "Timer.h"
 #include "TriLinInterp.h"
@@ -110,6 +116,9 @@ int main(int argc, char *argv[])
 	app.add_set_ignore_case("--problem", problem, {"trig", "gauss", "zero"},
 	                        "Which problem to solve");
 
+	string solver_type = "thunderegg";
+	app.add_set_ignore_case("--solver", solver_type, {"petsc", "thunderegg"},
+	                        "Which Solver to use");
 	string preconditioner = "";
 	auto   prec_opt
 	= app.add_set_ignore_case("--prec", preconditioner, {"GMG", "Schwarz", "BlockJacobi", "cheb"},
@@ -264,11 +273,6 @@ int main(int argc, char *argv[])
 	// interface interpolator
 	shared_ptr<Interpolator<3>> p_interp(new TriLinInterp());
 
-#ifdef ENABLE_AMGX
-	AmgxWrapper *amgxsolver = nullptr;
-	if (f_amgx) { amgxsolver = new AmgxWrapper(args::get(f_amgx)); }
-#endif
-
 	Tools::Timer timer;
 	for (int loop = 0; loop < loop_count; loop++) {
 		timer.start("Domain Initialization");
@@ -291,9 +295,11 @@ int main(int argc, char *argv[])
 		}
 		shared_ptr<SchurHelper<3>> sch(new SchurHelper<3>(dc, p_solver, p_operator, p_interp));
 
+		// Initialize Vectors
 		shared_ptr<PetscVector<3>> u     = dc->getNewDomainVec();
 		shared_ptr<PetscVector<3>> exact = dc->getNewDomainVec();
 		shared_ptr<PetscVector<3>> f     = dc->getNewDomainVec();
+		shared_ptr<PetscVector<3>> au    = dc->getNewDomainVec();
 
 		if (neumann) {
 			Init::initNeumann(*dc, f->vec, exact->vec, ffun, gfun, nfunx, nfuny, nfunz);
@@ -303,19 +309,9 @@ int main(int argc, char *argv[])
 
 		timer.stop("Domain Initialization");
 
-		// Create the gamma and diff vectors
 		shared_ptr<PetscVector<2>> gamma = sch->getNewSchurVec();
 		shared_ptr<PetscVector<2>> diff  = sch->getNewSchurVec();
 		shared_ptr<PetscVector<2>> b     = sch->getNewSchurVec();
-		PW<Mat>                    A;
-		shared_ptr<FuncWrap<3>>    w;
-		shared_ptr<SchwarzPrec>    sp;
-		shared_ptr<GMG::Helper>    gh;
-
-		// Create linear problem for the Belos solver
-		PW<KSP> solver;
-		KSPCreate(MPI_COMM_WORLD, &solver);
-		KSPSetFromOptions(solver);
 
 		if (neumann && !no_zero_rhs_avg) {
 			double fdiff = dc->integrate(f) / dc->volume();
@@ -323,23 +319,25 @@ int main(int argc, char *argv[])
 			f->shift(-fdiff);
 		}
 
-		if (!solve_schur || dc->num_global_domains != 1) {
-			// do iterative solve
+		if (solve_schur) {
+			// initialize vectors for Schur compliment system
 
-			if (solve_schur) {
-				// Get the b vector
-				gamma->set(0);
-				sch->solveWithInterface(f, u, gamma, b);
-				b->scale(-1);
+			// Get the b vector
+			gamma->set(0);
+			sch->solveWithInterface(f, u, gamma, b);
+			b->scale(-1);
 
-				if (rhs_filename != "") {
-					PetscViewer viewer;
-					PetscViewerBinaryOpen(PETSC_COMM_WORLD, rhs_filename.c_str(), FILE_MODE_WRITE,
-					                      &viewer);
-					VecView(b->vec, viewer);
-					PetscViewerDestroy(&viewer);
-				}
+			if (rhs_filename != "") {
+				PetscViewer viewer;
+				PetscViewerBinaryOpen(PETSC_COMM_WORLD, rhs_filename.c_str(), FILE_MODE_WRITE,
+				                      &viewer);
+				VecView(b->vec, viewer);
+				PetscViewerDestroy(&viewer);
 			}
+			std::shared_ptr<Operator<2>> A;
+			PW<Mat>                      A_petsc;
+			std::shared_ptr<Operator<2>> M;
+			PW<PC>                       M_petsc;
 
 			///////////////////
 			// setup start
@@ -348,46 +346,122 @@ int main(int argc, char *argv[])
 
 			timer.start("Matrix Formation");
 			if (matrix_type == "wrap") {
-				if (solve_schur) {
-					A = FuncWrap<3>::getMatrix(sch.get(), dc.get());
-				} else {
-					A = FullFuncWrap<3>::getMatrix(sch.get(), dc.get());
-				}
+				A.reset(new SchurWrapOp<3>(dc, sch));
 			} else if (matrix_type == "crs") {
-				if (solve_schur) {
-					SchurMatrixHelper smh(sch);
-					A = smh.formCRSMatrix();
-				} else {
-					MatrixHelper mh(*dc);
-					A = mh.formCRSMatrix();
-				}
+				SchurMatrixHelper smh(sch);
+				A_petsc = smh.formCRSMatrix();
+				A.reset(new PetscMatOp<2>(A_petsc));
 				if (setrow) {
 					int row = 0;
-					MatZeroRows(A, 1, &row, 1.0, nullptr, nullptr);
+					MatZeroRows(A_petsc, 1, &row, 1.0, nullptr, nullptr);
 				}
 
 				if (matrix_filename != "") {
 					PetscViewer viewer;
 					PetscViewerBinaryOpen(PETSC_COMM_WORLD, matrix_filename.c_str(),
 					                      FILE_MODE_WRITE, &viewer);
-					MatView(A, viewer);
+					MatView(A_petsc, viewer);
 					PetscViewerDestroy(&viewer);
 				}
 			} else if (matrix_type == "pbm") {
 				SchurMatrixHelper smh(sch);
-				A = smh.getPBMatrix();
+				A_petsc = smh.getPBMatrix();
+				A.reset(new PetscMatOp<2>(A_petsc));
 			}
 			timer.stop("Matrix Formation");
-
 			// preconditoners
-			timer.start("Petsc Setup");
-			KSPSetOperators(solver, A, A);
-			KSPSetUp(solver);
-			PC pc;
-			KSPGetPC(solver, &pc);
+			timer.start("Preconditioner Setup");
 			if (preconditioner == "Scwharz") {
-				sp.reset(new SchwarzPrec(sch.get(), &*dc));
-				sp->getPrec(pc);
+				throw 3;
+			} else if (preconditioner == "GMG") {
+				throw 3;
+			} else if (preconditioner == "cheb") {
+				M.reset(new PolyChebPrec(dc, sch));
+			}
+			timer.stop("Preconditioner Setup");
+
+			PW<KSP> solver;
+			// setup petsc if needed
+			if (solver_type == "petsc") {
+				timer.start("Petsc Setup");
+
+				KSPCreate(MPI_COMM_WORLD, &solver);
+				KSPSetFromOptions(solver);
+				KSPSetOperators(solver, A_petsc, A_petsc);
+				if (M != nullptr) {
+					PC M_petsc;
+					KSPGetPC(solver, &M_petsc);
+					PetscShellCreator::getPCShell(M_petsc, M, sch);
+				}
+				KSPSetUp(solver);
+				KSPSetTolerances(solver, tolerance, PETSC_DEFAULT, PETSC_DEFAULT, 5000);
+
+				timer.stop("Petsc Setup");
+			}
+			///////////////////
+			// setup end
+			///////////////////
+			timer.stop("Linear System Setup");
+
+			timer.start("Linear Solve");
+			if (solver_type == "petsc") {
+				KSPSolve(solver, b->vec, gamma->vec);
+				int its;
+				KSPGetIterationNumber(solver, &its);
+				if (my_global_rank == 0) { cout << "Iterations: " << its << endl; }
+			} else {
+				std::shared_ptr<VectorGenerator<2>> vg(new SchurHelperVG<2>(sch));
+
+				int its = BiCGStab<2>::solve(vg, A, gamma, b, M);
+				if (my_global_rank == 0) { cout << "Iterations: " << its << endl; }
+			}
+			timer.stop("Linear Solve");
+
+			// Do one last solve
+			timer.start("Patch Solve");
+
+			sch->solveWithInterface(f, u, gamma, diff);
+
+			timer.stop("Patch Solve");
+
+			sch->applyWithInterface(u, gamma, au);
+		} else {
+			std::shared_ptr<Operator<3>> A;
+			PW<Mat>                      A_petsc;
+			std::shared_ptr<Operator<3>> M;
+			///////////////////
+			// setup start
+			///////////////////
+			timer.start("Linear System Setup");
+
+			timer.start("Matrix Formation");
+			if (matrix_type == "wrap") {
+				A.reset(new DomainWrapOp<3>(sch));
+				A_petsc = PetscShellCreator::getMatShell(A, dc);
+			} else if (matrix_type == "crs") {
+				MatrixHelper mh(*dc);
+				A_petsc = mh.formCRSMatrix();
+				A.reset(new PetscMatOp<3>(A_petsc));
+				if (setrow) {
+					int row = 0;
+					MatZeroRows(A_petsc, 1, &row, 1.0, nullptr, nullptr);
+				}
+
+				if (matrix_filename != "") {
+					PetscViewer viewer;
+					PetscViewerBinaryOpen(PETSC_COMM_WORLD, matrix_filename.c_str(),
+					                      FILE_MODE_WRITE, &viewer);
+					MatView(A_petsc, viewer);
+					PetscViewerDestroy(&viewer);
+				}
+			} else if (matrix_type == "pbm") {
+				throw 3;
+			}
+			timer.stop("Matrix Formation");
+			// preconditoners
+			timer.start("Preconditioner Setup");
+			if (preconditioner == "Scwharz") {
+				M.reset(new SchwarzPrec<3>(sch));
 			} else if (preconditioner == "GMG") {
 				timer.start("GMG Setup");
 				timer.start("GMG Domain Collection Setup");
@@ -398,71 +472,63 @@ int main(int argc, char *argv[])
 				}
 				timer.stop("GMG Domain Collection Setup");
 
-				gh.reset(new GMG::Helper(n, dcs, sch, gmg_filename));
+				GMG::Helper gh(n, dcs, sch, gmg_filename);
 				timer.stop("GMG Setup");
-				gh->getPrec(pc);
+				M = gh.cycle;
 			} else if (preconditioner == "cheb") {
-				PolyChebPrec *pcp = new PolyChebPrec(*sch, *dc);
-				pcp->getPrec(pc);
-				PCSetUp(pc);
+				throw 3;
 			}
-			PCSetUp(pc);
-			timer.stop("Petsc Setup");
+			timer.stop("Preconditioner Setup");
 
+			PW<KSP> solver;
+			// setup petsc if needed
+			if (solver_type == "petsc") {
+				timer.start("Petsc Setup");
+
+				KSPCreate(MPI_COMM_WORLD, &solver);
+				KSPSetFromOptions(solver);
+				KSPSetOperators(solver, A_petsc, A_petsc);
+				if (M != nullptr) {
+					PC M_petsc;
+					KSPGetPC(solver, &M_petsc);
+					PetscShellCreator::getPCShell(M_petsc, M, dc);
+				}
+				KSPSetUp(solver);
+				KSPSetTolerances(solver, tolerance, PETSC_DEFAULT, PETSC_DEFAULT, 5000);
+
+				timer.stop("Petsc Setup");
+			}
 			///////////////////
 			// setup end
 			///////////////////
 			timer.stop("Linear System Setup");
-		}
-		///////////////////
-		// solve start
-		///////////////////
-		timer.start("Complete Solve");
 
-		if ((!solve_schur || dc->num_global_domains != 1)) {
 			timer.start("Linear Solve");
-			KSPSetTolerances(solver, tolerance, PETSC_DEFAULT, PETSC_DEFAULT, 5000);
-			if (solve_schur) {
-				KSPSolve(solver, b->vec, gamma->vec);
-			} else {
+			if (solver_type == "petsc") {
 				KSPSolve(solver, f->vec, u->vec);
+				int its;
+				KSPGetIterationNumber(solver, &its);
+				if (my_global_rank == 0) { cout << "Iterations: " << its << endl; }
+			} else {
+				std::shared_ptr<VectorGenerator<3>> vg(new DomainCollectionVG<3>(dc));
+
+				int its = BiCGStab<3>::solve(vg, A, u, f, M);
+				if (my_global_rank == 0) { cout << "Iterations: " << its << endl; }
 			}
-			int its;
-			KSPGetIterationNumber(solver, &its);
-			if (my_global_rank == 0) { cout << "Iterations: " << its << endl; }
 			timer.stop("Linear Solve");
+
+			A->apply(u, au);
 		}
 
-		if (solve_schur) {
-			// Do one last solve
-			timer.start("Patch Solve");
-
-			sch->solveWithInterface(f, u, gamma, diff);
-
-			timer.stop("Patch Solve");
-		}
-
-		///////////////////
-		// solve end
-		///////////////////
-		timer.stop("Complete Solve");
-
-		// residual
 		shared_ptr<PetscVector<3>> resid = dc->getNewDomainVec();
-		shared_ptr<PetscVector<3>> au    = dc->getNewDomainVec();
-		if (solve_schur) {
-			sch->applyWithInterface(u, gamma, au);
-		} else {
-			MatMult(A, u->vec, au->vec);
-		}
-		VecAXPBYPCZ(resid->vec, -1.0, 1.0, 0.0, au->vec, f->vec);
+		resid->addScaled(-1, au, 1, f);
 
 		double residual = resid->twoNorm();
 		double fnorm    = f->twoNorm();
 
 		// error
 		shared_ptr<PetscVector<3>> error = dc->getNewDomainVec();
-		VecAXPBYPCZ(error->vec, -1.0, 1.0, 0.0, exact->vec, u->vec);
+		error->addScaled(-1, exact, 1, u);
 		if (neumann) {
 			double uavg = dc->integrate(u) / dc->volume();
 			double eavg = dc->integrate(exact) / dc->volume();

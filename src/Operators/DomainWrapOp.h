@@ -19,43 +19,32 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef GMGWrapOp_H
-#define GMGWrapOp_H
-#include <GMG/Operator.h>
-#include <memory>
-namespace GMG
-{
+#ifndef DOMAINWRAPOP_H
+#define DOMAINWRAPOP_H
+#include <Operators/Operator.h>
+#include <SchurHelper.h>
 /**
- * @brief Wrapper for Matrix free operation
+ * @brief Base class for operators
  */
-template <size_t D> class WrapOp : public Operator<D>
+template <size_t D> class DomainWrapOp : public Operator<D>
 {
 	private:
-	/**
-	 * @brief PETSc Matrix object
-	 */
-	std::shared_ptr<SchurHelper<D>> helper;
+	std::shared_ptr<SchurHelper<D>> sh;
 
 	public:
-	/**
-	 * @brief Crate new WrapOp
-	 *
-	 * @param matrix the PETSc matrix
-	 */
-	WrapOp(std::shared_ptr<SchurHelper<D>> helper)
+    DomainWrapOp(std::shared_ptr<SchurHelper<D>> sh)
 	{
-		this->helper = helper;
+		this->sh = sh;
 	}
 	/**
-	 * @brief Perform matrix/vector multiply.
+	 * @brief Apply Schur matrix
 	 *
 	 * @param x the input vector.
 	 * @param b the output vector.
 	 */
 	void apply(std::shared_ptr<const Vector<D>> x, std::shared_ptr<Vector<D>> b) const
 	{
-		helper->apply(x, b);
+		sh->apply(x, b);
 	}
 };
-} // namespace GMG
 #endif

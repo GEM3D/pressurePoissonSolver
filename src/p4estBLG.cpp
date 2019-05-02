@@ -13,7 +13,7 @@ void set_ids(p4est_iter_volume_info_t *info, void *user_data)
 	int *data = (int *) &info->quad->p.user_data;
 	data[0]   = *(int *) user_data + info->quadid;
 }
-p4estBLG::p4estBLG(p4est_t *p4est, int n)
+p4estBLG::p4estBLG(p4est_t *p4est, std::array<int, 2> ns)
 {
 	p4est_t *my_p4est = p4est_copy(p4est, false);
 
@@ -32,7 +32,8 @@ p4estBLG::p4estBLG(p4est_t *p4est, int n)
 	// set global ids
 	p4est_iterate_ext(my_p4est, nullptr, &global_id_start, set_ids, nullptr, nullptr, 0);
 
-	extractLevel(my_p4est, global_max_level, n);
+	extractLevel(my_p4est, global_max_level, ns);
+	p4est_destroy(my_p4est);
 }
 void set_ranks(p4est_iter_volume_info_t *info, void *user_data)
 {
@@ -41,6 +42,7 @@ void set_ranks(p4est_iter_volume_info_t *info, void *user_data)
 }
 struct create_domains_ctx {
 	void **              ghost_data;
+	std::array<int, 2>   ns;
 	p4estBLG::DomainMap *dmap;
 };
 void create_domains(p4est_iter_volume_info_t *info, void *user_data)
@@ -57,9 +59,16 @@ void create_domains(p4est_iter_volume_info_t *info, void *user_data)
 	d.id       = global_id;
 	d.id_local = info->quadid;
 
-	// get length and coord (this is assuming trees are unit length)
+    //patch dimensions
+	d.ns          = ctx.ns;
+
+    //cell spacings
 	double length = (double) P4EST_QUADRANT_LEN(info->quad->level) / P4EST_ROOT_LEN;
-	d.lengths.fill(length);
+	d.spacings.fill(length);
+	d.spacings[0] /= ctx.ns[0];
+	d.spacings[1] /= ctx.ns[1];
+
+    //coordinates in block
 	double x    = (double) info->quad->x / P4EST_ROOT_LEN;
 	double y    = (double) info->quad->y / P4EST_ROOT_LEN;
 	d.starts[0] = x;
@@ -162,14 +171,14 @@ void coarsen_replace(p4est_t *p4est, p4est_topidx_t which_tree, int num_outgoing
 {
 	coarsen_domains_ctx &ctx  = *(coarsen_domains_ctx *) p4est->user_pointer;
 	p4estBLG::DomainMap &dmap = *ctx.dmap;
-	incoming[0]->p.user_int            = outgoing[0]->p.user_int;
+	incoming[0]->p.user_int   = outgoing[0]->p.user_int;
 	for (int i = 0; i < 4; i++) {
 		Domain<2> &d    = *dmap[outgoing[i]->p.user_int];
 		d.oct_on_parent = i;
 		d.parent_id     = incoming[0]->p.user_int;
 	}
 }
-void p4estBLG::extractLevel(p4est_t *p4est, int level, int n)
+void p4estBLG::extractLevel(p4est_t *p4est, int level, std::array<int, 2> ns)
 {
 	// set ranks
 	p4est_iterate_ext(p4est, nullptr, nullptr, set_ranks, nullptr, nullptr, 0);
@@ -179,24 +188,23 @@ void p4estBLG::extractLevel(p4est_t *p4est, int level, int n)
 	void *         ghost_data[ghost->ghosts.elem_count];
 	p4est_ghost_exchange_data(p4est, ghost, ghost_data);
 
-	create_domains_ctx ctx = {ghost_data, &levels[level]};
+	create_domains_ctx ctx = {ghost_data, ns, &levels[level]};
 	p4est_iterate_ext(p4est, ghost, &ctx, create_domains, link_domains, nullptr, 0);
 
+	p4est_ghost_destroy(ghost);
+
 	for (auto p : levels[level]) {
-		p.second->n = n;
 		p.second->setPtrs(this->levels[level]);
 	}
 	if (level > 0) {
 		coarsen_domains_ctx ctx = {level - 1, &levels[level]};
 		p4est->user_pointer     = &ctx;
 		p4est_coarsen_ext(p4est, false, true, coarsen, nullptr, coarsen_replace);
-	for (auto p : levels[level]) {
-        Domain<2> &d = *p.second;
-        if(!d.hasCoarseParent()){
-            d.parent_id=d.id;
-        }
-    }
-        p4est_partition_ext(p4est,true,nullptr);
-        extractLevel(p4est,level-1,n);
+		for (auto p : levels[level]) {
+			Domain<2> &d = *p.second;
+			if (!d.hasCoarseParent()) { d.parent_id = d.id; }
+		}
+		p4est_partition_ext(p4est, true, nullptr);
+		extractLevel(p4est, level - 1, ns);
 	}
 }

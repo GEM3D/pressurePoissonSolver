@@ -23,11 +23,11 @@
 #include "AvgRstr.h"
 #include "DrctIntp.h"
 #include "FFTBlockJacobiSmoother.h"
-#include "MatOp.h"
 #include "MatrixHelper2d.h"
+#include "Operators/PetscMatOp.h"
+#include "Operators/SchurDomainOp.h"
 #include "VCycle.h"
 #include "WCycle.h"
-#include "WrapOp.h"
 #include <fstream>
 #include <json.hpp>
 using namespace std;
@@ -80,9 +80,9 @@ Helper2d::Helper2d(int n, std::vector<std::shared_ptr<DomainCollection<2>>> dcs,
 	for (int i = 0; i < num_levels; i++) {
 		if (op_type == "crs_matrix") {
 			MatrixHelper2d mh(*dcs[i]);
-			ops[i].reset(new MatOp<2>(mh.formCRSMatrix()));
+			ops[i].reset(new PetscMatOp<2>(mh.formCRSMatrix()));
 		} else if (op_type == "matrix_free") {
-			ops[i].reset(new WrapOp<2>(helpers[i]));
+			ops[i].reset(new SchurDomainOp<2>(helpers[i]));
 		}
 	}
 
@@ -105,7 +105,7 @@ Helper2d::Helper2d(int n, std::vector<std::shared_ptr<DomainCollection<2>>> dcs,
 	// create  level objects
 	vector<shared_ptr<Level<2>>> levels(num_levels);
 	for (int i = 0; i < num_levels; i++) {
-		std::shared_ptr<DCVG<2>> vg(new DCVG<2>(dcs[i]));
+		std::shared_ptr<VectorGenerator<2>> vg(new DomainCollectionVG<2>(dcs[i]));
 		levels[i].reset(new Level<2>(vg));
 		levels[i]->setOperator(ops[i]);
 		levels[i]->setSmoother(smoothers[i]);

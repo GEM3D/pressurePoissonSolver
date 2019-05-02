@@ -23,6 +23,7 @@
 #define PETSCVECTOR_H
 #include <Vector.h>
 #include <petscvec.h>
+
 class PetscLDM : public LocalDataManager
 {
 	private:
@@ -95,6 +96,7 @@ template <size_t D> class PetscVector : public Vector<D>
 		double *                  data = ldm->getVecView() + patch_stride * local_patch_id;
 		return LocalData<D>(data, strides, lengths, std::move(ldm));
 	}
+    /*
 	void set(double alpha)
 	{
 		VecSet(vec, alpha);
@@ -125,5 +127,6 @@ template <size_t D> class PetscVector : public Vector<D>
 			Vector<D>::scaleThenAdd(alpha, b);
 		}
 	}
+    */
 };
 #endif

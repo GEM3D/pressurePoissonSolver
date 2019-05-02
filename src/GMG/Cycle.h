@@ -22,7 +22,7 @@
 #ifndef GMGCycle_H
 #define GMGCycle_H
 #include <GMG/Level.h>
-#include <PetscVector.h>
+#include <Vector.h>
 #include <list>
 namespace GMG
 {
@@ -31,29 +31,29 @@ namespace GMG
  * levels, and a function to run an iteration of smoothing on a level. Derived cycle classes
  * need to implement the visit function.
  */
-template <size_t D> class Cycle
+template <size_t D> class Cycle : public Operator<D>
 {
 	private:
-	/**
-	 * @brief stack of LHS vectors in use. Coarsest at beginning, finest at end.
-	 */
-	std::list<std::shared_ptr<Vector<D>>> u_vectors;
-	/**
-	 * @brief stack of RHS vectors in use. Coarsest at beginning, finest at end.
-	 */
-	std::list<std::shared_ptr<const Vector<D>>> f_vectors;
 	/**
 	 * @brief pointer to the finest level
 	 */
 	std::shared_ptr<Level<D>> finest_level;
 
 	protected:
+	using VecList      = std::list<std::shared_ptr<Vector<D>>>;
+	using ConstVecList = std::list<std::shared_ptr<const Vector<D>>>;
+	/**
+	 * @brief stack of LHS vectors in use. Coarsest at beginning, finest at end.
+	 */
+	/**
+	 * @brief stack of RHS vectors in use. Coarsest at beginning, finest at end.
+	 */
 	/**
 	 * @brief Prepare vectors for coarser level.
 	 *
 	 * @param level the current level
 	 */
-	void prepCoarser(const Level<D> &level)
+	void prepCoarser(const Level<D> &level, VecList &u_vectors, ConstVecList &f_vectors) const
 	{
 		// calculate residual
 		std::shared_ptr<Vector<D>> r = level.getVectorGenerator()->getNewVector();
@@ -71,7 +71,7 @@ template <size_t D> class Cycle
 	 *
 	 * @param level the current level
 	 */
-	void prepFiner(const Level<D> &level)
+	void prepFiner(const Level<D> &level, VecList &u_vectors, ConstVecList &f_vectors) const
 	{
 		std::shared_ptr<Vector<D>> old_u = u_vectors.front();
 		u_vectors.pop_front();
@@ -84,7 +84,7 @@ template <size_t D> class Cycle
 	 *
 	 * @param level the current level
 	 */
-	void smooth(const Level<D> &level)
+	void smooth(const Level<D> &level, VecList &u_vectors, ConstVecList &f_vectors) const
 	{
 		level.getSmoother().smooth(f_vectors.front(), u_vectors.front());
 	}
@@ -94,7 +94,8 @@ template <size_t D> class Cycle
 	 *
 	 * @param level the level currently begin visited.
 	 */
-	virtual void visit(const Level<D> &level) = 0;
+	virtual void visit(const Level<D> &level, VecList &u_vectors,
+	                   ConstVecList &f_vectors) const = 0;
 
 	public:
 	/**
@@ -112,11 +113,14 @@ template <size_t D> class Cycle
 	 * @param f the RHS vector.
 	 * @param u the current solution vector. Output will be updated solution vector.
 	 */
-	void apply(std::shared_ptr<const Vector<D>> f, std::shared_ptr<Vector<D>> u)
+	void apply(std::shared_ptr<const Vector<D>> f, std::shared_ptr<Vector<D>> u) const
 	{
+		u->set(0);
+		VecList      u_vectors;
+		ConstVecList f_vectors;
 		f_vectors.push_back(f);
 		u_vectors.push_back(u);
-		visit(*finest_level);
+		visit(*finest_level, u_vectors, f_vectors);
 		f_vectors.pop_front();
 		u_vectors.pop_front();
 	}

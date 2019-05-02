@@ -273,8 +273,8 @@ inline SchurHelper<D>::SchurHelper(std::shared_ptr<DomainCollection<D>> dc,
 	local_gamma        = getNewSchurDistVec();
 	gamma              = getNewSchurVec();
 	PW<IS> dist_is;
-	ISCreateBlock(MPI_COMM_SELF, iface_stride, iface_dist_map_vec.size(),
-	              &iface_dist_map_vec[0], PETSC_COPY_VALUES, &dist_is);
+	ISCreateBlock(MPI_COMM_SELF, iface_stride, iface_dist_map_vec.size(), &iface_dist_map_vec[0],
+	              PETSC_COPY_VALUES, &dist_is);
 	VecScatterCreate(gamma->vec, dist_is, local_gamma->vec, nullptr, &scatter);
 
 	int num_ifaces = ifaces.size();
@@ -508,6 +508,21 @@ template <size_t D> inline void SchurHelper<D>::indexIfacesGlobal()
 		}
 	}
 }
+template <size_t D> class SchurHelperVG : public VectorGenerator<D>
+{
+	private:
+	std::shared_ptr<SchurHelper<D + 1>> sh;
+
+	public:
+	SchurHelperVG(std::shared_ptr<SchurHelper<D + 1>> sh)
+	{
+		this->sh = sh;
+	}
+	std::shared_ptr<Vector<D>> getNewVector()
+	{
+		return sh->getNewSchurVec();
+	}
+};
 extern template class SchurHelper<2>;
 extern template class SchurHelper<3>;
 #endif

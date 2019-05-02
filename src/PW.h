@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -40,10 +40,10 @@ template <typename X> class PW
 	}
 
 	public:
-	explicit PW(X obj=nullptr, bool owns=true)
+	explicit PW(X obj = nullptr, bool owns = true)
 	{
-        this->obj=obj;
-        this->owns=owns;
+		this->obj  = obj;
+		this->owns = owns;
 		ref_count  = new size_t;
 		*ref_count = 1;
 	}
@@ -54,7 +54,10 @@ template <typename X> class PW
 		owns      = other.owns;
 		++(*ref_count);
 	}
-	~PW() { decrement(); }
+	~PW()
+	{
+		decrement();
+	}
 	PW &operator=(const PW<X> &other)
 	{
 		decrement();
@@ -71,6 +74,10 @@ template <typename X> class PW
 		ref_count  = new size_t;
 		*ref_count = 1;
 	}
+	bool isSet()
+	{
+		return obj != nullptr;
+	}
 	/*
 	PW &operator=(const X &other)
 	{
@@ -82,8 +89,14 @@ template <typename X> class PW
 	    return *this;
 	}
 	*/
-	   operator X() const { return obj; }
-	X *operator&() { return &obj; }
+	operator X() const
+	{
+		return obj;
+	}
+	X *operator&()
+	{
+		return &obj;
+	}
 };
 template <typename X> class PW_explicit : public PW<X>
 {

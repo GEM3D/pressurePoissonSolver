@@ -19,36 +19,25 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef GMGMatOp_H
-#define GMGMatOp_H
-#include <GMG/Operator.h>
-#include <memory>
-#include <petscmat.h>
-namespace GMG
-{
+#ifndef PETSCMATOP_H
+#define PETSCMATOP_H
+#include <Operators/Operator.h>
+#include <SchurHelper.h>
 /**
- * @brief Wrapper for PETSc Matrix
+ * @brief Base class for operators
  */
-template <size_t D> class MatOp : public Operator<D>
+template <size_t D> class PetscMatOp : public Operator<D>
 {
 	private:
-	/**
-	 * @brief PETSc Matrix object
-	 */
-	PW<Mat> matrix;
+	PW<Mat> A;
 
 	public:
-	/**
-	 * @brief Crate new MatOp
-	 *
-	 * @param matrix the PETSc matrix
-	 */
-	MatOp(PW<Mat> matrix)
+	PetscMatOp(PW<Mat> A)
 	{
-		this->matrix = matrix;
+		this->A = A;
 	}
 	/**
-	 * @brief Perform matrix/vector multiply.
+	 * @brief Apply Petsc matrix
 	 *
 	 * @param x the input vector.
 	 * @param b the output vector.
@@ -58,8 +47,7 @@ template <size_t D> class MatOp : public Operator<D>
 		const PetscVector<D> *x_vec = dynamic_cast<const PetscVector<D> *>(x.get());
 		PetscVector<D> *      b_vec = dynamic_cast<PetscVector<D> *>(b.get());
 		if (x_vec == nullptr || b_vec == nullptr) { throw 3; }
-		MatMult(matrix, x_vec->vec, b_vec->vec);
+		MatMult(A, x_vec->vec, b_vec->vec);
 	}
 };
-} // namespace GMG
 #endif

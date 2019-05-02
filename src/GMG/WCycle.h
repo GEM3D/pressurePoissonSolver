@@ -43,28 +43,29 @@ template <size_t D> class WCycle : public Cycle<D>
 	 *
 	 * @param level the current level that is being visited.
 	 */
-	void visit(const Level<D> &level)
+	void visit(const Level<D> &level, std::list<std::shared_ptr<Vector<D>>> &u_vectors,
+	           std::list<std::shared_ptr<const Vector<D>>> &f_vectors) const
 	{
 		if (level.coarsest()) {
 			for (int i = 0; i < num_coarse_sweeps; i++) {
-				this->smooth(level);
+				this->smooth(level, u_vectors, f_vectors);
 			}
 		} else {
 			for (int i = 0; i < num_pre_sweeps; i++) {
-				this->smooth(level);
+				this->smooth(level, u_vectors, f_vectors);
 			}
-			this->prepCoarser(level);
-			this->visit(level.getCoarser());
+			this->prepCoarser(level, u_vectors, f_vectors);
+			this->visit(level.getCoarser(), u_vectors, f_vectors);
 			for (int i = 0; i < num_mid_sweeps; i++) {
-				this->smooth(level);
+				this->smooth(level, u_vectors, f_vectors);
 			}
-			this->prepCoarser(level);
-			this->visit(level.getCoarser());
+			this->prepCoarser(level, u_vectors, f_vectors);
+			this->visit(level.getCoarser(), u_vectors, f_vectors);
 			for (int i = 0; i < num_post_sweeps; i++) {
-				this->smooth(level);
+				this->smooth(level, u_vectors, f_vectors);
 			}
 		}
-		if (!level.finest()) { this->prepFiner(level); }
+		if (!level.finest()) { this->prepFiner(level, u_vectors, f_vectors); }
 	}
 
 	public:

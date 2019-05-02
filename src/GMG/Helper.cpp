@@ -23,12 +23,12 @@
 #include "AvgRstr.h"
 #include "DrctIntp.h"
 #include "FFTBlockJacobiSmoother.h"
-#include "MatOp.h"
 #include "MatrixHelper.h"
+#include "Operators/PetscMatOp.h"
+#include "Operators/SchurDomainOp.h"
 #include "TriLinIntp.h"
 #include "VCycle.h"
 #include "WCycle.h"
-#include "WrapOp.h"
 #include <fstream>
 #include <json.hpp>
 using namespace std;
@@ -37,7 +37,7 @@ using nlohmann::json;
 Helper::Helper(int n, std::vector<std::shared_ptr<DomainCollection<3>>> dcs,
                std::shared_ptr<SchurHelper<3>> sh, std::string config_file)
 {
-    lengths=dcs.front()->getLengths();
+	lengths = dcs.front()->getLengths();
 	ifstream config_stream(config_file);
 	json     config_j;
 	config_stream >> config_j;
@@ -81,9 +81,9 @@ Helper::Helper(int n, std::vector<std::shared_ptr<DomainCollection<3>>> dcs,
 	for (int i = 0; i < num_levels; i++) {
 		if (op_type == "crs_matrix") {
 			MatrixHelper mh(*dcs[i]);
-			ops[i].reset(new MatOp<3>(mh.formCRSMatrix()));
+			ops[i].reset(new PetscMatOp<3>(mh.formCRSMatrix()));
 		} else if (op_type == "matrix_free") {
-			ops[i].reset(new WrapOp<3>(helpers[i]));
+			ops[i].reset(new SchurDomainOp<3>(helpers[i]));
 		}
 	}
 
@@ -106,7 +106,7 @@ Helper::Helper(int n, std::vector<std::shared_ptr<DomainCollection<3>>> dcs,
 	// create  level objects
 	vector<shared_ptr<Level<3>>> levels(num_levels);
 	for (int i = 0; i < num_levels; i++) {
-		std::shared_ptr<DCVG<3>> vg(new DCVG<3>(dcs[i]));
+		std::shared_ptr<VectorGenerator<3>> vg(new DomainCollectionVG<3>(dcs[i]));
 		levels[i].reset(new Level<3>(vg));
 		levels[i]->setOperator(ops[i]);
 		levels[i]->setSmoother(smoothers[i]);
@@ -163,7 +163,7 @@ Helper::Helper(int n, std::vector<std::shared_ptr<DomainCollection<3>>> dcs,
 }
 void Helper::apply(Vec f, Vec u)
 {
-    std::shared_ptr<Vector<3>> f_vec(new PetscVector<3>(f,lengths,false));
-    std::shared_ptr<Vector<3>> u_vec(new PetscVector<3>(u,lengths,false));
+	std::shared_ptr<Vector<3>> f_vec(new PetscVector<3>(f, lengths, false));
+	std::shared_ptr<Vector<3>> u_vec(new PetscVector<3>(u, lengths, false));
 	cycle->apply(f_vec, u_vec);
 }

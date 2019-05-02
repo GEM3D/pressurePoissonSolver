@@ -156,6 +156,7 @@ template <size_t D> inline LocalData<D - 1> LocalData<D>::getSliceOnSidePriv(Sid
 		return LocalData<D - 1>(new_data, new_strides, new_lengths, ldm);
 	}
 }
+
 template <size_t D> class Vector
 {
 	protected:
@@ -191,6 +192,15 @@ template <size_t D> class Vector
 			               [&](std::array<int, D> coord) { ld[coord] += delta; });
 		}
 	}
+	virtual void copy(std::shared_ptr<const Vector<D>> b)
+	{
+		for (int i = 0; i < num_local_patches; i++) {
+			LocalData<D>       ld   = getLocalData(i);
+			const LocalData<D> ld_b = b->getLocalData(i);
+			nested_loop<D>(ld.getStart(), ld.getEnd(),
+			               [&](std::array<int, D> coord) { ld[coord] = ld_b[coord]; });
+		}
+	}
 	virtual void add(std::shared_ptr<const Vector<D>> b)
 	{
 		for (int i = 0; i < num_local_patches; i++) {
@@ -209,6 +219,18 @@ template <size_t D> class Vector
 			               [&](std::array<int, D> coord) { ld[coord] += ld_b[coord] * alpha; });
 		}
 	}
+	virtual void addScaled(double alpha, std::shared_ptr<const Vector<D>> a, double beta,
+	                          std::shared_ptr<const Vector<D>> b)
+	{
+		for (int i = 0; i < num_local_patches; i++) {
+			LocalData<D>       ld   = getLocalData(i);
+			const LocalData<D> ld_a = a->getLocalData(i);
+			const LocalData<D> ld_b = b->getLocalData(i);
+			nested_loop<D>(ld.getStart(), ld.getEnd(), [&](std::array<int, D> coord) {
+				ld[coord] += ld_a[coord] * alpha + ld_b[coord] * beta;
+			});
+		}
+	}
 	virtual void scaleThenAdd(double alpha, std::shared_ptr<const Vector<D>> b)
 	{
 		for (int i = 0; i < num_local_patches; i++) {
@@ -216,6 +238,28 @@ template <size_t D> class Vector
 			const LocalData<D> ld_b = b->getLocalData(i);
 			nested_loop<D>(ld.getStart(), ld.getEnd(), [&](std::array<int, D> coord) {
 				ld[coord] = alpha * ld[coord] + ld_b[coord];
+			});
+		}
+	}
+	virtual void scaleThenAddScaled(double alpha, double beta, std::shared_ptr<const Vector<D>> b)
+	{
+		for (int i = 0; i < num_local_patches; i++) {
+			LocalData<D>       ld   = getLocalData(i);
+			const LocalData<D> ld_b = b->getLocalData(i);
+			nested_loop<D>(ld.getStart(), ld.getEnd(), [&](std::array<int, D> coord) {
+				ld[coord] = alpha * ld[coord] + beta * ld_b[coord];
+			});
+		}
+	}
+	virtual void scaleThenAddScaled(double alpha, double beta, std::shared_ptr<const Vector<D>> b,
+	                                double gamma, std::shared_ptr<const Vector<D>> c)
+	{
+		for (int i = 0; i < num_local_patches; i++) {
+			LocalData<D>       ld   = getLocalData(i);
+			const LocalData<D> ld_b = b->getLocalData(i);
+			const LocalData<D> ld_c = c->getLocalData(i);
+			nested_loop<D>(ld.getStart(), ld.getEnd(), [&](std::array<int, D> coord) {
+				ld[coord] = alpha * ld[coord] + beta * ld_b[coord] + gamma * ld_c[coord];
 			});
 		}
 	}
@@ -227,7 +271,7 @@ template <size_t D> class Vector
 			nested_loop<D>(ld.getStart(), ld.getEnd(),
 			               [&](std::array<int, D> coord) { sum += ld[coord] * ld[coord]; });
 		}
-		MPI_Allreduce(&sum, &sum, 1, MPI_DOUBLE, MPI_SUM, comm);
+		 MPI_Allreduce(&sum, &sum, 1, MPI_DOUBLE, MPI_SUM, comm);
 		return sqrt(sum);
 	}
 	virtual double infNorm() const
@@ -253,6 +297,11 @@ template <size_t D> class Vector
 		MPI_Allreduce(&retval, &retval, 1, MPI_DOUBLE, MPI_SUM, comm);
 		return retval;
 	}
+};
+template <size_t D> class VectorGenerator
+{
+	public:
+	virtual std::shared_ptr<Vector<D>> getNewVector() = 0;
 };
 extern template class LocalData<1>;
 extern template class LocalData<2>;

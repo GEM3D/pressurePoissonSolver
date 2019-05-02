@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -19,41 +19,21 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef GMGHELPER_H
-#define GMGHELPER_H
-#include <GMG/Cycle.h>
-#include <DomainCollection.h>
-#include <SchurHelper.h>
-#include <petscpc.h>
-namespace GMG
+#ifndef Operator_H
+#define Operator_H
+#include <Vector.h>
+/**
+ * @brief Base class for operators
+ */
+template <size_t D> class Operator
 {
-class Helper2d
-{
-	private:
-    std::array<int,2> lengths;
-
-	void apply(Vec f, Vec u);
-
 	public:
-	std::shared_ptr<Cycle<2>> cycle;
-	static int multiply(PC A, Vec f, Vec u)
-	{
-		Helper2d *gh = nullptr;
-		PCShellGetContext(A, (void **) &gh);
-		VecScale(u, 0);
-		gh->apply(f, u);
-		return 0;
-	}
-
-	Helper2d(int n, std::vector<std::shared_ptr<DomainCollection<2>>> domains,
-	         std::shared_ptr<SchurHelper<2>> sh, std::string config_file);
-
-	void getPrec(PC P)
-	{
-		PCSetType(P, PCSHELL);
-		PCShellSetContext(P, this);
-		PCShellSetApply(P, multiply);
-	}
+	/**
+	 * @brief Virtual function that base classes have to implement.
+	 *
+	 * @param x the input vector.
+	 * @param b the output vector.
+	 */
+	virtual void apply(std::shared_ptr<const Vector<D>> x, std::shared_ptr<Vector<D>> b) const = 0;
 };
-} // namespace GMG
 #endif

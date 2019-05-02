@@ -23,33 +23,14 @@
 #define GMGLEVEL_H
 #include <DomainCollection.h>
 #include <GMG/Interpolator.h>
-#include <GMG/Operator.h>
 #include <GMG/Restrictor.h>
 #include <GMG/Smoother.h>
+#include <Operators/Operator.h>
 #include <PetscVector.h>
 #include <memory>
 namespace GMG
 {
-template <size_t D> class VectorGenerator
-{
-	public:
-	virtual std::shared_ptr<Vector<D>> getNewVector() = 0;
-};
-template <size_t D> class DCVG : public VectorGenerator<D>
-{
-	private:
-	std::shared_ptr<DomainCollection<D>> dc;
 
-	public:
-	DCVG(std::shared_ptr<DomainCollection<D>> dc)
-	{
-		this->dc = dc;
-	}
-	std::shared_ptr<Vector<D>> getNewVector()
-	{
-		return dc->getNewDomainVec();
-	}
-};
 /**
  * @brief Represents a level in geometric multi-grid.
  */
