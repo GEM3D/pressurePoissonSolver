@@ -19,18 +19,43 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef MMWRITER_H
-#define MMWRITER_H
-#include <Thunderegg/DomainCollection.h>
-#include <string>
-class MMWriter
+#ifndef VALVECTOR_H
+#define VALVECTOR_H
+#include <Thunderegg/Vector.h>
+#include <valarray>
+template <size_t D> class ValVector : public Vector<D>
+
 {
 	private:
-	DomainCollection<3> dc;
-	bool                amr;
+	int                patch_stride;
+	std::array<int, D> lengths;
+	std::array<int, D> strides;
 
 	public:
-	MMWriter(DomainCollection<3> &dc, bool amr);
-	void write(const Vec u, std::string filename);
+	std::valarray<double> vec;
+	ValVector() = default;
+	ValVector(const std::array<int, D> &lengths, int num_patches = 1)
+	{
+		int size      = 1;
+		this->lengths = lengths;
+		for (size_t i = 0; i < D; i++) {
+			strides[i] = size;
+			size *= lengths[i];
+		}
+		patch_stride = size;
+		size *= num_patches;
+		vec.resize(size);
+	}
+	~ValVector() = default;
+	LocalData<D> getLocalData(int local_patch_id)
+	{
+		double *data = &vec[patch_stride * local_patch_id];
+		return LocalData<D>(data, strides, lengths, nullptr);
+	}
+	const LocalData<D> getLocalData(int local_patch_id) const
+	{
+		double *data = const_cast<double *>(&vec[patch_stride * local_patch_id]);
+		return LocalData<D>(data, strides, lengths, nullptr);
+	}
 };
 #endif

@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively
+ *  Thunderegg, a library for solving Poisson's equation on adaptively 
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -19,18 +19,41 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef MMWRITER_H
-#define MMWRITER_H
+#ifndef GMGHELPER_H
+#define GMGHELPER_H
+#include <Thunderegg/GMG/Cycle.h>
 #include <Thunderegg/DomainCollection.h>
-#include <string>
-class MMWriter
+#include <Thunderegg/SchurHelper.h>
+#include <petscpc.h>
+namespace GMG
+{
+class Helper2d
 {
 	private:
-	DomainCollection<3> dc;
-	bool                amr;
+    std::array<int,2> lengths;
+
+	void apply(Vec f, Vec u);
 
 	public:
-	MMWriter(DomainCollection<3> &dc, bool amr);
-	void write(const Vec u, std::string filename);
+	std::shared_ptr<Cycle<2>> cycle;
+	static int multiply(PC A, Vec f, Vec u)
+	{
+		Helper2d *gh = nullptr;
+		PCShellGetContext(A, (void **) &gh);
+		VecScale(u, 0);
+		gh->apply(f, u);
+		return 0;
+	}
+
+	Helper2d(int n, std::vector<std::shared_ptr<DomainCollection<2>>> domains,
+	         std::shared_ptr<SchurHelper<2>> sh, std::string config_file);
+
+	void getPrec(PC P)
+	{
+		PCSetType(P, PCSHELL);
+		PCShellSetContext(P, this);
+		PCShellSetApply(P, multiply);
+	}
 };
+} // namespace GMG
 #endif

@@ -19,18 +19,28 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef MMWRITER_H
-#define MMWRITER_H
+#ifndef POLYCHEBPREC_H
+#define POLYCHEBPREC_H
 #include <Thunderegg/DomainCollection.h>
-#include <string>
-class MMWriter
+#include <Thunderegg/MatrixHelper.h>
+#include <Thunderegg/Operators/Operator.h>
+#include <Thunderegg/SchurHelper.h>
+#include <petscpc.h>
+class PolyChebPrec : public Operator<2>
 {
 	private:
-	DomainCollection<3> dc;
-	bool                amr;
+	std::shared_ptr<SchurHelper<3>>      sh;
+	std::shared_ptr<DomainCollection<3>> dc;
+	double                               interval = 0.95;
+	std::vector<double>                  coeffs
+	= {4.472135954953655e+00, 5.675247900481234e+00, 3.601012922685066e+00, 2.284885928634731e+00,
+	   1.449787551186771e+00, 9.199076055378766e-01, 5.836924189936992e-01, 3.703598469934007e-01,
+	   2.349977690621489e-01, 1.491089055767314e-01, 9.461139059090561e-02, 6.003206306517687e-02,
+	   3.809106471898141e-02, 2.416923786484517e-02, 1.533567161022980e-02, 1.628851184599676e-02};
 
 	public:
-	MMWriter(DomainCollection<3> &dc, bool amr);
-	void write(const Vec u, std::string filename);
+	PolyChebPrec(std::shared_ptr<DomainCollection<3>> dc, std::shared_ptr<SchurHelper<3>> sh);
+
+	void apply(std::shared_ptr<const Vector<2>> x, std::shared_ptr<Vector<2>> b) const;
 };
 #endif

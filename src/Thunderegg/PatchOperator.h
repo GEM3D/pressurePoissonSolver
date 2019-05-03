@@ -19,18 +19,16 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef MMWRITER_H
-#define MMWRITER_H
-#include <Thunderegg/DomainCollection.h>
-#include <string>
-class MMWriter
+#ifndef PATCHOPERATOR_H
+#define PATCHOPERATOR_H
+#include <Thunderegg/SchurDomain.h>
+#include <Thunderegg/Vector.h>
+template <size_t D> class PatchOperator
 {
-	private:
-	DomainCollection<3> dc;
-	bool                amr;
-
 	public:
-	MMWriter(DomainCollection<3> &dc, bool amr);
-	void write(const Vec u, std::string filename);
+	virtual ~PatchOperator() {}
+	virtual void apply(SchurDomain<D> &d, std::shared_ptr<const Vector<D>> u,
+	                   std::shared_ptr<const Vector<D-1>> gamma, std::shared_ptr<Vector<D>> f)
+	= 0;
 };
 #endif

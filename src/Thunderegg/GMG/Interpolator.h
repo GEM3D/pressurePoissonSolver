@@ -19,18 +19,25 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef MMWRITER_H
-#define MMWRITER_H
-#include <Thunderegg/DomainCollection.h>
-#include <string>
-class MMWriter
+#ifndef GMGInterpolator_H
+#define GMGInterpolator_H
+#include <Thunderegg/Vector.h>
+namespace GMG
 {
-	private:
-	DomainCollection<3> dc;
-	bool                amr;
-
+/**
+ * @brief base class for interpolation operators from finer levels to coarser levels.
+ */
+template <size_t D> class Interpolator
+{
 	public:
-	MMWriter(DomainCollection<3> &dc, bool amr);
-	void write(const Vec u, std::string filename);
+	/**
+	 * @brief Virtual interpolation operation that needs to be implemented in derived classes.
+	 *
+	 * @param coarse the input vector from the coarser level.
+	 * @param fine the output vector for the fine level.
+	 */
+	virtual void interpolate(std::shared_ptr<const Vector<D>> coarse,
+	                         std::shared_ptr<Vector<D>>       fine) const = 0;
 };
+} // namespace GMG
 #endif

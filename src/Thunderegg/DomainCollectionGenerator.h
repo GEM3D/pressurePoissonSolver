@@ -19,18 +19,15 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef MMWRITER_H
-#define MMWRITER_H
+#ifndef DOMAINCOLLECTIONGENERATOR_H
+#define DOMAINCOLLECTIONGENERATOR_H
 #include <Thunderegg/DomainCollection.h>
-#include <string>
-class MMWriter
+template <size_t D> class DomainCollectionGenerator
 {
-	private:
-	DomainCollection<3> dc;
-	bool                amr;
-
 	public:
-	MMWriter(DomainCollection<3> &dc, bool amr);
-	void write(const Vec u, std::string filename);
+	~DomainCollectionGenerator(){};
+	virtual std::shared_ptr<DomainCollection<D>> getFinestDC()  = 0;
+	virtual bool                                 hasCoarserDC() = 0;
+	virtual std::shared_ptr<DomainCollection<D>> getCoarserDC() = 0;
 };
 #endif

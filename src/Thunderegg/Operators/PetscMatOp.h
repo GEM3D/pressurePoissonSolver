@@ -19,18 +19,35 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef MMWRITER_H
-#define MMWRITER_H
-#include <Thunderegg/DomainCollection.h>
-#include <string>
-class MMWriter
+#ifndef PETSCMATOP_H
+#define PETSCMATOP_H
+#include <Thunderegg/Operators/Operator.h>
+#include <Thunderegg/SchurHelper.h>
+/**
+ * @brief Base class for operators
+ */
+template <size_t D> class PetscMatOp : public Operator<D>
 {
 	private:
-	DomainCollection<3> dc;
-	bool                amr;
+	PW<Mat> A;
 
 	public:
-	MMWriter(DomainCollection<3> &dc, bool amr);
-	void write(const Vec u, std::string filename);
+	PetscMatOp(PW<Mat> A)
+	{
+		this->A = A;
+	}
+	/**
+	 * @brief Apply Petsc matrix
+	 *
+	 * @param x the input vector.
+	 * @param b the output vector.
+	 */
+	void apply(std::shared_ptr<const Vector<D>> x, std::shared_ptr<Vector<D>> b) const
+	{
+		const PetscVector<D> *x_vec = dynamic_cast<const PetscVector<D> *>(x.get());
+		PetscVector<D> *      b_vec = dynamic_cast<PetscVector<D> *>(b.get());
+		if (x_vec == nullptr || b_vec == nullptr) { throw 3; }
+		MatMult(A, x_vec->vec, b_vec->vec);
+	}
 };
 #endif

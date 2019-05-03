@@ -4,6 +4,7 @@ enable_language(CXX)
 enable_language(C)
 
 #set(CMAKE_CXX_EXTENSIONS OFF)
+include(GNUInstallDirs)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 

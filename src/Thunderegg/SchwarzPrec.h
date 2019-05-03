@@ -19,18 +19,40 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef MMWRITER_H
-#define MMWRITER_H
-#include <Thunderegg/DomainCollection.h>
-#include <string>
-class MMWriter
+#ifndef SCHWARZPREC_H
+#define SCHWARZPREC_H
+#include <Thunderegg/Operators/Operator.h>
+#include <Thunderegg/SchurHelper.h>
+/**
+ * @brief Additive Schwarz Preconditioner
+ */
+template <size_t D> class SchwarzPrec : public Operator<D>
 {
 	private:
-	DomainCollection<3> dc;
-	bool                amr;
+	/**
+	 * @brief the SchurHelper
+	 */
+	std::shared_ptr<SchurHelper<D>> sh;
 
 	public:
-	MMWriter(DomainCollection<3> &dc, bool amr);
-	void write(const Vec u, std::string filename);
+	/**
+	 * @brief Create new preconditioner
+	 *
+	 * @param sh the SchurHelper
+	 */
+	SchwarzPrec(std::shared_ptr<SchurHelper<D>> sh)
+	{
+		this->sh = sh;
+	}
+	/**
+	 * @brief Apply schwarz preconditioner
+	 *
+	 * @param x the input vector.
+	 * @param b the output vector.
+	 */
+	void apply(std::shared_ptr<const Vector<D>> x, std::shared_ptr<Vector<D>> b) const
+	{
+		sh->solveWithSolution(x, b);
+	}
 };
 #endif

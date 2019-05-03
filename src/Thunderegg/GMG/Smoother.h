@@ -19,18 +19,24 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef MMWRITER_H
-#define MMWRITER_H
-#include <Thunderegg/DomainCollection.h>
-#include <string>
-class MMWriter
+#ifndef GMGSmoother_H
+#define GMGSmoother_H
+#include <Thunderegg/Vector.h>
+namespace GMG
 {
-	private:
-	DomainCollection<3> dc;
-	bool                amr;
-
+/**
+ * @brief Base class for multi-grid smoothing operators.
+ */
+template <size_t D> class Smoother
+{
 	public:
-	MMWriter(DomainCollection<3> &dc, bool amr);
-	void write(const Vec u, std::string filename);
+	/**
+	 * @brief Virtual function that derived classes have to implement.
+	 *
+	 * @param f the RHS vector
+	 * @param u the solution vector, updated upon return.
+	 */
+	virtual void smooth(std::shared_ptr<const Vector<D>> f, std::shared_ptr<Vector<D>> u) const = 0;
 };
+} // namespace GMG
 #endif

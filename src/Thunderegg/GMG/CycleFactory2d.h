@@ -19,18 +19,22 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef MMWRITER_H
-#define MMWRITER_H
+#ifndef GMGCYCLEFACTORY2D_H
+#define GMGCYCLEFACTORY2D_H
 #include <Thunderegg/DomainCollection.h>
-#include <string>
-class MMWriter
+#include <Thunderegg/DomainCollectionGenerator.h>
+#include <Thunderegg/GMG/Cycle.h>
+#include <Thunderegg/SchurHelper.h>
+namespace GMG
 {
-	private:
-	DomainCollection<3> dc;
-	bool                amr;
-
+class CycleFactory2d
+{
 	public:
-	MMWriter(DomainCollection<3> &dc, bool amr);
-	void write(const Vec u, std::string filename);
+	static std::shared_ptr<Cycle<2>> getCycle(std::string config_file,
+	                                          std::shared_ptr<DomainCollectionGenerator<2>> dcg,
+	                                          std::shared_ptr<PatchSolver<2>>               solver,
+	                                          std::shared_ptr<PatchOperator<2>>             op,
+	                                          std::shared_ptr<IfaceInterp<2>> interpolator);
 };
+} // namespace GMG
 #endif

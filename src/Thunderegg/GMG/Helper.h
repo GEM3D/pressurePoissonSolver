@@ -19,18 +19,27 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef MMWRITER_H
-#define MMWRITER_H
+#ifndef GMGHELPER_H
+#define GMGHELPER_H
 #include <Thunderegg/DomainCollection.h>
-#include <string>
-class MMWriter
+#include <Thunderegg/GMG/Cycle.h>
+#include <Thunderegg/SchurHelper.h>
+#include <petscpc.h>
+namespace GMG
+{
+class Helper
 {
 	private:
-	DomainCollection<3> dc;
-	bool                amr;
+    std::array<int,3> lengths;
+
+	void apply(Vec f, Vec u);
 
 	public:
-	MMWriter(DomainCollection<3> &dc, bool amr);
-	void write(const Vec u, std::string filename);
+	std::shared_ptr<Cycle<3>> cycle;
+
+	Helper(int n, std::vector<std::shared_ptr<DomainCollection<3>>> domains,
+	       std::shared_ptr<SchurHelper<3>> sh, std::string config_file);
+
 };
+} // namespace GMG
 #endif

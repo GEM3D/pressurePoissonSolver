@@ -19,18 +19,21 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef MMWRITER_H
-#define MMWRITER_H
-#include <Thunderegg/DomainCollection.h>
-#include <string>
-class MMWriter
+#ifndef Operator_H
+#define Operator_H
+#include <Thunderegg/Vector.h>
+/**
+ * @brief Base class for operators
+ */
+template <size_t D> class Operator
 {
-	private:
-	DomainCollection<3> dc;
-	bool                amr;
-
 	public:
-	MMWriter(DomainCollection<3> &dc, bool amr);
-	void write(const Vec u, std::string filename);
+	/**
+	 * @brief Virtual function that base classes have to implement.
+	 *
+	 * @param x the input vector.
+	 * @param b the output vector.
+	 */
+	virtual void apply(std::shared_ptr<const Vector<D>> x, std::shared_ptr<Vector<D>> b) const = 0;
 };
 #endif

@@ -19,7 +19,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#include "DomainCollection.h"
+#include <Thunderegg/DomainCollection.h>
 #include <functional>
 class Init
 {

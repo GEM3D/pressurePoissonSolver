@@ -19,18 +19,25 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef MMWRITER_H
-#define MMWRITER_H
-#include <Thunderegg/DomainCollection.h>
-#include <string>
-class MMWriter
+#ifndef GMGRestrictor_H
+#define GMGRestrictor_H
+#include <Thunderegg/Vector.h>
+namespace GMG
 {
-	private:
-	DomainCollection<3> dc;
-	bool                amr;
-
+/**
+ * @brief Base class for multi-grid restriction operators.
+ */
+template <size_t D> class Restrictor
+{
 	public:
-	MMWriter(DomainCollection<3> &dc, bool amr);
-	void write(const Vec u, std::string filename);
+	/**
+	 * @brief Virtual function that base classes have to implement.
+	 *
+	 * @param coarse the output vector that is restricted to.
+	 * @param fine the input vector that is restricted.
+	 */
+	virtual void restrict(std::shared_ptr<Vector<D>>       coarse,
+	                      std::shared_ptr<const Vector<D>> fine) const = 0;
 };
+} // namespace GMG
 #endif

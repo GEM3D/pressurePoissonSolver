@@ -19,18 +19,35 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef MMWRITER_H
-#define MMWRITER_H
-#include <Thunderegg/DomainCollection.h>
-#include <string>
-class MMWriter
+#ifndef P4ESTDCG_H
+#define P4ESTDCG_H
+#include <Thunderegg/DomainCollectionGenerator.h>
+#include <list>
+#include <p4est_extended.h>
+class P4estDCG : public DomainCollectionGenerator<2>
 {
 	private:
-	DomainCollection<3> dc;
-	bool                amr;
+	bool neumann;
+	/**
+	 * @brief copy of p4est tree
+	 */
+	p4est_t *my_p4est;
+	/**
+	 * @brief finest is stored in front
+	 */
+	std::list<std::shared_ptr<DomainCollection<2>>> dc_list;
+
+	int                curr_level;
+	int                num_levels;
+	std::array<int, 2> ns;
+
+	void extractLevel();
 
 	public:
-	MMWriter(DomainCollection<3> &dc, bool amr);
-	void write(const Vec u, std::string filename);
+	P4estDCG(p4est_t *p4est, std::array<int, 2> ns, bool neumann = false);
+	~P4estDCG();
+	std::shared_ptr<DomainCollection<2>> getFinestDC();
+	bool                                 hasCoarserDC();
+	std::shared_ptr<DomainCollection<2>> getCoarserDC();
 };
 #endif

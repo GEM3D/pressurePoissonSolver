@@ -19,30 +19,30 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#include "BalancedLevelsGenerator.h"
-#include "BiCGStab.h"
-#include "CLI11.hpp"
-#include "DomainCollection.h"
-#include "FunctionWrapper.h"
-#include "GMG/Helper.h"
-#include "Init.h"
-#include "MatrixHelper.h"
-#include "OctTree.h"
-#include "Operators/DomainWrapOp.h"
-#include "Operators/PetscMatOp.h"
-#include "Operators/SchurWrapOp.h"
-#include "PatchSolvers/DftPatchSolver.h"
-#include "PatchSolvers/FftwPatchSolver.h"
-#include "PetscShellCreator.h"
-#include "PolyChebPrec.h"
-#include "SchurHelper.h"
-#include "SchurMatrixHelper.h"
-#include "SchwarzPrec.h"
-#include "SevenPtPatchOperator.h"
-#include "Timer.h"
-#include "TriLinInterp.h"
+#include <Thunderegg/BalancedLevelsGenerator.h>
+#include <Thunderegg/BiCGStab.h>
+#include <Thunderegg/DomainCollection.h>
+#include <Thunderegg/FunctionWrapper.h>
+#include <Thunderegg/GMG/Helper.h>
+#include <Thunderegg/MatrixHelper.h>
+#include <Thunderegg/OctTree.h>
+#include <Thunderegg/Operators/DomainWrapOp.h>
+#include <Thunderegg/Operators/PetscMatOp.h>
+#include <Thunderegg/Operators/SchurWrapOp.h>
+#include <Thunderegg/PatchSolvers/DftPatchSolver.h>
+#include <Thunderegg/PatchSolvers/FftwPatchSolver.h>
+#include <Thunderegg/PetscShellCreator.h>
+#include <Thunderegg/PolyChebPrec.h>
+#include <Thunderegg/SchurHelper.h>
+#include <Thunderegg/SchurMatrixHelper.h>
+#include <Thunderegg/SchwarzPrec.h>
+#include <Thunderegg/SevenPtPatchOperator.h>
+#include <Thunderegg/Timer.h>
+#include <Thunderegg/TriLinInterp.h>
 #include "Writers/ClawWriter.h"
 #include "Writers/MMWriter.h"
+#include "Init.h"
+#include "CLI11.hpp"
 #ifdef ENABLE_AMGX
 #include "AmgxWrapper.h"
 #endif

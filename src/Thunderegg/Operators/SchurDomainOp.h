@@ -19,18 +19,39 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef MMWRITER_H
-#define MMWRITER_H
-#include <Thunderegg/DomainCollection.h>
-#include <string>
-class MMWriter
+#ifndef SCHURDOMAINOP_H
+#define SCHURDOMAINOP_H
+#include <Thunderegg/Operators/Operator.h>
+#include <Thunderegg/SchurHelper.h>
+
+template <size_t D> class SchurDomainOp : public Operator<D>
 {
 	private:
-	DomainCollection<3> dc;
-	bool                amr;
+	/**
+	 * @brief PETSc Matrix object
+	 */
+	std::shared_ptr<SchurHelper<D>> helper;
 
 	public:
-	MMWriter(DomainCollection<3> &dc, bool amr);
-	void write(const Vec u, std::string filename);
+	/**
+	 * @brief Crate new WrapOp
+	 *
+	 * @param matrix the PETSc matrix
+	 */
+	SchurDomainOp(std::shared_ptr<SchurHelper<D>> helper)
+	{
+		this->helper = helper;
+	}
+	/**
+	 * @brief Perform matrix/vector multiply.
+	 *
+	 * @param x the input vector.
+	 * @param b the output vector.
+	 */
+	void apply(std::shared_ptr<const Vector<D>> x, std::shared_ptr<Vector<D>> b) const
+	{
+		helper->apply(x, b);
+	}
 };
+
 #endif

@@ -19,18 +19,43 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef MMWRITER_H
-#define MMWRITER_H
-#include <Thunderegg/DomainCollection.h>
-#include <string>
-class MMWriter
+#ifndef GMGFFTBlockJacobiSmoother_H
+#define GMGFFTBlockJacobiSmoother_H
+#include <Thunderegg/SchurHelper.h>
+namespace GMG
+{
+/**
+ * @brief A block Jacobi smoother that uses FFTW solves on each patch. Implemented using the
+ * SchurHelper class.
+ */
+template <size_t D> class FFTBlockJacobiSmoother : public Smoother<D>
 {
 	private:
-	DomainCollection<3> dc;
-	bool                amr;
+	/**
+	 * @brief point to the SchurHelper object.
+	 */
+	std::shared_ptr<SchurHelper<D>> sh;
 
 	public:
-	MMWriter(DomainCollection<3> &dc, bool amr);
-	void write(const Vec u, std::string filename);
+	/**
+	 * @brief Create new smoother with SchurHelper object
+	 *
+	 * @param sh pointer to the SchurHelper object
+	 */
+	FFTBlockJacobiSmoother(std::shared_ptr<SchurHelper<D>> sh)
+	{
+		this->sh = sh;
+	}
+	/**
+	 * @brief Run an iteration of smoothing.
+	 *
+	 * @param f the RHS vector
+	 * @param u the solution vector, updated upon return.
+	 */
+	void smooth(std::shared_ptr<const Vector<D>> f, std::shared_ptr<Vector<D>> u) const
+	{
+		sh->solveWithSolution(f, u);
+	}
 };
+} // namespace GMG
 #endif

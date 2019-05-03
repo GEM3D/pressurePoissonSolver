@@ -19,18 +19,26 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef MMWRITER_H
-#define MMWRITER_H
-#include <Thunderegg/DomainCollection.h>
-#include <string>
-class MMWriter
+#ifndef P4ESTBLG_H
+#define P4ESTBLG_H
+#include <Thunderegg/Domain.h>
+#include <deque>
+#include <iostream>
+#include <memory>
+#include <mpi.h>
+#include <p4est.h>
+#include <p4est_mesh.h>
+#include <set>
+#include <vector>
+#include <zoltan.h>
+class p4estBLG
 {
 	private:
-	DomainCollection<3> dc;
-	bool                amr;
+	void extractLevel(p4est_t *p4est, int level, std::array<int, 2> n);
 
 	public:
-	MMWriter(DomainCollection<3> &dc, bool amr);
-	void write(const Vec u, std::string filename);
+	using DomainMap = std::map<int, std::shared_ptr<Domain<2>>>;
+	std::vector<DomainMap> levels;
+	p4estBLG(p4est_t *p4est, std::array<int, 2> ns);
 };
 #endif

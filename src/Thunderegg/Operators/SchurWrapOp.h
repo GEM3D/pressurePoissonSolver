@@ -19,18 +19,36 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef MMWRITER_H
-#define MMWRITER_H
-#include <Thunderegg/DomainCollection.h>
-#include <string>
-class MMWriter
+#ifndef SCHURWRAPOP_H
+#define SCHURWRAPOP_H
+#include <Thunderegg/Operators/Operator.h>
+#include <Thunderegg/SchurHelper.h>
+/**
+ * @brief Base class for operators
+ */
+template <size_t D> class SchurWrapOp : public Operator<D - 1>
 {
 	private:
-	DomainCollection<3> dc;
-	bool                amr;
+	std::shared_ptr<DomainCollection<D>> dc;
+	std::shared_ptr<SchurHelper<D>>      sh;
 
 	public:
-	MMWriter(DomainCollection<3> &dc, bool amr);
-	void write(const Vec u, std::string filename);
+	SchurWrapOp(std::shared_ptr<DomainCollection<D>> dc, std::shared_ptr<SchurHelper<D>> sh)
+	{
+		this->dc = dc;
+		this->sh = sh;
+	}
+	/**
+	 * @brief Apply Schur matrix
+	 *
+	 * @param x the input vector.
+	 * @param b the output vector.
+	 */
+	void apply(std::shared_ptr<const Vector<D - 1>> x, std::shared_ptr<Vector<D - 1>> b) const
+	{
+		auto f = dc->getNewDomainVec();
+		auto u = dc->getNewDomainVec();
+		sh->solveAndInterpolateWithInterface(f, u, x, b);
+	}
 };
 #endif

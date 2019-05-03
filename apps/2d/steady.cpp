@@ -19,40 +19,38 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#include "DomainCollection.h"
-#include "FivePtPatchOperator.h"
-#include "FunctionWrapper.h"
-#include "ThundereggDCG.h"
-//#include "IfaceMatrixHelper.h"
-#include "BiCGStab.h"
-#include "BilinearInterpolator.h"
-#include "GMG/CycleFactory2d.h"
-#include "GMG/Helper2d.h"
+#include <Thunderegg/DomainCollection.h>
+#include <Thunderegg/FivePtPatchOperator.h>
+#include <Thunderegg/FunctionWrapper.h>
+#include <Thunderegg/ThundereggDCG.h>
+#include <Thunderegg/BiCGStab.h>
+#include <Thunderegg/BilinearInterpolator.h>
+#include <Thunderegg/GMG/CycleFactory2d.h>
+#include <Thunderegg/GMG/Helper2d.h>
+#include <Thunderegg/MatrixHelper2d.h>
+#include <Thunderegg/Operators/DomainWrapOp.h>
+#include <Thunderegg/Operators/PetscMatOp.h>
+#include <Thunderegg/Operators/SchurWrapOp.h>
+#include <Thunderegg/PatchSolvers/DftPatchSolver.h>
+#include <Thunderegg/PatchSolvers/FftwPatchSolver.h>
+#include <Thunderegg/PetscShellCreator.h>
+#include <Thunderegg/PolyChebPrec.h>
+#include <Thunderegg/QuadInterpolator.h>
+#include <Thunderegg/SchurHelper.h>
+#include <Thunderegg/SchurMatrixHelper2d.h>
+#include <Thunderegg/SchwarzPrec.h>
+#include <Thunderegg/Timer.h>
 #include "Init.h"
-#include "MatrixHelper2d.h"
-#include "Operators/DomainWrapOp.h"
-#include "Operators/PetscMatOp.h"
-#include "Operators/SchurWrapOp.h"
-#include "PatchSolvers/DftPatchSolver.h"
-#include "PatchSolvers/FftwPatchSolver.h"
-#include "PatchSolvers/FishpackPatchSolver.h"
-#include "PetscShellCreator.h"
-#include "PolyChebPrec.h"
-#include "QuadInterpolator.h"
-#include "SchurHelper.h"
-#include "SchurMatrixHelper2d.h"
-#include "SchwarzPrec.h"
 #include "Writers/ClawWriter.h"
 #include "Writers/MMWriter.h"
 #ifdef HAVE_VTK
 #include "Writers/VtkWriter2d.h"
 #endif
 #ifdef HAVE_P4EST
-#include "P4estDCG.h"
+#include <Thunderegg/P4estDCG.h>
 #include "TreeToP4est.h"
 #endif
 #include "CLI11.hpp"
-#include "Timer.h"
 #include <cmath>
 #include <iostream>
 #include <memory>
@@ -62,6 +60,7 @@
 #include <petscviewer.h>
 #include <string>
 #include <unistd.h>
+//#include "IfaceMatrixHelper.h"
 
 // =========== //
 // main driver //
