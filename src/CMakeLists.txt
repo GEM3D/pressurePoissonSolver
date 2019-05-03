@@ -6,6 +6,9 @@ find_package(FFTW REQUIRED)
 find_package(Zoltan REQUIRED)
 find_package(CUDA)
 find_package(p4est)
+if(p4est_FOUND)
+    find_package(sc REQUIRED)
+endif()
 
 #determine sources first
 list(APPEND Thunderegg_SRCS Thunderegg/SchurMatrixHelper.cpp)
@@ -36,7 +39,7 @@ if(p4est_FOUND)
     list(APPEND Thunderegg_SRCS Thunderegg/P4estDCG.cpp)
 endif()
 
-add_library(Thunderegg ${Thunderegg_SRCS})
+add_library(Thunderegg SHARED ${Thunderegg_SRCS})
 
 # set include directories
 target_include_directories(Thunderegg PUBLIC 
@@ -48,6 +51,7 @@ list(APPEND Thunderegg_Includes ${FFTW_INCLUDES})
 list(APPEND Thunderegg_Includes ${Zoltan_INCLUDES})
 if(p4est_FOUND)
     list(APPEND Thunderegg_Includes ${p4est_INCLUDES})
+    list(APPEND Thunderegg_Includes ${sc_INCLUDES})
 endif()
 target_include_directories(Thunderegg PUBLIC ${Thunderegg_Includes})
 
@@ -58,8 +62,10 @@ list(APPEND Thunderegg_Libs ${FFTW_LIBRARIES})
 list(APPEND Thunderegg_Libs ${Zoltan_LIBRARIES})
 if(p4est_FOUND)
     list(APPEND Thunderegg_Libs ${p4est_LIBRARIES})
+    list(APPEND Thunderegg_Libs ${sc_LIBRARIES})
 endif()
 target_link_libraries(Thunderegg PUBLIC ${Thunderegg_Libs})
+
 
 install(TARGETS Thunderegg EXPORT ThundereggConfig
     ARCHIVE  DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -73,7 +79,7 @@ install(DIRECTORY Thunderegg/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Thunderegg
 install(EXPORT ThundereggConfig DESTINATION share/Thunderegg/cmake)
 
 foreach(LIB ${Thunderegg_Libs})
-    set(Thunderegg_Lib_Flags "${Thunderegg_Lib_Flags} ${LIB}")
+    set(Thunderegg_Lib_Flags "${Thunderegg_Lib_Flags} -l${LIB}")
 endforeach()
 
 foreach(LIB ${Thunderegg_Includes})
