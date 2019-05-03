@@ -39,7 +39,7 @@ if(p4est_FOUND)
     list(APPEND Thunderegg_SRCS Thunderegg/P4estDCG.cpp)
 endif()
 
-add_library(Thunderegg SHARED ${Thunderegg_SRCS})
+add_library(Thunderegg ${Thunderegg_SRCS})
 
 # set include directories
 target_include_directories(Thunderegg PUBLIC 
