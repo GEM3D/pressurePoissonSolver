@@ -56,7 +56,7 @@ endif()
 target_include_directories(Thunderegg PUBLIC ${Thunderegg_Includes})
 
 # set link 
-list(APPEND Thunderegg_Libs ${MPI_CXX_LIBRARIES})
+#list(APPEND Thunderegg_Libs ${MPI_CXX_LIBRARIES})
 list(APPEND Thunderegg_Libs ${PETSC_LIBRARIES}) 
 list(APPEND Thunderegg_Libs ${FFTW_LIBRARIES}) 
 list(APPEND Thunderegg_Libs ${Zoltan_LIBRARIES})
@@ -65,6 +65,7 @@ if(p4est_FOUND)
     list(APPEND Thunderegg_Libs ${sc_LIBRARIES})
 endif()
 target_link_libraries(Thunderegg PUBLIC ${Thunderegg_Libs})
+target_link_libraries(Thunderegg PUBLIC ${MPI_CXX_LIBRARIES})
 
 
 install(TARGETS Thunderegg EXPORT ThundereggConfig
@@ -78,15 +79,8 @@ install(DIRECTORY Thunderegg/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Thunderegg
 
 install(EXPORT ThundereggConfig DESTINATION share/Thunderegg/cmake)
 
-foreach(LIB ${Thunderegg_Libs})
-    set(Thunderegg_Lib_Flags "${Thunderegg_Lib_Flags} -l${LIB}")
-endforeach()
-
-foreach(LIB ${Thunderegg_Includes})
-    set(Thunderegg_Include_Flags "${Thunderegg_Include_Flags} -I${LIB}")
-endforeach()
-
-CONFIGURE_FILE("Thunderegg.pc.in" "Thunderegg.pc" @ONLY)
+include(PkgConfigHandler)
+configure_pc_file("Thunderegg" "Thunderegg.pc.in" "Thunderegg.pc")
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/Thunderegg.pc" 
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
