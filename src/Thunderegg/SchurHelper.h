@@ -23,7 +23,7 @@
 #define SCHURHELPER_H
 #include <Thunderegg/DomainCollection.h>
 #include <Thunderegg/Iface.h>
-#include <Thunderegg/Interpolator.h>
+#include <Thunderegg/IfaceInterp.h>
 #include <Thunderegg/PatchOperator.h>
 #include <Thunderegg/PatchSolvers/PatchSolver.h>
 #include <Thunderegg/PetscVector.h>

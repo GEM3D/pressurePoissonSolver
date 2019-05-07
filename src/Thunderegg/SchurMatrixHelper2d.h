@@ -21,10 +21,7 @@
 
 #ifndef SCHURMATRIXHELPER2D_H
 #define SCHURMATRIXHELPER2D_H
-#include "Interpolator.h"
-#include "PatchOperator.h"
-#include "PatchSolvers/PatchSolver.h"
-#include "SchurHelper.h"
+#include <Thunderegg/SchurHelper.h>
 #include <functional>
 #include <memory>
 #include <petscmat.h>

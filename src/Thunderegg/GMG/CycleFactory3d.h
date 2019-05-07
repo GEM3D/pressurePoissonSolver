@@ -24,7 +24,7 @@
 #include <Thunderegg/DomainCollectionGenerator.h>
 #include <Thunderegg/GMG/Cycle.h>
 #include <Thunderegg/GMG/CycleOpts.h>
-#include <Thunderegg/Interpolator.h>
+#include <Thunderegg/IfaceInterp.h>
 #include <Thunderegg/PatchOperator.h>
 #include <Thunderegg/PatchSolvers/PatchSolver.h>
 namespace GMG

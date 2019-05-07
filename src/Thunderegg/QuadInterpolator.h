@@ -21,7 +21,7 @@
 
 #ifndef QUADINTERPOLATOR_H
 #define QUADINTERPOLATOR_H
-#include "Interpolator.h"
+#include <Thunderegg/IfaceInterp.h>
 class QuadInterpolator : public IfaceInterp<2>
 {
 	public:

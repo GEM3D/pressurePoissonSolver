@@ -21,7 +21,7 @@
 
 #ifndef TRILININTERP_H
 #define TRILININTERP_H
-#include "Interpolator.h"
+#include <Thunderegg/IfaceInterp.h>
 class TriLinInterp : public IfaceInterp<3>
 {
 	public:

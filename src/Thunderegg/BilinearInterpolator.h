@@ -21,7 +21,7 @@
 
 #ifndef BILINEARINTERPOLATOR_H
 #define BILINEARINTERPOLATOR_H
-#include "Interpolator.h"
+#include <Thunderegg/IfaceInterp.h>
 class BilinearInterpolator : public IfaceInterp<2>
 {
 	public:
