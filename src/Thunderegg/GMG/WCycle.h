@@ -74,24 +74,12 @@ template <size_t D> class WCycle : public Cycle<D>
 	 *
 	 * @param finest_level a pointer to the finest level
 	 */
-	WCycle(std::shared_ptr<Level<D>> finest_level, nlohmann::json config_j) : Cycle<D>(finest_level)
+	WCycle(std::shared_ptr<Level<D>> finest_level, const CycleOpts &opts) : Cycle<D>(finest_level)
 	{
-		try {
-			num_pre_sweeps = config_j.at("pre_sweeps");
-		} catch (nlohmann::detail::out_of_range oor) {
-		}
-		try {
-			num_post_sweeps = config_j.at("post_sweeps");
-		} catch (nlohmann::detail::out_of_range oor) {
-		}
-		try {
-			num_coarse_sweeps = config_j.at("coarse_sweeps");
-		} catch (nlohmann::detail::out_of_range oor) {
-		}
-		try {
-			num_mid_sweeps = config_j.at("mid_sweeps");
-		} catch (nlohmann::detail::out_of_range oor) {
-		}
+		num_pre_sweeps    = opts.pre_sweeps;
+		num_post_sweeps   = opts.post_sweeps;
+		num_coarse_sweeps = opts.coarse_sweeps;
+		num_mid_sweeps    = opts.mid_sweeps;
 	}
 };
 } // namespace GMG

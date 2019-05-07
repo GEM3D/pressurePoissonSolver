@@ -19,14 +19,15 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
+#include "Init.h"
+#include "Writers/ClawWriter.h"
+#include "Writers/MMWriter.h"
+#include <Thunderegg/BiCGStab.h>
+#include <Thunderegg/BilinearInterpolator.h>
 #include <Thunderegg/DomainCollection.h>
 #include <Thunderegg/FivePtPatchOperator.h>
 #include <Thunderegg/FunctionWrapper.h>
-#include <Thunderegg/ThundereggDCG.h>
-#include <Thunderegg/BiCGStab.h>
-#include <Thunderegg/BilinearInterpolator.h>
 #include <Thunderegg/GMG/CycleFactory2d.h>
-#include <Thunderegg/GMG/Helper2d.h>
 #include <Thunderegg/MatrixHelper2d.h>
 #include <Thunderegg/Operators/DomainWrapOp.h>
 #include <Thunderegg/Operators/PetscMatOp.h>
@@ -39,16 +40,14 @@
 #include <Thunderegg/SchurHelper.h>
 #include <Thunderegg/SchurMatrixHelper2d.h>
 #include <Thunderegg/SchwarzPrec.h>
+#include <Thunderegg/ThundereggDCG.h>
 #include <Thunderegg/Timer.h>
-#include "Init.h"
-#include "Writers/ClawWriter.h"
-#include "Writers/MMWriter.h"
 #ifdef HAVE_VTK
 #include "Writers/VtkWriter2d.h"
 #endif
 #ifdef HAVE_P4EST
-#include <Thunderegg/P4estDCG.h>
 #include "TreeToP4est.h"
+#include <Thunderegg/P4estDCG.h>
 #endif
 #include "CLI11.hpp"
 #include <cmath>
@@ -118,11 +117,7 @@ int main(int argc, char *argv[])
 	                        "Which Solver to use");
 
 	string preconditioner = "";
-	auto   prec_opt
-	= app.add_set_ignore_case("--prec", preconditioner, {"GMG"}, "Which Preconditoner to use");
-
-	string gmg_filename = "";
-	app.add_option("--gmg_config", gmg_filename, "Which problem to solve")->needs(prec_opt);
+	app.add_set_ignore_case("--prec", preconditioner, {"GMG"}, "Which Preconditoner to use");
 
 	string patch_solver = "fftw";
 	app.add_option("--patch_solver", patch_solver, "Which patch solver to use");
@@ -132,6 +127,31 @@ int main(int argc, char *argv[])
 
 	string petsc_opts = "";
 	app.add_option("--petsc_opts", petsc_opts, "petsc options");
+
+	// GMG options
+
+	auto gmg = app.add_subcommand("GMG", "GMG solver options");
+
+	GMG::CycleOpts copts;
+
+	gmg->add_option("--max_levels", copts.max_levels,
+	                "The max number of levels in GMG cycle. 0 means no limit.");
+
+	gmg->add_option(
+	"--patches_per_proc", copts.patches_per_proc,
+	"Lowest level is guaranteed to have at least this number of patches per processor.");
+
+	gmg->add_option("--pre_sweeps", copts.pre_sweeps, "Number of sweeps on down cycle");
+
+	gmg->add_option("--post_sweeps", copts.post_sweeps, "Number of sweeps on up cycle");
+
+	gmg->add_option("--mid_sweeps", copts.mid_sweeps,
+	                "Number of sweeps inbetween up and down cycle");
+
+	gmg->add_option("--coarse_sweeps", copts.coarse_sweeps, "Number of sweeps on coarse level");
+
+	gmg->add_option("--cycle_type", copts.cycle_type, "Cycle type");
+
 	// output options
 
 	string claw_filename = "";
@@ -470,8 +490,7 @@ int main(int argc, char *argv[])
 			} else if (preconditioner == "GMG") {
 				timer.start("GMG Setup");
 
-				M
-				= GMG::CycleFactory2d::getCycle(gmg_filename, dcg, p_solver, p_operator, p_interp);
+				M = GMG::CycleFactory2d::getCycle(copts, dcg, p_solver, p_operator, p_interp);
 
 				timer.stop("GMG Setup");
 			} else if (preconditioner == "cheb") {

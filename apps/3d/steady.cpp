@@ -19,11 +19,15 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#include <Thunderegg/BalancedLevelsGenerator.h>
+#include "CLI11.hpp"
+#include "Init.h"
+#include "Writers/ClawWriter.h"
+#include "Writers/MMWriter.h"
 #include <Thunderegg/BiCGStab.h>
 #include <Thunderegg/DomainCollection.h>
 #include <Thunderegg/FunctionWrapper.h>
-#include <Thunderegg/GMG/Helper.h>
+#include <Thunderegg/GMG/CycleFactory3d.h>
+#include <Thunderegg/GMG/CycleOpts.h>
 #include <Thunderegg/MatrixHelper.h>
 #include <Thunderegg/OctTree.h>
 #include <Thunderegg/Operators/DomainWrapOp.h>
@@ -37,12 +41,9 @@
 #include <Thunderegg/SchurMatrixHelper.h>
 #include <Thunderegg/SchwarzPrec.h>
 #include <Thunderegg/SevenPtPatchOperator.h>
+#include <Thunderegg/ThundereggDCG.h>
 #include <Thunderegg/Timer.h>
 #include <Thunderegg/TriLinInterp.h>
-#include "Writers/ClawWriter.h"
-#include "Writers/MMWriter.h"
-#include "Init.h"
-#include "CLI11.hpp"
 #ifdef ENABLE_AMGX
 #include "AmgxWrapper.h"
 #endif
@@ -120,12 +121,8 @@ int main(int argc, char *argv[])
 	app.add_set_ignore_case("--solver", solver_type, {"petsc", "thunderegg"},
 	                        "Which Solver to use");
 	string preconditioner = "";
-	auto   prec_opt
-	= app.add_set_ignore_case("--prec", preconditioner, {"GMG", "Schwarz", "BlockJacobi", "cheb"},
-	                          "Which Preconditoner to use");
-
-	string gmg_filename = "";
-	app.add_option("--gmg_config", gmg_filename, "Which problem to solve")->needs(prec_opt);
+	app.add_set_ignore_case("--prec", preconditioner, {"GMG", "Schwarz", "BlockJacobi", "cheb"},
+	                        "Which Preconditoner to use");
 
 	string patch_solver = "fftw";
 	app.add_option("--patch_solver", patch_solver, "Which patch solver to use");
@@ -135,6 +132,31 @@ int main(int argc, char *argv[])
 
 	string petsc_opts = "";
 	app.add_option("--petsc_opts", petsc_opts, "petsc options");
+
+	// GMG options
+
+	auto gmg = app.add_subcommand("GMG", "GMG solver options");
+
+	GMG::CycleOpts copts;
+
+	gmg->add_option("--max_levels", copts.max_levels,
+	                "The max number of levels in GMG cycle. 0 means no limit.");
+
+	gmg->add_option(
+	"--patches_per_proc", copts.patches_per_proc,
+	"Lowest level is guaranteed to have at least this number of patches per processor.");
+
+	gmg->add_option("--pre_sweeps", copts.pre_sweeps, "Number of sweeps on down cycle");
+
+	gmg->add_option("--post_sweeps", copts.post_sweeps, "Number of sweeps on up cycle");
+
+	gmg->add_option("--mid_sweeps", copts.mid_sweeps,
+	                "Number of sweeps inbetween up and down cycle");
+
+	gmg->add_option("--coarse_sweeps", copts.coarse_sweeps, "Number of sweeps on coarse level");
+
+	gmg->add_option("--cycle_type", copts.cycle_type, "Cycle type");
+
 	// output options
 
 	string claw_filename = "";
@@ -276,17 +298,10 @@ int main(int argc, char *argv[])
 	Tools::Timer timer;
 	for (int loop = 0; loop < loop_count; loop++) {
 		timer.start("Domain Initialization");
-		BalancedLevelsGenerator<3> blg(t, ns);
 
-		// partition domains if running in parallel
-		if (num_procs > 1) {
-			timer.start("Zoltan Balance");
-			blg.zoltanBalance();
-			timer.stop("Zoltan Balance");
-		}
+		shared_ptr<DomainCollectionGenerator<3>> dcg(new ThundereggDCG<3>(t, ns, neumann));
 
-		dc.reset(new DomainCollection<3>(blg.levels[t.num_levels - 1], ns));
-		if (neumann) { dc->setNeumann(); }
+		dc = dcg->getFinestDC();
 
 		if (patch_solver == "dft") {
 			p_solver.reset(new DftPatchSolver<3>(*dc));
@@ -464,17 +479,10 @@ int main(int argc, char *argv[])
 				M.reset(new SchwarzPrec<3>(sch));
 			} else if (preconditioner == "GMG") {
 				timer.start("GMG Setup");
-				timer.start("GMG Domain Collection Setup");
-				vector<shared_ptr<DomainCollection<3>>> dcs(t.num_levels);
-				dcs[0] = dc;
-				for (int i = 1; i < t.num_levels; i++) {
-					dcs[i].reset(new DomainCollection<3>(blg.levels[t.num_levels - 1 - i], ns));
-				}
-				timer.stop("GMG Domain Collection Setup");
 
-				GMG::Helper gh(n, dcs, sch, gmg_filename);
+				M = GMG::CycleFactory3d::getCycle(copts, dcg, p_solver, p_operator, p_interp);
+
 				timer.stop("GMG Setup");
-				M = gh.cycle;
 			} else if (preconditioner == "cheb") {
 				throw 3;
 			}

@@ -22,7 +22,7 @@
 #ifndef GMGVCycle_H
 #define GMGVCycle_H
 #include <Thunderegg/GMG/Cycle.h>
-#include <Thunderegg/tpl/json.hpp>
+#include <Thunderegg/GMG/CycleOpts.h>
 namespace GMG
 {
 /**
@@ -67,23 +67,11 @@ template <size_t D> class VCycle : public Cycle<D>
 	 *
 	 * @param finest_level a pointer to the finest level
 	 */
-	VCycle(std::shared_ptr<Level<D>> finest_level, nlohmann::json config_j) : Cycle<D>(finest_level)
+	VCycle(std::shared_ptr<Level<D>> finest_level, const CycleOpts &opts) : Cycle<D>(finest_level)
 	{
-		try {
-			num_pre_sweeps = config_j.at("pre_sweeps");
-		} catch (nlohmann::detail::out_of_range oor) {
-			throw 0;
-		}
-		try {
-			num_post_sweeps = config_j.at("post_sweeps");
-		} catch (nlohmann::detail::out_of_range oor) {
-			throw 0;
-		}
-		try {
-			num_coarse_sweeps = config_j.at("coarse_sweeps");
-		} catch (nlohmann::detail::out_of_range oor) {
-			throw 0;
-		}
+		num_pre_sweeps    = opts.pre_sweeps;
+		num_post_sweeps   = opts.post_sweeps;
+		num_coarse_sweeps = opts.coarse_sweeps;
 	}
 };
 } // namespace GMG

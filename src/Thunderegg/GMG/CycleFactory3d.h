@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -19,23 +19,24 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef FISHPACKPATCHSOLVER_H
-#define FISHPACKPATCHSOLVER_H
-#include "PatchSolvers/PatchSolver.h"
-class FishpackPatchSolver : public PatchSolver<2>
+#ifndef GMGCYCLEFACTORY3D_H
+#define GMGCYCLEFACTORY3D_H
+#include <Thunderegg/DomainCollectionGenerator.h>
+#include <Thunderegg/GMG/Cycle.h>
+#include <Thunderegg/GMG/CycleOpts.h>
+#include <Thunderegg/Interpolator.h>
+#include <Thunderegg/PatchOperator.h>
+#include <Thunderegg/PatchSolvers/PatchSolver.h>
+namespace GMG
 {
-	double lambda = 0;
-
+class CycleFactory3d
+{
 	public:
-	FishpackPatchSolver(double lambda = 0) { this->lambda = lambda; }
-	~FishpackPatchSolver() {}
-	void addDomain(SchurDomain<2> &d) {}
-	void domainSolve(std::deque<SchurDomain<2>> &domains, const Vec f, Vec u, const Vec gamma)
-	{
-		for (SchurDomain<2> &d : domains) {
-			solve(d, f, u, gamma);
-		}
-	}
-	void solve(SchurDomain<2> &d, const Vec f, Vec u, const Vec gamma);
+	static std::shared_ptr<Cycle<3>> getCycle(const CycleOpts &                             opts,
+	                                          std::shared_ptr<DomainCollectionGenerator<3>> dcg,
+	                                          std::shared_ptr<PatchSolver<3>>               solver,
+	                                          std::shared_ptr<PatchOperator<3>>             op,
+	                                          std::shared_ptr<IfaceInterp<3>> interpolator);
 };
+} // namespace GMG
 #endif

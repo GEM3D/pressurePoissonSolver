@@ -21,21 +21,18 @@ list(APPEND Thunderegg_SRCS Thunderegg/PBMatrix.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/PolyChebPrec.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/SchurHelper.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/DomainCollection.cpp)
-list(APPEND Thunderegg_SRCS Thunderegg/BalancedLevelsGenerator.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/ThundereggDCG.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/Domain.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/SchurDomain.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/Vector.cpp)
 
-list(APPEND Thunderegg_SRCS Thunderegg/GMG/Helper.cpp)
-list(APPEND Thunderegg_SRCS Thunderegg/GMG/Helper2d.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/GMG/CycleFactory2d.cpp)
+list(APPEND Thunderegg_SRCS Thunderegg/GMG/CycleFactory3d.cpp)
 
 list(APPEND Thunderegg_SRCS Thunderegg/PatchSolvers/DftPatchSolver.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/PatchSolvers/FftwPatchSolver.cpp)
 
 if(p4est_FOUND)
-    list(APPEND Thunderegg_SRCS Thunderegg/p4estBLG.cpp)
     list(APPEND Thunderegg_SRCS Thunderegg/P4estDCG.cpp)
 endif()
 
