@@ -19,13 +19,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef SEVENPTPATCHOPERATOR_H
-#define SEVENPTPATCHOPERATOR_H
-#include <Thunderegg/PatchOperator.h>
-class SevenPtPatchOperator : public PatchOperator<3>
-{
-	public:
-	void apply(SchurDomain<3> &d, std::shared_ptr<const Vector<3>> u,
-	                   std::shared_ptr<const Vector<2>> gamma, std::shared_ptr<Vector<3>> f);
-};
-#endif
+#include "StarPatchOp.h"
+
+template class StarPatchOp<2>;
+template class StarPatchOp<3>;

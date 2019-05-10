@@ -26,6 +26,9 @@ list(APPEND Thunderegg_SRCS Thunderegg/Domain.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/SchurDomain.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/Vector.cpp)
 
+list(APPEND Thunderegg_SRCS Thunderegg/SevenPtPatchOperator.cpp)
+list(APPEND Thunderegg_SRCS Thunderegg/StarPatchOp.cpp)
+
 list(APPEND Thunderegg_SRCS Thunderegg/GMG/CycleFactory2d.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/GMG/CycleFactory3d.cpp)
 

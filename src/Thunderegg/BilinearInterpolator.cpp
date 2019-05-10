@@ -20,9 +20,7 @@
  ***************************************************************************/
 
 #include "BilinearInterpolator.h"
-#include "Utils.h"
 using namespace std;
-using namespace Utils;
 void BilinearInterpolator::interpolate(SchurDomain<2> &d, std::shared_ptr<const Vector<2>> u,
                                        std::shared_ptr<Vector<1>> interp)
 {

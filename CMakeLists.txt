@@ -9,7 +9,7 @@ include(GNUInstallDirs)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
 set (CMAKE_CXX_FLAGS "-Wall --std=c++11 -O3 -march=native ${CMAKE_CXX_FLAGS}")
-set (CMAKE_CXX_FLAGS_DEBUG  "-Wall --std=c++11 -g -O3 -DDD_DEBUG")
+set (CMAKE_CXX_FLAGS_DEBUG  "-Wall --std=c++11 -g -O3 -march=native -DDD_DEBUG")
 
 find_program(CCACHE_FOUND ccache)
 if(CCACHE_FOUND)

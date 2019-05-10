@@ -23,7 +23,6 @@
 #define DFTPATCHSOLVER_H
 #include <Thunderegg/DomainCollection.h>
 #include <Thunderegg/PatchSolvers/PatchSolver.h>
-#include <Thunderegg/Utils.h>
 #include <Thunderegg/ValVector.h>
 #include <bitset>
 #include <map>
@@ -176,7 +175,6 @@ inline void DftPatchSolver<D>::solve(SchurDomain<D> &d, std::shared_ptr<const Ve
                                      std::shared_ptr<const Vector<D - 1>> gamma)
 {
 	using namespace std;
-	using namespace Utils;
 	const LocalData<D> f_view      = f->getLocalData(d.id_local);
 	LocalData<D>       f_copy_view = f_copy.getLocalData(0);
 	LocalData<D>       tmp_view    = tmp.getLocalData(0);

@@ -41,6 +41,7 @@
 #include <Thunderegg/SchurMatrixHelper.h>
 #include <Thunderegg/SchwarzPrec.h>
 #include <Thunderegg/SevenPtPatchOperator.h>
+#include <Thunderegg/StarPatchOp.h>
 #include <Thunderegg/ThundereggDCG.h>
 #include <Thunderegg/Timer.h>
 #include <Thunderegg/TriLinInterp.h>
@@ -290,7 +291,7 @@ int main(int argc, char *argv[])
 	shared_ptr<PatchSolver<3>> p_solver;
 
 	// patch operator
-	shared_ptr<PatchOperator<3>> p_operator(new SevenPtPatchOperator());
+	shared_ptr<PatchOperator<3>> p_operator(new StarPatchOp<3>());
 
 	// interface interpolator
 	shared_ptr<IfaceInterp<3>> p_interp(new TriLinInterp());

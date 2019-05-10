@@ -23,8 +23,8 @@
 #define VECTOR_H
 #include <Thunderegg/Side.h>
 #include <algorithm>
-#include <memory>
 #include <cmath>
+#include <memory>
 #include <mpi.h>
 #include <numeric>
 class LocalDataManager
@@ -71,7 +71,7 @@ template <size_t D> class LocalData
 	std::array<int, D>                end;
 	std::shared_ptr<LocalDataManager> ldm;
 
-	LocalData<D - 1> getSliceOnSidePriv(Side<D> s) const;
+	LocalData<D - 1> getSliceOnSidePriv(Side<D> s, int offset) const;
 
 	public:
 	LocalData() = default;
@@ -87,6 +87,22 @@ template <size_t D> class LocalData
 		for (size_t i = 0; i < D; i++) {
 			end[i]--;
 		}
+	}
+    inline double *getPtr(const std::array<int, D> &coord)
+	{
+		int idx = 0;
+		for (size_t i = 0; i < D; i++) {
+			idx += strides[i] * coord[i];
+		}
+		return data+idx;;
+	}
+	inline const double *getPtr(const std::array<int, D> &coord) const
+	{
+		int idx = 0;
+		for (size_t i = 0; i < D; i++) {
+			idx += strides[i] * coord[i];
+		}
+		return data+idx;;
 	}
 	inline double &operator[](const std::array<int, D> &coord)
 	{
@@ -104,13 +120,13 @@ template <size_t D> class LocalData
 		}
 		return data[idx];
 	}
-	LocalData<D - 1> getSliceOnSide(Side<D> s)
+	LocalData<D - 1> getSliceOnSide(Side<D> s, int offset = 0)
 	{
-		return getSliceOnSidePriv(s);
+		return getSliceOnSidePriv(s, offset);
 	}
-	const LocalData<D - 1> getSliceOnSide(Side<D> s) const
+	const LocalData<D - 1> getSliceOnSide(Side<D> s, int offset = 0) const
 	{
-		return getSliceOnSidePriv(s);
+		return getSliceOnSidePriv(s, offset);
 	}
 	const std::array<int, D> &getLengths() const
 	{
@@ -133,7 +149,8 @@ template <size_t D> class LocalData
 		return data;
 	}
 };
-template <size_t D> inline LocalData<D - 1> LocalData<D>::getSliceOnSidePriv(Side<D> s) const
+template <size_t D>
+inline LocalData<D - 1> LocalData<D>::getSliceOnSidePriv(Side<D> s, int offset) const
 {
 	size_t                 axis = s.toInt() / 2;
 	std::array<int, D - 1> new_strides;
@@ -151,9 +168,10 @@ template <size_t D> inline LocalData<D - 1> LocalData<D>::getSliceOnSidePriv(Sid
 		new_lengths[i] = lengths[i + 1];
 	}
 	if (s.isLowerOnAxis()) {
-		return LocalData<D - 1>(data, new_strides, new_lengths, ldm);
+		double *new_data = data + offset * strides[axis];
+		return LocalData<D - 1>(new_data, new_strides, new_lengths, ldm);
 	} else {
-		double *new_data = data + (lengths[axis] - 1) * strides[axis];
+		double *new_data = data + (lengths[axis] - 1 - offset) * strides[axis];
 		return LocalData<D - 1>(new_data, new_strides, new_lengths, ldm);
 	}
 }
@@ -221,7 +239,7 @@ template <size_t D> class Vector
 		}
 	}
 	virtual void addScaled(double alpha, std::shared_ptr<const Vector<D>> a, double beta,
-	                          std::shared_ptr<const Vector<D>> b)
+	                       std::shared_ptr<const Vector<D>> b)
 	{
 		for (int i = 0; i < num_local_patches; i++) {
 			LocalData<D>       ld   = getLocalData(i);
@@ -272,7 +290,7 @@ template <size_t D> class Vector
 			nested_loop<D>(ld.getStart(), ld.getEnd(),
 			               [&](std::array<int, D> coord) { sum += ld[coord] * ld[coord]; });
 		}
-		 MPI_Allreduce(&sum, &sum, 1, MPI_DOUBLE, MPI_SUM, comm);
+		MPI_Allreduce(&sum, &sum, 1, MPI_DOUBLE, MPI_SUM, comm);
 		return sqrt(sum);
 	}
 	virtual double infNorm() const

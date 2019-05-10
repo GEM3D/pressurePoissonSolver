@@ -20,8 +20,6 @@
  ***************************************************************************/
 
 #include "TriLinInterp.h"
-#include "Utils.h"
-using namespace Utils;
 void TriLinInterp::interpolate(SchurDomain<3> &d, std::shared_ptr<const Vector<3>> u,
                                std::shared_ptr<Vector<2>> interp)
 {

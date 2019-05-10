@@ -26,6 +26,7 @@
 #include <Thunderegg/BilinearInterpolator.h>
 #include <Thunderegg/DomainCollection.h>
 #include <Thunderegg/FivePtPatchOperator.h>
+#include <Thunderegg/StarPatchOp.h>
 #include <Thunderegg/FunctionWrapper.h>
 #include <Thunderegg/GMG/CycleFactory2d.h>
 #include <Thunderegg/MatrixHelper2d.h>
@@ -299,7 +300,7 @@ int main(int argc, char *argv[])
 	}
 
 	// patch operator
-	shared_ptr<PatchOperator<2>> p_operator(new FivePtPatchOperator());
+	shared_ptr<PatchOperator<2>> p_operator(new StarPatchOp<2>());
 
 	// interface interpolator
 	shared_ptr<IfaceInterp<2>> p_interp(new BilinearInterpolator());
