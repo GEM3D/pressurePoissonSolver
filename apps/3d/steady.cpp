@@ -25,7 +25,6 @@
 #include "Writers/MMWriter.h"
 #include <Thunderegg/BiCGStab.h>
 #include <Thunderegg/DomainCollection.h>
-#include <Thunderegg/FunctionWrapper.h>
 #include <Thunderegg/GMG/CycleFactory3d.h>
 #include <Thunderegg/GMG/CycleOpts.h>
 #include <Thunderegg/MatrixHelper.h>

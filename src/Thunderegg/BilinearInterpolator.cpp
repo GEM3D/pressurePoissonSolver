@@ -21,6 +21,26 @@
 
 #include "BilinearInterpolator.h"
 using namespace std;
+void BilinearInterpolator::interpolate(const std::vector<SchurDomain<2>> &patches,
+                                       std::shared_ptr<const Vector<2>>   u,
+                                       std::shared_ptr<Vector<1>>         interp)
+{
+	for (SchurDomain<2> p : patches) {
+		for (Side<2> s : Side<2>::getValues()) {
+			if (p.hasNbr(s)) {
+				std::deque<int>       idx;
+				std::deque<IfaceType> types;
+
+				p.getIfaceInfoPtr(s)->getLocalIndexes(idx);
+				p.getIfaceInfoPtr(s)->getIfaceTypes(types);
+
+				for (size_t i = 0; i < idx.size(); i++) {
+					interpolate(p, s, idx[i], types[i], u, interp);
+				}
+			}
+		}
+	}
+}
 void BilinearInterpolator::interpolate(SchurDomain<2> &d, std::shared_ptr<const Vector<2>> u,
                                        std::shared_ptr<Vector<1>> interp)
 {
@@ -28,7 +48,10 @@ void BilinearInterpolator::interpolate(SchurDomain<2> &d, std::shared_ptr<const 
 		if (d.hasNbr(s)) {
 			std::deque<int>       idx;
 			std::deque<IfaceType> types;
-			d.getIfaceInfoPtr(s)->getIdxAndTypes(idx, types);
+
+			d.getIfaceInfoPtr(s)->getLocalIndexes(idx);
+			d.getIfaceInfoPtr(s)->getIfaceTypes(types);
+
 			for (size_t i = 0; i < idx.size(); i++) {
 				interpolate(d, s, idx[i], types[i], u, interp);
 			}

@@ -19,12 +19,17 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef BILINEARINTERPOLATOR_H
-#define BILINEARINTERPOLATOR_H
+#ifndef THUNDEREGG_BILINEARINTERPOLATOR_H
+#define THUNDEREGG_BILINEARINTERPOLATOR_H
 #include <Thunderegg/IfaceInterp.h>
+/**
+ * @brief a bilinear interpolator
+ */
 class BilinearInterpolator : public IfaceInterp<2>
 {
 	public:
+	void interpolate(const std::vector<SchurDomain<2>> &patches, std::shared_ptr<const Vector<2>> u,
+	                 std::shared_ptr<Vector<1>> interp);
 	void interpolate(SchurDomain<2> &d, std::shared_ptr<const Vector<2>> u,
 	                 std::shared_ptr<Vector<1>> interp);
 	void interpolate(SchurDomain<2> &d, Side<2> s, int local_index, IfaceType itype,

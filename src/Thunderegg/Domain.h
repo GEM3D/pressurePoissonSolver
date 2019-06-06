@@ -19,8 +19,8 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef DOMAIN_H
-#define DOMAIN_H
+#ifndef THUNDEREGG_DOMAIN_H
+#define THUNDEREGG_DOMAIN_H
 #include "BufferWriter.h"
 #include "Serializable.h"
 #include "Side.h"

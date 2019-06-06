@@ -22,7 +22,6 @@
 #ifndef GMGWCycle_H
 #define GMGWCycle_H
 #include <Thunderegg/GMG/Cycle.h>
-#include <Thunderegg/tpl/json.hpp>
 namespace GMG
 {
 /**

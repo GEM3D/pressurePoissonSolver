@@ -25,6 +25,8 @@
 class TriLinInterp : public IfaceInterp<3>
 {
 	public:
+	void interpolate(const std::vector<SchurDomain<3>> &patches, std::shared_ptr<const Vector<3>> u,
+	                 std::shared_ptr<Vector<2>> interp);
 	void interpolate(SchurDomain<3> &d, std::shared_ptr<const Vector<3>> u,
 	                 std::shared_ptr<Vector<2>> interp);
 	void interpolate(SchurDomain<3> &d, Side<3> s, int local_index, IfaceType itype,

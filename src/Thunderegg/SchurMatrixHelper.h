@@ -19,8 +19,8 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#include "PBMatrix.h"
-#include "SchurHelper.h"
+#include <Thunderegg/Experimental/PBMatrix.h>
+#include <Thunderegg/SchurHelper.h>
 #include <functional>
 #include <petscmat.h>
 #include <valarray>

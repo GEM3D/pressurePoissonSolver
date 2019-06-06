@@ -20,6 +20,26 @@
  ***************************************************************************/
 
 #include "TriLinInterp.h"
+void TriLinInterp::interpolate(const std::vector<SchurDomain<3>> &patches,
+                               std::shared_ptr<const Vector<3>>   u,
+                               std::shared_ptr<Vector<2>>         interp)
+{
+	for (SchurDomain<3> p : patches) {
+		for (Side<3> s : Side<3>::getValues()) {
+			if (p.hasNbr(s)) {
+				std::deque<int>       idx;
+				std::deque<IfaceType> types;
+
+				p.getIfaceInfoPtr(s)->getLocalIndexes(idx);
+				p.getIfaceInfoPtr(s)->getIfaceTypes(types);
+
+				for (size_t i = 0; i < idx.size(); i++) {
+					interpolate(p, s, idx[i], types[i], u, interp);
+				}
+			}
+		}
+	}
+}
 void TriLinInterp::interpolate(SchurDomain<3> &d, std::shared_ptr<const Vector<3>> u,
                                std::shared_ptr<Vector<2>> interp)
 {
@@ -27,7 +47,10 @@ void TriLinInterp::interpolate(SchurDomain<3> &d, std::shared_ptr<const Vector<3
 		if (d.hasNbr(s)) {
 			std::deque<int>       idx;
 			std::deque<IfaceType> types;
-			d.getIfaceInfoPtr(s)->getIdxAndTypes(idx, types);
+
+			d.getIfaceInfoPtr(s)->getLocalIndexes(idx);
+			d.getIfaceInfoPtr(s)->getIfaceTypes(types);
+
 			for (size_t i = 0; i < idx.size(); i++) {
 				interpolate(d, s, idx[i], types[i], u, interp);
 			}

@@ -27,7 +27,6 @@
 #include <Thunderegg/DomainCollection.h>
 #include <Thunderegg/FivePtPatchOperator.h>
 #include <Thunderegg/StarPatchOp.h>
-#include <Thunderegg/FunctionWrapper.h>
 #include <Thunderegg/GMG/CycleFactory2d.h>
 #include <Thunderegg/MatrixHelper2d.h>
 #include <Thunderegg/Operators/DomainWrapOp.h>
@@ -236,7 +235,21 @@ int main(int argc, char *argv[])
 	function<double(double, double)> nfun;
 	function<double(double, double)> nfuny;
 
-	if (problem == "zero") {
+	if (true) {
+        double x0=.5;
+        double y0=.5;
+        double alpha=1000;
+		ffun  = [&](double x, double y) { 
+                double r2 = pow((x-x0),2) + pow((y-y0),2);                   
+                return exp(-alpha/2.0*r2)*(pow(alpha,2)*r2 - 2*alpha);  
+        };
+		gfun  = [&](double x, double y) { 
+                double r2 = pow((x-x0),2) + pow((y-y0),2);                   
+                return exp(-alpha/2.0*r2);  
+        };
+		nfun  = [](double x, double y) { return 0; };
+		nfuny = [](double x, double y) { return 0; };
+    }else if (problem == "zero") {
 		ffun  = [](double x, double y) { return 0; };
 		gfun  = [](double x, double y) { return 0; };
 		nfun  = [](double x, double y) { return 0; };

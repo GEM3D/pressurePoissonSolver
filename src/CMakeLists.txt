@@ -17,7 +17,6 @@ list(APPEND Thunderegg_SRCS Thunderegg/MatrixHelper.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/MatrixHelper2d.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/TriLinInterp.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/BilinearInterpolator.cpp)
-list(APPEND Thunderegg_SRCS Thunderegg/PBMatrix.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/PolyChebPrec.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/SchurHelper.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/DomainCollection.cpp)
@@ -38,6 +37,8 @@ list(APPEND Thunderegg_SRCS Thunderegg/PatchSolvers/FftwPatchSolver.cpp)
 if(p4est_FOUND)
     list(APPEND Thunderegg_SRCS Thunderegg/P4estDCG.cpp)
 endif()
+
+list(APPEND Thunderegg_SRCS Thunderegg/Experimental/PBMatrix.cpp)
 
 add_library(Thunderegg ${Thunderegg_SRCS})
 
