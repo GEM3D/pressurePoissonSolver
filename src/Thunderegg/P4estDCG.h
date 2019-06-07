@@ -31,7 +31,6 @@ class P4estDCG : public DomainCollectionGenerator<2>
 	using BlockMapFunc = std::function<void(int, double, double, double &, double &)>;
 
 	private:
-	bool neumann;
 	/**
 	 * @brief copy of p4est tree
 	 */
@@ -47,12 +46,12 @@ class P4estDCG : public DomainCollectionGenerator<2>
 	double             x_scale;
 	double             y_scale;
 	BlockMapFunc       bmf;
+	IsNeumannFunc<2>   inf;
 
 	void extractLevel();
 
 	public:
-	P4estDCG(p4est_t *p4est, const std::array<int, 2> &ns, bool neumann,
-	         BlockMapFunc bmf);
+	P4estDCG(p4est_t *p4est, const std::array<int, 2> &ns, IsNeumannFunc<2> inf, BlockMapFunc bmf);
 	~P4estDCG();
 	std::shared_ptr<DomainCollection<2>> getFinestDC();
 	bool                                 hasCoarserDC();

@@ -21,9 +21,10 @@
 
 #ifndef THUNDEREGG_DOMAIN_H
 #define THUNDEREGG_DOMAIN_H
-#include "BufferWriter.h"
-#include "Serializable.h"
-#include "Side.h"
+#include <Thunderegg/BufferWriter.h>
+#include <Thunderegg/Serializable.h>
+#include <Thunderegg/Side.h>
+#include <Thunderegg/TypeDefs.h>
 #include <array>
 #include <bitset>
 #include <map>
@@ -76,7 +77,7 @@ template <size_t D> struct Domain : public Serializable {
 	inline bool       isNeumann(Side<D> s) const;
 	void              setLocalNeighborIndexes(std::map<int, int> &rev_map);
 	void              setGlobalNeighborIndexes(std::map<int, int> &rev_map);
-	void              setNeumann();
+	void              setNeumann(IsNeumannFunc<D> inf);
 	std::vector<int>  getNbrIds();
 	int               serialize(char *buffer) const;
 	int               deserialize(char *buffer);
@@ -353,10 +354,18 @@ template <size_t D> inline void Domain<D>::setGlobalNeighborIndexes(std::map<int
 		if (hasNbr(s)) { getNbrInfoPtr(s)->setGlobalIndexes(rev_map); }
 	}
 }
-template <size_t D> inline void Domain<D>::setNeumann()
+template <size_t D> inline void Domain<D>::setNeumann(IsNeumannFunc<D> inf)
 {
-	for (size_t q = 0; q < neumann.size(); q++) {
-		neumann[q] = !hasNbr(static_cast<Side<D>>(q));
+	for (Side<D> s : Side<D>::getValues()) {
+		if (!hasNbr(s)) {
+			std::array<double, D> bound_start = starts;
+			if (!s.isLowerOnAxis()) { bound_start[s.axis()] += spacings[s.axis()] * ns[s.axis()]; }
+			std::array<double, D> bound_end = bound_start;
+			for (size_t dir = 0; dir < D; dir++) {
+				if (dir != s.axis()) { bound_end[dir] += spacings[dir] * ns[dir]; }
+			}
+			neumann[s.toInt()] = inf(s, bound_end, bound_start);
+		}
 	}
 }
 template <size_t D> inline std::vector<int> Domain<D>::getNbrIds()

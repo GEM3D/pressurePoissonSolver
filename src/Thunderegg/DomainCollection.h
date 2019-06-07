@@ -189,8 +189,7 @@ template <size_t D> class DomainCollection
 	}
 
 	public:
-	int  rank;
-	bool neumann = false;
+	int rank;
 	/**
 	 * @brief Number of total domains.
 	 */
@@ -243,12 +242,10 @@ template <size_t D> class DomainCollection
 			p.second->setPtrs(domains);
 		}
 	}
-
-	void setNeumann()
+	void setNeumann(IsNeumannFunc<D> inf)
 	{
-		neumann = true;
 		for (auto &p : domains) {
-			p.second->setNeumann();
+			p.second->setNeumann(inf);
 		}
 	}
 	std::shared_ptr<PetscVector<D>> getNewDomainVec() const

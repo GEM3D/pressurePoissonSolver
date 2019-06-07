@@ -53,12 +53,13 @@ static void set_ids(p4est_iter_volume_info_t *info, void *user_data)
 /**
  * Constructor
  */
-P4estDCG::P4estDCG(p4est_t *p4est, const std::array<int, 2> &ns, bool neumann, BlockMapFunc bmf)
+P4estDCG::P4estDCG(p4est_t *p4est, const std::array<int, 2> &ns, IsNeumannFunc<2> inf,
+                   BlockMapFunc bmf)
 {
-	this->neumann = neumann;
-	this->ns      = ns;
-
+	this->ns  = ns;
 	this->bmf = bmf;
+	this->inf = inf;
+
 	double x_start;
 	double y_start;
 	bmf(0, 0, 0, x_start, y_start);
@@ -285,7 +286,7 @@ void P4estDCG::extractLevel()
 	// create DC object
 	dc_list.push_back(
 	shared_ptr<DomainCollection<2>>(new DomainCollection<2>(new_level, ns, true)));
-	if (neumann) { dc_list.back()->setNeumann(); }
+	dc_list.back()->setNeumann(inf);
 
 	curr_level--;
 }

@@ -168,7 +168,11 @@ template <size_t D> inline void ThundereggDCG<D>::extractLevel()
 		balanceLevelWithLower(new_level, dc_list.back()->getDomainMap());
 	}
 	dc_list.push_back(std::shared_ptr<DomainCollection<D>>(new DomainCollection<D>(new_level, ns)));
-	if (neumann) { dc_list.back()->setNeumann(); }
+	if (neumann) {
+		IsNeumannFunc<D> inf = [](Side<D>, const std::array<double, D> &,
+		                          const std::array<double, D> &) { return true; };
+		dc_list.back()->setNeumann(inf);
+	}
 	curr_level--;
 }
 template <size_t D> inline void ThundereggDCG<D>::balanceLevel(DomainMap &level)

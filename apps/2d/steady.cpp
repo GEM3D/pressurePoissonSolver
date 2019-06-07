@@ -224,8 +224,11 @@ int main(int argc, char *argv[])
 			x = unit_x;
 			y = unit_y;
 		};
+		auto inf = [=](Side<2> s, const array<double,2>&,const array<double,2>&) {
+			return neumann;
+		};
 
-		dcg.reset(new P4estDCG(ttp.p4est, ns, neumann, bmf));
+		dcg.reset(new P4estDCG(ttp.p4est, ns, inf, bmf));
 #else
 	if (false) {
 #endif
@@ -241,7 +244,7 @@ int main(int argc, char *argv[])
 	function<double(double, double)> nfun;
 	function<double(double, double)> nfuny;
 
-	if (true) {
+	if (problem=="gauss") {
 		double x0    = .5;
 		double y0    = .5;
 		double alpha = 1000;
@@ -287,7 +290,7 @@ int main(int argc, char *argv[])
 		gfun  = [](double x, double y) { return 0; };
 		nfun  = [](double x, double y) { return 0; };
 		nfuny = [](double x, double y) { return 0; };
-	} else if (problem == "gauss") {
+	} else if (problem == "trig gauss") {
 		gfun = [](double x, double y) { return exp(cos(10 * M_PI * x)) - exp(cos(11 * M_PI * y)); };
 		ffun = [](double x, double y) {
 			return 100 * M_PI * M_PI * (pow(sin(10 * M_PI * x), 2) - cos(10 * M_PI * x))
