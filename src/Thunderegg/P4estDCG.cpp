@@ -53,11 +53,20 @@ static void set_ids(p4est_iter_volume_info_t *info, void *user_data)
 /**
  * Constructor
  */
-P4estDCG::P4estDCG(p4est_t *p4est, std::array<int, 2> ns, bool neumann)
+P4estDCG::P4estDCG(p4est_t *p4est, const std::array<int, 2> &ns, bool neumann, BlockMapFunc bmf)
 {
 	this->neumann = neumann;
 	this->ns      = ns;
-	my_p4est      = p4est_copy(p4est, false);
+
+	this->bmf = bmf;
+	double x_start;
+	double y_start;
+	bmf(0, 0, 0, x_start, y_start);
+	bmf(0, 1, 1, x_scale, y_scale);
+	x_scale -= x_start;
+	y_scale -= y_start;
+
+	my_p4est = p4est_copy(p4est, false);
 
 	int max_level = 0;
 	p4est_iterate_ext(my_p4est, nullptr, &max_level, get_num_levels, nullptr, nullptr, 0);
@@ -94,6 +103,9 @@ struct create_domains_ctx {
 	void **                                    ghost_data;
 	std::array<int, 2>                         ns;
 	std::map<int, std::shared_ptr<Domain<2>>> *dmap;
+	P4estDCG::BlockMapFunc                     bmf;
+	double                                     x_scale;
+	double                                     y_scale;
 };
 /**
  * @brief iterator to create domain objects
@@ -109,23 +121,22 @@ static void create_domains(p4est_iter_volume_info_t *info, void *user_data)
 	if (ptr == nullptr) { ptr.reset(new Domain<2>); }
 	Domain<2> &d = *ptr;
 
-	d.id       = global_id;
-	d.id_local = info->quadid;
+	d.id = global_id;
+	d.id_local
+	= info->quadid + p4est_tree_array_index(info->p4est->trees, info->treeid)->quadrants_offset;
 
 	// patch dimensions
 	d.ns = ctx.ns;
 
 	// cell spacings
 	double length = (double) P4EST_QUADRANT_LEN(info->quad->level) / P4EST_ROOT_LEN;
-	d.spacings.fill(length);
-	d.spacings[0] /= ctx.ns[0];
-	d.spacings[1] /= ctx.ns[1];
+	d.spacings[0] = length * ctx.x_scale / ctx.ns[0];
+	d.spacings[1] = length * ctx.y_scale / ctx.ns[1];
 
 	// coordinates in block
-	double x    = (double) info->quad->x / P4EST_ROOT_LEN;
-	double y    = (double) info->quad->y / P4EST_ROOT_LEN;
-	d.starts[0] = x;
-	d.starts[1] = y;
+	double x = (double) info->quad->x / P4EST_ROOT_LEN;
+	double y = (double) info->quad->y / P4EST_ROOT_LEN;
+	ctx.bmf(info->treeid, x, y, d.starts[0], d.starts[1]);
 
 	// set refinement level
 	d.refine_level = info->quad->level;
@@ -263,7 +274,7 @@ void P4estDCG::extractLevel()
 	p4est_ghost_exchange_data(my_p4est, ghost, ghost_data);
 
 	std::map<int, std::shared_ptr<Domain<2>>> new_level;
-	create_domains_ctx                        ctx = {ghost_data, ns, &new_level};
+	create_domains_ctx ctx = {ghost_data, ns, &new_level, bmf, x_scale, y_scale};
 	p4est_iterate_ext(my_p4est, ghost, &ctx, create_domains, link_domains, nullptr, 0);
 
 	p4est_ghost_destroy(ghost);

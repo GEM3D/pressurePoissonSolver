@@ -22,10 +22,14 @@
 #ifndef P4ESTDCG_H
 #define P4ESTDCG_H
 #include <Thunderegg/DomainCollectionGenerator.h>
+#include <functional>
 #include <list>
 #include <p4est_extended.h>
 class P4estDCG : public DomainCollectionGenerator<2>
 {
+	public:
+	using BlockMapFunc = std::function<void(int, double, double, double &, double &)>;
+
 	private:
 	bool neumann;
 	/**
@@ -40,11 +44,15 @@ class P4estDCG : public DomainCollectionGenerator<2>
 	int                curr_level;
 	int                num_levels;
 	std::array<int, 2> ns;
+	double             x_scale;
+	double             y_scale;
+	BlockMapFunc       bmf;
 
 	void extractLevel();
 
 	public:
-	P4estDCG(p4est_t *p4est, std::array<int, 2> ns, bool neumann = false);
+	P4estDCG(p4est_t *p4est, const std::array<int, 2> &ns, bool neumann,
+	         BlockMapFunc bmf);
 	~P4estDCG();
 	std::shared_ptr<DomainCollection<2>> getFinestDC();
 	bool                                 hasCoarserDC();

@@ -26,7 +26,6 @@
 #include <Thunderegg/BilinearInterpolator.h>
 #include <Thunderegg/DomainCollection.h>
 #include <Thunderegg/FivePtPatchOperator.h>
-#include <Thunderegg/StarPatchOp.h>
 #include <Thunderegg/GMG/CycleFactory2d.h>
 #include <Thunderegg/MatrixHelper2d.h>
 #include <Thunderegg/Operators/DomainWrapOp.h>
@@ -40,6 +39,7 @@
 #include <Thunderegg/SchurHelper.h>
 #include <Thunderegg/SchurMatrixHelper2d.h>
 #include <Thunderegg/SchwarzPrec.h>
+#include <Thunderegg/StarPatchOp.h>
 #include <Thunderegg/ThundereggDCG.h>
 #include <Thunderegg/Timer.h>
 #ifdef HAVE_VTK
@@ -219,7 +219,13 @@ int main(int argc, char *argv[])
 #ifdef HAVE_P4EST
 	if (use_p4est) {
 		TreeToP4est ttp(t);
-		dcg.reset(new P4estDCG(ttp.p4est, ns, neumann));
+
+		auto bmf = [](int block_no, double unit_x, double unit_y, double &x, double &y) {
+			x = unit_x;
+			y = unit_y;
+		};
+
+		dcg.reset(new P4estDCG(ttp.p4est, ns, neumann, bmf));
 #else
 	if (false) {
 #endif
@@ -236,20 +242,20 @@ int main(int argc, char *argv[])
 	function<double(double, double)> nfuny;
 
 	if (true) {
-        double x0=.5;
-        double y0=.5;
-        double alpha=1000;
-		ffun  = [&](double x, double y) { 
-                double r2 = pow((x-x0),2) + pow((y-y0),2);                   
-                return exp(-alpha/2.0*r2)*(pow(alpha,2)*r2 - 2*alpha);  
-        };
-		gfun  = [&](double x, double y) { 
-                double r2 = pow((x-x0),2) + pow((y-y0),2);                   
-                return exp(-alpha/2.0*r2);  
-        };
+		double x0    = .5;
+		double y0    = .5;
+		double alpha = 1000;
+		ffun         = [&](double x, double y) {
+            double r2 = pow((x - x0), 2) + pow((y - y0), 2);
+            return exp(-alpha / 2.0 * r2) * (pow(alpha, 2) * r2 - 2 * alpha);
+		};
+		gfun = [&](double x, double y) {
+			double r2 = pow((x - x0), 2) + pow((y - y0), 2);
+			return exp(-alpha / 2.0 * r2);
+		};
 		nfun  = [](double x, double y) { return 0; };
 		nfuny = [](double x, double y) { return 0; };
-    }else if (problem == "zero") {
+	} else if (problem == "zero") {
 		ffun  = [](double x, double y) { return 0; };
 		gfun  = [](double x, double y) { return 0; };
 		nfun  = [](double x, double y) { return 0; };
