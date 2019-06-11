@@ -175,7 +175,7 @@ inline void DftPatchSolver<D>::solve(SchurDomain<D> &d, std::shared_ptr<const Ve
                                      std::shared_ptr<const Vector<D - 1>> gamma)
 {
 	using namespace std;
-	const LocalData<D> f_view      = f->getLocalData(d.id_local);
+	const LocalData<D> f_view      = f->getLocalData(d.local_index);
 	LocalData<D>       f_copy_view = f_copy.getLocalData(0);
 	LocalData<D>       tmp_view    = tmp.getLocalData(0);
 
@@ -207,7 +207,7 @@ inline void DftPatchSolver<D>::solve(SchurDomain<D> &d, std::shared_ptr<const Ve
 
 	if (d.neumann.all()) { tmp.vec[0] = 0; }
 
-	LocalData<D> u_view = u->getLocalData(d.id_local);
+	LocalData<D> u_view = u->getLocalData(d.local_index);
 
 	execute_plan(plan2[d], tmp_view, u_view, false);
 

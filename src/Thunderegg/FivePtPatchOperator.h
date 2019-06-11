@@ -34,8 +34,8 @@ class FivePtPatchOperator : public PatchOperator<2>
 		double h_x = d.spacings[0];
 		double h_y = d.spacings[1];
 
-		LocalData<2>       f_data = f->getLocalData(d.id_local);
-		const LocalData<2> u_data = u->getLocalData(d.id_local);
+		LocalData<2>       f_data = f->getLocalData(d.local_index);
+		const LocalData<2> u_data = u->getLocalData(d.local_index);
 
 		double center, north, east, south, west;
 

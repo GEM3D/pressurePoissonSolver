@@ -40,10 +40,10 @@ PW_explicit<Mat> MatrixHelper2d::formCRSMatrix(double lambda)
 	MatMPIAIJSetPreallocation(A, 19, nullptr, 19, nullptr);
 
 	for (auto &p : dc.domains) {
-		Domain<2> &d     = *p.second;
-		double     h_x   = d.spacings[0];
-		double     h_y   = d.spacings[1];
-		int        start = nx * ny * d.id_global;
+		PatchInfo<2> &d     = *p.second;
+		double        h_x   = d.spacings[0];
+		double        h_y   = d.spacings[1];
+		int           start = nx * ny * d.local_index;
 
 		// center coeffs
 		double coeff = -2.0 / (h_x * h_x) - 2.0 / (h_y * h_y) + lambda;

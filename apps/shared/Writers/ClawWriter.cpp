@@ -44,14 +44,14 @@ void ClawWriter::write(Vec u, Vec resid)
 	q_file.precision(10);
 	q_file << scientific;
 	for (auto &p : dc.domains) {
-		Domain<2> &d = *p.second;
+		PatchInfo<2> &d = *p.second;
 		writePatch(d, q_file, u_view, resid_view);
 	}
 	VecRestoreArray(u, &u_view);
 	VecRestoreArray(resid, &resid_view);
 	q_file.close();
 }
-void ClawWriter::writePatch(Domain<2> &d, std::ostream &os, double *u_view, double *resid_view)
+void ClawWriter::writePatch(PatchInfo<2> &d, std::ostream &os, double *u_view, double *resid_view)
 {
 	const string tab = "\t";
 	os << d.id << tab << "grid_number" << endl;

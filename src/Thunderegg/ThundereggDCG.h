@@ -41,7 +41,7 @@ template <size_t D> class ThundereggDCG : public DomainCollectionGenerator<D>
 
 	void extractLevel();
 
-	using DomainMap = std::map<int, std::shared_ptr<Domain<D>>>;
+	using DomainMap = std::map<int, std::shared_ptr<PatchInfo<D>>>;
 	void balanceLevel(DomainMap &level);
 	void balanceLevelWithLower(DomainMap &level, DomainMap &lower_level);
 
@@ -93,27 +93,28 @@ template <size_t D> inline void ThundereggDCG<D>::extractLevel()
 		qed.insert(child.id);
 
 		while (!q.empty()) {
-			std::shared_ptr<Domain<D>> d_ptr(new Domain<D>());
-			Domain<D> &                d = *d_ptr;
-			Node<D>                    n = t.nodes.at(q.front());
+			std::shared_ptr<PatchInfo<D>> d_ptr(new PatchInfo<D>());
+			PatchInfo<D> &                pinfo = *d_ptr;
+			Node<D>                       n     = t.nodes.at(q.front());
 			q.pop_front();
 
-			d.ns = ns;
-			d.id = n.id;
+			pinfo.ns = ns;
+			pinfo.id = n.id;
 			for (size_t i = 0; i < D; i++) {
-				d.spacings[i] = n.lengths[i] / ns[i];
+				pinfo.spacings[i] = n.lengths[i] / ns[i];
 			}
-			d.starts       = n.starts;
-			d.refine_level = n.level;
+			pinfo.starts       = n.starts;
+			pinfo.refine_level = n.level;
 			if (n.level < curr_level) {
-				d.parent_id = n.id;
+				pinfo.parent_id = n.id;
 			} else {
-				d.parent_id = n.parent;
-				if (d.parent_id != -1) {
-					d.oct_on_parent = 0;
-					while (t.nodes.at(n.parent).child_id[d.oct_on_parent] != n.id) {
-						d.oct_on_parent++;
+				pinfo.parent_id = n.parent;
+				if (pinfo.parent_id != -1) {
+					char orth_on_parent = 0;
+					while (t.nodes.at(n.parent).child_id[orth_on_parent] != n.id) {
+						orth_on_parent++;
 					}
+					pinfo.orth_on_parent = orth_on_parent;
 				}
 			}
 
@@ -127,7 +128,7 @@ template <size_t D> inline void ThundereggDCG<D>::extractLevel()
 					while (parent.childId(octs[quad]) != n.id) {
 						quad++;
 					}
-					d.getNbrInfoPtr(s) = new CoarseNbrInfo<D>(nbr.id, quad);
+					pinfo.getNbrInfoPtr(s) = new CoarseNbrInfo<D>(nbr.id, quad);
 					if (!qed.count(nbr.id)) {
 						q.push_back(nbr.id);
 						qed.insert(nbr.id);
@@ -145,17 +146,17 @@ template <size_t D> inline void ThundereggDCG<D>::extractLevel()
 							qed.insert(id);
 						}
 					}
-					d.getNbrInfoPtr(s) = new FineNbrInfo<D>(nbr_ids);
+					pinfo.getNbrInfoPtr(s) = new FineNbrInfo<D>(nbr_ids);
 				} else if (n.nbrId(s) != -1) {
 					int id = n.nbrId(s);
 					if (!qed.count(id)) {
 						q.push_back(id);
 						qed.insert(id);
 					}
-					d.getNbrInfoPtr(s) = new NormalNbrInfo<D>(id);
+					pinfo.getNbrInfoPtr(s) = new NormalNbrInfo<D>(id);
 				}
 			}
-			new_level[d.id] = d_ptr;
+			new_level[pinfo.id] = d_ptr;
 		}
 		for (auto &p : new_level) {
 			p.second->setPtrs(new_level);
@@ -219,25 +220,25 @@ template <size_t D> inline void ThundereggDCG<D>::balanceLevel(DomainMap &level)
 	};
 	CompressedVertex graph;
 	for (auto &p : level) {
-		Domain<D> &d = *p.second;
-		graph.vertices.push_back(d.id);
+		PatchInfo<D> &pinfo = *p.second;
+		graph.vertices.push_back(pinfo.id);
 		graph.ptrs.push_back(graph.edges.size());
 		for (Side<D> s : Side<D>::getValues()) {
 			int edge_id = -1;
-			if (d.hasNbr(s)) {
-				switch (d.getNbrType(s)) {
+			if (pinfo.hasNbr(s)) {
+				switch (pinfo.getNbrType(s)) {
 					case NbrType::Normal:
 						if (s.isLowerOnAxis()) {
-							edge_id = d.getNormalNbrInfo(s).id;
+							edge_id = pinfo.getNormalNbrInfo(s).id;
 						} else {
-							edge_id = d.id;
+							edge_id = pinfo.id;
 						}
 						break;
 					case NbrType::Fine:
-						edge_id = d.id;
+						edge_id = pinfo.id;
 						break;
 					case NbrType::Coarse:
-						edge_id = d.getCoarseNbrInfo(s).id;
+						edge_id = pinfo.getCoarseNbrInfo(s).id;
 						break;
 				}
 			}
@@ -290,7 +291,7 @@ template <size_t D> inline void ThundereggDCG<D>::balanceLevel(DomainMap &level)
 	[](void *data, int num_gid_entries, ZOLTAN_ID_PTR global_id, int size, char *buf, int *ierr) {
 		DomainMap &map = *(DomainMap *) data;
 		*ierr          = ZOLTAN_OK;
-		map[*global_id].reset(new Domain<D>());
+		map[*global_id].reset(new PatchInfo<D>());
 		map[*global_id]->deserialize(buf);
 	},
 	&level);
@@ -423,40 +424,40 @@ inline void ThundereggDCG<D>::balanceLevelWithLower(DomainMap &level, DomainMap 
 	CompressedVertex graph;
 	// process coarse level
 	for (auto &p : level) {
-		Domain<D> &d = *p.second;
-		graph.vertices.push_back(d.id);
+		PatchInfo<D> &pinfo = *p.second;
+		graph.vertices.push_back(pinfo.id);
 		graph.ptrs.push_back(graph.edges.size());
 		// patch to patch communication
 		for (Side<D> s : Side<D>::getValues()) {
 			int edge_id = -1;
-			if (d.hasNbr(s)) {
-				switch (d.getNbrType(s)) {
+			if (pinfo.hasNbr(s)) {
+				switch (pinfo.getNbrType(s)) {
 					case NbrType::Normal:
 						if (s.isLowerOnAxis()) {
-							edge_id = d.getNormalNbrInfo(s).id;
+							edge_id = pinfo.getNormalNbrInfo(s).id;
 						} else {
-							edge_id = d.id;
+							edge_id = pinfo.id;
 						}
 						break;
 					case NbrType::Fine:
-						edge_id = d.id;
+						edge_id = pinfo.id;
 						break;
 					case NbrType::Coarse:
-						edge_id = d.getCoarseNbrInfo(s).id;
+						edge_id = pinfo.getCoarseNbrInfo(s).id;
 						break;
 				}
 			}
 			graph.edges.push_back(edge_id * Side<D>::num_sides + s.toInt());
 		}
 		// level to level communication
-		graph.edges.push_back(-d.id - 1);
+		graph.edges.push_back(-pinfo.id - 1);
 	}
 	// process fine level
 	for (auto &p : lower_level) {
-		Domain<D> &d = *p.second;
-		graph.vertices.push_back(d.id);
+		PatchInfo<D> &pinfo = *p.second;
+		graph.vertices.push_back(pinfo.id);
 		graph.ptrs.push_back(graph.edges.size());
-		graph.edges.push_back(-d.parent_id - 1);
+		graph.edges.push_back(-pinfo.parent_id - 1);
 	}
 
 	// set graph functions
@@ -531,7 +532,7 @@ inline void ThundereggDCG<D>::balanceLevelWithLower(DomainMap &level, DomainMap 
 	[](void *data, int num_gid_entries, ZOLTAN_ID_PTR global_id, int size, char *buf, int *ierr) {
 		Levels *levels = (Levels *) data;
 		*ierr          = ZOLTAN_OK;
-		(*levels->upper)[*global_id].reset(new Domain<D>());
+		(*levels->upper)[*global_id].reset(new PatchInfo<D>());
 		(*levels->upper)[*global_id]->deserialize(buf);
 	},
 	&levels);

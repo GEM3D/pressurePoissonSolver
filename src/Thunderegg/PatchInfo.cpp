@@ -19,6 +19,6 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#include "Domain.h"
-template class Domain<2>;
-template class Domain<3>;
+#include <Thunderegg/PatchInfo.h>
+template class PatchInfo<2>;
+template class PatchInfo<3>;

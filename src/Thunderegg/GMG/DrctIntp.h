@@ -28,8 +28,8 @@
 namespace GMG
 {
 /**
- * @brief Simple class that directly places values from coarse vector to fine vector. (This is
- * O(0) accuracy, need to replace with bi-linear interpolation.
+ * @brief Simple class that directly places values from coarse cell into the corresponding fine
+ * cells.
  */
 template <size_t D> class DrctIntp : public Interpolator<D>
 {
@@ -63,7 +63,8 @@ template <size_t D> class DrctIntp : public Interpolator<D>
 	 * @param coarse the input vector from the coarser level
 	 * @param fine the output vector for the finer level
 	 */
-	void interpolate(std::shared_ptr<const Vector<D>> coarse, std::shared_ptr<Vector<D>> fine)const;
+	void interpolate(std::shared_ptr<const Vector<D>> coarse,
+	                 std::shared_ptr<Vector<D>>       fine) const;
 };
 template <size_t D>
 inline DrctIntp<D>::DrctIntp(std::shared_ptr<DomainCollection<D>> coarse_dc,
@@ -84,15 +85,15 @@ inline void DrctIntp<D>::interpolate(std::shared_ptr<const Vector<D>> coarse,
 	ilc->scatter(coarse_local, coarse);
 
 	for (auto data : ilc->getFineDomains()) {
-		Domain<D> &d          = *data.d;
-		LocalData<D> coarse_local_data = coarse_local->getLocalData(data.local_index);
-		LocalData<D> fine_data         = fine->getLocalData(d.id_local);
+		PatchInfo<D> &pinfo             = *data.pinfo;
+		LocalData<D>  coarse_local_data = coarse_local->getLocalData(data.local_index);
+		LocalData<D>  fine_data         = fine->getLocalData(pinfo.local_index);
 
-		if (d.hasCoarseParent()) {
-			Orthant<D>         orth = d.oct_on_parent;
+		if (pinfo.hasCoarseParent()) {
+			Orthant<D>         orth = pinfo.orth_on_parent;
 			std::array<int, D> starts;
 			for (size_t i = 0; i < D; i++) {
-				starts[i]  = orth.isOnSide(2 * i) ? 0 : coarse_local_data.getLengths()[i];
+				starts[i] = orth.isOnSide(2 * i) ? 0 : coarse_local_data.getLengths()[i];
 			}
 
 			nested_loop<D>(fine_data.getStart(), fine_data.getEnd(),

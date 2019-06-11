@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -22,11 +22,26 @@
 #ifndef Serializable_H
 #define Serializable_H
 #include <memory>
+/**
+ * @brief Interface for serializing objects
+ */
 class Serializable
 {
 	public:
-	virtual ~Serializable()                   = default;
+	virtual ~Serializable() = default;
+	/**
+	 * @brief Serialize object into buffer
+	 *
+	 * @param buffer the buffer. Can be set to nullptr if you just want the size
+	 * @return int the size of the serialized object
+	 */
 	virtual int serialize(char *buffer) const = 0;
-	virtual int deserialize(char *buffer)     = 0;
+	/**
+	 * @brief Deserialize an object
+	 *
+	 * @param buffer the buffer
+	 * @return int the size of object that was deserialized
+	 */
+	virtual int deserialize(char *buffer) = 0;
 };
 #endif

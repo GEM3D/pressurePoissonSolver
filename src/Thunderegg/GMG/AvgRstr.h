@@ -28,7 +28,7 @@
 namespace GMG
 {
 /**
- * @brief Restrictor that averages the 8 corresponding fine cells into each coarse cell.
+ * @brief Restrictor that averages the corresponding fine cells into each coarse cell.
  */
 template <size_t D> class AvgRstr : public Restrictor<D>
 {
@@ -81,12 +81,12 @@ inline void AvgRstr<D>::restrict(std::shared_ptr<Vector<D>>       coarse,
 	std::shared_ptr<Vector<D>> coarse_local = ilc->getNewCoarseDistVec();
 
 	for (ILCFineToCoarseMetadata<D> data : ilc->getFineDomains()) {
-		Domain<D> &  d                 = *data.d;
-		LocalData<D> coarse_local_data = coarse_local->getLocalData(data.local_index);
-		LocalData<D> fine_data         = fine->getLocalData(d.id_local);
+		PatchInfo<D> &pinfo             = *data.pinfo;
+		LocalData<D>  coarse_local_data = coarse_local->getLocalData(data.local_index);
+		LocalData<D>  fine_data         = fine->getLocalData(pinfo.local_index);
 
-		if (d.hasCoarseParent()) {
-			Orthant<D>         orth = d.oct_on_parent;
+		if (pinfo.hasCoarseParent()) {
+			Orthant<D>         orth = pinfo.orth_on_parent;
 			std::array<int, D> starts;
 			for (size_t i = 0; i < D; i++) {
 				starts[i] = orth.isOnSide(2 * i) ? 0 : coarse_local_data.getLengths()[i];

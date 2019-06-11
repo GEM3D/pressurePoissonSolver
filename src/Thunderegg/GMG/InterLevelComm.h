@@ -30,9 +30,9 @@ namespace GMG
  */
 template <size_t D> struct ILCFineToCoarseMetadata {
 	/**
-	 * @brief The domain that this meta-data corresponds to.
+	 * @brief The PatchInfo object that this meta-data corresponds to.
 	 */
-	std::shared_ptr<Domain<D>> d;
+	std::shared_ptr<PatchInfo<D>> pinfo;
 	/**
 	 * @brief the local block-index of the parent domain in the scattered coarse vector.
 	 */
@@ -46,7 +46,7 @@ template <size_t D> struct ILCFineToCoarseMetadata {
 	 */
 	bool operator<(const ILCFineToCoarseMetadata &other) const
 	{
-		return *d < *other.d;
+		return *pinfo < *other.pinfo;
 	}
 };
 /**
@@ -55,7 +55,7 @@ template <size_t D> struct ILCFineToCoarseMetadata {
 template <size_t D> class InterLevelComm
 {
 	private:
-        std::array<int,D> lengths;
+	std::array<int, D> lengths;
 	/**
 	 * @brief the number of elements in the local distributed vector.
 	 */
@@ -114,11 +114,11 @@ inline InterLevelComm<D>::InterLevelComm(std::shared_ptr<DomainCollection<D>> co
 {
 	using namespace std;
 	int patch_stride = coarse_dc->getNumElementsInDomain();
-	lengths = coarse_dc->getLengths();
+	lengths          = coarse_dc->getLengths();
 	set<int> parent_ids;
-	for (auto &p : fine_dc->domains) {
-		Domain<D> &d = *p.second;
-		parent_ids.insert(d.parent_id);
+	for (auto &pair : fine_dc->domains) {
+		PatchInfo<D> &pinfo = *pair.second;
+		parent_ids.insert(pinfo.parent_id);
 	}
 	vector<int> coarse_parent_global_index_map_vec(parent_ids.begin(), parent_ids.end());
 	vector<int> coarse_parent_gid_map_vec = coarse_parent_global_index_map_vec;
@@ -138,10 +138,10 @@ inline InterLevelComm<D>::InterLevelComm(std::shared_ptr<DomainCollection<D>> co
 		gid_to_local[gid]  = i;
 		gid_to_global[gid] = coarse_parent_global_index_map_vec[i];
 	}
-	for (auto &p : fine_dc->domains) {
-		Domain<D> &                d    = *p.second;
-		int                        gid  = d.parent_id;
-		ILCFineToCoarseMetadata<D> data = {p.second, gid_to_local[gid], gid_to_global[gid]};
+	for (auto &pair : fine_dc->domains) {
+		PatchInfo<D> &             pinfo = *pair.second;
+		int                        gid   = pinfo.parent_id;
+		ILCFineToCoarseMetadata<D> data  = {pair.second, gid_to_local[gid], gid_to_global[gid]};
 		coarse_domains.insert(data);
 	}
 
@@ -153,7 +153,7 @@ inline InterLevelComm<D>::InterLevelComm(std::shared_ptr<DomainCollection<D>> co
 
 	PW<Vec> u_local;
 	VecCreateSeq(PETSC_COMM_SELF, local_vec_size, &u_local);
-    std::shared_ptr<PetscVector<D>> u = coarse_dc->getNewDomainVec();
+	std::shared_ptr<PetscVector<D>> u = coarse_dc->getNewDomainVec();
 	VecScatterCreate(u->vec, dist_is, u_local, nullptr, &p_scatter);
 }
 

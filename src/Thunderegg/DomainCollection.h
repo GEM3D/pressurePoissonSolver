@@ -21,9 +21,9 @@
 
 #ifndef DOMAINSIGNATURECOLLECTION_H
 #define DOMAINSIGNATURECOLLECTION_H
-#include <Thunderegg/Domain.h>
 #include <Thunderegg/InterpCase.h>
 #include <Thunderegg/PW.h>
+#include <Thunderegg/PatchInfo.h>
 #include <Thunderegg/PetscVector.h>
 #include <cmath>
 #include <deque>
@@ -60,8 +60,8 @@ template <size_t D> class DomainCollection
 				map_vec.resize(domains.size());
 				for (auto &p : domains) {
 					todo.insert(p.first);
-					Domain<D> &d        = *p.second;
-					map_vec[d.id_local] = d.id;
+					PatchInfo<D> &d        = *p.second;
+					map_vec[d.local_index] = d.id;
 				}
 				std::set<int> enqueued;
 				while (!todo.empty()) {
@@ -72,8 +72,8 @@ template <size_t D> class DomainCollection
 						int i = queue.front();
 						todo.erase(i);
 						queue.pop_front();
-						Domain<D> &d = *domains[i];
-						rev_map[i]   = d.id_local;
+						PatchInfo<D> &d = *domains[i];
+						rev_map[i]      = d.local_index;
 						for (int i : d.getNbrIds()) {
 							if (!enqueued.count(i)) {
 								enqueued.insert(i);
@@ -107,9 +107,9 @@ template <size_t D> class DomainCollection
 						todo.erase(i);
 						queue.pop_front();
 						map_vec.push_back(i);
-						Domain<D> &d = *domains[i];
-						rev_map[i]   = curr_i;
-						d.id_local   = curr_i;
+						PatchInfo<D> &d = *domains[i];
+						rev_map[i]      = curr_i;
+						d.local_index   = curr_i;
 						curr_i++;
 						for (int i : d.getNbrIds()) {
 							if (!enqueued.count(i)) {
@@ -136,7 +136,7 @@ template <size_t D> class DomainCollection
 		domain_vector.resize(domains.size());
 		for (auto &p : domains) {
 			p.second->setLocalNeighborIndexes(rev_map);
-			domain_vector[p.second->id_local] = p.second;
+			domain_vector[p.second->local_index] = p.second;
 		}
 		// domain_rev_map          = rev_map;
 		domain_map_vec          = map_vec;
@@ -197,13 +197,13 @@ template <size_t D> class DomainCollection
 	/**
 	 * @brief A map that maps the id of a domain to its domain signature.
 	 */
-	std::map<int, std::shared_ptr<Domain<D>>> domains;
-	std::vector<std::shared_ptr<Domain<D>>>   domain_vector;
-	std::vector<std::shared_ptr<Domain<D>>> & getDomainVector()
+	std::map<int, std::shared_ptr<PatchInfo<D>>> domains;
+	std::vector<std::shared_ptr<PatchInfo<D>>>   domain_vector;
+	std::vector<std::shared_ptr<PatchInfo<D>>> & getDomainVector()
 	{
 		return domain_vector;
 	}
-	std::map<int, std::shared_ptr<Domain<D>>> &getDomainMap()
+	std::map<int, std::shared_ptr<PatchInfo<D>>> &getDomainMap()
 	{
 		return domains;
 	}
@@ -220,7 +220,7 @@ template <size_t D> class DomainCollection
 	 * @brief Default empty constructor.
 	 */
 	DomainCollection() = default;
-	DomainCollection(std::map<int, std::shared_ptr<Domain<D>>> domain_set,
+	DomainCollection(std::map<int, std::shared_ptr<PatchInfo<D>>> domain_set,
 	                 const std::array<int, D> &lengths, bool local_id_set = false,
 	                 bool global_id_set = false)
 	{
@@ -275,8 +275,8 @@ template <size_t D> class DomainCollection
 	{
 		double sum = 0;
 		for (auto &p : domains) {
-			Domain<D> &d         = *p.second;
-			double     patch_vol = 1;
+			PatchInfo<D> &d         = *p.second;
+			double        patch_vol = 1;
 			for (size_t i = 0; i < D; i++) {
 				patch_vol *= d.spacings[i] * d.ns[i];
 			}
@@ -291,8 +291,8 @@ template <size_t D> class DomainCollection
 		double sum = 0;
 
 		for (auto &p : domains) {
-			Domain<D> &        d      = *p.second;
-			const LocalData<D> u_data = u->getLocalData(d.id_local);
+			PatchInfo<D> &     d      = *p.second;
+			const LocalData<D> u_data = u->getLocalData(d.local_index);
 
 			double patch_sum = 0;
 			nested_loop<D>(u_data.getStart(), u_data.getEnd(),

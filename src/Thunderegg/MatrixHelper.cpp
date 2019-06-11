@@ -41,11 +41,11 @@ PW_explicit<Mat> MatrixHelper::formCRSMatrix(double lambda)
 	MatMPIAIJSetPreallocation(A, 19, nullptr, 19, nullptr);
 
 	for (auto &p : dc.domains) {
-		Domain<3> &d     = *p.second;
-		double     h_x   = d.spacings[0];
-		double     h_y   = d.spacings[1];
-		double     h_z   = d.spacings[2];
-		int        start = nx * ny * nz * d.id_global;
+		PatchInfo<3> &d     = *p.second;
+		double        h_x   = d.spacings[0];
+		double        h_y   = d.spacings[1];
+		double        h_z   = d.spacings[2];
+		int           start = nx * ny * nz * d.local_index;
 
 		// center coeffs
 		double coeff = -2.0 / (h_x * h_x) - 2.0 / (h_y * h_y) - 2.0 / (h_z * h_z);

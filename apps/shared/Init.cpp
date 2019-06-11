@@ -22,8 +22,8 @@
 #include "Init.h"
 #include <algorithm>
 using namespace std;
-void getXYZ(const Domain<3> &d, const int &xi, const int &yi, const int &zi, double &x, double &y,
-            double &z)
+void getXYZ(const PatchInfo<3> &d, const int &xi, const int &yi, const int &zi, double &x,
+            double &y, double &z)
 {
 	double h_x = d.spacings[0];
 	double h_y = d.spacings[1];
@@ -50,7 +50,7 @@ void getXYZ(const Domain<3> &d, const int &xi, const int &yi, const int &zi, dou
 		z = d.starts[2] + h_z / 2.0 + d.spacings[2] * zi;
 	}
 }
-inline int index(Domain<3> &d, const int &xi, const int &yi, const int &zi)
+inline int index(PatchInfo<3> &d, const int &xi, const int &yi, const int &zi)
 {
 	return xi + yi * d.ns[0] + zi * d.ns[0] * d.ns[1];
 }
@@ -66,10 +66,10 @@ void Init::initNeumann(DomainCollection<3> &dc, Vec f, Vec exact,
 	double *exact_ptr;
 	VecGetArray(exact, &exact_ptr);
 	for (auto &p : dc.domains) {
-		Domain<3> &d = *p.second;
+		PatchInfo<3> &d = *p.second;
 
-		double *f_vals     = f_ptr + d.id_local * d.ns[0] * d.ns[1] * d.ns[2];
-		double *exact_vals = exact_ptr + d.id_local * d.ns[0] * d.ns[1] * d.ns[2];
+		double *f_vals     = f_ptr + d.local_index * d.ns[0] * d.ns[1] * d.ns[2];
+		double *exact_vals = exact_ptr + d.local_index * d.ns[0] * d.ns[1] * d.ns[2];
 
 		// Generate RHS vector
 		for (int zi = 0; zi < d.ns[2]; zi++) {
@@ -159,10 +159,10 @@ void Init::initDirichlet(DomainCollection<3> &dc, Vec f, Vec exact,
 	double *exact_ptr;
 	VecGetArray(exact, &exact_ptr);
 	for (auto &p : dc.domains) {
-		Domain<3> &d = *p.second;
+		PatchInfo<3> &d = *p.second;
 
-		double *f_vals     = f_ptr + d.id_local * d.ns[0] * d.ns[1] * d.ns[2];
-		double *exact_vals = exact_ptr + d.id_local * d.ns[0] * d.ns[1] * d.ns[2];
+		double *f_vals     = f_ptr + d.local_index * d.ns[0] * d.ns[1] * d.ns[2];
+		double *exact_vals = exact_ptr + d.local_index * d.ns[0] * d.ns[1] * d.ns[2];
 		// Generate RHS vector
 		double h_x = d.spacings[0];
 		double h_y = d.spacings[1];
@@ -256,10 +256,10 @@ void Init::initNeumann2d(DomainCollection<2> &dc, Vec f, Vec exact,
 	double *exact_ptr;
 	VecGetArray(exact, &exact_ptr);
 	for (auto &p : dc.domains) {
-		Domain<2> &d = *p.second;
+		PatchInfo<2> &d = *p.second;
 
-		double *f_vals     = f_ptr + d.id_local * d.ns[0] * d.ns[1];
-		double *exact_vals = exact_ptr + d.id_local * d.ns[0] * d.ns[1];
+		double *f_vals     = f_ptr + d.local_index * d.ns[0] * d.ns[1];
+		double *exact_vals = exact_ptr + d.local_index * d.ns[0] * d.ns[1];
 
 		// Generate RHS vector
 		double h_x = d.spacings[0];
@@ -314,10 +314,10 @@ void Init::initDirichlet2d(DomainCollection<2> &dc, Vec f, Vec exact,
 	double *exact_ptr;
 	VecGetArray(exact, &exact_ptr);
 	for (auto &p : dc.domains) {
-		Domain<2> &d = *p.second;
+		PatchInfo<2> &d = *p.second;
 
-		double *f_vals     = f_ptr + d.id_local * d.ns[0] * d.ns[1];
-		double *exact_vals = exact_ptr + d.id_local * d.ns[0] * d.ns[1];
+		double *f_vals     = f_ptr + d.local_index * d.ns[0] * d.ns[1];
+		double *exact_vals = exact_ptr + d.local_index * d.ns[0] * d.ns[1];
 		// Generate RHS vector
 		double h_x = d.spacings[0];
 		double h_y = d.spacings[1];
@@ -370,16 +370,16 @@ void Init::fillSolution2d(DomainCollection<2> &dc, Vec u,
 	double *vec;
 	VecGetArray(u, &vec);
 	for (auto &p : dc.domains) {
-		Domain<2> &d = *p.second;
+		PatchInfo<2> &d = *p.second;
 
-		double *f = vec + d.id_local * d.ns[0] * d.ns[1];
+		double *f = vec + d.local_index * d.ns[0] * d.ns[1];
 
 		double h_x = d.spacings[0];
 		double h_y = d.spacings[1];
 		for (int yi = 0; yi < d.ns[1]; yi++) {
 			for (int xi = 0; xi < d.ns[0]; xi++) {
-				double x       = d.starts[0] + h_x / 2.0 + h_x * xi;
-				double y       = d.starts[1] + h_y / 2.0 + h_y * yi;
+				double x             = d.starts[0] + h_x / 2.0 + h_x * xi;
+				double y             = d.starts[1] + h_y / 2.0 + h_y * yi;
 				f[yi * d.ns[0] + xi] = fun(x, y, time);
 			}
 		}

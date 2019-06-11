@@ -26,10 +26,10 @@ template <size_t D> class StarPatchOp : public PatchOperator<D>
 {
 	public:
 	void apply(SchurDomain<D> &d, std::shared_ptr<const Vector<D>> u,
-	                   std::shared_ptr<const Vector<D - 1>> gamma, std::shared_ptr<Vector<D>> f)
+	           std::shared_ptr<const Vector<D - 1>> gamma, std::shared_ptr<Vector<D>> f)
 	{
-		LocalData<D>          f_data = f->getLocalData(d.id_local);
-		const LocalData<D>    u_data = u->getLocalData(d.id_local);
+		LocalData<D>          f_data = f->getLocalData(d.local_index);
+		const LocalData<D>    u_data = u->getLocalData(d.local_index);
 		std::array<double, D> h2     = d.spacings;
 		for (size_t i = 0; i < D; i++) {
 			h2[i] *= h2[i];

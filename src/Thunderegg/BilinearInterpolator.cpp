@@ -65,7 +65,7 @@ void BilinearInterpolator::interpolate(SchurDomain<2> &d, Side<2> s, int local_i
 	int n = d.ns[!s.axis()];
 
 	LocalData<1>       interp_data = interp->getLocalData(local_index);
-	const LocalData<1> sl          = u->getLocalData(d.id_local).getSliceOnSide(s);
+	const LocalData<1> sl          = u->getLocalData(d.local_index).getSliceOnSide(s);
 
 	switch (itype.toInt()) {
 		case IfaceType::normal: {

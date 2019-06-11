@@ -21,8 +21,8 @@
 
 #ifndef SCHURDOMAIN_H
 #define SCHURDOMAIN_H
-#include "Domain.h"
-#include "Iface.h"
+#include <Thunderegg/PatchInfo.h>
+#include <Thunderegg/Iface.h>
 #include <deque>
 /**
  * @brief The IfaceInfo class represents the information for an interface on a given side of the
@@ -88,8 +88,8 @@ template <size_t D> class IfaceInfo
 	 *
 	 * @param ids adds to the deque of interface ownership
 	 */
-	virtual void getOwnership(std::deque<bool> &own)             = 0;
-	virtual void getIncomingProcs(std::set<int> &incoming_procs) = 0;
+	virtual void getOwnership(std::deque<bool> &own)                 = 0;
+	virtual void getIncomingProcs(std::set<int> &incoming_procs)     = 0;
 	virtual void setLocalIndexes(const std::map<int, int> &rev_map)  = 0;
 	virtual void setGlobalIndexes(const std::map<int, int> &rev_map) = 0;
 };
@@ -103,7 +103,7 @@ template <size_t D> class NormalIfaceInfo : public IfaceInfo<D>
 		this->local_index  = 0;
 		this->global_index = 0;
 	}
-	NormalIfaceInfo(Domain<D> &d, Side<D> s)
+	NormalIfaceInfo(PatchInfo<D> &d, Side<D> s)
 	{
 		nbr_info = d.getNormalNbrInfo(s);
 		if (s.isLowerOnAxis()) {
@@ -159,7 +159,7 @@ template <size_t D> class CoarseIfaceInfo : public IfaceInfo<D>
 	int              coarse_local_index;
 	int              coarse_global_index;
 	bool             coarse_own;
-	CoarseIfaceInfo(Domain<D> &d, Side<D> s)
+	CoarseIfaceInfo(PatchInfo<D> &d, Side<D> s)
 	{
 		nbr_info       = d.getCoarseNbrInfo(s);
 		this->id       = d.id * Side<D>::num_sides + s.toInt();
@@ -224,7 +224,7 @@ template <size_t D> class FineIfaceInfo : public IfaceInfo<D>
 	std::array<int, Orthant<D - 1>::num_orthants>  fine_local_indexes;
 	std::array<int, Orthant<D - 1>::num_orthants>  fine_global_indexes;
 	std::array<bool, Orthant<D - 1>::num_orthants> fine_own;
-	FineIfaceInfo(Domain<D> &d, Side<D> s)
+	FineIfaceInfo(PatchInfo<D> &d, Side<D> s)
 	{
 		nbr_info  = d.getFineNbrInfo(s);
 		this->id  = d.id * Side<D>::num_sides + s.toInt();
@@ -308,13 +308,13 @@ template <size_t D> class FineIfaceInfo : public IfaceInfo<D>
 		}
 	}
 };
-template <size_t D> struct SchurDomain : public Domain<D> {
+template <size_t D> struct SchurDomain : public PatchInfo<D> {
 	std::array<IfaceInfo<D> *, Side<D>::num_sides> iface_info;
 	SchurDomain()
 	{
 		iface_info.fill(nullptr);
 	}
-	SchurDomain(Domain<D> &d) : Domain<D>(d)
+	SchurDomain(PatchInfo<D> &d) : PatchInfo<D>(d)
 	{
 		iface_info.fill(nullptr);
 

@@ -21,7 +21,7 @@
 
 #ifndef STENCILHELPER_H
 #define STENCILHELPER_H
-#include "Domain.h"
+#include <Thunderegg/PatchInfo.h>
 #include <valarray>
 class StencilHelper
 {
@@ -42,10 +42,10 @@ class DirichletSH : public StencilHelper
 	int    stride;
 
 	public:
-	DirichletSH(Domain<2> &d, Side<2> s)
+	DirichletSH(PatchInfo<2> &d, Side<2> s)
 	{
 		double h   = 0;
-		int    idx = d.id_global * d.ns[0] * d.ns[1];
+		int    idx = d.global_index * d.ns[0] * d.ns[1];
 		switch (s.toInt()) {
 			case Side<2>::west:
 				h      = d.spacings[1];
@@ -101,10 +101,10 @@ class NeumannSH : public StencilHelper
 	int    stride;
 
 	public:
-	NeumannSH(Domain<2> &d, Side<2> s)
+	NeumannSH(PatchInfo<2> &d, Side<2> s)
 	{
 		double h   = 0;
-		int    idx = d.id_global * d.ns[0] * d.ns[1];
+		int    idx = d.global_index * d.ns[0] * d.ns[1];
 		switch (s.toInt()) {
 			case Side<2>::west:
 				h      = d.spacings[1];
@@ -161,10 +161,10 @@ class NormalSH : public StencilHelper
 	int    stride;
 
 	public:
-	NormalSH(Domain<2> &d, Side<2> s)
+	NormalSH(PatchInfo<2> &d, Side<2> s)
 	{
 		double h       = 0;
-		int    idx     = d.id_global * d.ns[0] * d.ns[1];
+		int    idx     = d.global_index * d.ns[0] * d.ns[1];
 		int    nbr_idx = d.getNormalNbrInfo(s).global_index * d.ns[0] * d.ns[1];
 		switch (s.toInt()) {
 			case Side<2>::west:
@@ -231,10 +231,10 @@ class CoarseSH : public StencilHelper
 	int stride;
 
 	public:
-	CoarseSH(Domain<2> &d, Side<2> s)
+	CoarseSH(PatchInfo<2> &d, Side<2> s)
 	{
 		double h             = 0;
-		int    idx           = d.id_global * d.ns[0] * d.ns[1];
+		int    idx           = d.global_index * d.ns[0] * d.ns[1];
 		int    nbr_idx_left  = d.getFineNbrInfo(s).global_indexes[0] * d.ns[0] * d.ns[1];
 		int    nbr_idx_right = d.getFineNbrInfo(s).global_indexes[1] * d.ns[0] * d.ns[1];
 		switch (s.toInt()) {
@@ -353,10 +353,10 @@ class FineSH : public StencilHelper
 	bool                  end;
 
 	public:
-	FineSH(Domain<2> &d, Side<2> s)
+	FineSH(PatchInfo<2> &d, Side<2> s)
 	{
 		double h       = 0;
-		int    idx     = d.id_global * d.ns[0] * d.ns[1];
+		int    idx     = d.global_index * d.ns[0] * d.ns[1];
 		int    nbr_idx = d.getCoarseNbrInfo(s).global_index * d.ns[0] * d.ns[1];
 		end            = d.getCoarseNbrInfo(s).quad_on_coarse == 1;
 		switch (s.toInt()) {
@@ -467,7 +467,7 @@ class FineSH : public StencilHelper
 	}
 };
 
-StencilHelper *getStencilHelper(Domain<2> &d, Side<2> s)
+StencilHelper *getStencilHelper(PatchInfo<2> &d, Side<2> s)
 {
 	StencilHelper *retval = nullptr;
 	if (d.hasNbr(s)) {

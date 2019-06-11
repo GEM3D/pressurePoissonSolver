@@ -12,8 +12,8 @@ void SevenPtPatchOperator::apply(SchurDomain<3> &d, std::shared_ptr<const Vector
 	double h_y = d.spacings[1];
 	double h_z = d.spacings[2];
 
-	LocalData<3>       f_data = f->getLocalData(d.id_local);
-	const LocalData<3> u_data = u->getLocalData(d.id_local);
+	LocalData<3>       f_data = f->getLocalData(d.local_index);
+	const LocalData<3> u_data = u->getLocalData(d.local_index);
 
 	double center, north, east, south, west, bottom, top;
 
