@@ -19,17 +19,17 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#include "P4estDCG.h"
+#include "P4estDomGen.h"
 
 #include <p4est_iterate.h>
 
 using namespace std;
 
-std::shared_ptr<Domain<2>> P4estDCG::getFinestDC()
+std::shared_ptr<Domain<2>> P4estDomGen::getFinestDomain()
 {
 	return domain_list.front();
 }
-bool P4estDCG::hasCoarserDC()
+bool P4estDomGen::hasCoarserDomain()
 {
 	return curr_level >= 0;
 }
@@ -53,8 +53,8 @@ static void set_ids(p4est_iter_volume_info_t *info, void *user_data)
 /**
  * Constructor
  */
-P4estDCG::P4estDCG(p4est_t *p4est, const std::array<int, 2> &ns, IsNeumannFunc<2> inf,
-                   BlockMapFunc bmf)
+P4estDomGen::P4estDomGen(p4est_t *p4est, const std::array<int, 2> &ns, IsNeumannFunc<2> inf,
+                         BlockMapFunc bmf)
 {
 	this->ns  = ns;
 	this->bmf = bmf;
@@ -88,7 +88,7 @@ P4estDCG::P4estDCG(p4est_t *p4est, const std::array<int, 2> &ns, IsNeumannFunc<2
 	// generate finest DC
 	extractLevel();
 }
-P4estDCG::~P4estDCG()
+P4estDomGen::~P4estDomGen()
 {
 	p4est_destroy(my_p4est);
 }
@@ -104,7 +104,7 @@ struct create_domains_ctx {
 	void **                                       ghost_data;
 	std::array<int, 2>                            ns;
 	std::map<int, std::shared_ptr<PatchInfo<2>>> *dmap;
-	P4estDCG::BlockMapFunc                        bmf;
+	P4estDomGen::BlockMapFunc                     bmf;
 	double                                        x_scale;
 	double                                        y_scale;
 };
@@ -253,7 +253,7 @@ static void coarsen_replace(p4est_t *p4est, p4est_topidx_t which_tree, int num_o
 		pinfo.parent_id      = incoming[0]->p.user_int;
 	}
 }
-void P4estDCG::extractLevel()
+void P4estDomGen::extractLevel()
 {
 	// coarsen previous
 	if (curr_level + 1 < num_levels) {
@@ -276,6 +276,7 @@ void P4estDCG::extractLevel()
 
 	std::map<int, std::shared_ptr<PatchInfo<2>>> new_level;
 	create_domains_ctx ctx = {ghost_data, ns, &new_level, bmf, x_scale, y_scale};
+	// create domain objects and set neighbor information
 	p4est_iterate_ext(my_p4est, ghost, &ctx, create_domains, link_domains, nullptr, 0);
 
 	p4est_ghost_destroy(ghost);
@@ -283,13 +284,13 @@ void P4estDCG::extractLevel()
 	for (auto p : new_level) {
 		p.second->setPtrs(new_level);
 	}
-	// create DC object
+	// create Domain object
 	domain_list.push_back(shared_ptr<Domain<2>>(new Domain<2>(new_level, true)));
 	domain_list.back()->setNeumann(inf);
 
 	curr_level--;
 }
-std::shared_ptr<Domain<2>> P4estDCG::getCoarserDC()
+std::shared_ptr<Domain<2>> P4estDomGen::getCoarserDomain()
 {
 	if (curr_level >= 0) {
 		extractLevel();

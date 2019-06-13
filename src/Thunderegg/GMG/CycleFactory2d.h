@@ -21,7 +21,7 @@
 
 #ifndef GMGCYCLEFACTORY2D_H
 #define GMGCYCLEFACTORY2D_H
-#include <Thunderegg/DomainCollectionGenerator.h>
+#include <Thunderegg/DomainGenerator.h>
 #include <Thunderegg/GMG/Cycle.h>
 #include <Thunderegg/GMG/CycleOpts.h>
 #include <Thunderegg/IfaceInterp.h>
@@ -32,11 +32,11 @@ namespace GMG
 class CycleFactory2d
 {
 	public:
-	static std::shared_ptr<Cycle<2>> getCycle(const CycleOpts &                             opts,
-	                                          std::shared_ptr<DomainCollectionGenerator<2>> dcg,
-	                                          std::shared_ptr<PatchSolver<2>>               solver,
-	                                          std::shared_ptr<PatchOperator<2>>             op,
-	                                          std::shared_ptr<IfaceInterp<2>> interpolator);
+	static std::shared_ptr<Cycle<2>> getCycle(const CycleOpts &                   opts,
+	                                          std::shared_ptr<DomainGenerator<2>> dcg,
+	                                          std::shared_ptr<PatchSolver<2>>     solver,
+	                                          std::shared_ptr<PatchOperator<2>>   op,
+	                                          std::shared_ptr<IfaceInterp<2>>     interpolator);
 };
 } // namespace GMG
 #endif

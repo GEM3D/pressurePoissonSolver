@@ -19,44 +19,35 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef P4ESTDCG_H
-#define P4ESTDCG_H
-#include <Thunderegg/DomainCollectionGenerator.h>
-#include <functional>
-#include <list>
-#include <p4est_extended.h>
-class P4estDCG : public DomainCollectionGenerator<2>
+#ifndef THUNDEREGG_DOMAINGENERATOR_H
+#define THUNDEREGG_DOMAINGENERATOR_H
+#include <Thunderegg/Domain.h>
+/**
+ * @brief Generates Domain objects.
+ *
+ * This class is intended to wrap around octree/quadtree libraries and provide Thunderegg with the
+ * necessary patch information. See P4estDG for the implimentation with the p4est library.
+ *
+ * @tparam D the number of Cartesian dimensions
+ */
+template <size_t D> class DomainGenerator
 {
 	public:
-	using BlockMapFunc = std::function<void(int, double, double, double &, double &)>;
-
-	private:
 	/**
-	 * @brief copy of p4est tree
+	 * @brief Destroy the DomainGenerator object
 	 */
-	p4est_t *my_p4est;
+	~DomainGenerator(){};
 	/**
-	 * @brief List of the domains
-	 *
-	 * Finest domain is stored in front
+	 * @brief Return the finest domain
 	 */
-	std::list<std::shared_ptr<Domain<2>>> domain_list;
-
-	int                curr_level;
-	int                num_levels;
-	std::array<int, 2> ns;
-	double             x_scale;
-	double             y_scale;
-	BlockMapFunc       bmf;
-	IsNeumannFunc<2>   inf;
-
-	void extractLevel();
-
-	public:
-	P4estDCG(p4est_t *p4est, const std::array<int, 2> &ns, IsNeumannFunc<2> inf, BlockMapFunc bmf);
-	~P4estDCG();
-	std::shared_ptr<Domain<2>> getFinestDC();
-	bool                       hasCoarserDC();
-	std::shared_ptr<Domain<2>> getCoarserDC();
+	virtual std::shared_ptr<Domain<D>> getFinestDomain() = 0;
+	/**
+	 * @brief return true if there is a coarser domain to be generated.
+	 */
+	virtual bool hasCoarserDomain() = 0;
+	/**
+	 * @brief Return a new coarser domain
+	 */
+	virtual std::shared_ptr<Domain<D>> getCoarserDomain() = 0;
 };
 #endif

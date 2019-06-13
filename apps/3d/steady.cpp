@@ -40,7 +40,7 @@
 #include <Thunderegg/SchwarzPrec.h>
 #include <Thunderegg/SevenPtPatchOperator.h>
 #include <Thunderegg/StarPatchOp.h>
-#include <Thunderegg/ThundereggDCG.h>
+#include <Thunderegg/ThundereggDomGen.h>
 #include <Thunderegg/Timer.h>
 #include <Thunderegg/TriLinInterp.h>
 #ifdef ENABLE_AMGX
@@ -298,9 +298,9 @@ int main(int argc, char *argv[])
 	for (int loop = 0; loop < loop_count; loop++) {
 		timer.start("Domain Initialization");
 
-		shared_ptr<DomainCollectionGenerator<3>> dcg(new ThundereggDCG<3>(t, ns, neumann));
+		shared_ptr<DomainGenerator<3>> dcg(new ThundereggDomGen<3>(t, ns, neumann));
 
-		dc = dcg->getFinestDC();
+		dc = dcg->getFinestDomain();
 
 		if (patch_solver == "dft") {
 			p_solver.reset(new DftPatchSolver<3>(*dc));

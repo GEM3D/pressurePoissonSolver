@@ -19,15 +19,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef DOMAINCOLLECTIONGENERATOR_H
-#define DOMAINCOLLECTIONGENERATOR_H
-#include <Thunderegg/Domain.h>
-template <size_t D> class DomainCollectionGenerator
-{
-	public:
-	~DomainCollectionGenerator(){};
-	virtual std::shared_ptr<Domain<D>> getFinestDC()  = 0;
-	virtual bool                       hasCoarserDC() = 0;
-	virtual std::shared_ptr<Domain<D>> getCoarserDC() = 0;
-};
-#endif
+#include "ThundereggDomGen.h"
+
+template class ThundereggDomGen<2>;
+template class ThundereggDomGen<3>;

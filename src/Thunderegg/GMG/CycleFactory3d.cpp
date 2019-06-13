@@ -66,11 +66,11 @@ static std::shared_ptr<Restrictor<3>> getNewRestrictor(std::string              
 {
 	return std::shared_ptr<Restrictor<3>>(new AvgRstr<3>(domain, finer_domain, ilc));
 }
-std::shared_ptr<Cycle<3>>
-CycleFactory3d::getCycle(const CycleOpts &opts, std::shared_ptr<DomainCollectionGenerator<3>> dcg,
-                         std::shared_ptr<PatchSolver<3>>   solver,
-                         std::shared_ptr<PatchOperator<3>> op,
-                         std::shared_ptr<IfaceInterp<3>>   interp)
+std::shared_ptr<Cycle<3>> CycleFactory3d::getCycle(const CycleOpts &                   opts,
+                                                   std::shared_ptr<DomainGenerator<3>> dcg,
+                                                   std::shared_ptr<PatchSolver<3>>     solver,
+                                                   std::shared_ptr<PatchOperator<3>>   op,
+                                                   std::shared_ptr<IfaceInterp<3>>     interp)
 {
 	int size;
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -86,7 +86,7 @@ CycleFactory3d::getCycle(const CycleOpts &opts, std::shared_ptr<DomainCollection
 	shared_ptr<Level<3>>  finest_level;
 	shared_ptr<Domain<3>> finer_domain;
 	{
-		shared_ptr<Domain<3>>          domain = dcg->getFinestDC();
+		shared_ptr<Domain<3>>          domain = dcg->getFinestDomain();
 		shared_ptr<SchurHelper<3>>     sh(new SchurHelper<3>(domain, solver, op, interp));
 		shared_ptr<VectorGenerator<3>> vg(new DomainVG<3>(domain));
 		finest_level.reset(new Level<3>(vg));
@@ -98,9 +98,9 @@ CycleFactory3d::getCycle(const CycleOpts &opts, std::shared_ptr<DomainCollection
 	shared_ptr<Level<3>> finer_level = finest_level;
 	// other levels
 	int curr_level = 1;
-	while (dcg->hasCoarserDC() && (opts.max_levels <= 0 || curr_level < opts.max_levels)) {
+	while (dcg->hasCoarserDomain() && (opts.max_levels <= 0 || curr_level < opts.max_levels)) {
 		// create new level
-		shared_ptr<Domain<3>> domain = dcg->getCoarserDC();
+		shared_ptr<Domain<3>> domain = dcg->getCoarserDomain();
 		if ((domain->getNumGlobalPatches() + 0.0) / size < opts.patches_per_proc) { break; }
 		shared_ptr<SchurHelper<3>>     sh(new SchurHelper<3>(domain, solver, op, interp));
 		shared_ptr<VectorGenerator<3>> vg(new DomainVG<3>(domain));

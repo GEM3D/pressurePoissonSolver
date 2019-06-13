@@ -39,14 +39,14 @@
 #include <Thunderegg/SchurMatrixHelper2d.h>
 #include <Thunderegg/SchwarzPrec.h>
 #include <Thunderegg/StarPatchOp.h>
-#include <Thunderegg/ThundereggDCG.h>
+#include <Thunderegg/ThundereggDomGen.h>
 #include <Thunderegg/Timer.h>
 #ifdef HAVE_VTK
 #include "Writers/VtkWriter2d.h"
 #endif
 #ifdef HAVE_P4EST
 #include "TreeToP4est.h"
-#include <Thunderegg/P4estDCG.h>
+#include <Thunderegg/P4estDomGen.h>
 #endif
 #include "CLI11.hpp"
 #include <cmath>
@@ -214,7 +214,7 @@ int main(int argc, char *argv[])
 		t.refineLeaves();
 	}
 
-	shared_ptr<DomainCollectionGenerator<2>> dcg;
+	shared_ptr<DomainGenerator<2>> dcg;
 #ifdef HAVE_P4EST
 	if (use_p4est) {
 		TreeToP4est ttp(t);
@@ -226,15 +226,15 @@ int main(int argc, char *argv[])
 		auto inf
 		= [=](Side<2> s, const array<double, 2> &, const array<double, 2> &) { return neumann; };
 
-		dcg.reset(new P4estDCG(ttp.p4est, ns, inf, bmf));
+		dcg.reset(new P4estDomGen(ttp.p4est, ns, inf, bmf));
 #else
 	if (false) {
 #endif
 	} else {
-		dcg.reset(new ThundereggDCG<2>(t, ns, neumann));
+		dcg.reset(new ThundereggDomGen<2>(t, ns, neumann));
 	}
 
-	domain = dcg->getFinestDC();
+	domain = dcg->getFinestDomain();
 
 	// the functions that we are using
 	function<double(double, double)> ffun;
