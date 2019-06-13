@@ -28,11 +28,11 @@
 class BilinearInterpolator : public IfaceInterp<2>
 {
 	public:
-	void interpolate(const std::vector<SchurDomain<2>> &patches, std::shared_ptr<const Vector<2>> u,
+	void interpolate(const std::vector<SchurInfo<2>> &patches, std::shared_ptr<const Vector<2>> u,
 	                 std::shared_ptr<Vector<1>> interp);
-	void interpolate(SchurDomain<2> &d, std::shared_ptr<const Vector<2>> u,
+	void interpolate(SchurInfo<2> &d, std::shared_ptr<const Vector<2>> u,
 	                 std::shared_ptr<Vector<1>> interp);
-	void interpolate(SchurDomain<2> &d, Side<2> s, int local_index, IfaceType itype,
+	void interpolate(SchurInfo<2> &d, Side<2> s, int local_index, IfaceType<2> itype,
 	                 std::shared_ptr<const Vector<2>> u, std::shared_ptr<Vector<1>> interp);
 };
 #endif

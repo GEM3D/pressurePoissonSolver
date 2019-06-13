@@ -23,7 +23,7 @@ list(APPEND Thunderegg_SRCS Thunderegg/Domain.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/ThundereggDomGen.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/PatchInfo.cpp)
 list(APPEND Thunderegg_HDRS Thunderegg/PatchInfo.h)
-list(APPEND Thunderegg_SRCS Thunderegg/SchurDomain.cpp)
+list(APPEND Thunderegg_SRCS Thunderegg/SchurInfo.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/Vector.cpp)
 
 list(APPEND Thunderegg_SRCS Thunderegg/SevenPtPatchOperator.cpp)

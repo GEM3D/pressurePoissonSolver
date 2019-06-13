@@ -19,8 +19,8 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef SCHURDOMAINOP_H
-#define SCHURDOMAINOP_H
+#ifndef SchurDomainOp_H
+#define SchurDomainOp_H
 #include <Thunderegg/Operators/Operator.h>
 #include <Thunderegg/SchurHelper.h>
 

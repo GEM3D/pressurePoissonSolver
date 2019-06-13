@@ -32,13 +32,13 @@ struct Block {
 	static const char             rot_quad_lookup_right[4][4];
 	static const char             quad_flip_lookup[4];
 	char                          data = 0;
-	IfaceType                     type;
+	IfaceType<3>                  type;
 	Side<3>                       main;
 	Side<3>                       aux;
 	int                           j;
 	int                           i;
 	bitset<6>                     neumann;
-	Block(Side<3> main, int j, Side<3> aux, int i, bitset<6> neumann, IfaceType type)
+	Block(Side<3> main, int j, Side<3> aux, int i, bitset<6> neumann, IfaceType<3> type)
 	{
 		this->main    = main;
 		this->j       = j;
@@ -96,10 +96,10 @@ struct Block {
 			return quad;
 		};
 		switch (type.toInt()) {
-			case IfaceType::fine_to_coarse:
-			case IfaceType::fine_to_fine:
-			case IfaceType::coarse_to_fine: {
-				int quad = type.getOrthant();
+			case IfaceType<3>::fine_to_coarse:
+			case IfaceType<3>::fine_to_fine:
+			case IfaceType<3>::coarse_to_fine: {
+				int quad = type.getOrthant().toInt();
 				quad     = rotateQuad(quad);
 				type.setOrthant(quad);
 			} break;
@@ -150,8 +150,8 @@ struct Block {
 	}
 };
 struct BlockKey {
-	IfaceType type;
-	Side<3>   s;
+	IfaceType<3> type;
+	Side<3>      s;
 
 	BlockKey() {}
 	BlockKey(const Block &b)
@@ -257,13 +257,15 @@ void SchurMatrixHelper::assembleMatrix(inserter insertBlock)
 		auto solver       = sh->getSolver();
 		auto interpolator = sh->getIfaceInterp();
 		// create domain representing curr_type
-		SchurDomain<3> sd;
-		sd.ns.fill(n);
-		sd.spacings.fill(1.0 / n);
-		sd.neumann                        = curr_type.neumann;
+		std::shared_ptr<PatchInfo<3>> pinfo(new PatchInfo<3>());
+		SchurInfo<3>                  sd;
+		sd.pinfo = pinfo;
+		pinfo->ns.fill(n);
+		pinfo->spacings.fill(1.0 / n);
+		pinfo->neumann                    = curr_type.neumann;
 		sd.getIfaceInfoPtr(Side<3>::west) = new NormalIfaceInfo<3>();
 		solver->addDomain(sd);
-		std::deque<SchurDomain<3>> single_domain;
+		std::deque<SchurInfo<3>> single_domain;
 		single_domain.push_back(sd);
 
 		map<BlockKey, shared_ptr<valarray<double>>> coeffs;
@@ -282,9 +284,9 @@ void SchurMatrixHelper::assembleMatrix(inserter insertBlock)
 
 			// fill the blocks
 			for (auto &p : coeffs) {
-				BlockKey  bk   = p.first;
-				Side<3>   s    = bk.s;
-				IfaceType type = bk.type;
+				BlockKey     bk   = p.first;
+				Side<3>      s    = bk.s;
+				IfaceType<3> type = bk.type;
 				VecScale(interp, 0);
 				interpolator->interpolate(sd, s, 0, type, u_vec, interp_vec);
 				valarray<double> &block = *p.second;
@@ -293,11 +295,11 @@ void SchurMatrixHelper::assembleMatrix(inserter insertBlock)
 				}
 				if (s == Side<3>::west) {
 					switch (type.toInt()) {
-						case IfaceType::normal:
+						case IfaceType<3>::normal:
 							block[n * n * j + j] += 0.5;
 							break;
-						case IfaceType::coarse_to_coarse:
-						case IfaceType::fine_to_fine:
+						case IfaceType<3>::coarse_to_coarse:
+						case IfaceType<3>::fine_to_fine:
 							block[n * n * j + j] += 1.0;
 							break;
 						default:

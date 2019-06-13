@@ -25,7 +25,7 @@
 class SevenPtPatchOperator : public PatchOperator<3>
 {
 	public:
-	void apply(SchurDomain<3> &d, std::shared_ptr<const Vector<3>> u,
-	                   std::shared_ptr<const Vector<2>> gamma, std::shared_ptr<Vector<3>> f);
+	void apply(SchurInfo<3> &d, std::shared_ptr<const Vector<3>> u,
+	           std::shared_ptr<const Vector<2>> gamma, std::shared_ptr<Vector<3>> f);
 };
 #endif

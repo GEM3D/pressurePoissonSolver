@@ -21,15 +21,15 @@
 
 #ifndef PATCHSOLVER_H
 #define PATCHSOLVER_H
-#include <Thunderegg/SchurDomain.h>
+#include <Thunderegg/SchurInfo.h>
 #include <Thunderegg/Vector.h>
 template <size_t D> class PatchSolver
 {
 	public:
 	virtual ~PatchSolver() {}
-	virtual void addDomain(SchurDomain<D> &d) = 0;
-	virtual void domainSolve(std::deque<SchurDomain<D>> &     domains,
-	                         std::shared_ptr<const Vector<D>> f, std::shared_ptr<Vector<D>> u,
+	virtual void addDomain(SchurInfo<D> &d) = 0;
+	virtual void domainSolve(std::deque<SchurInfo<D>> &domains, std::shared_ptr<const Vector<D>> f,
+	                         std::shared_ptr<Vector<D>>           u,
 	                         std::shared_ptr<const Vector<D - 1>> gamma)
 	= 0;
 };

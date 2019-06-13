@@ -22,7 +22,7 @@
 #ifndef THUNDEREGG_IFACEINTERP_H
 #define THUNDEREGG_IFACEINTERP_H
 #include <Thunderegg/Iface.h>
-#include <Thunderegg/SchurDomain.h>
+#include <Thunderegg/SchurInfo.h>
 #include <Thunderegg/Vector.h>
 /**
  * @brief An abstract class that interpolates to the interfaces in the Schur compliment system.
@@ -41,9 +41,9 @@ template <size_t D> class IfaceInterp
 	 * @param u the domain vector
 	 * @param interp the interface vector
 	 */
-	virtual void interpolate(const std::vector<SchurDomain<D>> &patches,
-	                         std::shared_ptr<const Vector<D>>   u,
-	                         std::shared_ptr<Vector<D - 1>>     interp)
+	virtual void interpolate(const std::vector<SchurInfo<D>> &patches,
+	                         std::shared_ptr<const Vector<D>> u,
+	                         std::shared_ptr<Vector<D - 1>>   interp)
 	= 0;
 	/**
 	 * \deprecated
@@ -53,7 +53,7 @@ template <size_t D> class IfaceInterp
 	 * @param u the domain vector
 	 * @param interp the interface vector
 	 */
-	virtual void interpolate(SchurDomain<D> &d, std::shared_ptr<const Vector<D>> u,
+	virtual void interpolate(SchurInfo<D> &d, std::shared_ptr<const Vector<D>> u,
 	                         std::shared_ptr<Vector<D - 1>> interp)
 	= 0;
 	/**
@@ -66,7 +66,7 @@ template <size_t D> class IfaceInterp
 	 * @param u
 	 * @param interp
 	 */
-	virtual void interpolate(SchurDomain<D> &d, Side<D> s, int local_index, IfaceType itype,
+	virtual void interpolate(SchurInfo<D> &d, Side<D> s, int local_index, IfaceType<D> itype,
 	                         std::shared_ptr<const Vector<D>> u,
 	                         std::shared_ptr<Vector<D - 1>>   interp)
 	= 0;

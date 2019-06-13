@@ -19,6 +19,6 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#include "SchurDomain.h"
-template struct SchurDomain<2>;
-template struct SchurDomain<3>;
+#include "SchurInfo.h"
+template struct SchurInfo<2>;
+template struct SchurInfo<3>;

@@ -27,7 +27,7 @@
 #include <Thunderegg/PatchOperator.h>
 #include <Thunderegg/PatchSolvers/PatchSolver.h>
 #include <Thunderegg/PetscVector.h>
-#include <Thunderegg/SchurDomain.h>
+#include <Thunderegg/SchurInfo.h>
 #include <deque>
 #include <memory>
 #include <petscmat.h>
@@ -66,7 +66,7 @@ template <size_t D> class SchurHelper
 	 */
 	std::shared_ptr<PatchSolver<D>> solver;
 
-	std::deque<SchurDomain<D>> domains;
+	std::deque<SchurInfo<D>>   domains;
 	std::map<int, IfaceSet<D>> ifaces;
 
 	std::vector<int> iface_dist_map_vec;
@@ -205,11 +205,11 @@ inline SchurHelper<D>::SchurHelper(std::shared_ptr<Domain<D>>        domain,
 		lengths[i] = domain->getNs()[i];
 	}
 	for (auto &pinfo : domain->getPatchInfoVector()) {
-		domains.push_back(*pinfo);
+		domains.push_back(pinfo);
 	}
 	std::map<int, std::map<int, IfaceSet<D>>> off_proc_ifaces;
 	std::set<int>                             incoming_procs;
-	for (SchurDomain<D> &sd : domains) {
+	for (SchurInfo<D> &sd : domains) {
 		sd.enumerateIfaces(ifaces, off_proc_ifaces, incoming_procs);
 		solver->addDomain(sd);
 	}
@@ -290,7 +290,7 @@ inline void SchurHelper<D>::solveWithInterface(std::shared_ptr<const Vector<D>> 
 	solver->domainSolve(domains, f, u, local_gamma);
 
 	local_gamma->set(0);
-	for (SchurDomain<D> &sd : domains) {
+	for (SchurInfo<D> &sd : domains) {
 		interpolator->interpolate(sd, u, local_gamma);
 	}
 
@@ -309,7 +309,7 @@ std::shared_ptr<const Vector<D - 1>> gamma, std::shared_ptr<Vector<D - 1>> inter
 	solver->domainSolve(domains, f, u, local_gamma);
 
 	local_gamma->set(0);
-	for (SchurDomain<D> &sd : domains) {
+	for (SchurInfo<D> &sd : domains) {
 		interpolator->interpolate(sd, u, local_gamma);
 	}
 
@@ -321,7 +321,7 @@ inline void SchurHelper<D>::solveWithSolution(std::shared_ptr<const Vector<D>> f
                                               std::shared_ptr<Vector<D>>       u)
 {
 	local_gamma->set(0);
-	for (SchurDomain<D> &sd : domains) {
+	for (SchurInfo<D> &sd : domains) {
 		interpolator->interpolate(sd, u, local_gamma);
 	}
 
@@ -337,7 +337,7 @@ inline void SchurHelper<D>::interpolateToInterface(std::shared_ptr<const Vector<
 {
 	// initilize our local variables
 	local_gamma->set(0);
-	for (SchurDomain<D> &sd : domains) {
+	for (SchurInfo<D> &sd : domains) {
 		interpolator->interpolate(sd, u, local_gamma);
 	}
 	gamma->set(0);
@@ -352,7 +352,7 @@ inline void SchurHelper<D>::applyWithInterface(std::shared_ptr<const Vector<D>> 
 
 	f->set(0);
 
-	for (SchurDomain<D> &sd : domains) {
+	for (SchurInfo<D> &sd : domains) {
 		op->apply(sd, u, local_gamma, f);
 	}
 }
@@ -360,14 +360,14 @@ template <size_t D>
 inline void SchurHelper<D>::apply(std::shared_ptr<const Vector<D>> u, std::shared_ptr<Vector<D>> f)
 {
 	local_gamma->set(0);
-	for (SchurDomain<D> &sd : domains) {
+	for (SchurInfo<D> &sd : domains) {
 		interpolator->interpolate(sd, u, local_gamma);
 	}
 
 	updateInterfaceDist(local_gamma);
 
 	f->set(0);
-	for (SchurDomain<D> &sd : domains) {
+	for (SchurInfo<D> &sd : domains) {
 		op->apply(sd, u, local_gamma, f);
 	}
 }
@@ -378,7 +378,7 @@ template <size_t D> inline void SchurHelper<D>::indexDomainIfacesLocal()
 	map<int, int> rev_map;
 	if (!domains.empty()) {
 		int curr_i = 0;
-		for (SchurDomain<D> &sd : domains) {
+		for (SchurInfo<D> &sd : domains) {
 			for (int id : sd.getIds()) {
 				if (rev_map.count(id) == 0) {
 					rev_map[id] = curr_i;
@@ -387,7 +387,7 @@ template <size_t D> inline void SchurHelper<D>::indexDomainIfacesLocal()
 				}
 			}
 		}
-		for (SchurDomain<D> &sd : domains) {
+		for (SchurInfo<D> &sd : domains) {
 			sd.setLocalIndexes(rev_map);
 		}
 	}
@@ -499,7 +499,7 @@ template <size_t D> inline void SchurHelper<D>::indexIfacesGlobal()
 		}
 
 		// set new global indices in domain objects
-		for (SchurDomain<D> &sd : domains) {
+		for (SchurInfo<D> &sd : domains) {
 			sd.setGlobalIndexes(rev_map);
 		}
 		for (size_t i = 0; i < iface_dist_map_vec.size(); i++) {

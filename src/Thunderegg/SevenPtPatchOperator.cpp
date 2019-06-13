@@ -1,26 +1,27 @@
 #include "SevenPtPatchOperator.h"
-void SevenPtPatchOperator::apply(SchurDomain<3> &d, std::shared_ptr<const Vector<3>> u,
+void SevenPtPatchOperator::apply(SchurInfo<3> &sinfo, std::shared_ptr<const Vector<3>> u,
                                  std::shared_ptr<const Vector<2>> gamma,
                                  std::shared_ptr<Vector<3>>       f)
 
 {
-	int nx = d.ns[0];
-	int ny = d.ns[1];
-	int nz = d.ns[2];
+	int nx = sinfo.pinfo->ns[0];
+	int ny = sinfo.pinfo->ns[1];
+	int nz = sinfo.pinfo->ns[2];
 
-	double h_x = d.spacings[0];
-	double h_y = d.spacings[1];
-	double h_z = d.spacings[2];
+	double h_x = sinfo.pinfo->spacings[0];
+	double h_y = sinfo.pinfo->spacings[1];
+	double h_z = sinfo.pinfo->spacings[2];
 
-	LocalData<3>       f_data = f->getLocalData(d.local_index);
-	const LocalData<3> u_data = u->getLocalData(d.local_index);
+	LocalData<3>       f_data = f->getLocalData(sinfo.pinfo->local_index);
+	const LocalData<3> u_data = u->getLocalData(sinfo.pinfo->local_index);
 
 	double center, north, east, south, west, bottom, top;
 
 	// derive in x direction
 	// west
-	if (d.hasNbr(Side<3>::west)) {
-		const LocalData<2> boundary_data = gamma->getLocalData(d.getIfaceLocalIndex(Side<3>::west));
+	if (sinfo.pinfo->hasNbr(Side<3>::west)) {
+		const LocalData<2> boundary_data
+		= gamma->getLocalData(sinfo.getIfaceLocalIndex(Side<3>::west));
 		for (int zi = 0; zi < nz; zi++) {
 			for (int yi = 0; yi < ny; yi++) {
 				west                = boundary_data[{yi, zi}];
@@ -29,7 +30,7 @@ void SevenPtPatchOperator::apply(SchurDomain<3> &d, std::shared_ptr<const Vector
 				f_data[{0, yi, zi}] = (2 * west - 3 * center + east) / (h_x * h_x);
 			}
 		}
-	} else if (d.isNeumann(Side<3>::west)) {
+	} else if (sinfo.pinfo->isNeumann(Side<3>::west)) {
 		for (int zi = 0; zi < nz; zi++) {
 			for (int yi = 0; yi < ny; yi++) {
 				center              = u_data[{0, yi, zi}];
@@ -59,8 +60,9 @@ void SevenPtPatchOperator::apply(SchurDomain<3> &d, std::shared_ptr<const Vector
 		}
 	}
 	// east
-	if (d.hasNbr(Side<3>::east)) {
-		const LocalData<2> boundary_data = gamma->getLocalData(d.getIfaceLocalIndex(Side<3>::east));
+	if (sinfo.pinfo->hasNbr(Side<3>::east)) {
+		const LocalData<2> boundary_data
+		= gamma->getLocalData(sinfo.getIfaceLocalIndex(Side<3>::east));
 		for (int zi = 0; zi < nz; zi++) {
 			for (int yi = 0; yi < ny; yi++) {
 				west                     = u_data[{nx - 2, yi, zi}];
@@ -69,7 +71,7 @@ void SevenPtPatchOperator::apply(SchurDomain<3> &d, std::shared_ptr<const Vector
 				f_data[{nx - 1, yi, zi}] = (west - 3 * center + 2 * east) / (h_x * h_x);
 			}
 		}
-	} else if (d.isNeumann(Side<3>::east)) {
+	} else if (sinfo.pinfo->isNeumann(Side<3>::east)) {
 		for (int zi = 0; zi < nz; zi++) {
 			for (int yi = 0; yi < ny; yi++) {
 				west                     = u_data[{nx - 2, yi, zi}];
@@ -89,9 +91,9 @@ void SevenPtPatchOperator::apply(SchurDomain<3> &d, std::shared_ptr<const Vector
 
 	// derive in y direction
 	// south
-	if (d.hasNbr(Side<3>::south)) {
+	if (sinfo.pinfo->hasNbr(Side<3>::south)) {
 		const LocalData<2> boundary_data
-		= gamma->getLocalData(d.getIfaceLocalIndex(Side<3>::south));
+		= gamma->getLocalData(sinfo.getIfaceLocalIndex(Side<3>::south));
 		for (int zi = 0; zi < nz; zi++) {
 			for (int xi = 0; xi < nx; xi++) {
 				south  = boundary_data[{xi, zi}];
@@ -100,7 +102,7 @@ void SevenPtPatchOperator::apply(SchurDomain<3> &d, std::shared_ptr<const Vector
 				f_data[{xi, 0, zi}] += (2 * south - 3 * center + north) / (h_y * h_y);
 			}
 		}
-	} else if (d.isNeumann(Side<3>::south)) {
+	} else if (sinfo.pinfo->isNeumann(Side<3>::south)) {
 		for (int zi = 0; zi < nz; zi++) {
 			for (int xi = 0; xi < nx; xi++) {
 				center = u_data[{xi, 0, zi}];
@@ -130,9 +132,9 @@ void SevenPtPatchOperator::apply(SchurDomain<3> &d, std::shared_ptr<const Vector
 		}
 	}
 	// north
-	if (d.hasNbr(Side<3>::north)) {
+	if (sinfo.pinfo->hasNbr(Side<3>::north)) {
 		const LocalData<2> boundary_data
-		= gamma->getLocalData(d.getIfaceLocalIndex(Side<3>::north));
+		= gamma->getLocalData(sinfo.getIfaceLocalIndex(Side<3>::north));
 		for (int zi = 0; zi < nz; zi++) {
 			for (int xi = 0; xi < nx; xi++) {
 				south  = u_data[{xi, ny - 2, zi}];
@@ -141,7 +143,7 @@ void SevenPtPatchOperator::apply(SchurDomain<3> &d, std::shared_ptr<const Vector
 				f_data[{xi, ny - 1, zi}] += (south - 3 * center + 2 * north) / (h_y * h_y);
 			}
 		}
-	} else if (d.isNeumann(Side<3>::north)) {
+	} else if (sinfo.pinfo->isNeumann(Side<3>::north)) {
 		for (int zi = 0; zi < nz; zi++) {
 			for (int xi = 0; xi < nx; xi++) {
 				south  = u_data[{xi, ny - 2, zi}];
@@ -161,9 +163,9 @@ void SevenPtPatchOperator::apply(SchurDomain<3> &d, std::shared_ptr<const Vector
 
 	// derive in z direction
 	// bottom
-	if (d.hasNbr(Side<3>::bottom)) {
+	if (sinfo.pinfo->hasNbr(Side<3>::bottom)) {
 		const LocalData<2> boundary_data
-		= gamma->getLocalData(d.getIfaceLocalIndex(Side<3>::bottom));
+		= gamma->getLocalData(sinfo.getIfaceLocalIndex(Side<3>::bottom));
 		for (int yi = 0; yi < ny; yi++) {
 			for (int xi = 0; xi < nx; xi++) {
 				bottom = boundary_data[{xi, yi}];
@@ -172,7 +174,7 @@ void SevenPtPatchOperator::apply(SchurDomain<3> &d, std::shared_ptr<const Vector
 				f_data[{xi, yi, 0}] += (2 * bottom - 3 * center + top) / (h_z * h_z);
 			}
 		}
-	} else if (d.isNeumann(Side<3>::bottom)) {
+	} else if (sinfo.pinfo->isNeumann(Side<3>::bottom)) {
 		for (int yi = 0; yi < ny; yi++) {
 			for (int xi = 0; xi < nx; xi++) {
 				center = u_data[{xi, yi, 0}];
@@ -202,8 +204,9 @@ void SevenPtPatchOperator::apply(SchurDomain<3> &d, std::shared_ptr<const Vector
 		}
 	}
 	// top
-	if (d.hasNbr(Side<3>::top)) {
-		const LocalData<2> boundary_data = gamma->getLocalData(d.getIfaceLocalIndex(Side<3>::top));
+	if (sinfo.pinfo->hasNbr(Side<3>::top)) {
+		const LocalData<2> boundary_data
+		= gamma->getLocalData(sinfo.getIfaceLocalIndex(Side<3>::top));
 		for (int yi = 0; yi < ny; yi++) {
 			for (int xi = 0; xi < nx; xi++) {
 				bottom = u_data[{xi, yi, nz - 2}];
@@ -212,7 +215,7 @@ void SevenPtPatchOperator::apply(SchurDomain<3> &d, std::shared_ptr<const Vector
 				f_data[{xi, yi, nz - 1}] += (bottom - 3 * center + 2 * top) / (h_z * h_z);
 			}
 		}
-	} else if (d.isNeumann(Side<3>::top)) {
+	} else if (sinfo.pinfo->isNeumann(Side<3>::top)) {
 		for (int yi = 0; yi < ny; yi++) {
 			for (int xi = 0; xi < nx; xi++) {
 				bottom = u_data[{xi, yi, nz - 2}];

@@ -19,10 +19,10 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef SCHURDOMAIN_H
-#define SCHURDOMAIN_H
-#include <Thunderegg/PatchInfo.h>
+#ifndef SchurInfo_H
+#define SchurInfo_H
 #include <Thunderegg/Iface.h>
+#include <Thunderegg/PatchInfo.h>
 #include <deque>
 /**
  * @brief The IfaceInfo class represents the information for an interface on a given side of the
@@ -62,54 +62,89 @@ template <size_t D> class IfaceInfo
 	/**
 	 * @brief add to a deque of local interface indexes
 	 *
-	 * @param ids adds to the deque of local interface indexes
+	 * @param idx adds to the deque of local interface indexes
 	 */
 	virtual void getLocalIndexes(std::deque<int> &idx) = 0;
 	/**
 	 * @brief add to a deque of global interface indexes
 	 *
-	 * @param ids adds to the deque of global interface indexes
+	 * @param idx adds to the deque of global interface indexes
 	 */
 	virtual void getGlobalIndexes(std::deque<int> &idx) = 0;
 	/**
 	 * @brief add to a deque of IfaceTypes
 	 *
-	 * @param ids adds to the deque of IfaceTypes
+	 * @param types adds to the deque of IfaceTypes
 	 */
-	virtual void getIfaceTypes(std::deque<IfaceType> &types) = 0;
+	virtual void getIfaceTypes(std::deque<IfaceType<D>> &types) = 0;
 	/**
 	 * @brief add to a deque of interface ranks
 	 *
-	 * @param ids adds to the deque of interface ranks
+	 * @param ranks adds to the deque of interface ranks
 	 */
 	virtual void getRanks(std::deque<int> &ranks) = 0;
 	/**
 	 * @brief add to a deque of interface ownership
 	 *
-	 * @param ids adds to the deque of interface ownership
+	 * @param own adds to the deque of interface ownership
 	 */
-	virtual void getOwnership(std::deque<bool> &own)                 = 0;
-	virtual void getIncomingProcs(std::set<int> &incoming_procs)     = 0;
-	virtual void setLocalIndexes(const std::map<int, int> &rev_map)  = 0;
+	virtual void getOwnership(std::deque<bool> &own) = 0;
+	/**
+	 * @brief add to a set of incoming mpi ranks
+	 *
+	 * If neighbor patch resides on another rank, and this rank needs information from it, it will
+	 * add that neighbor's rank.
+	 *
+	 * @param incoming_procs the set of incoming mpi ranks.
+	 */
+	virtual void getIncomingProcs(std::set<int> &incoming_procs) = 0;
+	/**
+	 * @brief Set the local indexes in the IfaceInfo objects
+	 *
+	 * @param rev_map map from id to local_index
+	 */
+	virtual void setLocalIndexes(const std::map<int, int> &rev_map) = 0;
+	/**
+	 * @brief Set the global indexes in the IfaceInfo objects
+	 *
+	 * @param rev_map map form local_index to global_index
+	 */
 	virtual void setGlobalIndexes(const std::map<int, int> &rev_map) = 0;
 };
+/**
+ * @brief This represents an interface where the neighbor is at the same refinement level
+ *
+ * @tparam D the number of Cartesian dimensions in a patch
+ */
 template <size_t D> class NormalIfaceInfo : public IfaceInfo<D>
 {
 	public:
+	/**
+	 * @brief convenience pointer to associated NbrInfo object
+	 */
 	NormalNbrInfo<D> nbr_info;
+	/**
+	 * @brief Construct a new NormalIfaceInfo object all values are set to zero
+	 */
 	NormalIfaceInfo()
 	{
 		this->id           = 0;
 		this->local_index  = 0;
 		this->global_index = 0;
 	}
-	NormalIfaceInfo(PatchInfo<D> &d, Side<D> s)
+	/**
+	 * @brief Construct a new NormalIfaceInfo object
+	 *
+	 * @param pinfo the associated PatchInfo object
+	 * @param s the side of the patch that the interface is on
+	 */
+	NormalIfaceInfo(std::shared_ptr<PatchInfo<D>> pinfo, Side<D> s)
 	{
-		nbr_info = d.getNormalNbrInfo(s);
+		nbr_info = pinfo->getNormalNbrInfo(s);
 		if (s.isLowerOnAxis()) {
-			this->id = d.id * Side<D>::num_sides + s.toInt();
+			this->id = pinfo->id * Side<D>::num_sides + s.toInt();
 		} else {
-			this->id = d.getNormalNbrInfo(s).id * Side<D>::num_sides + s.opposite().toInt();
+			this->id = pinfo->getNormalNbrInfo(s).id * Side<D>::num_sides + s.opposite().toInt();
 		}
 		this->own = ((s.toInt() & 0x1) || nbr_info.ptr != nullptr);
 	}
@@ -125,9 +160,9 @@ template <size_t D> class NormalIfaceInfo : public IfaceInfo<D>
 	{
 		idx.push_back(this->global_index);
 	}
-	void getIfaceTypes(std::deque<IfaceType> &types)
+	void getIfaceTypes(std::deque<IfaceType<D>> &types)
 	{
-		types.push_back(IfaceType::normal);
+		types.push_back(IfaceType<D>::normal);
 	}
 	void getRanks(std::deque<int> &ranks)
 	{
@@ -150,21 +185,53 @@ template <size_t D> class NormalIfaceInfo : public IfaceInfo<D>
 		this->global_index = rev_map.at(this->local_index);
 	}
 };
+/**
+ * @brief Represents the interfaces where the neighbor is at a coarser refinement level.
+ *
+ * There will be two interfaces associated with this object. The interface that lines up with this
+ * patch, and interface that lines up with the coarser patch.
+ *
+ * @tparam D the number of Cartesian dimensions in a patch
+ */
 template <size_t D> class CoarseIfaceInfo : public IfaceInfo<D>
 {
 	public:
+	/**
+	 * @brief convenience pointer to associated NbrInfo object
+	 */
 	CoarseNbrInfo<D> nbr_info;
-	int              quad_on_coarse;
-	int              coarse_id;
-	int              coarse_local_index;
-	int              coarse_global_index;
-	bool             coarse_own;
-	CoarseIfaceInfo(PatchInfo<D> &d, Side<D> s)
+	/**
+	 * @brief The orthant that this patch in relation to the coarser patch's interface.
+	 */
+	Orthant<D - 1> orth_on_coarse;
+	/**
+	 * @brief The id of the coarser patch's interface
+	 */
+	int coarse_id;
+	/**
+	 * @brief The local index of the coarser patch's inteface
+	 */
+	int coarse_local_index;
+	/**
+	 * @brief The global index of the coarser patch's interface
+	 */
+	int coarse_global_index;
+	/**
+	 * @brief Does this processor own the coarser patch's inteface?
+	 */
+	bool coarse_own;
+	/**
+	 * @brief Construct a new CoarseIfaceInfo object
+	 *
+	 * @param pinfo the cooresponding PatchInfo object
+	 * @param s the side that the interface is on
+	 */
+	CoarseIfaceInfo(std::shared_ptr<PatchInfo<D>> pinfo, Side<D> s)
 	{
-		nbr_info       = d.getCoarseNbrInfo(s);
-		this->id       = d.id * Side<D>::num_sides + s.toInt();
-		nbr_info       = d.getCoarseNbrInfo(s);
-		quad_on_coarse = nbr_info.quad_on_coarse;
+		nbr_info       = pinfo->getCoarseNbrInfo(s);
+		this->id       = pinfo->id * Side<D>::num_sides + s.toInt();
+		nbr_info       = pinfo->getCoarseNbrInfo(s);
+		orth_on_coarse = nbr_info.quad_on_coarse;
 		coarse_id      = nbr_info.id * Side<D>::num_sides + s.opposite().toInt();
 		this->own      = true;
 		coarse_own     = (nbr_info.ptr != nullptr);
@@ -184,10 +251,10 @@ template <size_t D> class CoarseIfaceInfo : public IfaceInfo<D>
 		idx.push_back(this->global_index);
 		idx.push_back(coarse_global_index);
 	}
-	void getIfaceTypes(std::deque<IfaceType> &types)
+	void getIfaceTypes(std::deque<IfaceType<D>> &types)
 	{
-		IfaceType fine_type(IfaceType::fine_to_fine, quad_on_coarse);
-		IfaceType coarse_type(IfaceType::fine_to_coarse, quad_on_coarse);
+		IfaceType<D> fine_type(IfaceType<D>::fine_to_fine, orth_on_coarse);
+		IfaceType<D> coarse_type(IfaceType<D>::fine_to_coarse, orth_on_coarse);
 		types.push_back(fine_type);
 		types.push_back(coarse_type);
 	}
@@ -216,31 +283,60 @@ template <size_t D> class CoarseIfaceInfo : public IfaceInfo<D>
 		coarse_global_index = rev_map.at(coarse_local_index);
 	}
 };
+/**
+ * @brief Represents the interfaces where the neighbors are at a finer refinement level.
+ *
+ * There will be 2^(D-1)+1 interfaces associated with this object. The interface that lines up with
+ * this patch, and interface that lines up with the finer patches.
+ *
+ * @tparam D the number of Cartesian dimensions in a patch
+ */
 template <size_t D> class FineIfaceInfo : public IfaceInfo<D>
 {
 	public:
-	FineNbrInfo<D>                                 nbr_info;
-	std::array<int, Orthant<D - 1>::num_orthants>  fine_ids;
-	std::array<int, Orthant<D - 1>::num_orthants>  fine_local_indexes;
-	std::array<int, Orthant<D - 1>::num_orthants>  fine_global_indexes;
+	/**
+	 * @brief convenience pointer to associated NbrInfo object
+	 */
+	FineNbrInfo<D> nbr_info;
+	/**
+	 * @brief the ids of the fine patches' interfaces
+	 */
+	std::array<int, Orthant<D - 1>::num_orthants> fine_ids;
+	/**
+	 * @brief the local indexes of the fine patches' interfaces
+	 */
+	std::array<int, Orthant<D - 1>::num_orthants> fine_local_indexes;
+	/**
+	 * @brief the global indexes of the fine patches' interfaces
+	 */
+	std::array<int, Orthant<D - 1>::num_orthants> fine_global_indexes;
+	/**
+	 * @brief ownership of the fine patches' interfaces
+	 */
 	std::array<bool, Orthant<D - 1>::num_orthants> fine_own;
-	FineIfaceInfo(PatchInfo<D> &d, Side<D> s)
+	/**
+	 * @brief Construct a new FineIfaceInfo object
+	 *
+	 * @param pinfo the associated PatchInfo object
+	 * @param s the side of the patch that the interface is on
+	 */
+	FineIfaceInfo(std::shared_ptr<PatchInfo<D>> pinfo, Side<D> s)
 	{
-		nbr_info  = d.getFineNbrInfo(s);
-		this->id  = d.id * Side<D>::num_sides + s.toInt();
+		nbr_info  = pinfo->getFineNbrInfo(s);
+		this->id  = pinfo->id * Side<D>::num_sides + s.toInt();
 		this->own = true;
 		for (size_t i = 0; i < fine_ids.size(); i++) {
 			fine_ids[i] = nbr_info.ids[i] * Side<D>::num_sides + s.opposite().toInt();
 			fine_own[i] = (nbr_info.ptrs[i] != nullptr);
 		}
 	}
-	void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType> &types)
+	void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType<D>> &types)
 	{
 		idx.push_back(this->local_index);
-		types.push_back(IfaceType::coarse_to_coarse);
+		types.push_back(IfaceType<D>::coarse_to_coarse);
 		for (size_t i = 0; i < fine_local_indexes.size(); i++) {
 			idx.push_back(fine_local_indexes[i]);
-			IfaceType type(IfaceType::coarse_to_fine, i);
+			IfaceType<D> type(IfaceType<D>::coarse_to_fine, i);
 			types.push_back(type);
 		}
 	}
@@ -265,11 +361,11 @@ template <size_t D> class FineIfaceInfo : public IfaceInfo<D>
 			idx.push_back(fine_global_indexes[i]);
 		}
 	}
-	void getIfaceTypes(std::deque<IfaceType> &types)
+	void getIfaceTypes(std::deque<IfaceType<D>> &types)
 	{
-		types.push_back(IfaceType::coarse_to_coarse);
+		types.push_back(IfaceType<D>::coarse_to_coarse);
 		for (size_t i = 0; i < fine_ids.size(); i++) {
-			IfaceType type(IfaceType::coarse_to_fine, i);
+			IfaceType<D> type(IfaceType<D>::coarse_to_fine, i);
 			types.push_back(type);
 		}
 	}
@@ -308,60 +404,103 @@ template <size_t D> class FineIfaceInfo : public IfaceInfo<D>
 		}
 	}
 };
-template <size_t D> struct SchurDomain : public PatchInfo<D> {
+/**
+ * @brief
+ *
+ * @tparam D the number of Cartesian dimensions in a patch
+ */
+template <size_t D> struct SchurInfo {
+	/**
+	 * @brief Pointer to associated PatchInfo object
+	 */
+	std::shared_ptr<PatchInfo<D>> pinfo;
+	/**
+	 * @brief Array of IfaceInfo objects
+	 */
 	std::array<IfaceInfo<D> *, Side<D>::num_sides> iface_info;
-	SchurDomain()
+	/**
+	 * @brief Construct a new empty SchurInfo object
+	 *
+	 */
+	SchurInfo()
 	{
 		iface_info.fill(nullptr);
 	}
-	SchurDomain(PatchInfo<D> &d) : PatchInfo<D>(d)
+	/**
+	 * @brief Construct a new SchurInfo object.
+	 *
+	 * Fills in information from the given PatchInfo object.
+	 */
+	SchurInfo(std::shared_ptr<PatchInfo<D>> &pinfo)
 	{
+		this->pinfo = pinfo;
 		iface_info.fill(nullptr);
 
 		// create iface objects
 		for (Side<D> s : Side<D>::getValues()) {
-			if (d.hasNbr(s)) {
-				switch (d.getNbrType(s)) {
+			if (pinfo->hasNbr(s)) {
+				switch (pinfo->getNbrType(s)) {
 					case NbrType::Normal:
-						getIfaceInfoPtr(s) = new NormalIfaceInfo<D>(d, s);
+						getIfaceInfoPtr(s) = new NormalIfaceInfo<D>(pinfo, s);
 						break;
 					case NbrType::Fine:
-						getIfaceInfoPtr(s) = new FineIfaceInfo<D>(d, s);
+						getIfaceInfoPtr(s) = new FineIfaceInfo<D>(pinfo, s);
 						break;
 					case NbrType::Coarse:
-						getIfaceInfoPtr(s) = new CoarseIfaceInfo<D>(d, s);
+						getIfaceInfoPtr(s) = new CoarseIfaceInfo<D>(pinfo, s);
 						break;
 				}
 			}
 		}
 	}
+	/**
+	 * @brief Get a reference to the IfaceInfo pointer
+	 *
+	 * @param s the side of the patch that the interface is on
+	 */
 	IfaceInfo<D> *&getIfaceInfoPtr(Side<D> s)
 	{
 		return iface_info[s.toInt()];
 	}
+	/*
+	 * @brief Get a reference to the NormalIfaceInfo object.
+	 *
+	 * If there is not a NormalIfaceInfo object on this side, the behavior is undefined.
+	 *
+	 * @param s the side of the patch that the interface is on
+	 */
+	/*
 	NormalIfaceInfo<D> &getNormalIfaceInfo(Side<D> s)
 	{
-		return *(NormalIfaceInfo<D> *) iface_info[s.toInt()];
+	    return *(NormalIfaceInfo<D> *) iface_info[s.toInt()];
 	}
+	*/
+	/**
+	 * @brief
+	 *
+	 * @param ifaces
+	 * @param off_proc_ifaces
+	 * @param incoming_procs
+	 */
 	void enumerateIfaces(std::map<int, IfaceSet<D>> &               ifaces,
 	                     std::map<int, std::map<int, IfaceSet<D>>> &off_proc_ifaces,
 	                     std::set<int> &                            incoming_procs)
 	{
 		std::array<int, Side<D>::num_sides> ids;
 		for (Side<D> s : Side<D>::getValues()) {
-			if (this->hasNbr(s)) {
+			if (pinfo->hasNbr(s)) {
 				ids[s.toInt()] = getIfaceInfoPtr(s)->id;
 			} else {
 				ids[s.toInt()] = -1;
 			}
 		}
-		std::deque<int>       iface_ids;
-		std::deque<IfaceType> iface_types;
-		std::deque<Side<D>>   iface_sides;
-		std::deque<bool>      iface_own;
-		std::deque<int>       iface_ranks;
+		std::deque<int>          iface_ids;
+		std::deque<IfaceType<D>> iface_types;
+		std::deque<Side<D>>      iface_sides;
+		std::deque<bool>         iface_own;
+		std::deque<int>          iface_ranks;
 		for (Side<D> s : Side<D>::getValues()) {
-			if (this->hasNbr(s)) {
+			if (pinfo->hasNbr(s)) {
 				int num_added = iface_ids.size();
 
 				getIfaceInfoPtr(s)->getIds(iface_ids);
@@ -378,18 +517,18 @@ template <size_t D> struct SchurDomain : public PatchInfo<D> {
 			}
 		}
 		for (size_t i = 0; i < iface_ids.size(); i++) {
-			int       id   = iface_ids[i];
-			IfaceType type = iface_types[i];
-			Side<D>   s    = iface_sides[i];
-			int       rank = iface_ranks[i];
+			int          id   = iface_ids[i];
+			IfaceType<D> type = iface_types[i];
+			Side<D>      s    = iface_sides[i];
+			int          rank = iface_ranks[i];
 			if (iface_own[i]) {
 				IfaceSet<D> &ifs = ifaces[id];
 				ifs.id           = id;
-				ifs.insert(Iface<D>(ids, type, s, this->neumann));
+				ifs.insert(Iface<D>(ids, type, s, pinfo->neumann));
 			} else {
 				IfaceSet<D> &ifs = off_proc_ifaces[rank][id];
 				ifs.id           = id;
-				ifs.insert(Iface<D>(ids, type, s, this->neumann));
+				ifs.insert(Iface<D>(ids, type, s, pinfo->neumann));
 			}
 		}
 	}
@@ -397,20 +536,20 @@ template <size_t D> struct SchurDomain : public PatchInfo<D> {
 	{
 		std::deque<int> retval;
 		for (Side<D> s : Side<D>::getValues()) {
-			if (this->hasNbr(s)) { getIfaceInfoPtr(s)->getIds(retval); }
+			if (pinfo->hasNbr(s)) { getIfaceInfoPtr(s)->getIds(retval); }
 		}
 		return retval;
 	}
 	void setLocalIndexes(const std::map<int, int> &rev_map)
 	{
 		for (Side<D> s : Side<D>::getValues()) {
-			if (this->hasNbr(s)) { getIfaceInfoPtr(s)->setLocalIndexes(rev_map); }
+			if (pinfo->hasNbr(s)) { getIfaceInfoPtr(s)->setLocalIndexes(rev_map); }
 		}
 	}
 	void setGlobalIndexes(const std::map<int, int> &rev_map)
 	{
 		for (Side<D> s : Side<D>::getValues()) {
-			if (this->hasNbr(s)) { getIfaceInfoPtr(s)->setGlobalIndexes(rev_map); }
+			if (pinfo->hasNbr(s)) { getIfaceInfoPtr(s)->setGlobalIndexes(rev_map); }
 		}
 	}
 	int getIfaceLocalIndex(Side<D> s)
@@ -418,6 +557,6 @@ template <size_t D> struct SchurDomain : public PatchInfo<D> {
 		return iface_info[s.toInt()]->local_index;
 	}
 };
-extern template struct SchurDomain<2>;
-extern template struct SchurDomain<3>;
+extern template struct SchurInfo<2>;
+extern template struct SchurInfo<3>;
 #endif

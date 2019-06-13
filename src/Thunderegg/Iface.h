@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -29,7 +29,7 @@
 #include <set>
 #include <vector>
 template <size_t D> struct Iface {
-	IfaceType                           type;
+	IfaceType<D>                        type;
 	Side<D>                             s;
 	std::array<int, Side<D>::num_sides> ids;
 	std::array<int, Side<D>::num_sides> local_id;
@@ -41,7 +41,7 @@ template <size_t D> struct Iface {
 		local_id.fill(-1);
 		global_id.fill(-1);
 	}
-	Iface(std::array<int, Side<D>::num_sides> ids, IfaceType type, Side<D> s,
+	Iface(std::array<int, Side<D>::num_sides> ids, IfaceType<D> type, Side<D> s,
 	      std::bitset<Side<D>::num_sides> neumann)
 	{
 		this->ids = ids;
