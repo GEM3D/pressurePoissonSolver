@@ -22,9 +22,9 @@
 #include "ClawWriter.h"
 #include <fstream>
 using namespace std;
-ClawWriter::ClawWriter(DomainCollection<2> &dc)
+ClawWriter::ClawWriter(std::shared_ptr<Domain<2>> domain)
 {
-	this->dc = dc;
+	this->domain = domain;
 }
 void ClawWriter::write(Vec u, Vec resid)
 {
@@ -32,7 +32,7 @@ void ClawWriter::write(Vec u, Vec resid)
 	const string tab = "\t";
 	t_file << 0.0 << tab << "time" << endl;
 	t_file << 2 << tab << "meqn" << endl;
-	t_file << dc.domains.size() << tab << "ngrids" << endl;
+	t_file << domain->getNumLocalPatches() << tab << "ngrids" << endl;
 	t_file << 2 << tab << "num_aux" << endl;
 	t_file << 2 << tab << "num_dim" << endl;
 	t_file.close();
@@ -43,9 +43,8 @@ void ClawWriter::write(Vec u, Vec resid)
 	VecGetArray(resid, &resid_view);
 	q_file.precision(10);
 	q_file << scientific;
-	for (auto &p : dc.domains) {
-		PatchInfo<2> &d = *p.second;
-		writePatch(d, q_file, u_view, resid_view);
+	for (auto &pinfo : domain->getPatchInfoVector()) {
+		writePatch(*pinfo, q_file, u_view, resid_view);
 	}
 	VecRestoreArray(u, &u_view);
 	VecRestoreArray(resid, &resid_view);

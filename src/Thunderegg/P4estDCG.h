@@ -36,9 +36,11 @@ class P4estDCG : public DomainCollectionGenerator<2>
 	 */
 	p4est_t *my_p4est;
 	/**
-	 * @brief finest is stored in front
+	 * @brief List of the domains
+	 *
+	 * Finest domain is stored in front
 	 */
-	std::list<std::shared_ptr<DomainCollection<2>>> dc_list;
+	std::list<std::shared_ptr<Domain<2>>> domain_list;
 
 	int                curr_level;
 	int                num_levels;
@@ -53,8 +55,8 @@ class P4estDCG : public DomainCollectionGenerator<2>
 	public:
 	P4estDCG(p4est_t *p4est, const std::array<int, 2> &ns, IsNeumannFunc<2> inf, BlockMapFunc bmf);
 	~P4estDCG();
-	std::shared_ptr<DomainCollection<2>> getFinestDC();
-	bool                                 hasCoarserDC();
-	std::shared_ptr<DomainCollection<2>> getCoarserDC();
+	std::shared_ptr<Domain<2>> getFinestDC();
+	bool                       hasCoarserDC();
+	std::shared_ptr<Domain<2>> getCoarserDC();
 };
 #endif

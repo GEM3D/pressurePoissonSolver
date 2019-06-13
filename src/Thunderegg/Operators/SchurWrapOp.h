@@ -29,14 +29,14 @@
 template <size_t D> class SchurWrapOp : public Operator<D - 1>
 {
 	private:
-	std::shared_ptr<DomainCollection<D>> dc;
-	std::shared_ptr<SchurHelper<D>>      sh;
+	std::shared_ptr<Domain<D>>      domain;
+	std::shared_ptr<SchurHelper<D>> sh;
 
 	public:
-	SchurWrapOp(std::shared_ptr<DomainCollection<D>> dc, std::shared_ptr<SchurHelper<D>> sh)
+	SchurWrapOp(std::shared_ptr<Domain<D>> domain, std::shared_ptr<SchurHelper<D>> sh)
 	{
-		this->dc = dc;
-		this->sh = sh;
+		this->domain = domain;
+		this->sh     = sh;
 	}
 	/**
 	 * @brief Apply Schur matrix
@@ -46,8 +46,8 @@ template <size_t D> class SchurWrapOp : public Operator<D - 1>
 	 */
 	void apply(std::shared_ptr<const Vector<D - 1>> x, std::shared_ptr<Vector<D - 1>> b) const
 	{
-		auto f = dc->getNewDomainVec();
-		auto u = dc->getNewDomainVec();
+		auto f = domain->getNewDomainVec();
+		auto u = domain->getNewDomainVec();
 		sh->solveAndInterpolateWithInterface(f, u, x, b);
 	}
 };

@@ -19,9 +19,10 @@ list(APPEND Thunderegg_SRCS Thunderegg/TriLinInterp.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/BilinearInterpolator.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/PolyChebPrec.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/SchurHelper.cpp)
-list(APPEND Thunderegg_SRCS Thunderegg/DomainCollection.cpp)
-list(APPEND Thunderegg_SRCS Thunderegg/ThundereggDCG.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/Domain.cpp)
+list(APPEND Thunderegg_SRCS Thunderegg/ThundereggDCG.cpp)
+list(APPEND Thunderegg_SRCS Thunderegg/PatchInfo.cpp)
+list(APPEND Thunderegg_HDRS Thunderegg/PatchInfo.h)
 list(APPEND Thunderegg_SRCS Thunderegg/SchurDomain.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/Vector.cpp)
 
@@ -40,7 +41,7 @@ endif()
 
 list(APPEND Thunderegg_SRCS Thunderegg/Experimental/PBMatrix.cpp)
 
-add_library(Thunderegg ${Thunderegg_SRCS})
+add_library(Thunderegg ${Thunderegg_SRCS} ${Thunderegg_HDRS})
 
 # set include directories
 target_include_directories(Thunderegg PUBLIC 

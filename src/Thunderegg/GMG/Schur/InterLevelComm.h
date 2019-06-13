@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively
+ *  Thunderegg, a library for solving Poisson's equation on adaptively 
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -21,18 +21,17 @@
 
 #ifndef InterLevelComm_H
 #define InterLevelComm_H
-#include <Thunderegg/Domain.h>
-#include <Thunderegg/PetscVector.h>
-namespace GMG
+#include "SchurHelper.h"
+namespace GMG::Schur
 {
 /**
  * @brief Structure that wraps some extra meta-data around a Domain object.
  */
 template <size_t D> struct ILCFineToCoarseMetadata {
 	/**
-	 * @brief The PatchInfo object that this meta-data corresponds to.
+	 * @brief The domain that this meta-data corresponds to.
 	 */
-	std::shared_ptr<PatchInfo<D>> pinfo;
+	std::shared_ptr<IfaceSet<D>> ifs;
 	/**
 	 * @brief the local block-index of the parent domain in the scattered coarse vector.
 	 */
@@ -46,7 +45,7 @@ template <size_t D> struct ILCFineToCoarseMetadata {
 	 */
 	bool operator<(const ILCFineToCoarseMetadata &other) const
 	{
-		return *pinfo < *other.pinfo;
+		return *d < *other.d;
 	}
 };
 /**
@@ -56,9 +55,9 @@ template <size_t D> class InterLevelComm
 {
 	private:
 	/**
-	 * @brief number of cells in each direction
+	 * @brief The number of cells in each direction on a patch
 	 */
-	std::array<int, D> ns;
+	int n;
 	/**
 	 * @brief the number of elements in the local distributed vector.
 	 */
@@ -72,24 +71,24 @@ template <size_t D> class InterLevelComm
 	 * @brief The PETSc VecScatter object that scatters the values of the coarse vector to each
 	 * process that needs them for interpolation / restriction.
 	 */
-	PW<VecScatter> p_scatter;
+	PW<VecScatter> scatter;
 
 	public:
 	/**
 	 * @brief Create a new InterLevelComm object.
 	 *
-	 * @param coarse_domain the coarser DomainCollection.
-	 * @param fine_domain the finer DomainCollection.
+	 * @param coarse_dc the coarser DomainCollection.
+	 * @param fine_dc the finer DomainCollection.
 	 */
-	InterLevelComm(std::shared_ptr<Domain<D>> coarse_domain,
-	               std::shared_ptr<Domain<D>> fine_domain);
+	InterLevelComm(std::shared_ptr<SchurHelper<D>> coarse_sh,
+	               std::shared_ptr<SchurHelper<D>> fine_sh);
 
 	/**
 	 * @brief Allocate a new vector for which coarse values values will be scattered into.
 	 *
 	 * @return the newly allocated vector.
 	 */
-	std::shared_ptr<Vector<D>> getNewCoarseDistVec();
+	PW_explicit<Vec> getNewCoarseDistVec();
 
 	/**
 	 * @brief Get a PETSc VecScatter object that will scatter values from the coarse vector to the
@@ -97,8 +96,7 @@ template <size_t D> class InterLevelComm
 	 *
 	 * @return the VecScatter object
 	 */
-	void scatter(std::shared_ptr<Vector<D>> dist, std::shared_ptr<const Vector<D>> global);
-	void scatterReverse(std::shared_ptr<const Vector<D>> dist, std::shared_ptr<Vector<D>> global);
+	PW_explicit<VecScatter> getScatter();
 
 	/**
 	 * @brief get a set of domains on the finer level that contains meta-data for how the values in
@@ -112,23 +110,24 @@ template <size_t D> class InterLevelComm
 	}
 };
 template <size_t D>
-inline InterLevelComm<D>::InterLevelComm(std::shared_ptr<Domain<D>> coarse_domain,
-                                         std::shared_ptr<Domain<D>> fine_domain)
+inline InterLevelComm<D>::InterLevelComm(std::shared_ptr<SchurHelper<D>> coarse_sh,
+                                         std::shared_ptr<SchurHelper<D>> fine_sh)
 {
 	using namespace std;
-	int patch_stride = coarse_domain->getNumCellsInPatch();
-	ns               = coarse_domain->getNs();
+	n = coarse_sh->getN();
 	set<int> parent_ids;
-	for (auto &pinfo : fine_domain->getPatchInfoVector()) {
-		parent_ids.insert(pinfo->parent_id);
+	for (auto &p : fine_sh->getIfaces()) {
+		IfaceSet<D> &ifs = *p.second;
+        if(ifs.parent_id!=-1){
+		parent_ids.insert(d.parent_id);
+        }
 	}
 	vector<int> coarse_parent_global_index_map_vec(parent_ids.begin(), parent_ids.end());
 	vector<int> coarse_parent_gid_map_vec = coarse_parent_global_index_map_vec;
 	// get global indexes for parent domains
 	PW<AO> ao;
-	AOCreateMapping(MPI_COMM_WORLD, coarse_domain->getNumLocalPatches(),
-	                &coarse_domain->getIdMapVec()[0], &coarse_domain->getGlobalIndexMapVec()[0],
-	                &ao);
+	AOCreateMapping(MPI_COMM_WORLD, coarse_dc->domain_gid_map_vec.size(),
+	                &coarse_dc->domain_gid_map_vec[0], &coarse_dc->domain_map_vec[0], &ao);
 	AOApplicationToPetsc(ao, coarse_parent_global_index_map_vec.size(),
 	                     &coarse_parent_global_index_map_vec[0]);
 
@@ -141,51 +140,33 @@ inline InterLevelComm<D>::InterLevelComm(std::shared_ptr<Domain<D>> coarse_domai
 		gid_to_local[gid]  = i;
 		gid_to_global[gid] = coarse_parent_global_index_map_vec[i];
 	}
-	for (auto &pinfo : fine_domain->getPatchInfoVector()) {
-		int                        gid  = pinfo->parent_id;
-		ILCFineToCoarseMetadata<D> data = {pinfo, gid_to_local[gid], gid_to_global[gid]};
+	for (auto &p : fine_dc->domains) {
+		Domain<D> &                d    = *p.second;
+		int                        gid  = d.parent_id;
+		ILCFineToCoarseMetadata<D> data = {p.second, gid_to_local[gid], gid_to_global[gid]};
 		coarse_domains.insert(data);
 	}
 
 	PW<IS> dist_is;
-	ISCreateBlock(MPI_COMM_SELF, patch_stride, coarse_parent_global_index_map_vec.size(),
+	ISCreateBlock(MPI_COMM_SELF, (int) pow(n, D-1), coarse_parent_global_index_map_vec.size(),
 	              &coarse_parent_global_index_map_vec[0], PETSC_COPY_VALUES, &dist_is);
 
-	local_vec_size = coarse_parent_global_index_map_vec.size() * patch_stride;
+	local_vec_size = coarse_parent_global_index_map_vec.size() * pow(n, D-1);
 
-	PW<Vec> u_local;
-	VecCreateSeq(PETSC_COMM_SELF, local_vec_size, &u_local);
-	std::shared_ptr<PetscVector<D>> u = coarse_domain->getNewDomainVec();
-	VecScatterCreate(u->vec, dist_is, u_local, nullptr, &p_scatter);
+	PW<Vec> u_local = getNewCoarseDistVec();
+	PW<Vec> u       = coarse_dc->getNewDomainVec();
+	VecScatterCreate(u, dist_is, u_local, nullptr, &scatter);
 }
 
-template <size_t D> inline std::shared_ptr<Vector<D>> InterLevelComm<D>::getNewCoarseDistVec()
+template <size_t D> inline PW_explicit<Vec> InterLevelComm<D>::getNewCoarseDistVec()
 {
-	Vec u;
+	PW<Vec> u;
 	VecCreateSeq(PETSC_COMM_SELF, local_vec_size, &u);
-	return std::shared_ptr<Vector<D>>(new PetscVector<D>(u, ns));
+	return u;
 }
-template <size_t D>
-inline void InterLevelComm<D>::scatter(std::shared_ptr<Vector<D>>       dist,
-                                       std::shared_ptr<const Vector<D>> global)
+template <size_t D> inline PW_explicit<VecScatter> InterLevelComm<D>::getScatter()
 {
-	// TODO make this general;
-	PetscVector<D> *      p_dist   = dynamic_cast<PetscVector<D> *>(dist.get());
-	const PetscVector<D> *p_global = dynamic_cast<const PetscVector<D> *>(global.get());
-	if (p_dist == nullptr || p_global == nullptr) { throw 3; }
-	VecScatterBegin(p_scatter, p_global->vec, p_dist->vec, INSERT_VALUES, SCATTER_FORWARD);
-	VecScatterEnd(p_scatter, p_global->vec, p_dist->vec, INSERT_VALUES, SCATTER_FORWARD);
-}
-template <size_t D>
-inline void InterLevelComm<D>::scatterReverse(std::shared_ptr<const Vector<D>> dist,
-                                              std::shared_ptr<Vector<D>>       global)
-{
-	// TODO make this general;
-	const PetscVector<D> *p_dist   = dynamic_cast<const PetscVector<D> *>(dist.get());
-	PetscVector<D> *      p_global = dynamic_cast<PetscVector<D> *>(global.get());
-	if (p_dist == nullptr || p_global == nullptr) { throw 3; }
-	VecScatterBegin(p_scatter, p_dist->vec, p_global->vec, ADD_VALUES, SCATTER_REVERSE);
-	VecScatterEnd(p_scatter, p_dist->vec, p_global->vec, ADD_VALUES, SCATTER_REVERSE);
+	return scatter;
 }
 } // namespace GMG
 #endif

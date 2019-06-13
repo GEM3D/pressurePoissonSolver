@@ -22,16 +22,15 @@
 #include "PolyChebPrec.h"
 #include <iostream>
 using namespace std;
-PolyChebPrec::PolyChebPrec(std::shared_ptr<DomainCollection<3>> dc,
-                           std::shared_ptr<SchurHelper<3>>      sh)
+PolyChebPrec::PolyChebPrec(std::shared_ptr<Domain<3>> domain, std::shared_ptr<SchurHelper<3>> sh)
 {
-	this->sh = sh;
-	this->dc = dc;
+	this->sh     = sh;
+	this->domain = domain;
 }
 void PolyChebPrec::apply(std::shared_ptr<const Vector<2>> x, std::shared_ptr<Vector<2>> b) const
 {
-	std::shared_ptr<PetscVector<3>> f = dc->getNewDomainVec();
-	std::shared_ptr<PetscVector<3>> u = dc->getNewDomainVec();
+	std::shared_ptr<PetscVector<3>> f = domain->getNewDomainVec();
+	std::shared_ptr<PetscVector<3>> u = domain->getNewDomainVec();
 
 	std::shared_ptr<PetscVector<2>> bk  = sh->getNewSchurVec();
 	std::shared_ptr<PetscVector<2>> bk1 = sh->getNewSchurVec();

@@ -21,7 +21,7 @@
 
 #ifndef AMGXWRAPPER_H
 #define AMGXWRAPPER_H
-#include "DomainCollection.h"
+#include "Domain.h"
 #include "amgx_c.h"
 #include <petscmat.h>
 #include <iostream>

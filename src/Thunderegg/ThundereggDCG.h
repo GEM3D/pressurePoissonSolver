@@ -32,7 +32,7 @@ template <size_t D> class ThundereggDCG : public DomainCollectionGenerator<D>
 	/**
 	 * @brief finest is stored in front
 	 */
-	std::list<std::shared_ptr<DomainCollection<D>>> dc_list;
+	std::list<std::shared_ptr<Domain<D>>> domain;
 
 	int                curr_level;
 	int                num_levels;
@@ -48,9 +48,9 @@ template <size_t D> class ThundereggDCG : public DomainCollectionGenerator<D>
 	public:
 	ThundereggDCG(Tree<D> t, std::array<int, D> ns, bool neumann = false);
 	~ThundereggDCG() = default;
-	std::shared_ptr<DomainCollection<D>> getFinestDC();
-	bool                                 hasCoarserDC();
-	std::shared_ptr<DomainCollection<D>> getCoarserDC();
+	std::shared_ptr<Domain<D>> getFinestDC();
+	bool                       hasCoarserDC();
+	std::shared_ptr<Domain<D>> getCoarserDC();
 };
 template <size_t D> ThundereggDCG<D>::ThundereggDCG(Tree<D> t, std::array<int, D> ns, bool neumann)
 {
@@ -63,15 +63,15 @@ template <size_t D> ThundereggDCG<D>::ThundereggDCG(Tree<D> t, std::array<int, D
 	// generate finest DC
 	extractLevel();
 }
-template <size_t D> std::shared_ptr<DomainCollection<D>> ThundereggDCG<D>::getFinestDC()
+template <size_t D> std::shared_ptr<Domain<D>> ThundereggDCG<D>::getFinestDC()
 {
-	return dc_list.front();
+	return domain.front();
 }
-template <size_t D> std::shared_ptr<DomainCollection<D>> ThundereggDCG<D>::getCoarserDC()
+template <size_t D> std::shared_ptr<Domain<D>> ThundereggDCG<D>::getCoarserDC()
 {
 	if (curr_level > 0) {
 		extractLevel();
-		return dc_list.back();
+		return domain.back();
 	} else {
 		return nullptr;
 	}
@@ -166,13 +166,13 @@ template <size_t D> inline void ThundereggDCG<D>::extractLevel()
 	if (curr_level == num_levels) {
 		balanceLevel(new_level);
 	} else {
-		balanceLevelWithLower(new_level, dc_list.back()->getDomainMap());
+		balanceLevelWithLower(new_level, domain.back()->getPatchInfoMap());
 	}
-	dc_list.push_back(std::shared_ptr<DomainCollection<D>>(new DomainCollection<D>(new_level, ns)));
+	domain.push_back(std::shared_ptr<Domain<D>>(new Domain<D>(new_level)));
 	if (neumann) {
 		IsNeumannFunc<D> inf = [](Side<D>, const std::array<double, D> &,
 		                          const std::array<double, D> &) { return true; };
-		dc_list.back()->setNeumann(inf);
+		domain.back()->setNeumann(inf);
 	}
 	curr_level--;
 }

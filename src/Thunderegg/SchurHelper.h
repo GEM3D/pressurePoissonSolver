@@ -21,7 +21,7 @@
 
 #ifndef SCHURHELPER_H
 #define SCHURHELPER_H
-#include <Thunderegg/DomainCollection.h>
+#include <Thunderegg/Domain.h>
 #include <Thunderegg/Iface.h>
 #include <Thunderegg/IfaceInterp.h>
 #include <Thunderegg/PatchOperator.h>
@@ -45,7 +45,7 @@
 template <size_t D> class SchurHelper
 {
 	private:
-	std::shared_ptr<DomainCollection<D>> dc;
+	std::shared_ptr<Domain<D>> domain;
 
 	std::shared_ptr<PetscVector<D - 1>> local_gamma;
 	std::shared_ptr<PetscVector<D - 1>> gamma;
@@ -85,10 +85,10 @@ template <size_t D> class SchurHelper
 	/**
 	 * @brief Create a SchurHelper from a given DomainCollection
 	 *
-	 * @param dc the DomainCollection
+	 * @param domain the DomainCollection
 	 * @param comm the teuchos communicator
 	 */
-	SchurHelper(std::shared_ptr<DomainCollection<D>> dc, std::shared_ptr<PatchSolver<D>> solver,
+	SchurHelper(std::shared_ptr<Domain<D>> domain, std::shared_ptr<PatchSolver<D>> solver,
 	            std::shared_ptr<PatchOperator<D>> op, std::shared_ptr<IfaceInterp<D>> interpolator);
 
 	/**
@@ -194,18 +194,18 @@ template <size_t D> class SchurHelper
 	}
 };
 template <size_t D>
-inline SchurHelper<D>::SchurHelper(std::shared_ptr<DomainCollection<D>> dc,
-                                   std::shared_ptr<PatchSolver<D>>      solver,
-                                   std::shared_ptr<PatchOperator<D>>    op,
-                                   std::shared_ptr<IfaceInterp<D>>      interpolator)
+inline SchurHelper<D>::SchurHelper(std::shared_ptr<Domain<D>>        domain,
+                                   std::shared_ptr<PatchSolver<D>>   solver,
+                                   std::shared_ptr<PatchOperator<D>> op,
+                                   std::shared_ptr<IfaceInterp<D>>   interpolator)
 {
 	iface_stride = 1;
 	for (size_t i = 0; i < D - 1; i++) {
-		iface_stride *= dc->getLengths()[i];
-		lengths[i] = dc->getLengths()[i];
+		iface_stride *= domain->getNs()[i];
+		lengths[i] = domain->getNs()[i];
 	}
-	for (auto &p : dc->domains) {
-		domains.push_back(*p.second);
+	for (auto &pinfo : domain->getPatchInfoVector()) {
+		domains.push_back(*pinfo);
 	}
 	std::map<int, std::map<int, IfaceSet<D>>> off_proc_ifaces;
 	std::set<int>                             incoming_procs;

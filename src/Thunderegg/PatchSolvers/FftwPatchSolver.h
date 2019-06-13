@@ -21,7 +21,7 @@
 
 #ifndef FFTWPATCHSOLVER_H
 #define FFTWPATCHSOLVER_H
-#include <Thunderegg/DomainCollection.h>
+#include <Thunderegg/Domain.h>
 #include <Thunderegg/PatchSolvers/PatchSolver.h>
 #include <Thunderegg/ValVector.h>
 #include <bitset>
@@ -62,7 +62,7 @@ template <size_t D> class FftwPatchSolver : public PatchSolver<D>
 	std::map<DomainK<D>, std::valarray<double>> denoms;
 
 	public:
-	FftwPatchSolver(DomainCollection<D> &dsc, double lambda = 0);
+	FftwPatchSolver(Domain<D> &domain, double lambda = 0);
 	~FftwPatchSolver();
 	void solve(SchurDomain<D> &d, std::shared_ptr<const Vector<D>> f, std::shared_ptr<Vector<D>> u,
 	           std::shared_ptr<const Vector<D - 1>> gamma);
@@ -75,9 +75,9 @@ template <size_t D> class FftwPatchSolver : public PatchSolver<D>
 	}
 	void addDomain(SchurDomain<D> &d);
 };
-template <size_t D> FftwPatchSolver<D>::FftwPatchSolver(DomainCollection<D> &dc, double lambda)
+template <size_t D> FftwPatchSolver<D>::FftwPatchSolver(Domain<D> &domain, double lambda)
 {
-	n            = dc.getLengths()[0];
+	n            = domain.getNs()[0];
 	this->lambda = lambda;
 }
 template <size_t D> FftwPatchSolver<D>::~FftwPatchSolver()

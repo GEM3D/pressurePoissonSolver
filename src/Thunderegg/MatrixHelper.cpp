@@ -23,29 +23,28 @@
 #include "StencilHelper.h"
 #include <iostream>
 using namespace std;
-MatrixHelper::MatrixHelper(DomainCollection<3> dc)
+MatrixHelper::MatrixHelper(std::shared_ptr<Domain<3>> domain)
 {
-	this->dc = dc;
+	this->domain = domain;
 }
 PW_explicit<Mat> MatrixHelper::formCRSMatrix(double lambda)
 {
 	PW<Mat> A;
 	MatCreate(MPI_COMM_WORLD, &A);
-	int nx          = dc.getLengths()[0];
-	int ny          = dc.getLengths()[1];
-	int nz          = dc.getLengths()[2];
-	int local_size  = dc.domains.size() * nx * ny * nz;
-	int global_size = dc.num_global_domains * nx * ny * nz;
+	int nx          = domain->getNs()[0];
+	int ny          = domain->getNs()[1];
+	int nz          = domain->getNs()[2];
+	int local_size  = domain->getNumLocalPatches() * nx * ny * nz;
+	int global_size = domain->getNumGlobalPatches() * nx * ny * nz;
 	MatSetSizes(A, local_size, local_size, global_size, global_size);
 	MatSetType(A, MATMPIAIJ);
 	MatMPIAIJSetPreallocation(A, 19, nullptr, 19, nullptr);
 
-	for (auto &p : dc.domains) {
-		PatchInfo<3> &d     = *p.second;
-		double        h_x   = d.spacings[0];
-		double        h_y   = d.spacings[1];
-		double        h_z   = d.spacings[2];
-		int           start = nx * ny * nz * d.local_index;
+	for (auto pinfo : domain->getPatchInfoVector()) {
+		double h_x   = pinfo->spacings[0];
+		double h_y   = pinfo->spacings[1];
+		double h_z   = pinfo->spacings[2];
+		int    start = nx * ny * nz * pinfo->local_index;
 
 		// center coeffs
 		double coeff = -2.0 / (h_x * h_x) - 2.0 / (h_y * h_y) - 2.0 / (h_z * h_z);
@@ -123,7 +122,7 @@ PW_explicit<Mat> MatrixHelper::formCRSMatrix(double lambda)
 
 		// boundaries
 		for (Side<3> s : Side<3>::getValues()) {
-			StencilHelper *sh = getStencilHelper(d, s);
+			StencilHelper *sh = getStencilHelper(*pinfo, s);
 			for (int yi = 0; yi < sh->ny; yi++) {
 				for (int xi = 0; xi < sh->nx; xi++) {
 					int     row    = sh->row(xi, yi);

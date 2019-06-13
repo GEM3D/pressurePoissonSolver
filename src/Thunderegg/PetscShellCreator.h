@@ -31,22 +31,22 @@ class PetscShellCreator
 	template <size_t D> class PetscPCShellOpDomain
 	{
 		private:
-		std::shared_ptr<Operator<D>>         op;
-		std::shared_ptr<DomainCollection<D>> dc;
+		std::shared_ptr<Operator<D>> op;
+		std::shared_ptr<Domain<D>>   domain;
 
 		public:
-		PetscPCShellOpDomain(std::shared_ptr<Operator<D>>         op,
-		                     std::shared_ptr<DomainCollection<D>> dc)
+		PetscPCShellOpDomain(std::shared_ptr<Operator<D>> op, std::shared_ptr<Domain<D>> domain)
 		{
 			this->op = op;
-			this->dc = dc;
+
+			this->domain = domain;
 		}
 		static int applyMat(Mat A, Vec x, Vec b)
 		{
 			PetscPCShellOpDomain<D> *wrap = nullptr;
 			MatShellGetContext(A, &wrap);
-			std::shared_ptr<Vector<D>> x_vec(new PetscVector<D>(x, wrap->dc->getLengths(), false));
-			std::shared_ptr<Vector<D>> b_vec(new PetscVector<D>(b, wrap->dc->getLengths(), false));
+			std::shared_ptr<Vector<D>> x_vec(new PetscVector<D>(x, wrap->domain->getNs(), false));
+			std::shared_ptr<Vector<D>> b_vec(new PetscVector<D>(b, wrap->domain->getNs(), false));
 			wrap->op->apply(x_vec, b_vec);
 			return 0;
 		}
@@ -61,8 +61,8 @@ class PetscShellCreator
 		{
 			PetscPCShellOpDomain<D> *wrap = nullptr;
 			PCShellGetContext(P, (void **) &wrap);
-			std::shared_ptr<Vector<D>> x_vec(new PetscVector<D>(x, wrap->dc->getLengths(), false));
-			std::shared_ptr<Vector<D>> b_vec(new PetscVector<D>(b, wrap->dc->getLengths(), false));
+			std::shared_ptr<Vector<D>> x_vec(new PetscVector<D>(x, wrap->domain->getNs(), false));
+			std::shared_ptr<Vector<D>> b_vec(new PetscVector<D>(b, wrap->domain->getNs(), false));
 			wrap->op->apply(x_vec, b_vec);
 			return 0;
 		}
@@ -123,9 +123,9 @@ class PetscShellCreator
 	public:
 	template <size_t D>
 	static void getPCShell(PC pc, std::shared_ptr<Operator<D>> op,
-	                       std::shared_ptr<DomainCollection<D>> dc)
+	                       std::shared_ptr<Domain<D>> domain)
 	{
-		PetscPCShellOpDomain<D> *wrap = new PetscPCShellOpDomain<D>(op, dc);
+		PetscPCShellOpDomain<D> *wrap = new PetscPCShellOpDomain<D>(op, domain);
 		PCSetType(pc, PCSHELL);
 		PCShellSetContext(pc, wrap);
 		PCShellSetApply(pc, PetscPCShellOpDomain<D>::apply);
@@ -142,12 +142,12 @@ class PetscShellCreator
 		PCShellSetDestroy(pc, PetscPCShellOpSchur<D>::destroy);
 	}
 	template <size_t D>
-	static PW_explicit<Mat> getMatShell(std::shared_ptr<Operator<D>>         op,
-	                                    std::shared_ptr<DomainCollection<D>> dc)
+	static PW_explicit<Mat> getMatShell(std::shared_ptr<Operator<D>> op,
+	                                    std::shared_ptr<Domain<D>>   domain)
 	{
-		PetscPCShellOpDomain<D> *wrap = new PetscPCShellOpDomain<D>(op, dc);
-		int                      M    = dc->getGlobalNumCells();
-		int                      m    = dc->getLocalNumCells();
+		PetscPCShellOpDomain<D> *wrap = new PetscPCShellOpDomain<D>(op, domain);
+		int                      M    = domain->getNumGlobalCells();
+		int                      m    = domain->getNumLocalCells();
 		PW<Mat>                  A;
 		MatCreateShell(MPI_COMM_WORLD, m, m, M, M, wrap, &A);
 		MatShellSetOperation(A, MATOP_MULT, (void (*)(void)) PetscPCShellOpDomain<D>::applyMat);

@@ -1,4 +1,4 @@
-#include "../DomainCollection.h"
+#include "../Domain.h"
 #include "catch.hpp"
 using namespace std;
 #if 0

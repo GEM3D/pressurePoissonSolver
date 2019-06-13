@@ -25,9 +25,9 @@
 
 using namespace std;
 
-std::shared_ptr<DomainCollection<2>> P4estDCG::getFinestDC()
+std::shared_ptr<Domain<2>> P4estDCG::getFinestDC()
 {
-	return dc_list.front();
+	return domain_list.front();
 }
 bool P4estDCG::hasCoarserDC()
 {
@@ -257,10 +257,10 @@ void P4estDCG::extractLevel()
 {
 	// coarsen previous
 	if (curr_level + 1 < num_levels) {
-		coarsen_domains_ctx ctx = {curr_level, &dc_list.back()->getDomainMap()};
+		coarsen_domains_ctx ctx = {curr_level, &domain_list.back()->getPatchInfoMap()};
 		my_p4est->user_pointer  = &ctx;
 		p4est_coarsen_ext(my_p4est, false, true, coarsen, nullptr, coarsen_replace);
-		for (auto p : dc_list.back()->getDomainMap()) {
+		for (auto p : domain_list.back()->getPatchInfoMap()) {
 			PatchInfo<2> &pinfo = *p.second;
 			if (!pinfo.hasCoarseParent()) { pinfo.parent_id = pinfo.id; }
 		}
@@ -284,17 +284,16 @@ void P4estDCG::extractLevel()
 		p.second->setPtrs(new_level);
 	}
 	// create DC object
-	dc_list.push_back(
-	shared_ptr<DomainCollection<2>>(new DomainCollection<2>(new_level, ns, true)));
-	dc_list.back()->setNeumann(inf);
+	domain_list.push_back(shared_ptr<Domain<2>>(new Domain<2>(new_level, true)));
+	domain_list.back()->setNeumann(inf);
 
 	curr_level--;
 }
-std::shared_ptr<DomainCollection<2>> P4estDCG::getCoarserDC()
+std::shared_ptr<Domain<2>> P4estDCG::getCoarserDC()
 {
 	if (curr_level >= 0) {
 		extractLevel();
-		return dc_list.back();
+		return domain_list.back();
 	} else {
 		return nullptr;
 	}

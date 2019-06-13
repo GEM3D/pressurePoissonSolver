@@ -21,7 +21,7 @@
 
 #ifndef DFTPATCHSOLVER_H
 #define DFTPATCHSOLVER_H
-#include <Thunderegg/DomainCollection.h>
+#include <Thunderegg/Domain.h>
 #include <Thunderegg/PatchSolvers/PatchSolver.h>
 #include <Thunderegg/ValVector.h>
 #include <bitset>
@@ -75,7 +75,7 @@ template <size_t D> class DftPatchSolver : public PatchSolver<D>
 	                  LocalData<D> out, const bool inverse);
 
 	public:
-	DftPatchSolver(DomainCollection<D> &dsc, double lambda = 0);
+	DftPatchSolver(Domain<D> &domain, double lambda = 0);
 	void solve(SchurDomain<D> &d, std::shared_ptr<const Vector<D>> f, std::shared_ptr<Vector<D>> u,
 	           std::shared_ptr<const Vector<D - 1>> gamma);
 	void domainSolve(std::deque<SchurDomain<D>> &domains, std::shared_ptr<const Vector<D>> f,
@@ -88,11 +88,11 @@ template <size_t D> class DftPatchSolver : public PatchSolver<D>
 	void addDomain(SchurDomain<D> &d);
 };
 
-template <size_t D> inline DftPatchSolver<D>::DftPatchSolver(DomainCollection<D> &dc, double lambda)
+template <size_t D> inline DftPatchSolver<D>::DftPatchSolver(Domain<D> &domain, double lambda)
 {
-	ns           = dc.getLengths();
+	ns           = domain.getNs();
 	n            = ns[0];
-	patch_stride = dc.getNumElementsInDomain();
+	patch_stride = domain.getNumCellsInPatch();
 	this->lambda = lambda;
 }
 template <size_t D> inline void DftPatchSolver<D>::addDomain(SchurDomain<D> &d)

@@ -18,15 +18,30 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
-
+/**
+ * \file
+ *
+ * @brief Useful type definitions for Thunderegg library
+ */
 #ifndef THUNDEREGG_TYPEDEFS_H
 #define THUNDEREGG_TYPEDEFS_H
 
 #include <array>
 #include <functional>
 
+/**
+ * @brief This function is used to set the boundary condition types of the solver.
+ *
+ * This function will only be called on the boundaries of the domain.
+ *
+ * @param s the side of the patch being inquired about
+ * @param lower the lower coordinate of the patch's side
+ * @param upper the upper coordinate of the patch's side
+ *
+ * @return wether the boundary is a neumann boundary
+ */
 template <size_t D>
-using IsNeumannFunc
-= std::function<bool(Side<D>, const std::array<double, D> &, const std::array<double, D> &)>;
+using IsNeumannFunc = std::function<bool(Side<D> s, const std::array<double, D> &lower,
+                                         const std::array<double, D> &upper)>;
 
 #endif

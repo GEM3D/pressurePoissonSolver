@@ -21,7 +21,7 @@
 
 #ifndef CONTIGFFTWSOLVER_H
 #define CONTIGFFTWSOLVER_H
-#include "DomainCollection.h"
+#include "Domain.h"
 #include <deque>
 #include <fftw3.h>
 struct FftwChunk {

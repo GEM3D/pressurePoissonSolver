@@ -21,7 +21,7 @@
 
 #ifndef GMGDrctIntp_H
 #define GMGDrctIntp_H
-#include <Thunderegg/DomainCollection.h>
+#include <Thunderegg/Domain.h>
 #include <Thunderegg/GMG/InterLevelComm.h>
 #include <Thunderegg/GMG/Interpolator.h>
 #include <memory>
@@ -37,11 +37,11 @@ template <size_t D> class DrctIntp : public Interpolator<D>
 	/**
 	 * @brief The coarser set of domains
 	 */
-	std::shared_ptr<DomainCollection<D>> coarse_dc;
+	std::shared_ptr<Domain<D>> coarse_domain;
 	/**
 	 * @brief The finer set of domains
 	 */
-	std::shared_ptr<DomainCollection<D>> fine_dc;
+	std::shared_ptr<Domain<D>> fine_domain;
 	/**
 	 * @brief The comm package between the levels.
 	 */
@@ -51,12 +51,12 @@ template <size_t D> class DrctIntp : public Interpolator<D>
 	/**
 	 * @brief Create new DrctIntp object.
 	 *
-	 * @param coarse_dc the coarser set of domains.
-	 * @param fine_dc the finer set of domains.
+	 * @param coarse_domain the coarser set of domains.
+	 * @param fine_domain the finer set of domains.
 	 * @param ilc the comm package between the levels.
 	 */
-	DrctIntp(std::shared_ptr<DomainCollection<D>> coarse_dc,
-	         std::shared_ptr<DomainCollection<D>> fine_dc, std::shared_ptr<InterLevelComm<D>> ilc);
+	DrctIntp(std::shared_ptr<Domain<D>> coarse_domain, std::shared_ptr<Domain<D>> fine_domain,
+	         std::shared_ptr<InterLevelComm<D>> ilc);
 	/**
 	 * @brief Interpolate from the finer level to the coarser level.
 	 *
@@ -67,13 +67,13 @@ template <size_t D> class DrctIntp : public Interpolator<D>
 	                 std::shared_ptr<Vector<D>>       fine) const;
 };
 template <size_t D>
-inline DrctIntp<D>::DrctIntp(std::shared_ptr<DomainCollection<D>> coarse_dc,
-                             std::shared_ptr<DomainCollection<D>> fine_dc,
-                             std::shared_ptr<InterLevelComm<D>>   ilc)
+inline DrctIntp<D>::DrctIntp(std::shared_ptr<Domain<D>>         coarse_domain,
+                             std::shared_ptr<Domain<D>>         fine_domain,
+                             std::shared_ptr<InterLevelComm<D>> ilc)
 {
-	this->coarse_dc = coarse_dc;
-	this->fine_dc   = fine_dc;
-	this->ilc       = ilc;
+	this->coarse_domain = coarse_domain;
+	this->fine_domain   = fine_domain;
+	this->ilc           = ilc;
 }
 
 template <size_t D>

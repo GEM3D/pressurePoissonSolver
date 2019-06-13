@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -19,26 +19,25 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef MATRIXHELPER_H
-#define MATRIXHELPER_H
-#include "DomainCollection.h"
+#ifndef THUNDEREGG_MATRIXHELPER2D_H
+#define THUNDEREGG_MATRIXHELPER2D_H
+#include "Domain.h"
 #include <petscmat.h>
+/**
+ * @brief Create a matrix for the 2D second-order Laplacian operator
+ */
 class MatrixHelper2d
 {
 	private:
-	DomainCollection<2> dc;
+	std::shared_ptr<Domain<2>> domain;
 
 	public:
 	/**
-	 * @brief Create a SchurHelper from a given DomainCollection
+	 * @brief Create a MatrixHelper for a given domain
 	 *
-	 * @param dc the DomainCollection
-	 * @param n number of cells in each direction for each domain
-	 * @param h_x the x spacing
-	 * @param h_y the y spacing
-	 * @param comm the teuchos communicator
+	 * @param domain the domain
 	 */
-	MatrixHelper2d(DomainCollection<2> dc);
+	MatrixHelper2d(std::shared_ptr<Domain<2>> domain);
 
 	/**
 	 * @brief Form the matrix

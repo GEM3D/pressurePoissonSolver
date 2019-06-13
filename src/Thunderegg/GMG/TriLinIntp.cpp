@@ -44,12 +44,12 @@ inline std::array<std::array<Side<3>, 2>, 12> getPairValues()
 	                                                {{Side<3>::north, Side<3>::bottom}},
 	                                                {{Side<3>::north, Side<3>::top}}}});
 }
-TriLinIntp::TriLinIntp(shared_ptr<DomainCollection<3>> coarse_dc,
-                       shared_ptr<DomainCollection<3>> fine_dc, shared_ptr<InterLevelComm<3>> ilc)
+TriLinIntp::TriLinIntp(shared_ptr<Domain<3>> coarse_domain, shared_ptr<Domain<3>> fine_domain,
+                       shared_ptr<InterLevelComm<3>> ilc)
 {
-	this->coarse_dc = coarse_dc;
-	this->fine_dc   = fine_dc;
-	this->ilc       = ilc;
+	this->coarse_domain = coarse_domain;
+	this->fine_domain   = fine_domain;
+	this->ilc           = ilc;
 }
 struct OctInfo {
 	Orthant<3> oct;
@@ -624,12 +624,12 @@ void TriLinIntp::interpolate(std::shared_ptr<const Vector<3>> coarse,
 	ilc->scatterReverse(coarse_local, coarse);
 
 	for (auto p : ilc->getFineDomains()) {
-		Domain<3> &d          = *p.d;
-		int        n          = d.n;
-		int        coarse_idx = p.local_index * n * n * n;
+		PatchInfo<3> &d          = *p.pinfo;
+		int           n          = d.ns[0];
+		int           coarse_idx = p.local_index * n * n * n;
 
-		Orthant<3> oct      = d.oct_on_parent;
-		int        fine_idx = d.id_local * n * n * n;
+		Orthant<3> oct      = d.orth_on_parent;
+		int        fine_idx = d.local_index * n * n * n;
 
 		if (!d.hasCoarseParent()) {
 			for (int zi = 0; zi < n; zi++) {

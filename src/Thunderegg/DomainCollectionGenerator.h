@@ -21,13 +21,13 @@
 
 #ifndef DOMAINCOLLECTIONGENERATOR_H
 #define DOMAINCOLLECTIONGENERATOR_H
-#include <Thunderegg/DomainCollection.h>
+#include <Thunderegg/Domain.h>
 template <size_t D> class DomainCollectionGenerator
 {
 	public:
 	~DomainCollectionGenerator(){};
-	virtual std::shared_ptr<DomainCollection<D>> getFinestDC()  = 0;
-	virtual bool                                 hasCoarserDC() = 0;
-	virtual std::shared_ptr<DomainCollection<D>> getCoarserDC() = 0;
+	virtual std::shared_ptr<Domain<D>> getFinestDC()  = 0;
+	virtual bool                       hasCoarserDC() = 0;
+	virtual std::shared_ptr<Domain<D>> getCoarserDC() = 0;
 };
 #endif

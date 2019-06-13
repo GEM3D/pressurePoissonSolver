@@ -21,7 +21,7 @@
 
 #ifndef GMGTriLinIntp_H
 #define GMGTriLinIntp_H
-#include <Thunderegg/DomainCollection.h>
+#include <Thunderegg/Domain.h>
 #include <Thunderegg/GMG/InterLevelComm.h>
 #include <Thunderegg/GMG/Interpolator.h>
 #include <memory>
@@ -37,11 +37,11 @@ class TriLinIntp : public Interpolator<3>
 	/**
 	 * @brief The coarser set of domains
 	 */
-	std::shared_ptr<DomainCollection<3>> coarse_dc;
+	std::shared_ptr<Domain<3>> coarse_domain;
 	/**
 	 * @brief The finer set of domains
 	 */
-	std::shared_ptr<DomainCollection<3>> fine_dc;
+	std::shared_ptr<Domain<3>> fine_domain;
 	/**
 	 * @brief The comm package between the levels.
 	 */
@@ -51,13 +51,12 @@ class TriLinIntp : public Interpolator<3>
 	/**
 	 * @brief Create new TriLinIntp object.
 	 *
-	 * @param coarse_dc the coarser set of domains.
-	 * @param fine_dc the finer set of domains.
+	 * @param coarse_domain the coarser set of domains.
+	 * @param fine_domain the finer set of domains.
 	 * @param ilc the comm package between the levels.
 	 */
-	TriLinIntp(std::shared_ptr<DomainCollection<3>> coarse_dc,
-	           std::shared_ptr<DomainCollection<3>> fine_dc,
-	           std::shared_ptr<InterLevelComm<3>>   ilc);
+	TriLinIntp(std::shared_ptr<Domain<3>> coarse_domain, std::shared_ptr<Domain<3>> fine_domain,
+	           std::shared_ptr<InterLevelComm<3>> ilc);
 	/**
 	 * @brief Interpolate from the finer level to the coarser level.
 	 *
