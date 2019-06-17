@@ -313,7 +313,7 @@ class CoarseSH : public StencilHelper
 		double            h        = 0;
 		int               idx      = d.global_index * d.ns[0] * d.ns[1] * d.ns[2];
 		int               nbr_idx  = nbr_info.global_index * d.ns[0] * d.ns[1] * d.ns[2];
-		quad                       = nbr_info.quad_on_coarse;
+		quad                       = nbr_info.orth_on_coarse.toInt();
 		switch (s.toInt()) {
 			case Side<3>::west:
 				h         = d.spacings[0];

@@ -19,8 +19,8 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef SchurInfo_H
-#define SchurInfo_H
+#ifndef THUNDEREGG_SCHURINFO_H
+#define THUNDEREGG_SCHURINFO_H
 #include <Thunderegg/Iface.h>
 #include <Thunderegg/PatchInfo.h>
 #include <deque>
@@ -122,7 +122,7 @@ template <size_t D> class NormalIfaceInfo : public IfaceInfo<D>
 	/**
 	 * @brief convenience pointer to associated NbrInfo object
 	 */
-	NormalNbrInfo<D> nbr_info;
+	std::shared_ptr<NormalNbrInfo<D>> nbr_info;
 	/**
 	 * @brief Construct a new NormalIfaceInfo object all values are set to zero
 	 */
@@ -140,13 +140,13 @@ template <size_t D> class NormalIfaceInfo : public IfaceInfo<D>
 	 */
 	NormalIfaceInfo(std::shared_ptr<PatchInfo<D>> pinfo, Side<D> s)
 	{
-		nbr_info = pinfo->getNormalNbrInfo(s);
+		nbr_info = pinfo->getNormalNbrInfoPtr(s);
 		if (s.isLowerOnAxis()) {
 			this->id = pinfo->id * Side<D>::num_sides + s.toInt();
 		} else {
 			this->id = pinfo->getNormalNbrInfo(s).id * Side<D>::num_sides + s.opposite().toInt();
 		}
-		this->own = ((s.toInt() & 0x1) || nbr_info.ptr != nullptr);
+		this->own = ((s.toInt() & 0x1) || nbr_info->ptr != nullptr);
 	}
 	void getIds(std::deque<int> &ids)
 	{
@@ -166,7 +166,7 @@ template <size_t D> class NormalIfaceInfo : public IfaceInfo<D>
 	}
 	void getRanks(std::deque<int> &ranks)
 	{
-		ranks.push_back(nbr_info.rank);
+		ranks.push_back(nbr_info->rank);
 	}
 	void getOwnership(std::deque<bool> &own)
 	{
@@ -174,7 +174,7 @@ template <size_t D> class NormalIfaceInfo : public IfaceInfo<D>
 	}
 	void getIncomingProcs(std::set<int> &incoming_procs)
 	{
-		if (this->own && nbr_info.ptr == nullptr) { incoming_procs.insert(nbr_info.rank); }
+		if (this->own && nbr_info->ptr == nullptr) { incoming_procs.insert(nbr_info->rank); }
 	}
 	void setLocalIndexes(const std::map<int, int> &rev_map)
 	{
@@ -199,7 +199,7 @@ template <size_t D> class CoarseIfaceInfo : public IfaceInfo<D>
 	/**
 	 * @brief convenience pointer to associated NbrInfo object
 	 */
-	CoarseNbrInfo<D> nbr_info;
+	std::shared_ptr<CoarseNbrInfo<D>> nbr_info;
 	/**
 	 * @brief The orthant that this patch in relation to the coarser patch's interface.
 	 */
@@ -228,13 +228,12 @@ template <size_t D> class CoarseIfaceInfo : public IfaceInfo<D>
 	 */
 	CoarseIfaceInfo(std::shared_ptr<PatchInfo<D>> pinfo, Side<D> s)
 	{
-		nbr_info       = pinfo->getCoarseNbrInfo(s);
+		nbr_info       = pinfo->getCoarseNbrInfoPtr(s);
 		this->id       = pinfo->id * Side<D>::num_sides + s.toInt();
-		nbr_info       = pinfo->getCoarseNbrInfo(s);
-		orth_on_coarse = nbr_info.quad_on_coarse;
-		coarse_id      = nbr_info.id * Side<D>::num_sides + s.opposite().toInt();
+		orth_on_coarse = nbr_info->orth_on_coarse;
+		coarse_id      = nbr_info->id * Side<D>::num_sides + s.opposite().toInt();
 		this->own      = true;
-		coarse_own     = (nbr_info.ptr != nullptr);
+		coarse_own     = (nbr_info->ptr != nullptr);
 	}
 	void getIds(std::deque<int> &ids)
 	{
@@ -260,8 +259,8 @@ template <size_t D> class CoarseIfaceInfo : public IfaceInfo<D>
 	}
 	void getRanks(std::deque<int> &ranks)
 	{
-		ranks.push_back(nbr_info.rank);
-		ranks.push_back(nbr_info.rank);
+		ranks.push_back(nbr_info->rank);
+		ranks.push_back(nbr_info->rank);
 	}
 	void getOwnership(std::deque<bool> &own)
 	{
@@ -270,7 +269,7 @@ template <size_t D> class CoarseIfaceInfo : public IfaceInfo<D>
 	}
 	void getIncomingProcs(std::set<int> &incoming_procs)
 	{
-		if (nbr_info.ptr == nullptr) { incoming_procs.insert(nbr_info.rank); }
+		if (nbr_info->ptr == nullptr) { incoming_procs.insert(nbr_info->rank); }
 	}
 	void setLocalIndexes(const std::map<int, int> &rev_map)
 	{
@@ -297,7 +296,7 @@ template <size_t D> class FineIfaceInfo : public IfaceInfo<D>
 	/**
 	 * @brief convenience pointer to associated NbrInfo object
 	 */
-	FineNbrInfo<D> nbr_info;
+	std::shared_ptr<FineNbrInfo<D>> nbr_info;
 	/**
 	 * @brief the ids of the fine patches' interfaces
 	 */
@@ -322,12 +321,12 @@ template <size_t D> class FineIfaceInfo : public IfaceInfo<D>
 	 */
 	FineIfaceInfo(std::shared_ptr<PatchInfo<D>> pinfo, Side<D> s)
 	{
-		nbr_info  = pinfo->getFineNbrInfo(s);
+		nbr_info  = pinfo->getFineNbrInfoPtr(s);
 		this->id  = pinfo->id * Side<D>::num_sides + s.toInt();
 		this->own = true;
 		for (size_t i = 0; i < fine_ids.size(); i++) {
-			fine_ids[i] = nbr_info.ids[i] * Side<D>::num_sides + s.opposite().toInt();
-			fine_own[i] = (nbr_info.ptrs[i] != nullptr);
+			fine_ids[i] = nbr_info->ids[i] * Side<D>::num_sides + s.opposite().toInt();
+			fine_own[i] = (nbr_info->ptrs[i] != nullptr);
 		}
 	}
 	void getIdxAndTypes(std::deque<int> &idx, std::deque<IfaceType<D>> &types)
@@ -373,7 +372,7 @@ template <size_t D> class FineIfaceInfo : public IfaceInfo<D>
 	{
 		ranks.push_back(-1);
 		for (size_t i = 0; i < fine_ids.size(); i++) {
-			ranks.push_back(nbr_info.ranks[i]);
+			ranks.push_back(nbr_info->ranks[i]);
 		}
 	}
 	void getOwnership(std::deque<bool> &own)
@@ -385,8 +384,8 @@ template <size_t D> class FineIfaceInfo : public IfaceInfo<D>
 	}
 	void getIncomingProcs(std::set<int> &incoming_procs)
 	{
-		for (size_t i = 0; i < nbr_info.ptrs.size(); i++) {
-			if (nbr_info.ptrs[i] == nullptr) { incoming_procs.insert(nbr_info.ranks[i]); }
+		for (size_t i = 0; i < nbr_info->ptrs.size(); i++) {
+			if (nbr_info->ptrs[i] == nullptr) { incoming_procs.insert(nbr_info->ranks[i]); }
 		}
 	}
 	void setLocalIndexes(const std::map<int, int> &rev_map)

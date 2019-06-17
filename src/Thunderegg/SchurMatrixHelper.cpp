@@ -265,7 +265,7 @@ void SchurMatrixHelper::assembleMatrix(inserter insertBlock)
 		pinfo->neumann                    = curr_type.neumann;
 		sd.getIfaceInfoPtr(Side<3>::west) = new NormalIfaceInfo<3>();
 		solver->addDomain(sd);
-		std::deque<SchurInfo<3>> single_domain;
+		std::vector<SchurInfo<3>> single_domain;
 		single_domain.push_back(sd);
 
 		map<BlockKey, shared_ptr<valarray<double>>> coeffs;

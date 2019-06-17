@@ -78,7 +78,7 @@ template <size_t D> class DftPatchSolver : public PatchSolver<D>
 	DftPatchSolver(Domain<D> &domain, double lambda = 0);
 	void solve(SchurInfo<D> &sinfo, std::shared_ptr<const Vector<D>> f,
 	           std::shared_ptr<Vector<D>> u, std::shared_ptr<const Vector<D - 1>> gamma);
-	void domainSolve(std::deque<SchurInfo<D>> &domains, std::shared_ptr<const Vector<D>> f,
+	void domainSolve(std::vector<SchurInfo<D>> &domains, std::shared_ptr<const Vector<D>> f,
 	                 std::shared_ptr<Vector<D>> u, std::shared_ptr<const Vector<D - 1>> gamma)
 	{
 		for (SchurInfo<D> &sinfo : domains) {

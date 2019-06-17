@@ -30,9 +30,9 @@
 #include <Thunderegg/TypeDefs.h>
 #include <array>
 #include <bitset>
+#include <deque>
 #include <map>
 #include <memory>
-#include <vector>
 
 /**
  * @brief The type of neighbor
@@ -117,9 +117,9 @@ template <size_t D> struct PatchInfo : public Serializable {
 	std::array<double, D> spacings;
 	/**
 	 * @brief Nbr info objects for each side.
-	 * If there is no neighbor, it shoud be set to nullptr.
+	 * If there is no neighbor, it should be set to nullptr.
 	 */
-	std::array<NbrInfo<D> *, Side<D>::num_sides> nbr_info;
+	std::array<std::shared_ptr<NbrInfo<D>>, Side<D>::num_sides> nbr_info;
 
 	/**
 	 * @brief Construct a new Patch Info object
@@ -135,7 +135,7 @@ template <size_t D> struct PatchInfo : public Serializable {
 	/**
 	 * @brief Destroy the Patch Info object
 	 */
-	~PatchInfo();
+	~PatchInfo() = default;
 	/**
 	 * @brief Compare the ids of the patches
 	 *
@@ -148,13 +148,6 @@ template <size_t D> struct PatchInfo : public Serializable {
 	{
 		return l.id < r.id;
 	}
-	/**
-	 * @brief Get the NbrInfo pointer for a given side
-	 *
-	 * @param s the side
-	 * @return NbrInfo<D>*& the NbrInfo ptr
-	 */
-	NbrInfo<D> *&getNbrInfoPtr(Side<D> s);
 	/**
 	 * @brief Get the NbrType for a side
 	 *
@@ -172,6 +165,18 @@ template <size_t D> struct PatchInfo : public Serializable {
 	 */
 	NormalNbrInfo<D> &getNormalNbrInfo(Side<D> s) const;
 	/**
+	 * @brief Get the NormalNbrInfo pointer
+	 *
+	 * Neighbor must be of Normal type, otherwise a nullptr will be returned.
+	 *
+	 * @param s the side
+	 * @return std::shared_ptr<NormalNbrInfo<D>> the pointer
+	 */
+	std::shared_ptr<NormalNbrInfo<D>> getNormalNbrInfoPtr(Side<D> s) const
+	{
+		return std::dynamic_pointer_cast<NormalNbrInfo<D>>(nbr_info[s.toInt()]);
+	}
+	/**
 	 * @brief Get the CoarseNbrInfo object
 	 *
 
@@ -179,6 +184,18 @@ template <size_t D> struct PatchInfo : public Serializable {
 	 * @return CoarseNbrInfo<D>& the object
 	*/
 	CoarseNbrInfo<D> &getCoarseNbrInfo(Side<D> s) const;
+	/**
+	 * @brief Get the CoarseNbrInfo pointer
+	 *
+	 * Neighbor must be of Coarse type, otherwise a nullptr will be returned.
+	 *
+	 * @param s the side
+	 * @return std::shared_ptr<CoarseNbrInfo<D>> the pointer
+	 */
+	std::shared_ptr<CoarseNbrInfo<D>> getCoarseNbrInfoPtr(Side<D> s) const
+	{
+		return std::dynamic_pointer_cast<CoarseNbrInfo<D>>(nbr_info[s.toInt()]);
+	}
 	/**
 	 * @brief Get the FineNbrInfo object
 	 *
@@ -188,6 +205,18 @@ template <size_t D> struct PatchInfo : public Serializable {
 	 * @return FineNbrInfo<D>& the object
 	 */
 	FineNbrInfo<D> &getFineNbrInfo(Side<D> s) const;
+	/**
+	 * @brief Get the FineNbrInfo pointer
+	 *
+	 * Neighbor must be of Coarse type, otherwise a nullptr will be returned.
+	 *
+	 * @param s the side
+	 * @return std::shared_ptr<FineNbrInfo<D>> the pointer
+	 */
+	std::shared_ptr<FineNbrInfo<D>> getFineNbrInfoPtr(Side<D> s) const
+	{
+		return std::dynamic_pointer_cast<FineNbrInfo<D>>(nbr_info[s.toInt()]);
+	}
 	/**
 	 * @brief Return whether the patch has a neighbor
 	 *
@@ -203,7 +232,7 @@ template <size_t D> struct PatchInfo : public Serializable {
 	 */
 	inline bool hasCoarseParent() const;
 	/**
-	 * @brief Return wheter the boundary conditions are neumann
+	 * @brief Return wether the boundary conditions are neumann
 	 *
 	 * @param s the side
 	 */
@@ -229,7 +258,7 @@ template <size_t D> struct PatchInfo : public Serializable {
 	/**
 	 * @brief return a vector of neighbor ids
 	 */
-	std::vector<int> getNbrIds();
+	std::deque<int> getNbrIds();
 	/**
 	 * @brief set the ptrs to PatchInfo objects in the NbrInfo objects.
 	 *
@@ -246,27 +275,96 @@ template <size_t D> struct PatchInfo : public Serializable {
 	int  serialize(char *buffer) const;
 	int  deserialize(char *buffer);
 };
+/**
+ * @brief Represents information about a patch's neighbor.
+ *
+ * Includes information like neighbor id and and indexes.
+ *
+ * @tparam D the number of Cartesian dimensions in a patch
+ */
 template <size_t D> class NbrInfo : virtual public Serializable
 {
 	public:
-	virtual ~NbrInfo()                                                             = default;
-	virtual NbrType getNbrType()                                                   = 0;
-	virtual void    getNbrIds(std::vector<int> &nbr_ids)                           = 0;
-	virtual void    setGlobalIndexes(std::map<int, int> &rev_map)                  = 0;
-	virtual void    setLocalIndexes(std::map<int, int> &rev_map)                   = 0;
-	virtual void    setPtrs(std::map<int, std::shared_ptr<PatchInfo<D>>> &domains) = 0;
-	virtual void    updateRankOnNeighbors(int new_rank, Side<D> s)                 = 0;
+	/**
+	 * @brief Destroy the NbrInfo object
+	 */
+	virtual ~NbrInfo() = default;
+	/**
+	 * @brief Get the NbrType
+	 */
+	virtual NbrType getNbrType() = 0;
+	/**
+	 * @brief Add to a deque of neighbor ids
+	 */
+	virtual void getNbrIds(std::deque<int> &nbr_ids) = 0;
+	/**
+	 * @brief Set the local indexes in the NbrInfo objects
+	 *
+	 * @param rev_map map from id to local_index
+	 */
+	virtual void setGlobalIndexes(std::map<int, int> &rev_map) = 0;
+	/**
+	 * @brief Set the global indexes in the NbrInfo objects
+	 *
+	 * @param rev_map map from local_index to global_index
+	 */
+	virtual void setLocalIndexes(std::map<int, int> &rev_map) = 0;
+	/**
+	 * @brief Set the pointers to neighboring patches.
+	 *
+	 * @param domains map of patch id to PatchInfo ptr of patches on this processor.
+	 */
+	virtual void setPtrs(std::map<int, std::shared_ptr<PatchInfo<D>>> &domains) = 0;
+	/**
+	 * @brief Update the ranks on the neighbor objects.
+	 *
+	 * TODO make this work across processors. This only updates the objects on the same processor
+	 *
+	 * @param new_rank The new rank of this patch
+	 * @param s the side of tha patch that the neighbor is on.
+	 */
+	virtual void updateRankOnNeighbors(int new_rank, Side<D> s) = 0;
 };
+/**
+ * @brief Represents a neighbor that is at the same refinement level.
+ *
+ * @tparam D the number of Cartesian dimensions on a patch.
+ */
 template <size_t D> class NormalNbrInfo : public NbrInfo<D>
 {
 	public:
-	std::shared_ptr<PatchInfo<D>> ptr          = nullptr;
-	int                           rank         = 0;
-	int                           id           = 0;
-	int                           local_index  = 0;
-	int                           global_index = 0;
+	/**
+	 * @brief Pointer to neighboring PatchInfo object.
+	 *
+	 * If the neighbor is on a different processor, it will be set to nullptr.
+	 */
+	std::shared_ptr<PatchInfo<D>> ptr = nullptr;
+	/**
+	 * @brief The mpi rank that the neighbor resides on.
+	 */
+	int rank = 0;
+	/**
+	 * @brief The id of the neighbor
+	 */
+	int id = 0;
+	/**
+	 * @brief The local index of the neighbor
+	 */
+	int local_index = 0;
+	/**
+	 * @brief The global index of the neighbor
+	 */
+	int global_index = 0;
+	/**
+	 * @brief Construct a new empty NormalNbrInfo object
+	 */
 	NormalNbrInfo() {}
 	~NormalNbrInfo() = default;
+	/**
+	 * @brief Construct a new NormalNbrInfo object
+	 *
+	 * @param id the id of the neighbor.
+	 */
 	NormalNbrInfo(int id)
 	{
 		this->id = id;
@@ -275,10 +373,10 @@ template <size_t D> class NormalNbrInfo : public NbrInfo<D>
 	{
 		return NbrType::Normal;
 	}
-	void getNbrIds(std::vector<int> &nbr_ids)
+	void getNbrIds(std::deque<int> &nbr_ids)
 	{
 		nbr_ids.push_back(id);
-	};
+	}
 	void setGlobalIndexes(std::map<int, int> &rev_map)
 	{
 		global_index = rev_map.at(local_index);
@@ -295,6 +393,9 @@ template <size_t D> class NormalNbrInfo : public NbrInfo<D>
 			ptr = nullptr;
 		}
 	}
+	/**
+	 * @brief Update the rank value on this object.
+	 */
 	void updateRank(int new_rank)
 	{
 		rank = new_rank;
@@ -318,27 +419,62 @@ template <size_t D> class NormalNbrInfo : public NbrInfo<D>
 		return reader.getPos();
 	}
 };
+/**
+ * @brief Represents a neighbor that is at a coarser refinement level.
+ *
+ * @tparam D the number of Cartesian dimensions.
+ */
 template <size_t D> class CoarseNbrInfo : public NbrInfo<D>
 {
 	public:
+	/**
+	 * @brief Pointer to neighboring PatchInfo object.
+	 *
+	 * If the neighbor is on a different processor, it will be set to nullptr.
+	 */
 	std::shared_ptr<PatchInfo<D>> ptr;
-	int                           rank = 0;
-	int                           id;
-	int                           local_index;
-	int                           global_index;
-	int                           quad_on_coarse;
+	/**
+	 * @brief The mpi rank that the neighbor resides on.
+	 */
+	int rank = 0;
+	/**
+	 * @brief The id of the neighbor
+	 */
+	int id = 0;
+	/**
+	 * @brief The local index of the neighbor
+	 */
+	int local_index = 0;
+	/**
+	 * @brief The global index of the neighbor
+	 */
+	int global_index = 0;
+	/**
+	 * @brief The orthant that this patch in relation to the coarser patch's interface.
+	 */
+	Orthant<D - 1> orth_on_coarse;
+	/**
+	 * @brief Construct a new empty CoarseNbrInfo object
+	 */
 	CoarseNbrInfo()  = default;
 	~CoarseNbrInfo() = default;
-	CoarseNbrInfo(int id, int quad_on_coarse)
+	/**
+	 * @brief Construct a new CoarseNbrInfo object
+	 *
+	 * @param id the id of the neighbor
+	 * @param orth_on_coarse The orthant that this patch in relation to the coarser patch's
+	 * interface.
+	 */
+	CoarseNbrInfo(int id, Orthant<D - 1> orth_on_coarse)
 	{
 		this->id             = id;
-		this->quad_on_coarse = quad_on_coarse;
+		this->orth_on_coarse = orth_on_coarse;
 	}
 	NbrType getNbrType()
 	{
 		return NbrType::Coarse;
 	}
-	void getNbrIds(std::vector<int> &nbr_ids)
+	void getNbrIds(std::deque<int> &nbr_ids)
 	{
 		nbr_ids.push_back(id);
 	};
@@ -358,6 +494,9 @@ template <size_t D> class CoarseNbrInfo : public NbrInfo<D>
 			ptr = nullptr;
 		}
 	}
+	/**
+	 * @brief Update the rank value on this object.
+	 */
 	void updateRank(int new_rank)
 	{
 		rank = new_rank;
@@ -368,7 +507,7 @@ template <size_t D> class CoarseNbrInfo : public NbrInfo<D>
 		BufferWriter writer(buffer);
 		writer << rank;
 		writer << id;
-		writer << quad_on_coarse;
+		writer << orth_on_coarse;
 		return writer.getPos();
 	}
 	int deserialize(char *buffer)
@@ -376,25 +515,58 @@ template <size_t D> class CoarseNbrInfo : public NbrInfo<D>
 		BufferReader reader(buffer);
 		reader >> rank;
 		reader >> id;
-		reader >> quad_on_coarse;
+		reader >> orth_on_coarse;
 		return reader.getPos();
 	}
 };
+/**
+ * @brief Represents neighbors that are at a finer refinement level.
+ *
+ * @tparam D the number of Cartesian dimensions.
+ */
 template <size_t D> class FineNbrInfo : public NbrInfo<D>
 {
 	public:
+	/**
+	 * @brief Pointers to neighboring PatchInfo objects.
+	 *
+	 * If the neighbor is on a different processor, it will be set to nullptr.
+	 */
 	std::array<std::shared_ptr<PatchInfo<D>>, Orthant<D - 1>::num_orthants> ptrs;
-	std::array<int, Orthant<D - 1>::num_orthants>                           ranks;
-	std::array<int, Orthant<D - 1>::num_orthants>                           ids;
-	std::array<int, Orthant<D - 1>::num_orthants>                           global_indexes;
-	std::array<int, Orthant<D - 1>::num_orthants>                           local_indexes;
+	/**
+	 * @brief The mpi rank that the neighbor resides on.
+	 */
+	std::array<int, Orthant<D - 1>::num_orthants> ranks;
+	/**
+	 * @brief The ids of the neighbors
+	 */
+	std::array<int, Orthant<D - 1>::num_orthants> ids;
+	/**
+	 * @brief The global indexes of the neighbors
+	 */
+	std::array<int, Orthant<D - 1>::num_orthants> global_indexes;
+	/**
+	 * @brief The local indexes of the neighbors
+	 */
+	std::array<int, Orthant<D - 1>::num_orthants> local_indexes;
+	/**
+	 * @brief Construct a new empty FineNbrInfo object
+	 */
 	FineNbrInfo()
 	{
 		ptrs.fill(nullptr);
 		ranks.fill(0);
+		ids.fill(0);
+		global_indexes.fill(0);
+		local_indexes.fill(0);
 	}
 	~FineNbrInfo() = default;
-	FineNbrInfo(std::array<int, Orthant<D>::num_orthants / 2> ids)
+	/**
+	 * @brief Construct a new FineNbrInfo object
+	 *
+	 * @param ids the ids of the neighbors
+	 */
+	FineNbrInfo(std::array<int, Orthant<D - 1>::num_orthants> ids)
 	{
 		ptrs.fill(nullptr);
 		ranks.fill(0);
@@ -404,7 +576,7 @@ template <size_t D> class FineNbrInfo : public NbrInfo<D>
 	{
 		return NbrType::Fine;
 	}
-	void getNbrIds(std::vector<int> &nbr_ids)
+	void getNbrIds(std::deque<int> &nbr_ids)
 	{
 		for (size_t i = 0; i < ids.size(); i++) {
 			nbr_ids.push_back(ids[i]);
@@ -432,11 +604,16 @@ template <size_t D> class FineNbrInfo : public NbrInfo<D>
 			}
 		}
 	}
-	void updateRank(int new_rank, int quad_on_coarse)
+	/**
+	 * @brief Update a rank in this object
+	 *
+	 * @param new_rank the new rank
+	 * @param orth_on_coarse the orthant of the neighbor being updated
+	 */
+	void updateRank(int new_rank, Orthant<D - 1> orth_on_coarse)
 	{
-		ranks[quad_on_coarse] = new_rank;
+		ranks[orth_on_coarse.toInt()] = new_rank;
 	}
-
 	void updateRankOnNeighbors(int new_rank, Side<D> s)
 	{
 		for (size_t i = 0; i < ptrs.size(); i++) {
@@ -460,19 +637,7 @@ template <size_t D> class FineNbrInfo : public NbrInfo<D>
 };
 template <size_t D> inline void CoarseNbrInfo<D>::updateRankOnNeighbors(int new_rank, Side<D> s)
 {
-	ptr->getFineNbrInfo(s.opposite()).updateRank(new_rank, quad_on_coarse);
-}
-template <size_t D> inline PatchInfo<D>::~PatchInfo()
-{
-	/*
-	for (NbrInfo *info : nbr_info) {
-	    delete info;
-	}
-	*/
-}
-template <size_t D> inline NbrInfo<D> *&PatchInfo<D>::getNbrInfoPtr(Side<D> s)
-{
-	return nbr_info[s.toInt()];
+	ptr->getFineNbrInfo(s.opposite()).updateRank(new_rank, orth_on_coarse);
 }
 template <size_t D> inline NbrType PatchInfo<D>::getNbrType(Side<D> s) const
 {
@@ -480,15 +645,15 @@ template <size_t D> inline NbrType PatchInfo<D>::getNbrType(Side<D> s) const
 }
 template <size_t D> inline NormalNbrInfo<D> &PatchInfo<D>::getNormalNbrInfo(Side<D> s) const
 {
-	return *(NormalNbrInfo<D> *) nbr_info[s.toInt()];
+	return *std::dynamic_pointer_cast<NormalNbrInfo<D>>(nbr_info[s.toInt()]);
 }
 template <size_t D> inline CoarseNbrInfo<D> &PatchInfo<D>::getCoarseNbrInfo(Side<D> s) const
 {
-	return *(CoarseNbrInfo<D> *) nbr_info[s.toInt()];
+	return *std::dynamic_pointer_cast<CoarseNbrInfo<D>>(nbr_info[s.toInt()]);
 }
 template <size_t D> inline FineNbrInfo<D> &PatchInfo<D>::getFineNbrInfo(Side<D> s) const
 {
-	return *(FineNbrInfo<D> *) nbr_info[s.toInt()];
+	return *std::dynamic_pointer_cast<FineNbrInfo<D>>(nbr_info[s.toInt()]);
 }
 template <size_t D> inline bool PatchInfo<D>::hasNbr(Side<D> s) const
 {
@@ -506,14 +671,14 @@ template <size_t D> inline void PatchInfo<D>::setLocalNeighborIndexes(std::map<i
 {
 	local_index = rev_map.at(id);
 	for (Side<D> s : Side<D>::getValues()) {
-		if (hasNbr(s)) { getNbrInfoPtr(s)->setLocalIndexes(rev_map); }
+		if (hasNbr(s)) { nbr_info[s.toInt()]->setLocalIndexes(rev_map); }
 	}
 }
 template <size_t D> inline void PatchInfo<D>::setGlobalNeighborIndexes(std::map<int, int> &rev_map)
 {
 	global_index = rev_map.at(local_index);
 	for (Side<D> s : Side<D>::getValues()) {
-		if (hasNbr(s)) { getNbrInfoPtr(s)->setGlobalIndexes(rev_map); }
+		if (hasNbr(s)) { nbr_info[s.toInt()]->setGlobalIndexes(rev_map); }
 	}
 }
 template <size_t D> inline void PatchInfo<D>::setNeumann(IsNeumannFunc<D> inf)
@@ -530,11 +695,11 @@ template <size_t D> inline void PatchInfo<D>::setNeumann(IsNeumannFunc<D> inf)
 		}
 	}
 }
-template <size_t D> inline std::vector<int> PatchInfo<D>::getNbrIds()
+template <size_t D> inline std::deque<int> PatchInfo<D>::getNbrIds()
 {
-	std::vector<int> retval;
+	std::deque<int> retval;
 	for (Side<D> s : Side<D>::getValues()) {
-		if (hasNbr(s)) { getNbrInfoPtr(s)->getNbrIds(retval); }
+		if (hasNbr(s)) { nbr_info[s.toInt()]->getNbrIds(retval); }
 	}
 	return retval;
 }
@@ -594,19 +759,19 @@ template <size_t D> inline int PatchInfo<D>::deserialize(char *buffer)
 		if (has_nbr[i]) {
 			NbrType type;
 			reader >> type;
-			NbrInfo<D> *info = nullptr;
+			std::shared_ptr<NbrInfo<D>> info;
 			switch (type) {
 				case NbrType::Normal:
-					info = new NormalNbrInfo<D>();
-					reader >> *(NormalNbrInfo<D> *) info;
+					info.reset(new NormalNbrInfo<D>());
+					reader >> *std::static_pointer_cast<NormalNbrInfo<D>>(info);
 					break;
 				case NbrType::Fine:
-					info = new FineNbrInfo<D>();
-					reader >> *(FineNbrInfo<D> *) info;
+					info.reset(new FineNbrInfo<D>());
+					reader >> *std::static_pointer_cast<FineNbrInfo<D>>(info);
 					break;
 				case NbrType::Coarse:
-					info = new CoarseNbrInfo<D>();
-					reader >> *(CoarseNbrInfo<D> *) info;
+					info.reset(new CoarseNbrInfo<D>());
+					reader >> *std::static_pointer_cast<CoarseNbrInfo<D>>(info);
 					break;
 			}
 			nbr_info[i] = info;
@@ -618,14 +783,14 @@ template <size_t D>
 inline void PatchInfo<D>::setPtrs(std::map<int, std::shared_ptr<PatchInfo>> &domains)
 {
 	for (Side<D> s : Side<D>::getValues()) {
-		if (hasNbr(s)) { getNbrInfoPtr(s)->setPtrs(domains); }
+		if (hasNbr(s)) { nbr_info[s.toInt()]->setPtrs(domains); }
 	}
 }
 template <size_t D> inline void PatchInfo<D>::updateRank(int rank)
 {
 	rank = rank;
 	for (Side<D> s : Side<D>::getValues()) {
-		if (hasNbr(s)) { getNbrInfoPtr(s)->updateRankOnNeighbors(rank, s); }
+		if (hasNbr(s)) { nbr_info[s.toInt()]->updateRankOnNeighbors(rank, s); }
 	}
 }
 extern template class PatchInfo<2>;

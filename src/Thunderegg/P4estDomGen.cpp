@@ -48,7 +48,8 @@ static void get_num_levels(p4est_iter_volume_info_t *info, void *user_data)
 static void set_ids(p4est_iter_volume_info_t *info, void *user_data)
 {
 	int *data = (int *) &info->quad->p.user_data;
-	data[0]   = *(int *) user_data + info->quadid;
+	data[0]   = *(int *) user_data + info->quadid
+	          + p4est_tree_array_index(info->p4est->trees, info->treeid)->quadrants_offset;
 }
 /**
  * Constructor
@@ -169,9 +170,9 @@ static void link_domains(p4est_iter_face_info_t *info, void *user_data)
 				  }
 				  for (int i = 0; i < 2; i++) {
 					  if (!side_info1.is.hanging.is_ghost[i]) {
-						  int           id          = side_info1.is.hanging.quad[i]->p.user_int;
-						  PatchInfo<2> &pinfo       = *dmap[id];
-						  pinfo.getNbrInfoPtr(side) = new CoarseNbrInfo<2>(nbr_id, i);
+						  int           id    = side_info1.is.hanging.quad[i]->p.user_int;
+						  PatchInfo<2> &pinfo = *dmap[id];
+						  pinfo.nbr_info[side.toInt()].reset(new CoarseNbrInfo<2>(nbr_id, i));
 						  pinfo.getCoarseNbrInfo(side).updateRank(nbr_rank);
 					  }
 				  }
@@ -192,8 +193,8 @@ static void link_domains(p4est_iter_face_info_t *info, void *user_data)
 							  ranks[i]   = info->p4est->mpirank;
 						  }
 					  }
-					  PatchInfo<2> &pinfo       = *dmap[id];
-					  pinfo.getNbrInfoPtr(side) = new FineNbrInfo<2>(nbr_ids);
+					  PatchInfo<2> &pinfo = *dmap[id];
+					  pinfo.nbr_info[side.toInt()].reset(new FineNbrInfo<2>(nbr_ids));
 					  pinfo.getFineNbrInfo(side).updateRank(ranks[0], 0);
 					  pinfo.getFineNbrInfo(side).updateRank(ranks[1], 1);
 				  }
@@ -210,8 +211,8 @@ static void link_domains(p4est_iter_face_info_t *info, void *user_data)
 						  nbr_id   = side_info2.is.full.quad->p.user_int;
 						  nbr_rank = info->p4est->mpirank;
 					  }
-					  PatchInfo<2> &pinfo       = *dmap[id];
-					  pinfo.getNbrInfoPtr(side) = new NormalNbrInfo<2>(nbr_id);
+					  PatchInfo<2> &pinfo = *dmap[id];
+					  pinfo.nbr_info[side.toInt()].reset(new NormalNbrInfo<2>(nbr_id));
 					  pinfo.getNormalNbrInfo(side).updateRank(nbr_rank);
 				  }
 			  }
