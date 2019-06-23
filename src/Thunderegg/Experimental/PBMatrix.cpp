@@ -118,7 +118,7 @@ struct PBlockMin {
 	std::shared_ptr<std::valarray<double>> coeffs;
 	std::function<int(int, int, int)> col_trans;
 	std::function<int(int, int, int)> row_trans;
-	PBlockMin(const PBlock &b)
+	PBlockMin(const PBMatrix::PBlock &b)
 	{
 		coeffs    = b.coeffs;
 		col_trans = b.col_trans;

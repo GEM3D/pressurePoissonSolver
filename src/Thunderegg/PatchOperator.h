@@ -21,14 +21,14 @@
 
 #ifndef PATCHOPERATOR_H
 #define PATCHOPERATOR_H
-#include <Thunderegg/SchurDomain.h>
+#include <Thunderegg/SchurInfo.h>
 #include <Thunderegg/Vector.h>
 template <size_t D> class PatchOperator
 {
 	public:
 	virtual ~PatchOperator() {}
-	virtual void apply(SchurDomain<D> &d, std::shared_ptr<const Vector<D>> u,
-	                   std::shared_ptr<const Vector<D-1>> gamma, std::shared_ptr<Vector<D>> f)
+	virtual void apply(SchurInfo<D> &d, std::shared_ptr<const Vector<D>> u,
+	                   std::shared_ptr<const Vector<D - 1>> gamma, std::shared_ptr<Vector<D>> f)
 	= 0;
 };
 #endif

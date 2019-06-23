@@ -21,14 +21,14 @@
 
 #ifndef GMGAVGRSTR_H
 #define GMGAVGRSTR_H
-#include <Thunderegg/DomainCollection.h>
+#include <Thunderegg/Domain.h>
 #include <Thunderegg/GMG/InterLevelComm.h>
 #include <Thunderegg/GMG/Restrictor.h>
 #include <memory>
 namespace GMG
 {
 /**
- * @brief Restrictor that averages the 8 corresponding fine cells into each coarse cell.
+ * @brief Restrictor that averages the corresponding fine cells into each coarse cell.
  */
 template <size_t D> class AvgRstr : public Restrictor<D>
 {
@@ -36,11 +36,11 @@ template <size_t D> class AvgRstr : public Restrictor<D>
 	/**
 	 * @brief The coarse DomainCollection that is being restricted to.
 	 */
-	std::shared_ptr<DomainCollection<D>> coarse_dc;
+	std::shared_ptr<Domain<D>> coarse_domain;
 	/**
 	 * @brief The fine DomainCollection that is being restricted from.
 	 */
-	std::shared_ptr<DomainCollection<D>> fine_dc;
+	std::shared_ptr<Domain<D>> fine_domain;
 	/**
 	 * @brief The communication package for restricting between levels.
 	 */
@@ -50,12 +50,12 @@ template <size_t D> class AvgRstr : public Restrictor<D>
 	/**
 	 * @brief Create new AvgRstr object.
 	 *
-	 * @param coarse_dc the DomainColleciton that is being restricted to.
-	 * @param fine_dc the DomainCollection that is being restricted from.
+	 * @param coarse_domain the DomainColleciton that is being restricted to.
+	 * @param fine_domain the DomainCollection that is being restricted from.
 	 * @param ilc the communcation package for these two levels.
 	 */
-	AvgRstr(std::shared_ptr<DomainCollection<D>> coarse_dc,
-	        std::shared_ptr<DomainCollection<D>> fine_dc, std::shared_ptr<InterLevelComm<D>> ilc);
+	AvgRstr(std::shared_ptr<Domain<D>> coarse_domain, std::shared_ptr<Domain<D>> fine_domain,
+	        std::shared_ptr<InterLevelComm<D>> ilc);
 	/**
 	 * @brief restriction function
 	 *
@@ -66,13 +66,13 @@ template <size_t D> class AvgRstr : public Restrictor<D>
 };
 
 template <size_t D>
-inline AvgRstr<D>::AvgRstr(std::shared_ptr<DomainCollection<D>> coarse_dc,
-                           std::shared_ptr<DomainCollection<D>> fine_dc,
-                           std::shared_ptr<InterLevelComm<D>>   ilc)
+inline AvgRstr<D>::AvgRstr(std::shared_ptr<Domain<D>>         coarse_domain,
+                           std::shared_ptr<Domain<D>>         fine_domain,
+                           std::shared_ptr<InterLevelComm<D>> ilc)
 {
-	this->coarse_dc = coarse_dc;
-	this->fine_dc   = fine_dc;
-	this->ilc       = ilc;
+	this->coarse_domain = coarse_domain;
+	this->fine_domain   = fine_domain;
+	this->ilc           = ilc;
 }
 template <size_t D>
 inline void AvgRstr<D>::restrict(std::shared_ptr<Vector<D>>       coarse,
@@ -81,12 +81,12 @@ inline void AvgRstr<D>::restrict(std::shared_ptr<Vector<D>>       coarse,
 	std::shared_ptr<Vector<D>> coarse_local = ilc->getNewCoarseDistVec();
 
 	for (ILCFineToCoarseMetadata<D> data : ilc->getFineDomains()) {
-		Domain<D> &  d                 = *data.d;
-		LocalData<D> coarse_local_data = coarse_local->getLocalData(data.local_index);
-		LocalData<D> fine_data         = fine->getLocalData(d.id_local);
+		PatchInfo<D> &pinfo             = *data.pinfo;
+		LocalData<D>  coarse_local_data = coarse_local->getLocalData(data.local_index);
+		LocalData<D>  fine_data         = fine->getLocalData(pinfo.local_index);
 
-		if (d.hasCoarseParent()) {
-			Orthant<D>         orth = d.oct_on_parent;
+		if (pinfo.hasCoarseParent()) {
+			Orthant<D>         orth = pinfo.orth_on_parent;
 			std::array<int, D> starts;
 			for (size_t i = 0; i < D; i++) {
 				starts[i] = orth.isOnSide(2 * i) ? 0 : coarse_local_data.getLengths()[i];

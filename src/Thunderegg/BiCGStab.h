@@ -21,9 +21,25 @@
 
 #include <Thunderegg/Operators/Operator.h>
 #include <Thunderegg/Vector.h>
+/**
+ * @brief Thunderegg implementation of BiCGStab iterative solver.
+ *
+ * @tparam D the number of Cartesian dimensions
+ */
 template <size_t D> class BiCGStab
 {
 	public:
+	/**
+	 * @brief Perform an iterative solver
+	 *
+	 * @param vg a VectorGenerator that allow for the creation of temporary work vectors
+	 * @param A the matrix
+	 * @param x the initial LHS guess.
+	 * @param b the RHS vector.
+	 * @param Mr the right preconditioner. Set to nullptr if there is no right preconditioner.
+	 *
+	 * @return the number of iterations
+	 */
 	static int solve(std::shared_ptr<VectorGenerator<D>> vg, std::shared_ptr<const Operator<D>> A,
 	                 std::shared_ptr<Vector<D>> x, std::shared_ptr<const Vector<D>> b,
 	                 std::shared_ptr<const Operator<D>> Mr = nullptr)

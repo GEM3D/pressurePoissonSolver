@@ -27,13 +27,13 @@ list(APPEND Thunderegg_SRCS Thunderegg/MatrixHelper.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/MatrixHelper2d.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/TriLinInterp.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/BilinearInterpolator.cpp)
-list(APPEND Thunderegg_SRCS Thunderegg/PBMatrix.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/PolyChebPrec.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/SchurHelper.cpp)
-list(APPEND Thunderegg_SRCS Thunderegg/DomainCollection.cpp)
-list(APPEND Thunderegg_SRCS Thunderegg/ThundereggDCG.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/Domain.cpp)
-list(APPEND Thunderegg_SRCS Thunderegg/SchurDomain.cpp)
+list(APPEND Thunderegg_SRCS Thunderegg/ThundereggDomGen.cpp)
+list(APPEND Thunderegg_SRCS Thunderegg/PatchInfo.cpp)
+list(APPEND Thunderegg_HDRS Thunderegg/PatchInfo.h)
+list(APPEND Thunderegg_SRCS Thunderegg/SchurInfo.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/Vector.cpp)
 
 list(APPEND Thunderegg_SRCS Thunderegg/SevenPtPatchOperator.cpp)
@@ -46,10 +46,12 @@ list(APPEND Thunderegg_SRCS Thunderegg/PatchSolvers/DftPatchSolver.cpp)
 list(APPEND Thunderegg_SRCS Thunderegg/PatchSolvers/FftwPatchSolver.cpp)
 
 if(p4est_FOUND)
-    list(APPEND Thunderegg_SRCS Thunderegg/P4estDCG.cpp)
+    list(APPEND Thunderegg_SRCS Thunderegg/P4estDomGen.cpp)
 endif()
 
-add_library(Thunderegg ${Thunderegg_SRCS})
+list(APPEND Thunderegg_SRCS Thunderegg/Experimental/PBMatrix.cpp)
+
+add_library(Thunderegg ${Thunderegg_SRCS} ${Thunderegg_HDRS})
 
 # set include directories
 target_include_directories(Thunderegg PUBLIC 

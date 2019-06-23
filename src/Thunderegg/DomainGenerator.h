@@ -19,7 +19,35 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#include "ThundereggDCG.h"
-
-template class ThundereggDCG<2>;
-template class ThundereggDCG<3>;
+#ifndef THUNDEREGG_DOMAINGENERATOR_H
+#define THUNDEREGG_DOMAINGENERATOR_H
+#include <Thunderegg/Domain.h>
+/**
+ * @brief Generates Domain objects.
+ *
+ * This class is intended to wrap around octree/quadtree libraries and provide Thunderegg with the
+ * necessary patch information. See P4estDG for the implimentation with the p4est library.
+ *
+ * @tparam D the number of Cartesian dimensions
+ */
+template <size_t D> class DomainGenerator
+{
+	public:
+	/**
+	 * @brief Destroy the DomainGenerator object
+	 */
+	~DomainGenerator(){};
+	/**
+	 * @brief Return the finest domain
+	 */
+	virtual std::shared_ptr<Domain<D>> getFinestDomain() = 0;
+	/**
+	 * @brief return true if there is a coarser domain to be generated.
+	 */
+	virtual bool hasCoarserDomain() = 0;
+	/**
+	 * @brief Return a new coarser domain
+	 */
+	virtual std::shared_ptr<Domain<D>> getCoarserDomain() = 0;
+};
+#endif

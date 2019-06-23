@@ -19,443 +19,413 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef DOMAIN_H
-#define DOMAIN_H
-#include "BufferWriter.h"
-#include "Serializable.h"
-#include "Side.h"
-#include <array>
-#include <bitset>
+#ifndef THUNDEREGG_DOMAIN_H
+#define THUNDEREGG_DOMAIN_H
+#include <Thunderegg/InterpCase.h>
+#include <Thunderegg/PW.h>
+#include <Thunderegg/PatchInfo.h>
+#include <Thunderegg/PetscVector.h>
+#include <cmath>
+#include <deque>
 #include <map>
 #include <memory>
+#include <petscao.h>
+#include <petscvec.h>
+#include <set>
+#include <string>
 #include <vector>
-enum class NbrType { Normal, Coarse, Fine };
-template <size_t D> struct NbrInfo;
-template <size_t D> struct NormalNbrInfo;
-template <size_t D> struct CoarseNbrInfo;
-template <size_t D> struct FineNbrInfo;
-template <size_t D> struct Domain : public Serializable {
+/**
+ * @brief Represents the domain of the problem.
+ *
+ * This class mainly manages a set of patches that makes up the domain. It is responsible for
+ * setting up the indexing of the domains, which is used in the rest of the Thunderegg library.
+ *
+ * @tparam D the number of Cartesian dimensions
+ */
+template <size_t D> class Domain
+{
+	private:
 	/**
-	 * @brief The domain's own id
+	 * @brief The number of cells in each direction
 	 */
-	int id        = 0;
-	int id_local  = 0;
-	int id_global = 0;
+	std::array<int, D> ns;
+	/**
+	 * @brief The number of cells in a patch
+	 */
+	int num_cells_in_patch;
+	/**
+	 * @brief Map that goes form patch's id to the PatchInfo pointer
+	 */
+	std::map<int, std::shared_ptr<PatchInfo<D>>> pinfo_id_map;
+	/**
+	 * @brief Vector of PatchInfo pointers where index in the vector corresponds to the patch's
+	 * local index
+	 */
+	std::vector<std::shared_ptr<PatchInfo<D>>> pinfo_vector;
+	/**
+	 * @brief The global number of patches
+	 */
+	int global_num_patches = 1;
+	/**
+	 * @brief Vector of patch ids. Index corresponds to the patch's local index.
+	 */
+	std::vector<int> patch_id_map_vec;
+	/**
+	 * @brief Vector of patch global_indexes. Index corresponds to the patch's global index.
+	 */
+	std::vector<int> patch_global_index_map_vec;
+	/**
+	 * @brief Vector of ghost patch global_indexes. Index corresponds to the patch's local index in
+	 * the ghost vector.
+	 */
+	std::vector<int> patch_global_index_map_vec_off_proc;
+	/**
+	 * @brief mpi rank
+	 */
+	int rank;
 
-	int refine_level  = 1;
-	int parent_id     = -1;
-	int oct_on_parent = -1;
+	/**
+	 * @brief Give the patches local indexes.
+	 *
+	 * @param local_id_set true if local indexes are set by user.
+	 */
+	void indexDomainsLocal(bool local_id_set = false);
+	/**
+	 * @brief Give the patches global indexes
+	 *
+	 * @param global_id_set true if global indexes are set by user.
+	 */
+	void indexDomainsGlobal(bool global_id_set = false);
 
-	std::bitset<Side<D>::num_sides> neumann;
-
-	std::array<int, D>    ns;
-	std::array<double, D> starts;
-	std::array<double, D> spacings;
-
-	std::array<NbrInfo<D> *, Side<D>::num_sides> nbr_info;
-
-	Domain()
+	/**
+	 * @brief Give patches new global and local indexes
+	 *
+	 * @param local_id_set true if local indexes are set by user
+	 * @param global_id_set true if global indexes are set by user
+	 */
+	void reIndex(bool local_id_set, bool global_id_set)
 	{
-		starts.fill(0);
-		nbr_info.fill(nullptr);
-		ns.fill(0);
-		spacings.fill(0);
+		indexDomainsLocal(local_id_set);
+		if (!global_id_set) { indexDomainsGlobal(); }
 	}
-	~Domain();
-	friend bool operator<(const Domain &l, const Domain &r)
-	{
-		return l.id < r.id;
-	}
-	NbrInfo<D> *&     getNbrInfoPtr(Side<D> s);
-	NbrType           getNbrType(Side<D> s) const;
-	NormalNbrInfo<D> &getNormalNbrInfo(Side<D> s) const;
-	CoarseNbrInfo<D> &getCoarseNbrInfo(Side<D> s) const;
-	FineNbrInfo<D> &  getFineNbrInfo(Side<D> s) const;
-	inline bool       hasNbr(Side<D> s) const;
-	inline bool       hasCoarseParent() const;
-	inline bool       isNeumann(Side<D> s) const;
-	void              setLocalNeighborIndexes(std::map<int, int> &rev_map);
-	void              setGlobalNeighborIndexes(std::map<int, int> &rev_map);
-	void              setNeumann();
-	std::vector<int>  getNbrIds();
-	int               serialize(char *buffer) const;
-	int               deserialize(char *buffer);
-	void              setPtrs(std::map<int, std::shared_ptr<Domain>> &domains);
-	void              updateRank(int rank);
-};
-template <size_t D> class NbrInfo : virtual public Serializable
-{
+
 	public:
-	virtual ~NbrInfo()                                                          = default;
-	virtual NbrType getNbrType()                                                = 0;
-	virtual void    getNbrIds(std::vector<int> &nbr_ids)                        = 0;
-	virtual void    setGlobalIndexes(std::map<int, int> &rev_map)               = 0;
-	virtual void    setLocalIndexes(std::map<int, int> &rev_map)                = 0;
-	virtual void    setPtrs(std::map<int, std::shared_ptr<Domain<D>>> &domains) = 0;
-	virtual void    updateRankOnNeighbors(int new_rank, Side<D> s)              = 0;
+	/**
+	 * @brief Construct a new Domain object with a given PatchInfo map.
+	 *
+	 * @param pinfo_map map that goes from patch id to the PatchInfo pointer
+	 * @param local_id_set true if local indexes are set by user
+	 * @param global_id_set true if global indexes are set by user
+	 */
+	Domain(std::map<int, std::shared_ptr<PatchInfo<D>>> pinfo_map, bool local_id_set = false,
+	       bool global_id_set = false)
+	{
+		this->ns = pinfo_map.begin()->second->ns;
+
+		num_cells_in_patch = 1;
+		for (size_t i = 0; i < D; i++) {
+			num_cells_in_patch *= ns[i];
+		}
+
+		pinfo_id_map = pinfo_map;
+
+		int num_local_domains = pinfo_id_map.size();
+		MPI_Allreduce(&num_local_domains, &global_num_patches, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+
+		reIndex(local_id_set, global_id_set);
+
+		for (auto &p : pinfo_id_map) {
+			p.second->setPtrs(pinfo_id_map);
+		}
+	}
+	/**
+	 * @brief Get a vector of PatchInfo pointers where index in the vector corresponds to the
+	 * patch's local index
+	 */
+	std::vector<std::shared_ptr<PatchInfo<D>>> &getPatchInfoVector()
+	{
+		return pinfo_vector;
+	}
+	/**
+	 * @brief Get map that goes form patch's id to the PatchInfo pointer
+	 */
+	std::map<int, std::shared_ptr<PatchInfo<D>>> &getPatchInfoMap()
+	{
+		return pinfo_id_map;
+	}
+	/**
+	 * @brief Get a vector of patch ids. Index in vector corresponds to the patch's local index.
+	 */
+	const std::vector<int> &getIdMapVec() const
+	{
+		return patch_id_map_vec;
+	}
+	/**
+	 * @brief Get a vector of patch global indexes. Index in vector corresponds to the patch's
+	 * global index.
+	 */
+	const std::vector<int> &getGlobalIndexMapVec() const
+	{
+		return patch_global_index_map_vec;
+	}
+	/**
+	 * @brief Get the number of cells in each direction
+	 *
+	 */
+	const std::array<int, D> &getNs() const
+	{
+		return ns;
+	}
+	/**
+	 * @brief Set the neumann boundary conditions
+	 *
+	 * @param inf the function that determines boundary conditions
+	 */
+	void setNeumann(IsNeumannFunc<D> inf)
+	{
+		for (auto &p : pinfo_id_map) {
+			p.second->setNeumann(inf);
+		}
+	}
+	std::shared_ptr<PetscVector<D>> getNewDomainVec() const
+	{
+		Vec u;
+		VecCreateMPI(MPI_COMM_WORLD, pinfo_id_map.size() * num_cells_in_patch, PETSC_DETERMINE, &u);
+		return std::shared_ptr<PetscVector<D>>(new PetscVector<D>(u, ns));
+	}
+	/**
+	 * @brief Get the number of global patches
+	 */
+	int getNumGlobalPatches() const
+	{
+		return global_num_patches;
+	}
+	/**
+	 * @brief Get the number of local patches
+	 */
+	int getNumLocalPatches() const
+	{
+		return pinfo_vector.size();
+	}
+	/**
+	 * @brief get the number of global cells
+	 */
+	int getNumGlobalCells() const
+	{
+		return global_num_patches * num_cells_in_patch;
+	}
+	/**
+	 * @brief Get get the number of local cells
+	 */
+	int getNumLocalCells() const
+	{
+		return pinfo_id_map.size() * num_cells_in_patch;
+	}
+	/**
+	 * @brief Get the number of cells in a patch
+	 */
+	int getNumCellsInPatch() const
+	{
+		return num_cells_in_patch;
+	}
+	/**
+	 * @brief Get the volume of the domain.
+	 *
+	 * For 2D, this will be the area.
+	 */
+	double volume() const
+	{
+		double sum = 0;
+		for (auto &p : pinfo_id_map) {
+			PatchInfo<D> &d         = *p.second;
+			double        patch_vol = 1;
+			for (size_t i = 0; i < D; i++) {
+				patch_vol *= d.spacings[i] * d.ns[i];
+			}
+			sum += patch_vol;
+		}
+		double retval;
+		MPI_Allreduce(&sum, &retval, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		return retval;
+	}
+	/**
+	 * @brief Integrate a vector over the domain.
+	 *
+	 * @param u the vector
+	 * @return double the result of the integral
+	 */
+	double integrate(std::shared_ptr<const Vector<D>> u) const
+	{
+		double sum = 0;
+
+		for (auto &p : pinfo_id_map) {
+			PatchInfo<D> &     d      = *p.second;
+			const LocalData<D> u_data = u->getLocalData(d.local_index);
+
+			double patch_sum = 0;
+			nested_loop<D>(u_data.getStart(), u_data.getEnd(),
+			               [&](std::array<int, D> coord) { patch_sum += u_data[coord]; });
+
+			for (size_t i = 0; i < D; i++) {
+				patch_sum *= d.spacings[i];
+			}
+			sum += patch_sum;
+		}
+		double retval;
+		MPI_Allreduce(&sum, &retval, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		return retval;
+	}
 };
-template <size_t D> class NormalNbrInfo : public NbrInfo<D>
+
+template <size_t D> void Domain<D>::indexDomainsLocal(bool local_id_set)
 {
-	public:
-	std::shared_ptr<Domain<D>> ptr          = nullptr;
-	int                        rank         = 0;
-	int                        id           = 0;
-	int                        local_index  = 0;
-	int                        global_index = 0;
-	NormalNbrInfo() {}
-	~NormalNbrInfo() = default;
-	NormalNbrInfo(int id)
-	{
-		this->id = id;
-	}
-	NbrType getNbrType()
-	{
-		return NbrType::Normal;
-	}
-	void getNbrIds(std::vector<int> &nbr_ids)
-	{
-		nbr_ids.push_back(id);
-	};
-	void setGlobalIndexes(std::map<int, int> &rev_map)
-	{
-		global_index = rev_map.at(local_index);
-	}
-	void setLocalIndexes(std::map<int, int> &rev_map)
-	{
-		local_index = rev_map.at(id);
-	}
-	void setPtrs(std::map<int, std::shared_ptr<Domain<D>>> &domains)
-	{
-		try {
-			ptr = domains.at(id);
-		} catch (std::out_of_range) {
-			ptr = nullptr;
+	std::vector<int>   map_vec;
+	std::vector<int>   off_proc_map_vec;
+	std::map<int, int> rev_map;
+	int                curr_i = local_id_set ? pinfo_id_map.size() : 0;
+	if (local_id_set) {
+		std::set<int> offs;
+		if (!pinfo_id_map.empty()) {
+			std::set<int> todo;
+			map_vec.resize(pinfo_id_map.size());
+			for (auto &p : pinfo_id_map) {
+				todo.insert(p.first);
+				PatchInfo<D> &d        = *p.second;
+				map_vec[d.local_index] = d.id;
+			}
+			std::set<int> enqueued;
+			while (!todo.empty()) {
+				std::deque<int> queue;
+				queue.push_back(*todo.begin());
+				enqueued.insert(*todo.begin());
+				while (!queue.empty()) {
+					int i = queue.front();
+					todo.erase(i);
+					queue.pop_front();
+					PatchInfo<D> &d = *pinfo_id_map[i];
+					rev_map[i]      = d.local_index;
+					for (int i : d.getNbrIds()) {
+						if (!enqueued.count(i)) {
+							enqueued.insert(i);
+							if (pinfo_id_map.count(i)) {
+								queue.push_back(i);
+							} else {
+								if (!offs.count(i)) {
+									offs.insert(i);
+									off_proc_map_vec.push_back(i);
+								}
+							}
+						}
+					}
+				}
+			}
 		}
-	}
-	void updateRank(int new_rank)
-	{
-		rank = new_rank;
-	}
-	void updateRankOnNeighbors(int new_rank, Side<D> s)
-	{
-		ptr->getNormalNbrInfo(s.opposite()).updateRank(new_rank);
-	}
-	int serialize(char *buffer) const
-	{
-		BufferWriter writer(buffer);
-		writer << rank;
-		writer << id;
-		return writer.getPos();
-	}
-	int deserialize(char *buffer)
-	{
-		BufferReader reader(buffer);
-		reader >> rank;
-		reader >> id;
-		return reader.getPos();
-	}
-};
-template <size_t D> class CoarseNbrInfo : public NbrInfo<D>
-{
-	public:
-	std::shared_ptr<Domain<D>> ptr;
-	int                        rank = 0;
-	int                        id;
-	int                        local_index;
-	int                        global_index;
-	int                        quad_on_coarse;
-	CoarseNbrInfo()  = default;
-	~CoarseNbrInfo() = default;
-	CoarseNbrInfo(int id, int quad_on_coarse)
-	{
-		this->id             = id;
-		this->quad_on_coarse = quad_on_coarse;
-	}
-	NbrType getNbrType()
-	{
-		return NbrType::Coarse;
-	}
-	void getNbrIds(std::vector<int> &nbr_ids)
-	{
-		nbr_ids.push_back(id);
-	};
-	void setGlobalIndexes(std::map<int, int> &rev_map)
-	{
-		global_index = rev_map.at(local_index);
-	}
-	void setLocalIndexes(std::map<int, int> &rev_map)
-	{
-		local_index = rev_map.at(id);
-	}
-	void setPtrs(std::map<int, std::shared_ptr<Domain<D>>> &domains)
-	{
-		try {
-			ptr = domains.at(id);
-		} catch (std::out_of_range) {
-			ptr = nullptr;
-		}
-	}
-	void updateRank(int new_rank)
-	{
-		rank = new_rank;
-	}
-	void updateRankOnNeighbors(int new_rank, Side<D> s);
-	int  serialize(char *buffer) const
-	{
-		BufferWriter writer(buffer);
-		writer << rank;
-		writer << id;
-		writer << quad_on_coarse;
-		return writer.getPos();
-	}
-	int deserialize(char *buffer)
-	{
-		BufferReader reader(buffer);
-		reader >> rank;
-		reader >> id;
-		reader >> quad_on_coarse;
-		return reader.getPos();
-	}
-};
-template <size_t D> class FineNbrInfo : public NbrInfo<D>
-{
-	public:
-	std::array<std::shared_ptr<Domain<D>>, Orthant<D - 1>::num_orthants> ptrs;
-	std::array<int, Orthant<D - 1>::num_orthants>                        ranks;
-	std::array<int, Orthant<D - 1>::num_orthants>                        ids;
-	std::array<int, Orthant<D - 1>::num_orthants>                        global_indexes;
-	std::array<int, Orthant<D - 1>::num_orthants>                        local_indexes;
-	FineNbrInfo()
-	{
-		ptrs.fill(nullptr);
-		ranks.fill(0);
-	}
-	~FineNbrInfo() = default;
-	FineNbrInfo(std::array<int, Orthant<D>::num_orthants / 2> ids)
-	{
-		ptrs.fill(nullptr);
-		ranks.fill(0);
-		this->ids = ids;
-	}
-	NbrType getNbrType()
-	{
-		return NbrType::Fine;
-	}
-	void getNbrIds(std::vector<int> &nbr_ids)
-	{
-		for (size_t i = 0; i < ids.size(); i++) {
-			nbr_ids.push_back(ids[i]);
-		}
-	};
-	void setGlobalIndexes(std::map<int, int> &rev_map)
-	{
-		for (size_t i = 0; i < global_indexes.size(); i++) {
-			global_indexes[i] = rev_map.at(local_indexes[i]);
-		}
-	}
-	void setLocalIndexes(std::map<int, int> &rev_map)
-	{
-		for (size_t i = 0; i < local_indexes.size(); i++) {
-			local_indexes[i] = rev_map.at(ids[i]);
-		}
-	}
-	void setPtrs(std::map<int, std::shared_ptr<Domain<D>>> &domains)
-	{
-		for (size_t i = 0; i < ids.size(); i++) {
-			try {
-				ptrs[i] = domains.at(ids[i]);
-			} catch (std::out_of_range) {
-				ptrs[i] = nullptr;
+	} else {
+		std::set<int> offs;
+		if (!pinfo_id_map.empty()) {
+			std::set<int> todo;
+			for (auto &p : pinfo_id_map) {
+				todo.insert(p.first);
+			}
+			std::set<int> enqueued;
+			while (!todo.empty()) {
+				std::deque<int> queue;
+				queue.push_back(*todo.begin());
+				enqueued.insert(*todo.begin());
+				while (!queue.empty()) {
+					int i = queue.front();
+					todo.erase(i);
+					queue.pop_front();
+					map_vec.push_back(i);
+					PatchInfo<D> &d = *pinfo_id_map[i];
+					rev_map[i]      = curr_i;
+					d.local_index   = curr_i;
+					curr_i++;
+					for (int i : d.getNbrIds()) {
+						if (!enqueued.count(i)) {
+							enqueued.insert(i);
+							if (pinfo_id_map.count(i)) {
+								queue.push_back(i);
+							} else {
+								if (!offs.count(i)) {
+									offs.insert(i);
+									off_proc_map_vec.push_back(i);
+								}
+							}
+						}
+					}
+				}
 			}
 		}
 	}
-	void updateRank(int new_rank, int quad_on_coarse)
-	{
-		ranks[quad_on_coarse] = new_rank;
+	// map off proc
+	for (int i : off_proc_map_vec) {
+		rev_map[i] = curr_i;
+		curr_i++;
+	}
+	pinfo_vector.resize(pinfo_id_map.size());
+	for (auto &p : pinfo_id_map) {
+		p.second->setLocalNeighborIndexes(rev_map);
+		pinfo_vector[p.second->local_index] = p.second;
+	}
+	// domain_rev_map          = rev_map;
+	patch_global_index_map_vec          = map_vec;
+	patch_id_map_vec                    = map_vec;
+	patch_global_index_map_vec_off_proc = off_proc_map_vec;
+}
+template <size_t D> void Domain<D>::indexDomainsGlobal(bool global_id_set)
+{
+	// global indices are going to be sequentially increasing with rank
+	int local_size = pinfo_id_map.size();
+	int start_i;
+	MPI_Scan(&local_size, &start_i, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+	start_i -= local_size;
+	std::vector<int> new_global(local_size);
+	iota(new_global.begin(), new_global.end(), start_i);
+
+	// create map for gids
+	PW<AO> ao;
+	AOCreateMapping(MPI_COMM_WORLD, local_size, &patch_global_index_map_vec[0], &new_global[0],
+	                &ao);
+
+	// get global indices that we want to recieve for dest vector
+	std::vector<int> inds = patch_global_index_map_vec;
+	for (int i : patch_global_index_map_vec_off_proc) {
+		inds.push_back(i);
 	}
 
-	void updateRankOnNeighbors(int new_rank, Side<D> s)
-	{
-		for (size_t i = 0; i < ptrs.size(); i++) {
-			ptrs[i]->getCoarseNbrInfo(s.opposite()).updateRank(new_rank);
-		}
+	// get new global indices
+	AOApplicationToPetsc(ao, inds.size(), &inds[0]);
+	std::map<int, int> rev_map;
+	for (size_t i = 0; i < inds.size(); i++) {
+		rev_map[i] = inds[i];
 	}
-	int serialize(char *buffer) const
-	{
-		BufferWriter writer(buffer);
-		writer << ranks;
-		writer << ids;
-		return writer.getPos();
+
+	for (auto &p : pinfo_id_map) {
+		p.second->setGlobalNeighborIndexes(rev_map);
 	}
-	int deserialize(char *buffer)
+	for (size_t i = 0; i < patch_global_index_map_vec.size(); i++) {
+		patch_global_index_map_vec[i] = inds[i];
+	}
+	for (size_t i = 0; i < patch_global_index_map_vec_off_proc.size(); i++) {
+		patch_global_index_map_vec_off_proc[i] = inds[patch_global_index_map_vec.size() + i];
+	}
+}
+template <size_t D> class DomainVG : public VectorGenerator<D>
+{
+	private:
+	std::shared_ptr<Domain<D>> dc;
+
+	public:
+	DomainVG(std::shared_ptr<Domain<D>> dc)
 	{
-		BufferReader reader(buffer);
-		reader >> ranks;
-		reader >> ids;
-		return reader.getPos();
+		this->dc = dc;
+	}
+	std::shared_ptr<Vector<D>> getNewVector()
+	{
+		return dc->getNewDomainVec();
 	}
 };
-template <size_t D> inline void CoarseNbrInfo<D>::updateRankOnNeighbors(int new_rank, Side<D> s)
-{
-	ptr->getFineNbrInfo(s.opposite()).updateRank(new_rank, quad_on_coarse);
-}
-template <size_t D> inline Domain<D>::~Domain()
-{
-	/*
-	for (NbrInfo *info : nbr_info) {
-	    delete info;
-	}
-	*/
-}
-template <size_t D> inline NbrInfo<D> *&Domain<D>::getNbrInfoPtr(Side<D> s)
-{
-	return nbr_info[s.toInt()];
-}
-template <size_t D> inline NbrType Domain<D>::getNbrType(Side<D> s) const
-{
-	return nbr_info[s.toInt()]->getNbrType();
-}
-template <size_t D> inline NormalNbrInfo<D> &Domain<D>::getNormalNbrInfo(Side<D> s) const
-{
-	return *(NormalNbrInfo<D> *) nbr_info[s.toInt()];
-}
-template <size_t D> inline CoarseNbrInfo<D> &Domain<D>::getCoarseNbrInfo(Side<D> s) const
-{
-	return *(CoarseNbrInfo<D> *) nbr_info[s.toInt()];
-}
-template <size_t D> inline FineNbrInfo<D> &Domain<D>::getFineNbrInfo(Side<D> s) const
-{
-	return *(FineNbrInfo<D> *) nbr_info[s.toInt()];
-}
-template <size_t D> inline bool Domain<D>::hasNbr(Side<D> s) const
-{
-	return nbr_info[s.toInt()] != nullptr;
-}
-template <size_t D> inline bool Domain<D>::hasCoarseParent() const
-{
-	return oct_on_parent != -1;
-}
-template <size_t D> inline bool Domain<D>::isNeumann(Side<D> s) const
-{
-	return neumann[s.toInt()];
-}
-template <size_t D> inline void Domain<D>::setLocalNeighborIndexes(std::map<int, int> &rev_map)
-{
-	id_local = rev_map.at(id);
-	for (Side<D> s : Side<D>::getValues()) {
-		if (hasNbr(s)) { getNbrInfoPtr(s)->setLocalIndexes(rev_map); }
-	}
-}
-template <size_t D> inline void Domain<D>::setGlobalNeighborIndexes(std::map<int, int> &rev_map)
-{
-	id_global = rev_map.at(id_local);
-	for (Side<D> s : Side<D>::getValues()) {
-		if (hasNbr(s)) { getNbrInfoPtr(s)->setGlobalIndexes(rev_map); }
-	}
-}
-template <size_t D> inline void Domain<D>::setNeumann()
-{
-	for (size_t q = 0; q < neumann.size(); q++) {
-		neumann[q] = !hasNbr(static_cast<Side<D>>(q));
-	}
-}
-template <size_t D> inline std::vector<int> Domain<D>::getNbrIds()
-{
-	std::vector<int> retval;
-	for (Side<D> s : Side<D>::getValues()) {
-		if (hasNbr(s)) { getNbrInfoPtr(s)->getNbrIds(retval); }
-	}
-	return retval;
-}
-
-template <size_t D> inline int Domain<D>::serialize(char *buffer) const
-{
-	BufferWriter writer(buffer);
-	writer << id;
-	writer << ns;
-	writer << refine_level;
-	writer << parent_id;
-	writer << oct_on_parent;
-	writer << neumann;
-	writer << starts;
-	writer << spacings;
-	std::bitset<Side<D>::num_sides> has_nbr;
-	for (size_t i = 0; i < Side<D>::num_sides; i++) {
-		has_nbr[i] = nbr_info[i] != nullptr;
-	}
-	writer << has_nbr;
-	for (Side<D> s : Side<D>::getValues()) {
-		if (hasNbr(s)) {
-			NbrType type = getNbrType(s);
-			writer << type;
-			switch (type) {
-				case NbrType::Normal: {
-					NormalNbrInfo<D> tmp = getNormalNbrInfo(s);
-					writer << tmp;
-				} break;
-				case NbrType::Fine: {
-					FineNbrInfo<D> tmp = getFineNbrInfo(s);
-					writer << tmp;
-				} break;
-				case NbrType::Coarse: {
-					CoarseNbrInfo<D> tmp = getCoarseNbrInfo(s);
-					writer << tmp;
-				} break;
-			}
-		}
-	}
-	return writer.getPos();
-}
-template <size_t D> inline int Domain<D>::deserialize(char *buffer)
-{
-	BufferReader reader(buffer);
-	reader >> id;
-	reader >> ns;
-	reader >> refine_level;
-	reader >> parent_id;
-	reader >> oct_on_parent;
-	reader >> neumann;
-	reader >> starts;
-	reader >> spacings;
-	std::bitset<Side<D>::num_sides> has_nbr;
-	reader >> has_nbr;
-	for (size_t i = 0; i < Side<D>::num_sides; i++) {
-		if (has_nbr[i]) {
-			NbrType type;
-			reader >> type;
-			NbrInfo<D> *info = nullptr;
-			switch (type) {
-				case NbrType::Normal:
-					info = new NormalNbrInfo<D>();
-					reader >> *(NormalNbrInfo<D> *) info;
-					break;
-				case NbrType::Fine:
-					info = new FineNbrInfo<D>();
-					reader >> *(FineNbrInfo<D> *) info;
-					break;
-				case NbrType::Coarse:
-					info = new CoarseNbrInfo<D>();
-					reader >> *(CoarseNbrInfo<D> *) info;
-					break;
-			}
-			nbr_info[i] = info;
-		}
-	}
-	return reader.getPos();
-}
-template <size_t D> inline void Domain<D>::setPtrs(std::map<int, std::shared_ptr<Domain>> &domains)
-{
-	for (Side<D> s : Side<D>::getValues()) {
-		if (hasNbr(s)) { getNbrInfoPtr(s)->setPtrs(domains); }
-	}
-}
-template <size_t D> inline void Domain<D>::updateRank(int rank)
-{
-	rank = rank;
-	for (Side<D> s : Side<D>::getValues()) {
-		if (hasNbr(s)) { getNbrInfoPtr(s)->updateRankOnNeighbors(rank, s); }
-	}
-}
 extern template class Domain<2>;
 extern template class Domain<3>;
 #endif

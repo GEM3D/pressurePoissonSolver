@@ -21,15 +21,15 @@
 
 #ifndef CLAWWRITER_H
 #define CLAWWRITER_H
-#include <Thunderegg/DomainCollection.h>
+#include <Thunderegg/Domain.h>
 class ClawWriter
 {
 	private:
-	DomainCollection<2> dc;
-	void writePatch(Domain<2> &d, std::ostream &os, double *u_view, double *resid_view);
+	std::shared_ptr<Domain<2>> domain;
+	void writePatch(PatchInfo<2> &d, std::ostream &os, double *u_view, double *resid_view);
 
 	public:
-	ClawWriter(DomainCollection<2> &dc);
+	ClawWriter(std::shared_ptr<Domain<2>> domain);
 	void write(Vec u, Vec resid);
 };
 #endif

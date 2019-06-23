@@ -19,40 +19,84 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef THUDNEREGGDCG_H
-#define THUDNEREGGDCG_H
-#include <Thunderegg/DomainCollectionGenerator.h>
+#ifndef THUNDEREGG_THUNDEREGGDOMGEN_H
+#define THUNDEREGG_THUNDEREGGDOMGEN_H
+#include <Thunderegg/DomainGenerator.h>
 #include <Thunderegg/OctTree.h>
 #include <list>
 #include <zoltan.h>
-template <size_t D> class ThundereggDCG : public DomainCollectionGenerator<D>
+/**
+ * @brief Creates domains from a Thunderegg Tree
+ *
+ * @tparam D the number of Cartesian dimensions
+ */
+template <size_t D> class ThundereggDomGen : public DomainGenerator<D>
 {
 	private:
+	/**
+	 * @brief Whether Neumann boundary conditions are being used
+	 */
 	bool neumann;
 	/**
 	 * @brief finest is stored in front
 	 */
-	std::list<std::shared_ptr<DomainCollection<D>>> dc_list;
-
-	int                curr_level;
-	int                num_levels;
-	Tree<D>            t;
+	std::list<std::shared_ptr<Domain<D>>> domain_list;
+	/**
+	 * @brief the level of the generated domain. starts with num_levels-1
+	 */
+	int curr_level;
+	/**
+	 * @brief number of levels in the tree
+	 */
+	int num_levels;
+	/**
+	 * @brief the tree
+	 */
+	Tree<D> t;
+	/**
+	 * @brief the number of cells in each direction.
+	 */
 	std::array<int, D> ns;
-
+	/**
+	 * @brief extract a new coarser level
+	 */
 	void extractLevel();
-
-	using DomainMap = std::map<int, std::shared_ptr<Domain<D>>>;
-	void balanceLevel(DomainMap &level);
-	void balanceLevelWithLower(DomainMap &level, DomainMap &lower_level);
+	/**
+	 * @brief maps patch id to PatchInfo pointer
+	 */
+	using PInfoMap = std::map<int, std::shared_ptr<PatchInfo<D>>>;
+	/**
+	 * @brief Use Zoltan to distribute patches
+	 *
+	 * The is only used on the coarsest domain
+	 *
+	 * @param level the level
+	 */
+	void balanceLevel(PInfoMap &level);
+	/**
+	 * @brief Balance a level with zoltan using a finer level
+	 *
+	 * @param level the new coarse level
+	 * @param lower_level the finer level
+	 */
+	void balanceLevelWithLower(PInfoMap &level, PInfoMap &lower_level);
 
 	public:
-	ThundereggDCG(Tree<D> t, std::array<int, D> ns, bool neumann = false);
-	~ThundereggDCG() = default;
-	std::shared_ptr<DomainCollection<D>> getFinestDC();
-	bool                                 hasCoarserDC();
-	std::shared_ptr<DomainCollection<D>> getCoarserDC();
+	/**
+	 * @brief Construct a new ThundereggDomGen object
+	 *
+	 * @param t the tree to use
+	 * @param ns the number of cells in each direction
+	 * @param neumann whether to use neumann boundary conditions
+	 */
+	ThundereggDomGen(Tree<D> t, std::array<int, D> ns, bool neumann = false);
+	~ThundereggDomGen() = default;
+	std::shared_ptr<Domain<D>> getFinestDomain();
+	bool                       hasCoarserDomain();
+	std::shared_ptr<Domain<D>> getCoarserDomain();
 };
-template <size_t D> ThundereggDCG<D>::ThundereggDCG(Tree<D> t, std::array<int, D> ns, bool neumann)
+template <size_t D>
+ThundereggDomGen<D>::ThundereggDomGen(Tree<D> t, std::array<int, D> ns, bool neumann)
 {
 	this->t       = t;
 	this->ns      = ns;
@@ -63,28 +107,28 @@ template <size_t D> ThundereggDCG<D>::ThundereggDCG(Tree<D> t, std::array<int, D
 	// generate finest DC
 	extractLevel();
 }
-template <size_t D> std::shared_ptr<DomainCollection<D>> ThundereggDCG<D>::getFinestDC()
+template <size_t D> std::shared_ptr<Domain<D>> ThundereggDomGen<D>::getFinestDomain()
 {
-	return dc_list.front();
+	return domain_list.front();
 }
-template <size_t D> std::shared_ptr<DomainCollection<D>> ThundereggDCG<D>::getCoarserDC()
+template <size_t D> std::shared_ptr<Domain<D>> ThundereggDomGen<D>::getCoarserDomain()
 {
 	if (curr_level > 0) {
 		extractLevel();
-		return dc_list.back();
+		return domain_list.back();
 	} else {
 		return nullptr;
 	}
 }
-template <size_t D> bool ThundereggDCG<D>::hasCoarserDC()
+template <size_t D> bool ThundereggDomGen<D>::hasCoarserDomain()
 {
 	return curr_level > 0;
 }
-template <size_t D> inline void ThundereggDCG<D>::extractLevel()
+template <size_t D> inline void ThundereggDomGen<D>::extractLevel()
 {
 	int rank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	DomainMap new_level;
+	PInfoMap new_level;
 	if (rank == 0) {
 		Node<D>         child = *t.levels.at(curr_level);
 		std::deque<int> q;
@@ -93,27 +137,28 @@ template <size_t D> inline void ThundereggDCG<D>::extractLevel()
 		qed.insert(child.id);
 
 		while (!q.empty()) {
-			std::shared_ptr<Domain<D>> d_ptr(new Domain<D>());
-			Domain<D> &                d = *d_ptr;
-			Node<D>                    n = t.nodes.at(q.front());
+			std::shared_ptr<PatchInfo<D>> d_ptr(new PatchInfo<D>());
+			PatchInfo<D> &                pinfo = *d_ptr;
+			Node<D>                       n     = t.nodes.at(q.front());
 			q.pop_front();
 
-			d.ns = ns;
-			d.id = n.id;
+			pinfo.ns = ns;
+			pinfo.id = n.id;
 			for (size_t i = 0; i < D; i++) {
-				d.spacings[i] = n.lengths[i] / ns[i];
+				pinfo.spacings[i] = n.lengths[i] / ns[i];
 			}
-			d.starts       = n.starts;
-			d.refine_level = n.level;
+			pinfo.starts       = n.starts;
+			pinfo.refine_level = n.level;
 			if (n.level < curr_level) {
-				d.parent_id = n.id;
+				pinfo.parent_id = n.id;
 			} else {
-				d.parent_id = n.parent;
-				if (d.parent_id != -1) {
-					d.oct_on_parent = 0;
-					while (t.nodes.at(n.parent).child_id[d.oct_on_parent] != n.id) {
-						d.oct_on_parent++;
+				pinfo.parent_id = n.parent;
+				if (pinfo.parent_id != -1) {
+					char orth_on_parent = 0;
+					while (t.nodes.at(n.parent).child_id[orth_on_parent] != n.id) {
+						orth_on_parent++;
 					}
+					pinfo.orth_on_parent = orth_on_parent;
 				}
 			}
 
@@ -127,7 +172,7 @@ template <size_t D> inline void ThundereggDCG<D>::extractLevel()
 					while (parent.childId(octs[quad]) != n.id) {
 						quad++;
 					}
-					d.getNbrInfoPtr(s) = new CoarseNbrInfo<D>(nbr.id, quad);
+					pinfo.nbr_info[s.toInt()].reset(new CoarseNbrInfo<D>(nbr.id, quad));
 					if (!qed.count(nbr.id)) {
 						q.push_back(nbr.id);
 						qed.insert(nbr.id);
@@ -145,17 +190,17 @@ template <size_t D> inline void ThundereggDCG<D>::extractLevel()
 							qed.insert(id);
 						}
 					}
-					d.getNbrInfoPtr(s) = new FineNbrInfo<D>(nbr_ids);
+					pinfo.nbr_info[s.toInt()].reset(new FineNbrInfo<D>(nbr_ids));
 				} else if (n.nbrId(s) != -1) {
 					int id = n.nbrId(s);
 					if (!qed.count(id)) {
 						q.push_back(id);
 						qed.insert(id);
 					}
-					d.getNbrInfoPtr(s) = new NormalNbrInfo<D>(id);
+					pinfo.nbr_info[s.toInt()].reset(new NormalNbrInfo<D>(id));
 				}
 			}
-			new_level[d.id] = d_ptr;
+			new_level[pinfo.id] = d_ptr;
 		}
 		for (auto &p : new_level) {
 			p.second->setPtrs(new_level);
@@ -165,13 +210,17 @@ template <size_t D> inline void ThundereggDCG<D>::extractLevel()
 	if (curr_level == num_levels) {
 		balanceLevel(new_level);
 	} else {
-		balanceLevelWithLower(new_level, dc_list.back()->getDomainMap());
+		balanceLevelWithLower(new_level, domain_list.back()->getPatchInfoMap());
 	}
-	dc_list.push_back(std::shared_ptr<DomainCollection<D>>(new DomainCollection<D>(new_level, ns)));
-	if (neumann) { dc_list.back()->setNeumann(); }
+	domain_list.push_back(std::shared_ptr<Domain<D>>(new Domain<D>(new_level)));
+	if (neumann) {
+		IsNeumannFunc<D> inf = [](Side<D>, const std::array<double, D> &,
+		                          const std::array<double, D> &) { return true; };
+		domain_list.back()->setNeumann(inf);
+	}
 	curr_level--;
 }
-template <size_t D> inline void ThundereggDCG<D>::balanceLevel(DomainMap &level)
+template <size_t D> inline void ThundereggDomGen<D>::balanceLevel(PInfoMap &level)
 {
 	struct Zoltan_Struct *zz = Zoltan_Create(MPI_COMM_WORLD);
 
@@ -187,8 +236,8 @@ template <size_t D> inline void ThundereggDCG<D>::balanceLevel(DomainMap &level)
 	// Query functions
 	// Number of Vertices
 	auto numObjFn = [](void *data, int *ierr) -> int {
-		DomainMap &map = *(DomainMap *) data;
-		*ierr          = ZOLTAN_OK;
+		PInfoMap &map = *(PInfoMap *) data;
+		*ierr         = ZOLTAN_OK;
 		return map.size();
 	};
 	Zoltan_Set_Num_Obj_Fn(zz, numObjFn, &level);
@@ -197,9 +246,9 @@ template <size_t D> inline void ThundereggDCG<D>::balanceLevel(DomainMap &level)
 	auto objListFn
 	= [](void *data, int num_gid_entries, int num_lid_entries, ZOLTAN_ID_PTR global_ids,
 	     ZOLTAN_ID_PTR local_ids, int wgt_dim, float *obj_wgts, int *ierr) {
-		  DomainMap &map = *(DomainMap *) data;
-		  *ierr          = ZOLTAN_OK;
-		  int pos        = 0;
+		  PInfoMap &map = *(PInfoMap *) data;
+		  *ierr         = ZOLTAN_OK;
+		  int pos       = 0;
 		  for (auto p : map) {
 			  global_ids[pos] = p.first;
 			  pos++;
@@ -215,25 +264,25 @@ template <size_t D> inline void ThundereggDCG<D>::balanceLevel(DomainMap &level)
 	};
 	CompressedVertex graph;
 	for (auto &p : level) {
-		Domain<D> &d = *p.second;
-		graph.vertices.push_back(d.id);
+		PatchInfo<D> &pinfo = *p.second;
+		graph.vertices.push_back(pinfo.id);
 		graph.ptrs.push_back(graph.edges.size());
 		for (Side<D> s : Side<D>::getValues()) {
 			int edge_id = -1;
-			if (d.hasNbr(s)) {
-				switch (d.getNbrType(s)) {
+			if (pinfo.hasNbr(s)) {
+				switch (pinfo.getNbrType(s)) {
 					case NbrType::Normal:
 						if (s.isLowerOnAxis()) {
-							edge_id = d.getNormalNbrInfo(s).id;
+							edge_id = pinfo.getNormalNbrInfo(s).id;
 						} else {
-							edge_id = d.id;
+							edge_id = pinfo.id;
 						}
 						break;
 					case NbrType::Fine:
-						edge_id = d.id;
+						edge_id = pinfo.id;
 						break;
 					case NbrType::Coarse:
-						edge_id = d.getCoarseNbrInfo(s).id;
+						edge_id = pinfo.getCoarseNbrInfo(s).id;
 						break;
 				}
 			}
@@ -266,8 +315,8 @@ template <size_t D> inline void ThundereggDCG<D>::balanceLevel(DomainMap &level)
 	Zoltan_Set_Obj_Size_Fn(zz,
 	                       [](void *data, int num_gid_entries, int num_lid_entries,
 	                          ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id, int *ierr) {
-		                       DomainMap &map = *(DomainMap *) data;
-		                       *ierr          = ZOLTAN_OK;
+		                       PInfoMap &map = *(PInfoMap *) data;
+		                       *ierr         = ZOLTAN_OK;
 		                       return map[*global_id]->serialize(nullptr);
 	                       },
 	                       &level);
@@ -275,8 +324,8 @@ template <size_t D> inline void ThundereggDCG<D>::balanceLevel(DomainMap &level)
 	                       [](void *data, int num_gid_entries, int num_lid_entries,
 	                          ZOLTAN_ID_PTR global_id, ZOLTAN_ID_PTR local_id, int dest, int size,
 	                          char *buf, int *ierr) {
-		                       DomainMap &map = *(DomainMap *) data;
-		                       *ierr          = ZOLTAN_OK;
+		                       PInfoMap &map = *(PInfoMap *) data;
+		                       *ierr         = ZOLTAN_OK;
 		                       map[*global_id]->serialize(buf);
 		                       map.erase(*global_id);
 	                       },
@@ -284,9 +333,9 @@ template <size_t D> inline void ThundereggDCG<D>::balanceLevel(DomainMap &level)
 	Zoltan_Set_Unpack_Obj_Fn(
 	zz,
 	[](void *data, int num_gid_entries, ZOLTAN_ID_PTR global_id, int size, char *buf, int *ierr) {
-		DomainMap &map = *(DomainMap *) data;
-		*ierr          = ZOLTAN_OK;
-		map[*global_id].reset(new Domain<D>());
+		PInfoMap &map = *(PInfoMap *) data;
+		*ierr         = ZOLTAN_OK;
+		map[*global_id].reset(new PatchInfo<D>());
 		map[*global_id]->deserialize(buf);
 	},
 	&level);
@@ -360,7 +409,7 @@ template <size_t D> inline void ThundereggDCG<D>::balanceLevel(DomainMap &level)
 	}
 }
 template <size_t D>
-inline void ThundereggDCG<D>::balanceLevelWithLower(DomainMap &level, DomainMap &lower_level)
+inline void ThundereggDomGen<D>::balanceLevelWithLower(PInfoMap &level, PInfoMap &lower_level)
 {
 	struct Zoltan_Struct *zz = Zoltan_Create(MPI_COMM_WORLD);
 
@@ -377,8 +426,8 @@ inline void ThundereggDCG<D>::balanceLevelWithLower(DomainMap &level, DomainMap 
 	// Query functions
 	// Number of Vertices
 	struct Levels {
-		DomainMap *upper;
-		DomainMap *lower;
+		PInfoMap *upper;
+		PInfoMap *lower;
 	};
 	Levels levels = {&level, &lower_level};
 	Zoltan_Set_Num_Obj_Fn(zz,
@@ -419,40 +468,40 @@ inline void ThundereggDCG<D>::balanceLevelWithLower(DomainMap &level, DomainMap 
 	CompressedVertex graph;
 	// process coarse level
 	for (auto &p : level) {
-		Domain<D> &d = *p.second;
-		graph.vertices.push_back(d.id);
+		PatchInfo<D> &pinfo = *p.second;
+		graph.vertices.push_back(pinfo.id);
 		graph.ptrs.push_back(graph.edges.size());
 		// patch to patch communication
 		for (Side<D> s : Side<D>::getValues()) {
 			int edge_id = -1;
-			if (d.hasNbr(s)) {
-				switch (d.getNbrType(s)) {
+			if (pinfo.hasNbr(s)) {
+				switch (pinfo.getNbrType(s)) {
 					case NbrType::Normal:
 						if (s.isLowerOnAxis()) {
-							edge_id = d.getNormalNbrInfo(s).id;
+							edge_id = pinfo.getNormalNbrInfo(s).id;
 						} else {
-							edge_id = d.id;
+							edge_id = pinfo.id;
 						}
 						break;
 					case NbrType::Fine:
-						edge_id = d.id;
+						edge_id = pinfo.id;
 						break;
 					case NbrType::Coarse:
-						edge_id = d.getCoarseNbrInfo(s).id;
+						edge_id = pinfo.getCoarseNbrInfo(s).id;
 						break;
 				}
 			}
 			graph.edges.push_back(edge_id * Side<D>::num_sides + s.toInt());
 		}
 		// level to level communication
-		graph.edges.push_back(-d.id - 1);
+		graph.edges.push_back(-pinfo.id - 1);
 	}
 	// process fine level
 	for (auto &p : lower_level) {
-		Domain<D> &d = *p.second;
-		graph.vertices.push_back(d.id);
+		PatchInfo<D> &pinfo = *p.second;
+		graph.vertices.push_back(pinfo.id);
 		graph.ptrs.push_back(graph.edges.size());
-		graph.edges.push_back(-d.parent_id - 1);
+		graph.edges.push_back(-pinfo.parent_id - 1);
 	}
 
 	// set graph functions
@@ -527,7 +576,7 @@ inline void ThundereggDCG<D>::balanceLevelWithLower(DomainMap &level, DomainMap 
 	[](void *data, int num_gid_entries, ZOLTAN_ID_PTR global_id, int size, char *buf, int *ierr) {
 		Levels *levels = (Levels *) data;
 		*ierr          = ZOLTAN_OK;
-		(*levels->upper)[*global_id].reset(new Domain<D>());
+		(*levels->upper)[*global_id].reset(new PatchInfo<D>());
 		(*levels->upper)[*global_id]->deserialize(buf);
 	},
 	&levels);
@@ -597,6 +646,6 @@ inline void ThundereggDCG<D>::balanceLevelWithLower(DomainMap &level, DomainMap 
 		p.second->setPtrs(level);
 	}
 }
-extern template class ThundereggDCG<2>;
-extern template class ThundereggDCG<3>;
+extern template class ThundereggDomGen<2>;
+extern template class ThundereggDomGen<3>;
 #endif

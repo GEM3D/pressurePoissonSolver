@@ -21,43 +21,66 @@
 
 #include "BilinearInterpolator.h"
 using namespace std;
-void BilinearInterpolator::interpolate(SchurDomain<2> &d, std::shared_ptr<const Vector<2>> u,
-                                       std::shared_ptr<Vector<1>> interp)
+void BilinearInterpolator::interpolate(const std::vector<SchurInfo<2>> &patches,
+                                       std::shared_ptr<const Vector<2>> u,
+                                       std::shared_ptr<Vector<1>>       interp)
 {
-	for (Side<2> s : Side<2>::getValues()) {
-		if (d.hasNbr(s)) {
-			std::deque<int>       idx;
-			std::deque<IfaceType> types;
-			d.getIfaceInfoPtr(s)->getIdxAndTypes(idx, types);
-			for (size_t i = 0; i < idx.size(); i++) {
-				interpolate(d, s, idx[i], types[i], u, interp);
+	for (SchurInfo<2> p : patches) {
+		for (Side<2> s : Side<2>::getValues()) {
+			if (p.pinfo->hasNbr(s)) {
+				std::deque<int>          idx;
+				std::deque<IfaceType<2>> types;
+
+				p.getIfaceInfoPtr(s)->getLocalIndexes(idx);
+				p.getIfaceInfoPtr(s)->getIfaceTypes(types);
+
+				for (size_t i = 0; i < idx.size(); i++) {
+					interpolate(p, s, idx[i], types[i], u, interp);
+				}
 			}
 		}
 	}
 }
-void BilinearInterpolator::interpolate(SchurDomain<2> &d, Side<2> s, int local_index,
-                                       IfaceType itype, std::shared_ptr<const Vector<2>> u,
+void BilinearInterpolator::interpolate(SchurInfo<2> &sinfo, std::shared_ptr<const Vector<2>> u,
                                        std::shared_ptr<Vector<1>> interp)
 {
-	int n = d.ns[!s.axis()];
+	for (Side<2> s : Side<2>::getValues()) {
+		if (sinfo.pinfo->hasNbr(s)) {
+			std::deque<int>          idx;
+			std::deque<IfaceType<2>> types;
+
+			sinfo.getIfaceInfoPtr(s)->getLocalIndexes(idx);
+			sinfo.getIfaceInfoPtr(s)->getIfaceTypes(types);
+
+			for (size_t i = 0; i < idx.size(); i++) {
+				interpolate(sinfo, s, idx[i], types[i], u, interp);
+			}
+		}
+	}
+}
+void BilinearInterpolator::interpolate(SchurInfo<2> &sinfo, Side<2> s, int local_index,
+                                       IfaceType<2> itype, std::shared_ptr<const Vector<2>> u,
+                                       std::shared_ptr<Vector<1>> interp)
+{
+	int n = sinfo.pinfo->ns[!s.axis()];
 
 	LocalData<1>       interp_data = interp->getLocalData(local_index);
-	const LocalData<1> sl          = u->getLocalData(d.id_local).getSliceOnSide(s);
+	const LocalData<1> sl          = u->getLocalData(sinfo.pinfo->local_index).getSliceOnSide(s);
 
 	switch (itype.toInt()) {
-		case IfaceType::normal: {
+		case IfaceType<2>::normal: {
 			for (int i = 0; i < n; i++) {
 				interp_data[{i}] += 0.5 * sl[{i}];
 			}
 		} break;
-		case IfaceType::coarse_to_coarse: {
+		case IfaceType<2>::coarse_to_coarse: {
 			// middle cases
 			for (int i = 0; i < n; i++) {
 				interp_data[{i}] += 1.0 / 3 * sl[{i}];
 			}
 		} break;
-		case IfaceType::fine_to_coarse: {
-			if (itype.getOrthant() == 0) {
+		case IfaceType<2>::fine_to_coarse: {
+			if (itype.getOrthant().toInt() == 0) {
 				// middle cases
 				for (int i = 0; i < n; i += 2) {
 					interp_data[{i / 2}] += 1.0 / 3 * sl[{i}] + 1.0 / 3 * sl[{i + 1}];
@@ -69,7 +92,7 @@ void BilinearInterpolator::interpolate(SchurDomain<2> &d, Side<2> s, int local_i
 				}
 			}
 		} break;
-		case IfaceType::fine_to_fine: {
+		case IfaceType<2>::fine_to_fine: {
 			// middle cases
 			for (int i = 0; i < n; i += 2) {
 				interp_data[{i}] += 5.0 / 6 * sl[{i}] - 1.0 / 6 * sl[{i + 1}];
@@ -78,8 +101,8 @@ void BilinearInterpolator::interpolate(SchurDomain<2> &d, Side<2> s, int local_i
 				interp_data[{i}] += 5.0 / 6 * sl[{i}] - 1.0 / 6 * sl[{i - 1}];
 			}
 		} break;
-		case IfaceType::coarse_to_fine: {
-			if (itype.getOrthant() == 0) {
+		case IfaceType<2>::coarse_to_fine: {
+			if (itype.getOrthant().toInt() == 0) {
 				for (int i = 0; i < n; i++) {
 					interp_data[{i}] += 2.0 / 6 * sl[{i / 2}];
 				}

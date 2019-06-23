@@ -21,7 +21,7 @@
 
 #ifndef GMGLEVEL_H
 #define GMGLEVEL_H
-#include <Thunderegg/DomainCollection.h>
+#include <Thunderegg/Domain.h>
 #include <Thunderegg/GMG/Interpolator.h>
 #include <Thunderegg/GMG/Restrictor.h>
 #include <Thunderegg/GMG/Smoother.h>

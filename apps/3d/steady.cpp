@@ -22,10 +22,8 @@
 #include "CLI11.hpp"
 #include "Init.h"
 #include "Writers/ClawWriter.h"
-#include "Writers/MMWriter.h"
 #include <Thunderegg/BiCGStab.h>
-#include <Thunderegg/DomainCollection.h>
-#include <Thunderegg/FunctionWrapper.h>
+#include <Thunderegg/Domain.h>
 #include <Thunderegg/GMG/CycleFactory3d.h>
 #include <Thunderegg/GMG/CycleOpts.h>
 #include <Thunderegg/MatrixHelper.h>
@@ -42,7 +40,7 @@
 #include <Thunderegg/SchwarzPrec.h>
 #include <Thunderegg/SevenPtPatchOperator.h>
 #include <Thunderegg/StarPatchOp.h>
-#include <Thunderegg/ThundereggDCG.h>
+#include <Thunderegg/ThundereggDomGen.h>
 #include <Thunderegg/Timer.h>
 #include <Thunderegg/TriLinInterp.h>
 #ifdef ENABLE_AMGX
@@ -209,8 +207,8 @@ int main(int argc, char *argv[])
 	///////////////
 	// Create Mesh
 	///////////////
-	shared_ptr<DomainCollection<3>> dc;
-	Tree<3>                         t;
+	shared_ptr<Domain<3>> dc;
+	Tree<3>               t;
 	t = Tree<3>(mesh_filename);
 	for (int i = 0; i < div; i++) {
 		t.refineLeaves();
@@ -300,9 +298,9 @@ int main(int argc, char *argv[])
 	for (int loop = 0; loop < loop_count; loop++) {
 		timer.start("Domain Initialization");
 
-		shared_ptr<DomainCollectionGenerator<3>> dcg(new ThundereggDCG<3>(t, ns, neumann));
+		shared_ptr<DomainGenerator<3>> dcg(new ThundereggDomGen<3>(t, ns, neumann));
 
-		dc = dcg->getFinestDC();
+		dc = dcg->getFinestDomain();
 
 		if (patch_solver == "dft") {
 			p_solver.reset(new DftPatchSolver<3>(*dc));
@@ -455,7 +453,7 @@ int main(int argc, char *argv[])
 				A.reset(new DomainWrapOp<3>(sch));
 				A_petsc = PetscShellCreator::getMatShell(A, dc);
 			} else if (matrix_type == "crs") {
-				MatrixHelper mh(*dc);
+				MatrixHelper mh(dc);
 				A_petsc = mh.formCRSMatrix();
 				A.reset(new PetscMatOp<3>(A_petsc));
 				if (setrow) {
@@ -519,7 +517,7 @@ int main(int argc, char *argv[])
 				KSPGetIterationNumber(solver, &its);
 				if (my_global_rank == 0) { cout << "Iterations: " << its << endl; }
 			} else {
-				std::shared_ptr<VectorGenerator<3>> vg(new DomainCollectionVG<3>(dc));
+				std::shared_ptr<VectorGenerator<3>> vg(new DomainVG<3>(dc));
 
 				int its = BiCGStab<3>::solve(vg, A, u, f, M);
 				if (my_global_rank == 0) { cout << "Iterations: " << its << endl; }
@@ -563,7 +561,7 @@ int main(int argc, char *argv[])
 			std::cout << "Residual: " << residual / fnorm << endl;
 			std::cout << u8"ΣAu-Σf: " << ausum - fsum << endl;
 			cout.unsetf(std::ios_base::floatfield);
-			int total_cells = dc->getGlobalNumCells();
+			int total_cells = dc->getNumGlobalCells();
 			cout << "Total cells: " << total_cells << endl;
 			cout << "Cores: " << num_procs << endl;
 		}

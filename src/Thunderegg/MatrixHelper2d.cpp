@@ -23,27 +23,26 @@
 #include "StencilHelper2d.h"
 #include <iostream>
 using namespace std;
-MatrixHelper2d::MatrixHelper2d(DomainCollection<2> dc)
+MatrixHelper2d::MatrixHelper2d(std::shared_ptr<Domain<2>> domain)
 {
-	this->dc = dc;
+	this->domain = domain;
 }
 PW_explicit<Mat> MatrixHelper2d::formCRSMatrix(double lambda)
 {
 	PW<Mat> A;
 	MatCreate(MPI_COMM_WORLD, &A);
-	int nx          = dc.getLengths()[0];
-	int ny          = dc.getLengths()[1];
-	int local_size  = dc.domains.size() * nx * ny;
-	int global_size = dc.num_global_domains * nx * ny;
+	int nx          = domain->getNs()[0];
+	int ny          = domain->getNs()[1];
+	int local_size  = domain->getNumLocalPatches() * nx * ny;
+	int global_size = domain->getNumGlobalPatches() * nx * ny;
 	MatSetSizes(A, local_size, local_size, global_size, global_size);
 	MatSetType(A, MATMPIAIJ);
 	MatMPIAIJSetPreallocation(A, 19, nullptr, 19, nullptr);
 
-	for (auto &p : dc.domains) {
-		Domain<2> &d     = *p.second;
-		double     h_x   = d.spacings[0];
-		double     h_y   = d.spacings[1];
-		int        start = nx * ny * d.id_global;
+	for (auto &pinfo : domain->getPatchInfoVector()) {
+		double h_x   = pinfo->spacings[0];
+		double h_y   = pinfo->spacings[1];
+		int    start = nx * ny * pinfo->local_index;
 
 		// center coeffs
 		double coeff = -2.0 / (h_x * h_x) - 2.0 / (h_y * h_y) + lambda;
@@ -89,7 +88,7 @@ PW_explicit<Mat> MatrixHelper2d::formCRSMatrix(double lambda)
 		}
 		// boundaries
 		for (Side<2> s : Side<2>::getValues()) {
-			StencilHelper *sh = getStencilHelper(d, s);
+			StencilHelper *sh = getStencilHelper(*pinfo, s);
 			for (int i = 0; i < sh->n; i++) {
 				int     row    = sh->row(i);
 				int     size   = sh->size(i);
@@ -105,7 +104,7 @@ PW_explicit<Mat> MatrixHelper2d::formCRSMatrix(double lambda)
 	/*
 	int rank;
 	MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-	if (dc.neumann&&rank==0) {
+	if (domain->neumann&&rank==0) {
 	    int           ncols;
 	    const int *   cols;
 	    const double *vals;

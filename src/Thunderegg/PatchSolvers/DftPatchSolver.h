@@ -21,7 +21,7 @@
 
 #ifndef DFTPATCHSOLVER_H
 #define DFTPATCHSOLVER_H
-#include <Thunderegg/DomainCollection.h>
+#include <Thunderegg/Domain.h>
 #include <Thunderegg/PatchSolvers/PatchSolver.h>
 #include <Thunderegg/ValVector.h>
 #include <bitset>
@@ -38,10 +38,10 @@ template <size_t D> struct DomainK {
 	double        h_x     = 0;
 
 	DomainK() {}
-	DomainK(const SchurDomain<D> &d)
+	DomainK(const SchurInfo<D> &sinfo)
 	{
-		this->neumann = d.neumann.to_ulong();
-		this->h_x     = d.spacings[0];
+		this->neumann = sinfo.pinfo->neumann.to_ulong();
+		this->h_x     = sinfo.pinfo->spacings[0];
 	}
 	friend bool operator<(const DomainK &l, const DomainK &r)
 	{
@@ -75,27 +75,27 @@ template <size_t D> class DftPatchSolver : public PatchSolver<D>
 	                  LocalData<D> out, const bool inverse);
 
 	public:
-	DftPatchSolver(DomainCollection<D> &dsc, double lambda = 0);
-	void solve(SchurDomain<D> &d, std::shared_ptr<const Vector<D>> f, std::shared_ptr<Vector<D>> u,
-	           std::shared_ptr<const Vector<D - 1>> gamma);
-	void domainSolve(std::deque<SchurDomain<D>> &domains, std::shared_ptr<const Vector<D>> f,
+	DftPatchSolver(Domain<D> &domain, double lambda = 0);
+	void solve(SchurInfo<D> &sinfo, std::shared_ptr<const Vector<D>> f,
+	           std::shared_ptr<Vector<D>> u, std::shared_ptr<const Vector<D - 1>> gamma);
+	void domainSolve(std::vector<SchurInfo<D>> &domains, std::shared_ptr<const Vector<D>> f,
 	                 std::shared_ptr<Vector<D>> u, std::shared_ptr<const Vector<D - 1>> gamma)
 	{
-		for (SchurDomain<D> &d : domains) {
-			solve(d, f, u, gamma);
+		for (SchurInfo<D> &sinfo : domains) {
+			solve(sinfo, f, u, gamma);
 		}
 	}
-	void addDomain(SchurDomain<D> &d);
+	void addDomain(SchurInfo<D> &sinfo);
 };
 
-template <size_t D> inline DftPatchSolver<D>::DftPatchSolver(DomainCollection<D> &dc, double lambda)
+template <size_t D> inline DftPatchSolver<D>::DftPatchSolver(Domain<D> &domain, double lambda)
 {
-	ns           = dc.getLengths();
+	ns           = domain.getNs();
 	n            = ns[0];
-	patch_stride = dc.getNumElementsInDomain();
+	patch_stride = domain.getNumCellsInPatch();
 	this->lambda = lambda;
 }
-template <size_t D> inline void DftPatchSolver<D>::addDomain(SchurDomain<D> &d)
+template <size_t D> inline void DftPatchSolver<D>::addDomain(SchurInfo<D> &sinfo)
 {
 	using namespace std;
 	if (!initialized) {
@@ -109,16 +109,16 @@ template <size_t D> inline void DftPatchSolver<D>::addDomain(SchurDomain<D> &d)
 
 	DftType transforms[D];
 	DftType transforms_inv[D];
-	if (!plan1.count(d)) {
+	if (!plan1.count(sinfo)) {
 		for (size_t i = 0; i < D; i++) {
 			// x direction
-			if (d.isNeumann(2 * i) && d.isNeumann(2 * i + 1)) {
+			if (sinfo.pinfo->isNeumann(2 * i) && sinfo.pinfo->isNeumann(2 * i + 1)) {
 				transforms[i]     = DftType::DCT_II;
 				transforms_inv[i] = DftType::DCT_III;
-			} else if (d.isNeumann(2 * i)) {
+			} else if (sinfo.pinfo->isNeumann(2 * i)) {
 				transforms[i]     = DftType::DCT_IV;
 				transforms_inv[i] = DftType::DCT_IV;
-			} else if (d.isNeumann(2 * i + 1)) {
+			} else if (sinfo.pinfo->isNeumann(2 * i + 1)) {
 				transforms[i]     = DftType::DST_IV;
 				transforms_inv[i] = DftType::DST_IV;
 			} else {
@@ -127,12 +127,12 @@ template <size_t D> inline void DftPatchSolver<D>::addDomain(SchurDomain<D> &d)
 			}
 		}
 
-		plan1[d] = plan(transforms);
-		plan2[d] = plan(transforms_inv);
+		plan1[sinfo] = plan(transforms);
+		plan2[sinfo] = plan(transforms_inv);
 	}
 
-	if (!eigen_vals.count(d)) {
-		valarray<double> &denom = eigen_vals[d];
+	if (!eigen_vals.count(sinfo)) {
+		valarray<double> &denom = eigen_vals[sinfo];
 		denom.resize(patch_stride);
 
 		valarray<double> ones(pow(n, D - 1));
@@ -142,17 +142,17 @@ template <size_t D> inline void DftPatchSolver<D>::addDomain(SchurDomain<D> &d)
 			valarray<size_t> sizes(D - 1);
 			sizes = n;
 			valarray<size_t> strides(D - 1);
-			for (size_t d = 1; d < D; d++) {
-				strides[d - 1] = pow(n, (i + d) % D);
+			for (size_t sinfo = 1; sinfo < D; sinfo++) {
+				strides[sinfo - 1] = pow(n, (i + sinfo) % D);
 			}
-			double h = d.spacings[0];
+			double h = sinfo.pinfo->spacings[0];
 
-			if (d.isNeumann(i * 2) && d.isNeumann(i * 2 + 1)) {
+			if (sinfo.pinfo->isNeumann(i * 2) && sinfo.pinfo->isNeumann(i * 2 + 1)) {
 				for (int xi = 0; xi < n; xi++) {
 					denom[gslice(xi * pow(n, i), sizes, strides)]
 					-= 4 / (h * h) * pow(sin(xi * M_PI / (2 * n)), 2) * ones;
 				}
-			} else if (d.isNeumann(i * 2) || d.isNeumann(i * 2 + 1)) {
+			} else if (sinfo.pinfo->isNeumann(i * 2) || sinfo.pinfo->isNeumann(i * 2 + 1)) {
 				for (int xi = 0; xi < n; xi++) {
 					denom[gslice(xi * pow(n, i), sizes, strides)]
 					-= 4 / (h * h) * pow(sin((xi + 0.5) * M_PI / (2 * n)), 2) * ones;
@@ -170,12 +170,12 @@ template <size_t D> inline void DftPatchSolver<D>::addDomain(SchurDomain<D> &d)
 }
 
 template <size_t D>
-inline void DftPatchSolver<D>::solve(SchurDomain<D> &d, std::shared_ptr<const Vector<D>> f,
+inline void DftPatchSolver<D>::solve(SchurInfo<D> &sinfo, std::shared_ptr<const Vector<D>> f,
                                      std::shared_ptr<Vector<D>>           u,
                                      std::shared_ptr<const Vector<D - 1>> gamma)
 {
 	using namespace std;
-	const LocalData<D> f_view      = f->getLocalData(d.id_local);
+	const LocalData<D> f_view      = f->getLocalData(sinfo.pinfo->local_index);
 	LocalData<D>       f_copy_view = f_copy.getLocalData(0);
 	LocalData<D>       tmp_view    = tmp.getLocalData(0);
 
@@ -191,25 +191,25 @@ inline void DftPatchSolver<D>::solve(SchurDomain<D> &d, std::shared_ptr<const Ve
 		start.fill(0);
 		end.fill(n - 1);
 
-		if (d.hasNbr(s)) {
-			const LocalData<D - 1> gamma_view = gamma->getLocalData(d.getIfaceLocalIndex(s));
+		if (sinfo.pinfo->hasNbr(s)) {
+			const LocalData<D - 1> gamma_view = gamma->getLocalData(sinfo.getIfaceLocalIndex(s));
 			LocalData<D - 1>       slice      = f_copy.getLocalData(0).getSliceOnSide(s);
-			double                 h2         = pow(d.spacings[s.toInt() / 2], 2);
+			double                 h2         = pow(sinfo.pinfo->spacings[s.toInt() / 2], 2);
 			nested_loop<D - 1>(start, end, [&](std::array<int, D - 1> coord) {
 				slice[coord] -= 2.0 / h2 * gamma_view[coord];
 			});
 		}
 	}
 
-	execute_plan(plan1[d], f_copy_view, tmp_view, false);
+	execute_plan(plan1[sinfo], f_copy_view, tmp_view, false);
 
-	tmp.vec /= eigen_vals[d];
+	tmp.vec /= eigen_vals[sinfo];
 
-	if (d.neumann.all()) { tmp.vec[0] = 0; }
+	if (sinfo.pinfo->neumann.all()) { tmp.vec[0] = 0; }
 
-	LocalData<D> u_view = u->getLocalData(d.id_local);
+	LocalData<D> u_view = u->getLocalData(sinfo.pinfo->local_index);
 
-	execute_plan(plan2[d], tmp_view, u_view, false);
+	execute_plan(plan2[sinfo], tmp_view, u_view, false);
 
 	double scale = pow(2.0 / n, D);
 	nested_loop<D>(start, end, [&](std::array<int, D> coord) { u_view[coord] *= scale; });

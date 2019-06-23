@@ -21,7 +21,7 @@
 
 #ifndef VTKWRITER2D_H
 #define VTKWRITER2D_H
-#include "DomainCollection.h"
+#include "Domain.h"
 #include <map>
 #include <set>
 #include <string>

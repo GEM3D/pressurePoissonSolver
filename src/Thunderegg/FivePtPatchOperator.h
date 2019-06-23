@@ -25,32 +25,32 @@
 class FivePtPatchOperator : public PatchOperator<2>
 {
 	public:
-	void apply(SchurDomain<2> &d, std::shared_ptr<const Vector<2>> u,
+	void apply(SchurInfo<2> &sinfo, std::shared_ptr<const Vector<2>> u,
 	           std::shared_ptr<const Vector<1>> gamma, std::shared_ptr<Vector<2>> f)
 	{
-		int nx = d.ns[0];
-		int ny = d.ns[1];
+		int nx = sinfo.pinfo->ns[0];
+		int ny = sinfo.pinfo->ns[1];
 
-		double h_x = d.spacings[0];
-		double h_y = d.spacings[1];
+		double h_x = sinfo.pinfo->spacings[0];
+		double h_y = sinfo.pinfo->spacings[1];
 
-		LocalData<2>       f_data = f->getLocalData(d.id_local);
-		const LocalData<2> u_data = u->getLocalData(d.id_local);
+		LocalData<2>       f_data = f->getLocalData(sinfo.pinfo->local_index);
+		const LocalData<2> u_data = u->getLocalData(sinfo.pinfo->local_index);
 
 		double center, north, east, south, west;
 
 		// derive in x direction
 		// west
-		if (d.hasNbr(Side<2>::west)) {
+		if (sinfo.pinfo->hasNbr(Side<2>::west)) {
 			const LocalData<1> boundary_data
-			= gamma->getLocalData(d.getIfaceLocalIndex(Side<2>::west));
+			= gamma->getLocalData(sinfo.getIfaceLocalIndex(Side<2>::west));
 			for (int yi = 0; yi < ny; yi++) {
 				west            = boundary_data[{yi}];
 				center          = u_data[{0, yi}];
 				east            = u_data[{1, yi}];
 				f_data[{0, yi}] = (2 * west - 3 * center + east) / (h_x * h_x);
 			}
-		} else if (d.isNeumann(Side<2>::west)) {
+		} else if (sinfo.pinfo->isNeumann(Side<2>::west)) {
 			for (int yi = 0; yi < ny; yi++) {
 				center          = u_data[{0, yi}];
 				east            = u_data[{1, yi}];
@@ -74,16 +74,16 @@ class FivePtPatchOperator : public PatchOperator<2>
 			}
 		}
 		// east
-		if (d.hasNbr(Side<2>::east)) {
+		if (sinfo.pinfo->hasNbr(Side<2>::east)) {
 			const LocalData<1> boundary_data
-			= gamma->getLocalData(d.getIfaceLocalIndex(Side<2>::east));
+			= gamma->getLocalData(sinfo.getIfaceLocalIndex(Side<2>::east));
 			for (int yi = 0; yi < ny; yi++) {
 				west                 = u_data[{nx - 2, yi}];
 				center               = u_data[{nx - 1, yi}];
 				east                 = boundary_data[{yi}];
 				f_data[{nx - 1, yi}] = (west - 3 * center + 2 * east) / (h_x * h_x);
 			}
-		} else if (d.isNeumann(Side<2>::east)) {
+		} else if (sinfo.pinfo->isNeumann(Side<2>::east)) {
 			for (int yi = 0; yi < ny; yi++) {
 				west                 = u_data[{nx - 2, yi}];
 				center               = u_data[{nx - 1, yi}];
@@ -99,16 +99,16 @@ class FivePtPatchOperator : public PatchOperator<2>
 
 		// derive in y direction
 		// south
-		if (d.hasNbr(Side<2>::south)) {
+		if (sinfo.pinfo->hasNbr(Side<2>::south)) {
 			const LocalData<1> boundary_data
-			= gamma->getLocalData(d.getIfaceLocalIndex(Side<2>::south));
+			= gamma->getLocalData(sinfo.getIfaceLocalIndex(Side<2>::south));
 			for (int xi = 0; xi < nx; xi++) {
 				south  = boundary_data[{xi}];
 				center = u_data[{xi, 0}];
 				north  = u_data[{xi, 1}];
 				f_data[{xi, 0}] += (2 * south - 3 * center + north) / (h_y * h_y);
 			}
-		} else if (d.isNeumann(Side<2>::south)) {
+		} else if (sinfo.pinfo->isNeumann(Side<2>::south)) {
 			for (int xi = 0; xi < nx; xi++) {
 				center = u_data[{xi, 0}];
 				north  = u_data[{xi, 1}];
@@ -132,16 +132,16 @@ class FivePtPatchOperator : public PatchOperator<2>
 			}
 		}
 		// north
-		if (d.hasNbr(Side<2>::north)) {
+		if (sinfo.pinfo->hasNbr(Side<2>::north)) {
 			const LocalData<1> boundary_data
-			= gamma->getLocalData(d.getIfaceLocalIndex(Side<2>::north));
+			= gamma->getLocalData(sinfo.getIfaceLocalIndex(Side<2>::north));
 			for (int xi = 0; xi < nx; xi++) {
 				south  = u_data[{xi, ny - 2}];
 				center = u_data[{xi, ny - 1}];
 				north  = boundary_data[{xi}];
 				f_data[{xi, ny - 1}] += (south - 3 * center + 2 * north) / (h_y * h_y);
 			}
-		} else if (d.isNeumann(Side<2>::north)) {
+		} else if (sinfo.pinfo->isNeumann(Side<2>::north)) {
 			for (int xi = 0; xi < nx; xi++) {
 				south  = u_data[{xi, ny - 2}];
 				center = u_data[{xi, ny - 1}];

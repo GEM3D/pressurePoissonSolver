@@ -21,7 +21,7 @@
 
 #ifndef IFACEMATRIXHELPER_H
 #define IFACEMATRIXHELPER_H
-#include "DomainCollection.h"
+#include "Domain.h"
 #include <petscmat.h>
 class IfaceMatrixHelper
 {

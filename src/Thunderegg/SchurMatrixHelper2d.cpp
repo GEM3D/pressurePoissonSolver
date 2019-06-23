@@ -28,7 +28,7 @@ enum axis_enum { X_AXIS, Y_AXIS };
 enum bc_enum { DIRICHLET, NEUMANN, REFINED };
 
 struct Block {
-	IfaceType           type;
+	IfaceType<2>        type;
 	Side<2>             s;
 	bitset<4>           neumann;
 	int                 i;
@@ -42,7 +42,7 @@ struct Block {
 	                           {Side<2>::north, Side<2>::south, Side<2>::west, Side<2>::east},
 	                           {Side<2>::south, Side<2>::north, Side<2>::east, Side<2>::west}};
 
-	Block(Side<2> main, int j, Side<2> aux, int i, bitset<4> neumann, IfaceType type)
+	Block(Side<2> main, int j, Side<2> aux, int i, bitset<4> neumann, IfaceType<2> type)
 	{
 		s          = rot_table[main.toInt()][aux.toInt()];
 		this->i    = i;
@@ -53,7 +53,7 @@ struct Block {
 		}
 		flip_j = flip_j_table[main.toInt()];
 		flip_i = flip_i_table[main.toInt()][s.toInt()];
-		if (flip_i) { this->type.setOrthant(!type.getOrthant()); }
+		if (flip_i) { this->type.setOrthant(!type.getOrthant().toInt()); }
 	}
 	bool operator==(const Block &b) const
 	{
@@ -65,8 +65,8 @@ struct Block {
 	}
 };
 struct BlockKey {
-	IfaceType type;
-	Side<2>   s;
+	IfaceType<2> type;
+	Side<2>      s;
 
 	BlockKey() {}
 	BlockKey(const Block &b)
@@ -134,12 +134,14 @@ void SchurMatrixHelper2d::assembleMatrix(inserter insertBlock)
 		auto solver       = sh->getSolver();
 		auto interpolator = sh->getIfaceInterp();
 		// create domain representing curr_type
-		SchurDomain<2> sd;
-		sd.ns.fill(n);
-		sd.neumann                        = curr_type.neumann;
+		std::shared_ptr<PatchInfo<2>> pinfo(new PatchInfo<2>());
+		SchurInfo<2>                  sd;
+		sd.pinfo = pinfo;
+		pinfo->ns.fill(n);
+		pinfo->neumann                    = curr_type.neumann;
 		sd.getIfaceInfoPtr(Side<2>::west) = new NormalIfaceInfo<2>();
 		solver->addDomain(sd);
-		std::deque<SchurDomain<2>> single_domain;
+		std::vector<SchurInfo<2>> single_domain;
 		single_domain.push_back(sd);
 
 		map<BlockKey, shared_ptr<valarray<double>>> coeffs;
@@ -158,8 +160,8 @@ void SchurMatrixHelper2d::assembleMatrix(inserter insertBlock)
 
 			// fill the blocks
 			for (auto &p : coeffs) {
-				Side<2>   s    = p.first.s;
-				IfaceType type = p.first.type;
+				Side<2>      s    = p.first.s;
+				IfaceType<2> type = p.first.type;
 				VecScale(interp, 0);
 				interpolator->interpolate(sd, s, 0, type, u_vec, interp_vec);
 				valarray<double> &block = *p.second;
@@ -168,11 +170,11 @@ void SchurMatrixHelper2d::assembleMatrix(inserter insertBlock)
 				}
 				if (s == Side<2>::west) {
 					switch (type.toInt()) {
-						case IfaceType::normal:
+						case IfaceType<2>::normal:
 							block[n * j + j] += 0.5;
 							break;
-						case IfaceType::coarse_to_coarse:
-						case IfaceType::fine_to_fine:
+						case IfaceType<2>::coarse_to_coarse:
+						case IfaceType<2>::fine_to_fine:
 							block[n * j + j] += 1;
 							break;
 						default:

@@ -20,61 +20,84 @@
  ***************************************************************************/
 
 #include "TriLinInterp.h"
-void TriLinInterp::interpolate(SchurDomain<3> &d, std::shared_ptr<const Vector<3>> u,
-                               std::shared_ptr<Vector<2>> interp)
+void TriLinInterp::interpolate(const std::vector<SchurInfo<3>> &patches,
+                               std::shared_ptr<const Vector<3>> u,
+                               std::shared_ptr<Vector<2>>       interp)
 {
-	for (Side<3> s : Side<3>::getValues()) {
-		if (d.hasNbr(s)) {
-			std::deque<int>       idx;
-			std::deque<IfaceType> types;
-			d.getIfaceInfoPtr(s)->getIdxAndTypes(idx, types);
-			for (size_t i = 0; i < idx.size(); i++) {
-				interpolate(d, s, idx[i], types[i], u, interp);
+	for (SchurInfo<3> p : patches) {
+		for (Side<3> s : Side<3>::getValues()) {
+			if (p.pinfo->hasNbr(s)) {
+				std::deque<int>          idx;
+				std::deque<IfaceType<3>> types;
+
+				p.getIfaceInfoPtr(s)->getLocalIndexes(idx);
+				p.getIfaceInfoPtr(s)->getIfaceTypes(types);
+
+				for (size_t i = 0; i < idx.size(); i++) {
+					interpolate(p, s, idx[i], types[i], u, interp);
+				}
 			}
 		}
 	}
 }
-void TriLinInterp::interpolate(SchurDomain<3> &d, Side<3> s, int local_index, IfaceType itype,
+void TriLinInterp::interpolate(SchurInfo<3> &sinfo, std::shared_ptr<const Vector<3>> u,
+                               std::shared_ptr<Vector<2>> interp)
+{
+	for (Side<3> s : Side<3>::getValues()) {
+		if (sinfo.pinfo->hasNbr(s)) {
+			std::deque<int>          idx;
+			std::deque<IfaceType<3>> types;
+
+			sinfo.getIfaceInfoPtr(s)->getLocalIndexes(idx);
+			sinfo.getIfaceInfoPtr(s)->getIfaceTypes(types);
+
+			for (size_t i = 0; i < idx.size(); i++) {
+				interpolate(sinfo, s, idx[i], types[i], u, interp);
+			}
+		}
+	}
+}
+void TriLinInterp::interpolate(SchurInfo<3> &sinfo, Side<3> s, int local_index, IfaceType<3> itype,
                                std::shared_ptr<const Vector<3>> u,
                                std::shared_ptr<Vector<2>>       interp)
 {
 	std::array<int, 2> ns;
 	for (int i = 0; i < s.axis(); i++) {
-		ns[i] = d.ns[i];
+		ns[i] = sinfo.pinfo->ns[i];
 	}
 	for (int i = s.axis(); i < 2; i++) {
-		ns[i] = d.ns[i + 1];
+		ns[i] = sinfo.pinfo->ns[i + 1];
 	}
 	int nx = ns[0];
 	int ny = ns[1];
 
 	LocalData<2>       interp_data = interp->getLocalData(local_index);
-	const LocalData<2> sl          = u->getLocalData(d.id_local).getSliceOnSide(s);
+	const LocalData<2> sl          = u->getLocalData(sinfo.pinfo->local_index).getSliceOnSide(s);
 
 	switch (itype.toInt()) {
-		case IfaceType::normal: {
+		case IfaceType<3>::normal: {
 			for (int yi = 0; yi < ny; yi++) {
 				for (int xi = 0; xi < nx; xi++) {
 					interp_data[{xi, yi}] += 0.5 * sl[{xi, yi}];
 				}
 			}
 		} break;
-		case IfaceType::fine_to_fine: {
+		case IfaceType<3>::fine_to_fine: {
 			for (int yi = 0; yi < ny / 2; yi++) {
 				for (int xi = 0; xi < nx / 2; xi++) {
-					double a = sl[{xi * 2, yi * 2}];
-					double b = sl[{xi * 2 + 1, yi * 2}];
-					double c = sl[{xi * 2, yi * 2 + 1}];
-					double d = sl[{xi * 2 + 1, yi * 2 + 1}];
-					interp_data[{xi * 2, yi * 2}] += (11 * a - b - c - d) / 12.0;
-					interp_data[{xi * 2 + 1, yi * 2}] += (-a + 11 * b - c - d) / 12.0;
-					interp_data[{xi * 2, yi * 2 + 1}] += (-a - b + 11 * c - d) / 12.0;
-					interp_data[{xi * 2 + 1, yi * 2 + 1}] += (-a - b - c + 11 * d) / 12.0;
+					double a     = sl[{xi * 2, yi * 2}];
+					double b     = sl[{xi * 2 + 1, yi * 2}];
+					double c     = sl[{xi * 2, yi * 2 + 1}];
+					double sinfo = sl[{xi * 2 + 1, yi * 2 + 1}];
+					interp_data[{xi * 2, yi * 2}] += (11 * a - b - c - sinfo) / 12.0;
+					interp_data[{xi * 2 + 1, yi * 2}] += (-a + 11 * b - c - sinfo) / 12.0;
+					interp_data[{xi * 2, yi * 2 + 1}] += (-a - b + 11 * c - sinfo) / 12.0;
+					interp_data[{xi * 2 + 1, yi * 2 + 1}] += (-a - b - c + 11 * sinfo) / 12.0;
 				}
 			}
 		} break;
-		case IfaceType::coarse_to_fine:
-			switch (itype.getOrthant()) {
+		case IfaceType<3>::coarse_to_fine:
+			switch (itype.getOrthant().toInt()) {
 				case 0: {
 					for (int yi = 0; yi < ny; yi++) {
 						for (int xi = 0; xi < nx; xi++) {
@@ -106,15 +129,15 @@ void TriLinInterp::interpolate(SchurDomain<3> &d, Side<3> s, int local_index, If
 				} break;
 			}
 			break;
-		case IfaceType::coarse_to_coarse: {
+		case IfaceType<3>::coarse_to_coarse: {
 			for (int yi = 0; yi < ny; yi++) {
 				for (int xi = 0; xi < nx; xi++) {
 					interp_data[{xi, yi}] += 2.0 / 6.0 * sl[{xi, yi}];
 				}
 			}
 		} break;
-		case IfaceType::fine_to_coarse:
-			switch (itype.getOrthant()) {
+		case IfaceType<3>::fine_to_coarse:
+			switch (itype.getOrthant().toInt()) {
 				case 0: {
 					for (int yi = 0; yi < ny; yi++) {
 						for (int xi = 0; xi < nx; xi++) {

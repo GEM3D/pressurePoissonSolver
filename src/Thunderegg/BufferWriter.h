@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively 
+ *  Thunderegg, a library for solving Poisson's equation on adaptively
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -19,8 +19,8 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef BUFFERWRITER_H
-#define BUFFERWRITER_H
+#ifndef THUNDEREGG_BUFFERIO_H
+#define THUNDEREGG_BUFFERIO_H
 #include "Serializable.h"
 #include <cstddef>
 #include <iostream>
@@ -29,6 +29,9 @@ template <typename T> constexpr bool isSerializable()
 {
 	return std::is_base_of<Serializable, T>::value;
 }
+/**
+ * @brief Class that is used to help serialize objects into a buffer.
+ */
 class BufferWriter
 {
 	private:
@@ -36,14 +39,49 @@ class BufferWriter
 	int   pos    = 0;
 
 	public:
-    BufferWriter()=default;
-	BufferWriter(char *buffer) { this->buffer = buffer; }
-	int           getPos() { return pos; }
+	/**
+	 * @brief Create a new BufferWriter with the buffer set to nullptr. This is helpful for
+	 * determining the size needed for the buffer.
+	 */
+	BufferWriter() = default;
+	/**
+	 * @brief Create a new BufferWriter with given buffer.
+	 *
+	 * @param buffer the pointer to the beginning of the buffer.
+	 */
+	BufferWriter(char *buffer)
+	{
+		this->buffer = buffer;
+	}
+	/**
+	 * @brief get the current position in the buffer
+	 *
+	 * @return  the current position
+	 */
+	int getPos()
+	{
+		return pos;
+	}
+	/**
+	 * @brief  Add object to the buffer.
+	 *
+	 * @param obj the Serializable object.
+	 *
+	 * @return  this BufferWriter
+	 */
 	BufferWriter &operator<<(const Serializable &obj)
 	{
 		pos += obj.serialize(buffer == nullptr ? nullptr : (buffer + pos));
 		return *this;
 	}
+	/**
+	 * @brief Add an object to the buffer.
+	 *
+	 * @tparam T the type of the object.
+	 * @param obj the object. This object must be in serialized form.
+	 *
+	 * @return  this BufferWriter
+	 */
 	template <typename T>
 	typename std::enable_if<!isSerializable<T>(), BufferWriter>::type &operator<<(const T &obj)
 	{
@@ -52,6 +90,9 @@ class BufferWriter
 		return *this;
 	}
 };
+/**
+ * @brief Class that is used to help read serialized objects from a buffer.
+ */
 class BufferReader
 {
 	private:
@@ -59,14 +100,44 @@ class BufferReader
 	int   pos    = 0;
 
 	public:
-    BufferReader()=default;
-	BufferReader(char *buffer) { this->buffer = buffer; }
-	int           getPos() { return pos; }
+	/**
+	 * @brief Create a new BufferReader with given buffer.
+	 *
+	 * @param buffer the pointer to the beginning of the buffer.
+	 */
+	BufferReader(char *buffer)
+	{
+		this->buffer = buffer;
+	}
+	/**
+	 * @brief get the current position in the buffer
+	 *
+	 * @return the current position
+	 */
+	int getPos()
+	{
+		return pos;
+	}
+	/**
+	 * @brief Get an object of the buffer.
+	 *
+	 * @param obj the Serializable object.
+	 *
+	 * @return  this BufferReader
+	 */
 	BufferReader &operator>>(Serializable &obj)
 	{
 		pos += obj.deserialize(buffer + pos);
 		return *this;
 	}
+	/**
+	 * @brief Get an object from the buffer.
+	 *
+	 * @tparam T the type of the object.
+	 * @param obj the object. This object must be in serialized form.
+	 *
+	 * @return  this BufferReader
+	 */
 	template <typename T>
 	typename std::enable_if<!isSerializable<T>(), BufferReader>::type &operator>>(T &obj)
 	{

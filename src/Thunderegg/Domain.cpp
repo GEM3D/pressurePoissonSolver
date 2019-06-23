@@ -20,5 +20,6 @@
  ***************************************************************************/
 
 #include "Domain.h"
+
 template class Domain<2>;
 template class Domain<3>;

@@ -25,12 +25,12 @@
 template <size_t D> class StarPatchOp : public PatchOperator<D>
 {
 	public:
-	void apply(SchurDomain<D> &d, std::shared_ptr<const Vector<D>> u,
-	                   std::shared_ptr<const Vector<D - 1>> gamma, std::shared_ptr<Vector<D>> f)
+	void apply(SchurInfo<D> &sinfo, std::shared_ptr<const Vector<D>> u,
+	           std::shared_ptr<const Vector<D - 1>> gamma, std::shared_ptr<Vector<D>> f)
 	{
-		LocalData<D>          f_data = f->getLocalData(d.id_local);
-		const LocalData<D>    u_data = u->getLocalData(d.id_local);
-		std::array<double, D> h2     = d.spacings;
+		LocalData<D>          f_data = f->getLocalData(sinfo.pinfo->local_index);
+		const LocalData<D>    u_data = u->getLocalData(sinfo.pinfo->local_index);
+		std::array<double, D> h2     = sinfo.pinfo->spacings;
 		for (size_t i = 0; i < D; i++) {
 			h2[i] *= h2[i];
 		}
@@ -38,16 +38,17 @@ template <size_t D> class StarPatchOp : public PatchOperator<D>
 			constexpr int axis       = 0;
 			Side<D>       lower_side = axis * 2;
 			Side<D>       upper_side = axis * 2 + 1;
-			if (d.hasNbr(lower_side)) {
+			if (sinfo.pinfo->hasNbr(lower_side)) {
 				LocalData<D - 1>       f_slice = f_data.getSliceOnSide(lower_side);
-				const LocalData<D - 1> bnd = gamma->getLocalData(d.getIfaceLocalIndex(lower_side));
-				const LocalData<D - 1> mid = u_data.getSliceOnSide(lower_side);
+				const LocalData<D - 1> bnd
+				= gamma->getLocalData(sinfo.getIfaceLocalIndex(lower_side));
+				const LocalData<D - 1> mid   = u_data.getSliceOnSide(lower_side);
 				const LocalData<D - 1> upper = u_data.getSliceOnSide(lower_side, 1);
 
 				nested_loop<D - 1>(mid.getStart(), mid.getEnd(), [&](std::array<int, D - 1> coord) {
 					f_slice[coord] = (2 * bnd[coord] - 3 * mid[coord] + upper[coord]) / h2[axis];
 				});
-			} else if (d.isNeumann(lower_side)) {
+			} else if (sinfo.pinfo->isNeumann(lower_side)) {
 				LocalData<D - 1>       f_slice = f_data.getSliceOnSide(lower_side);
 				const LocalData<D - 1> mid     = u_data.getSliceOnSide(lower_side);
 				const LocalData<D - 1> upper   = u_data.getSliceOnSide(lower_side, 1);
@@ -80,16 +81,17 @@ template <size_t D> class StarPatchOp : public PatchOperator<D>
 				});
 			}
 			// east
-			if (d.hasNbr(upper_side)) {
+			if (sinfo.pinfo->hasNbr(upper_side)) {
 				LocalData<D - 1>       f_slice = f_data.getSliceOnSide(upper_side);
 				const LocalData<D - 1> lower   = u_data.getSliceOnSide(upper_side, 1);
 				const LocalData<D - 1> mid     = u_data.getSliceOnSide(upper_side);
-				const LocalData<D - 1> bnd = gamma->getLocalData(d.getIfaceLocalIndex(upper_side));
+				const LocalData<D - 1> bnd
+				= gamma->getLocalData(sinfo.getIfaceLocalIndex(upper_side));
 
 				nested_loop<D - 1>(mid.getStart(), mid.getEnd(), [&](std::array<int, D - 1> coord) {
 					f_slice[coord] = (lower[coord] - 3 * mid[coord] + 2 * bnd[coord]) / h2[axis];
 				});
-			} else if (d.isNeumann(upper_side)) {
+			} else if (sinfo.pinfo->isNeumann(upper_side)) {
 				LocalData<D - 1>       f_slice = f_data.getSliceOnSide(upper_side);
 				const LocalData<D - 1> lower   = u_data.getSliceOnSide(upper_side, 1);
 				const LocalData<D - 1> mid     = u_data.getSliceOnSide(upper_side);
@@ -110,16 +112,17 @@ template <size_t D> class StarPatchOp : public PatchOperator<D>
 		for (size_t axis = 1; axis < D; axis++) {
 			Side<D> lower_side = axis * 2;
 			Side<D> upper_side = axis * 2 + 1;
-			if (d.hasNbr(lower_side)) {
+			if (sinfo.pinfo->hasNbr(lower_side)) {
 				LocalData<D - 1>       f_slice = f_data.getSliceOnSide(lower_side);
-				const LocalData<D - 1> bnd = gamma->getLocalData(d.getIfaceLocalIndex(lower_side));
-				const LocalData<D - 1> mid = u_data.getSliceOnSide(lower_side);
+				const LocalData<D - 1> bnd
+				= gamma->getLocalData(sinfo.getIfaceLocalIndex(lower_side));
+				const LocalData<D - 1> mid   = u_data.getSliceOnSide(lower_side);
 				const LocalData<D - 1> upper = u_data.getSliceOnSide(lower_side, 1);
 
 				nested_loop<D - 1>(mid.getStart(), mid.getEnd(), [&](std::array<int, D - 1> coord) {
 					f_slice[coord] += (2 * bnd[coord] - 3 * mid[coord] + upper[coord]) / h2[axis];
 				});
-			} else if (d.isNeumann(lower_side)) {
+			} else if (sinfo.pinfo->isNeumann(lower_side)) {
 				LocalData<D - 1>       f_slice = f_data.getSliceOnSide(lower_side);
 				const LocalData<D - 1> mid     = u_data.getSliceOnSide(lower_side);
 				const LocalData<D - 1> upper   = u_data.getSliceOnSide(lower_side, 1);
@@ -152,16 +155,17 @@ template <size_t D> class StarPatchOp : public PatchOperator<D>
 				});
 			}
 			// east
-			if (d.hasNbr(upper_side)) {
+			if (sinfo.pinfo->hasNbr(upper_side)) {
 				LocalData<D - 1>       f_slice = f_data.getSliceOnSide(upper_side);
 				const LocalData<D - 1> lower   = u_data.getSliceOnSide(upper_side, 1);
 				const LocalData<D - 1> mid     = u_data.getSliceOnSide(upper_side);
-				const LocalData<D - 1> bnd = gamma->getLocalData(d.getIfaceLocalIndex(upper_side));
+				const LocalData<D - 1> bnd
+				= gamma->getLocalData(sinfo.getIfaceLocalIndex(upper_side));
 
 				nested_loop<D - 1>(mid.getStart(), mid.getEnd(), [&](std::array<int, D - 1> coord) {
 					f_slice[coord] += (lower[coord] - 3 * mid[coord] + 2 * bnd[coord]) / h2[axis];
 				});
-			} else if (d.isNeumann(upper_side)) {
+			} else if (sinfo.pinfo->isNeumann(upper_side)) {
 				LocalData<D - 1>       f_slice = f_data.getSliceOnSide(upper_side);
 				const LocalData<D - 1> lower   = u_data.getSliceOnSide(upper_side, 1);
 				const LocalData<D - 1> mid     = u_data.getSliceOnSide(upper_side);

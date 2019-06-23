@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Thunderegg, a library for solving Poisson's equation on adaptively
+ *  Thunderegg, a library for solving Poisson's equation on adaptively 
  *  refined block-structured Cartesian grids
  *
  *  Copyright (C) 2019  Thunderegg Developers. See AUTHORS.md file at the
@@ -19,35 +19,37 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
-#ifndef P4ESTDCG_H
-#define P4ESTDCG_H
-#include <Thunderegg/DomainCollectionGenerator.h>
-#include <list>
-#include <p4est_extended.h>
-class P4estDCG : public DomainCollectionGenerator<2>
+#ifndef AMGXWRAPPER_H
+#define AMGXWRAPPER_H
+#include "Domain.h"
+#include "amgx_c.h"
+#include <petscmat.h>
+#include <iostream>
+#include <string>
+class AmgxWrapper
 {
 	private:
-	bool neumann;
-	/**
-	 * @brief copy of p4est tree
-	 */
-	p4est_t *my_p4est;
-	/**
-	 * @brief finest is stored in front
-	 */
-	std::list<std::shared_ptr<DomainCollection<2>>> dc_list;
-
-	int                curr_level;
-	int                num_levels;
-	std::array<int, 2> ns;
-
-	void extractLevel();
+	static void print_callback(const char *msg, int length)
+	{
+		int rank = 0;
+		MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+		if (rank == 0) std::cout << msg;
+	}
+	// library handles
+	MPI_Comm              AMGX_MPI_COMM;
+	AMGX_config_handle    cfg;
+	AMGX_resources_handle rsrc;
+	AMGX_matrix_handle    gA;
+	AMGX_vector_handle    gb;
+	AMGX_vector_handle    gx;
+	AMGX_solver_handle    solver;
+	int               num_rows;
+        int nrings = 0;
 
 	public:
-	P4estDCG(p4est_t *p4est, std::array<int, 2> ns, bool neumann = false);
-	~P4estDCG();
-	std::shared_ptr<DomainCollection<2>> getFinestDC();
-	bool                                 hasCoarserDC();
-	std::shared_ptr<DomainCollection<2>> getCoarserDC();
+	AmgxWrapper(std::string filename);
+	void setMatrix(Mat A);
+	~AmgxWrapper();
+	void solve(Vec x, Vec b);
 };
 #endif

@@ -21,13 +21,10 @@
 
 #include "Init.h"
 #include "Writers/ClawWriter.h"
-#include "Writers/MMWriter.h"
 #include <Thunderegg/BiCGStab.h>
 #include <Thunderegg/BilinearInterpolator.h>
-#include <Thunderegg/DomainCollection.h>
+#include <Thunderegg/Domain.h>
 #include <Thunderegg/FivePtPatchOperator.h>
-#include <Thunderegg/StarPatchOp.h>
-#include <Thunderegg/FunctionWrapper.h>
 #include <Thunderegg/GMG/CycleFactory2d.h>
 #include <Thunderegg/MatrixHelper2d.h>
 #include <Thunderegg/Operators/DomainWrapOp.h>
@@ -41,14 +38,15 @@
 #include <Thunderegg/SchurHelper.h>
 #include <Thunderegg/SchurMatrixHelper2d.h>
 #include <Thunderegg/SchwarzPrec.h>
-#include <Thunderegg/ThundereggDCG.h>
+#include <Thunderegg/StarPatchOp.h>
+#include <Thunderegg/ThundereggDomGen.h>
 #include <Thunderegg/Timer.h>
 #ifdef HAVE_VTK
 #include "Writers/VtkWriter2d.h"
 #endif
 #ifdef HAVE_P4EST
 #include "TreeToP4est.h"
-#include <Thunderegg/P4estDCG.h>
+#include <Thunderegg/P4estDomGen.h>
 #endif
 #include "CLI11.hpp"
 #include <cmath>
@@ -209,26 +207,34 @@ int main(int argc, char *argv[])
 	///////////////
 	// Create Mesh
 	///////////////
-	shared_ptr<DomainCollection<2>> dc;
-	Tree<2>                         t;
+	shared_ptr<Domain<2>> domain;
+	Tree<2>               t;
 	t = Tree<2>(mesh_filename);
 	for (int i = 0; i < div; i++) {
 		t.refineLeaves();
 	}
 
-	shared_ptr<DomainCollectionGenerator<2>> dcg;
+	shared_ptr<DomainGenerator<2>> dcg;
 #ifdef HAVE_P4EST
 	if (use_p4est) {
 		TreeToP4est ttp(t);
-		dcg.reset(new P4estDCG(ttp.p4est, ns, neumann));
+
+		auto bmf = [](int block_no, double unit_x, double unit_y, double &x, double &y) {
+			x = unit_x;
+			y = unit_y;
+		};
+		auto inf
+		= [=](Side<2> s, const array<double, 2> &, const array<double, 2> &) { return neumann; };
+
+		dcg.reset(new P4estDomGen(ttp.p4est, ns, inf, bmf));
 #else
 	if (false) {
 #endif
 	} else {
-		dcg.reset(new ThundereggDCG<2>(t, ns, neumann));
+		dcg.reset(new ThundereggDomGen<2>(t, ns, neumann));
 	}
 
-	dc = dcg->getFinestDC();
+	domain = dcg->getFinestDomain();
 
 	// the functions that we are using
 	function<double(double, double)> ffun;
@@ -236,7 +242,21 @@ int main(int argc, char *argv[])
 	function<double(double, double)> nfun;
 	function<double(double, double)> nfuny;
 
-	if (problem == "zero") {
+	if (problem == "gauss") {
+		double x0    = .5;
+		double y0    = .5;
+		double alpha = 1000;
+		ffun         = [&](double x, double y) {
+            double r2 = pow((x - x0), 2) + pow((y - y0), 2);
+            return exp(-alpha / 2.0 * r2) * (pow(alpha, 2) * r2 - 2 * alpha);
+		};
+		gfun = [&](double x, double y) {
+			double r2 = pow((x - x0), 2) + pow((y - y0), 2);
+			return exp(-alpha / 2.0 * r2);
+		};
+		nfun  = [](double x, double y) { return 0; };
+		nfuny = [](double x, double y) { return 0; };
+	} else if (problem == "zero") {
 		ffun  = [](double x, double y) { return 0; };
 		gfun  = [](double x, double y) { return 0; };
 		nfun  = [](double x, double y) { return 0; };
@@ -268,7 +288,7 @@ int main(int argc, char *argv[])
 		gfun  = [](double x, double y) { return 0; };
 		nfun  = [](double x, double y) { return 0; };
 		nfuny = [](double x, double y) { return 0; };
-	} else if (problem == "gauss") {
+	} else if (problem == "trig gauss") {
 		gfun = [](double x, double y) { return exp(cos(10 * M_PI * x)) - exp(cos(11 * M_PI * y)); };
 		ffun = [](double x, double y) {
 			return 100 * M_PI * M_PI * (pow(sin(10 * M_PI * x), 2) - cos(10 * M_PI * x))
@@ -294,9 +314,9 @@ int main(int argc, char *argv[])
 	// set the patch solver
 	shared_ptr<PatchSolver<2>> p_solver;
 	if (patch_solver == "dft") {
-		p_solver.reset(new DftPatchSolver<2>(*dc));
+		p_solver.reset(new DftPatchSolver<2>(*domain));
 	} else {
-		p_solver.reset(new FftwPatchSolver<2>(*dc));
+		p_solver.reset(new FftwPatchSolver<2>(*domain));
 	}
 
 	// patch operator
@@ -309,7 +329,7 @@ int main(int argc, char *argv[])
 	for (int loop = 0; loop < loop_count; loop++) {
 		timer.start("Domain Initialization");
 
-		shared_ptr<SchurHelper<2>> sch(new SchurHelper<2>(dc, p_solver, p_operator, p_interp));
+		shared_ptr<SchurHelper<2>> sch(new SchurHelper<2>(domain, p_solver, p_operator, p_interp));
 		/*
 		if (f_outim) {
 		    IfaceMatrixHelper imh(dc);
@@ -322,15 +342,15 @@ int main(int argc, char *argv[])
 		}
 		*/
 
-		shared_ptr<PetscVector<2>> u     = dc->getNewDomainVec();
-		shared_ptr<PetscVector<2>> exact = dc->getNewDomainVec();
-		shared_ptr<PetscVector<2>> f     = dc->getNewDomainVec();
-		shared_ptr<PetscVector<2>> au    = dc->getNewDomainVec();
+		shared_ptr<PetscVector<2>> u     = domain->getNewDomainVec();
+		shared_ptr<PetscVector<2>> exact = domain->getNewDomainVec();
+		shared_ptr<PetscVector<2>> f     = domain->getNewDomainVec();
+		shared_ptr<PetscVector<2>> au    = domain->getNewDomainVec();
 
 		if (neumann) {
-			Init::initNeumann2d(*dc, f->vec, exact->vec, ffun, gfun, nfun, nfuny);
+			Init::initNeumann2d(*domain, f->vec, exact->vec, ffun, gfun, nfun, nfuny);
 		} else {
-			Init::initDirichlet2d(*dc, f->vec, exact->vec, ffun, gfun);
+			Init::initDirichlet2d(*domain, f->vec, exact->vec, ffun, gfun);
 		}
 
 		timer.stop("Domain Initialization");
@@ -346,7 +366,7 @@ int main(int argc, char *argv[])
 		KSPSetFromOptions(solver);
 
 		if (neumann && !no_zero_rhs_avg) {
-			double fdiff = dc->integrate(f) / dc->volume();
+			double fdiff = domain->integrate(f) / domain->volume();
 			if (my_global_rank == 0) cout << "Fdiff: " << fdiff << endl;
 			f->shift(-fdiff);
 		}
@@ -378,7 +398,7 @@ int main(int argc, char *argv[])
 
 			timer.start("Matrix Formation");
 			if (matrix_type == "wrap") {
-				A.reset(new SchurWrapOp<2>(dc, sch));
+				A.reset(new SchurWrapOp<2>(domain, sch));
 			} else if (matrix_type == "crs") {
 				SchurMatrixHelper2d smh(sch);
 				A_petsc = smh.formCRSMatrix();
@@ -463,9 +483,9 @@ int main(int argc, char *argv[])
 			timer.start("Matrix Formation");
 			if (matrix_type == "wrap") {
 				A.reset(new DomainWrapOp<2>(sch));
-				A_petsc = PetscShellCreator::getMatShell(A, dc);
+				A_petsc = PetscShellCreator::getMatShell(A, domain);
 			} else if (matrix_type == "crs") {
-				MatrixHelper2d mh(*dc);
+				MatrixHelper2d mh(domain);
 				A_petsc = mh.formCRSMatrix();
 				A.reset(new PetscMatOp<2>(A_petsc));
 				if (setrow) {
@@ -510,7 +530,7 @@ int main(int argc, char *argv[])
 				if (M != nullptr) {
 					PC M_petsc;
 					KSPGetPC(solver, &M_petsc);
-					PetscShellCreator::getPCShell(M_petsc, M, dc);
+					PetscShellCreator::getPCShell(M_petsc, M, domain);
 				}
 				KSPSetUp(solver);
 				KSPSetTolerances(solver, tolerance, PETSC_DEFAULT, PETSC_DEFAULT, 5000);
@@ -529,7 +549,7 @@ int main(int argc, char *argv[])
 				KSPGetIterationNumber(solver, &its);
 				if (my_global_rank == 0) { cout << "Iterations: " << its << endl; }
 			} else {
-				std::shared_ptr<VectorGenerator<2>> vg(new DomainCollectionVG<2>(dc));
+				std::shared_ptr<VectorGenerator<2>> vg(new DomainVG<2>(domain));
 
 				int its = BiCGStab<2>::solve(vg, A, u, f, M);
 				if (my_global_rank == 0) { cout << "Iterations: " << its << endl; }
@@ -540,17 +560,17 @@ int main(int argc, char *argv[])
 		}
 
 		// residual
-		shared_ptr<PetscVector<2>> resid = dc->getNewDomainVec();
+		shared_ptr<PetscVector<2>> resid = domain->getNewDomainVec();
 		VecAXPBYPCZ(resid->vec, -1.0, 1.0, 0.0, au->vec, f->vec);
 		double residual = resid->twoNorm();
 		double fnorm    = f->twoNorm();
 
 		// error
-		shared_ptr<PetscVector<2>> error = dc->getNewDomainVec();
+		shared_ptr<PetscVector<2>> error = domain->getNewDomainVec();
 		VecAXPBYPCZ(error->vec, -1.0, 1.0, 0.0, exact->vec, u->vec);
 		if (neumann) {
-			double uavg = dc->integrate(u) / dc->volume();
-			double eavg = dc->integrate(exact) / dc->volume();
+			double uavg = domain->integrate(u) / domain->volume();
+			double eavg = domain->integrate(exact) / domain->volume();
 
 			if (my_global_rank == 0) {
 				cout << "Average of computed solution: " << uavg << endl;
@@ -562,8 +582,8 @@ int main(int argc, char *argv[])
 		double error_norm = error->twoNorm();
 		double exact_norm = exact->twoNorm();
 
-		double ausum = dc->integrate(au);
-		double fsum  = dc->integrate(f);
+		double ausum = domain->integrate(au);
+		double fsum  = domain->integrate(f);
 		if (my_global_rank == 0) {
 			std::cout << std::scientific;
 			std::cout.precision(13);
@@ -571,18 +591,18 @@ int main(int argc, char *argv[])
 			std::cout << "Residual: " << residual / fnorm << endl;
 			std::cout << u8"ΣAu-Σf: " << ausum - fsum << endl;
 			cout.unsetf(std::ios_base::floatfield);
-			int total_cells = dc->getGlobalNumCells();
+			int total_cells = domain->getNumGlobalCells();
 			cout << "Total cells: " << total_cells << endl;
 		}
 
 		// output
 		if (claw_filename != "") {
-			ClawWriter writer(*dc);
+			ClawWriter writer(domain);
 			writer.write(u->vec, resid->vec);
 		}
 #ifdef HAVE_VTK
 		if (vtk_filename != "") {
-			VtkWriter2d writer(*dc, vtk_filename);
+			VtkWriter2d writer(*domain, vtk_filename);
 			writer.add(u->vec, "Solution");
 			writer.add(error->vec, "Error");
 			writer.add(resid->vec, "Residual");
