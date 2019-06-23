@@ -290,8 +290,9 @@ template <size_t D> class Vector
 			nested_loop<D>(ld.getStart(), ld.getEnd(),
 			               [&](std::array<int, D> coord) { sum += ld[coord] * ld[coord]; });
 		}
-		MPI_Allreduce(&sum, &sum, 1, MPI_DOUBLE, MPI_SUM, comm);
-		return sqrt(sum);
+		double global_sum;
+		MPI_Allreduce(&sum, &global_sum, 1, MPI_DOUBLE, MPI_SUM, comm);
+		return sqrt(global_sum);
 	}
 	virtual double infNorm() const
 	{
@@ -301,8 +302,9 @@ template <size_t D> class Vector
 			nested_loop<D>(ld.getStart(), ld.getEnd(),
 			               [&](std::array<int, D> coord) { max = fmax(fabs(ld[coord]), max); });
 		}
-		MPI_Allreduce(&max, &max, 1, MPI_DOUBLE, MPI_MAX, comm);
-		return max;
+		double global_max;
+		MPI_Allreduce(&max, &global_max, 1, MPI_DOUBLE, MPI_MAX, comm);
+		return global_max;
 	}
 	virtual double dot(std::shared_ptr<const Vector<D>> b) const
 	{
@@ -313,8 +315,9 @@ template <size_t D> class Vector
 			nested_loop<D>(ld.getStart(), ld.getEnd(),
 			               [&](std::array<int, D> coord) { retval += ld[coord] * ld_b[coord]; });
 		}
-		MPI_Allreduce(&retval, &retval, 1, MPI_DOUBLE, MPI_SUM, comm);
-		return retval;
+		double global_retval;
+		MPI_Allreduce(&retval, &global_retval, 1, MPI_DOUBLE, MPI_SUM, comm);
+		return global_retval;
 	}
 };
 template <size_t D> class VectorGenerator

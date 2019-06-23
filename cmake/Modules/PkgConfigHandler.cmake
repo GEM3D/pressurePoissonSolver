@@ -36,11 +36,7 @@ function (linker_cmdline what INTO outvar FROM)
                 ${deplib_name}
                 )
           # check if library is in system path
-          unset(lib CACHE)
-          find_library(lib ${deplib_name} )
-          if(NOT lib)
-              list (APPEND deplib_list "-L${deplib_dir}")
-          endif()
+          list (APPEND deplib_list "-L${deplib_dir}")
           # if there was no translation of the name, the library is named
           # unconventionally (.so.3gf, I'm looking at you), so pass this
           # name unmodified to the linker switch
