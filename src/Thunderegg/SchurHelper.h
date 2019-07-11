@@ -271,7 +271,6 @@ inline SchurHelper<D>::SchurHelper(std::shared_ptr<Domain<D>>        domain,
 	local_gamma        = getNewSchurDistVec();
 	gamma              = getNewSchurVec();
 	PW<IS> dist_is;
-	std::cerr<< iface_stride <<std::endl;
 	ISCreateBlock(MPI_COMM_SELF, iface_stride, iface_dist_map_vec.size(), &iface_dist_map_vec[0],
 	              PETSC_COPY_VALUES, &dist_is);
 	VecScatterCreate(gamma->vec, dist_is, local_gamma->vec, nullptr, &scatter);
