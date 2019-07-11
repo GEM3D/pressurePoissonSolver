@@ -169,7 +169,7 @@ class FivePtPatchOperator : public PatchOperator<2>
 			}
 		}
 	}
-	void apply(SchurInfo<2> &sinfo, const LocalData<2> u, LocalData<2> f) override
+	void apply(const SchurInfo<2> &sinfo, const LocalData<2> u, LocalData<2> f) override
 	{
 		int nx = sinfo.pinfo->ns[0];
 		int ny = sinfo.pinfo->ns[1];

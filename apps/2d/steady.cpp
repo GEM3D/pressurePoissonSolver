@@ -30,6 +30,7 @@
 #include <Thunderegg/Operators/DomainWrapOp.h>
 #include <Thunderegg/Operators/PetscMatOp.h>
 #include <Thunderegg/Operators/SchurWrapOp.h>
+#include <Thunderegg/PatchSolvers/BiCGStabSolver.h>
 #include <Thunderegg/PatchSolvers/DftPatchSolver.h>
 #include <Thunderegg/PatchSolvers/FftwPatchSolver.h>
 #include <Thunderegg/PetscShellCreator.h>
@@ -119,7 +120,13 @@ int main(int argc, char *argv[])
 	app.add_set_ignore_case("--prec", preconditioner, {"GMG"}, "Which Preconditoner to use");
 
 	string patch_solver = "fftw";
-	app.add_option("--patch_solver", patch_solver, "Which patch solver to use");
+	app.add_set_ignore_case("--patch_solver", patch_solver, {"fftw", "bcgs", "dft"},
+	                        "Which patch solver to use");
+
+	int ps_max_it = 1000;
+	app.add_option("--patch_solver_max_it", ps_max_it, "max iterations for bcgs patch solver");
+	double ps_tol = 1e-12;
+	app.add_option("--patch_solver_tol", ps_tol, "tolerance for bcgs patch solver");
 
 	bool setrow = false;
 	app.add_flag("--setrow", setrow, "Set row in matrix");
@@ -311,16 +318,18 @@ int main(int argc, char *argv[])
 		nfuny = [](double x, double y) { return M_PI * cosl(M_PI * y) * cosl(2 * M_PI * x); };
 	}
 
+	// patch operator
+	shared_ptr<PatchOperator<2>> p_operator(new StarPatchOp<2>());
+
 	// set the patch solver
 	shared_ptr<PatchSolver<2>> p_solver;
-	if (patch_solver == "dft") {
+	if (patch_solver == "bcgs") {
+		p_solver.reset(new BiCGStabSolver<2>(p_operator, ps_tol, ps_max_it));
+	} else if (patch_solver == "dft") {
 		p_solver.reset(new DftPatchSolver<2>(*domain));
 	} else {
 		p_solver.reset(new FftwPatchSolver<2>(*domain));
 	}
-
-	// patch operator
-	shared_ptr<PatchOperator<2>> p_operator(new StarPatchOp<2>());
 
 	// interface interpolator
 	shared_ptr<IfaceInterp<2>> p_interp(new BilinearInterpolator());

@@ -19,6 +19,8 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  ***************************************************************************/
 
+#ifndef BICGSTAB_H
+#define BICGSTAB_H
 #include <Thunderegg/Operators/Operator.h>
 #include <Thunderegg/Vector.h>
 /**
@@ -42,7 +44,8 @@ template <size_t D> class BiCGStab
 	 */
 	static int solve(std::shared_ptr<VectorGenerator<D>> vg, std::shared_ptr<const Operator<D>> A,
 	                 std::shared_ptr<Vector<D>> x, std::shared_ptr<const Vector<D>> b,
-	                 std::shared_ptr<const Operator<D>> Mr = nullptr)
+	                 std::shared_ptr<const Operator<D>> Mr = nullptr, int max_it = 1000,
+	                 double tolerance = 1e-12)
 	{
 		std::shared_ptr<Vector<D>> resid = vg->getNewVector();
 		std::shared_ptr<Vector<D>> ms;
@@ -64,9 +67,7 @@ template <size_t D> class BiCGStab
 		std::shared_ptr<Vector<D>> s   = vg->getNewVector();
 		double                     rho = rhat->dot(resid);
 
-		double tolerance = 1e-12;
-		int    num_its   = 0;
-		int    max_it    = 1000;
+		int num_its = 0;
 		while (resid->twoNorm() / r0_norm > tolerance && num_its < max_it) {
 			if (Mr != nullptr) {
 				Mr->apply(p, mp);
@@ -104,3 +105,4 @@ template <size_t D> class BiCGStab
 		return num_its;
 	}
 };
+#endif

@@ -33,6 +33,6 @@ template <size_t D> class PatchOperator
 	virtual void addInterfaceToRHS(SchurInfo<D> &d, std::shared_ptr<const Vector<D - 1>> gamma,
 	                               LocalData<D> f)
 	= 0;
-	virtual void apply(SchurInfo<D> &d, const LocalData<D> u, LocalData<D> f) = 0;
+	virtual void apply(const SchurInfo<D> &d, const LocalData<D> u, LocalData<D> f) = 0;
 };
 #endif

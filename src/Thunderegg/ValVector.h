@@ -36,8 +36,9 @@ template <size_t D> class ValVector : public Vector<D>
 	ValVector() = default;
 	ValVector(const std::array<int, D> &lengths, int num_patches = 1)
 	{
-		int size      = 1;
-		this->lengths = lengths;
+		this->num_local_patches = num_patches;
+		int size                = 1;
+		this->lengths           = lengths;
 		for (size_t i = 0; i < D; i++) {
 			strides[i] = size;
 			size *= lengths[i];

@@ -244,7 +244,7 @@ void SevenPtPatchOperator::addInterfaceToRHS(SchurInfo<3> &                   si
 		}
 	}
 }
-void SevenPtPatchOperator::apply(SchurInfo<3> &sinfo, const LocalData<3> u, LocalData<3> f)
+void SevenPtPatchOperator::apply(const SchurInfo<3> &sinfo, const LocalData<3> u, LocalData<3> f)
 
 {
 	int nx = sinfo.pinfo->ns[0];

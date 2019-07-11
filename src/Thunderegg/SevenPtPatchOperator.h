@@ -29,6 +29,6 @@ class SevenPtPatchOperator : public PatchOperator<3>
 	                        std::shared_ptr<const Vector<2>> gamma, LocalData<3> f) override;
 	void addInterfaceToRHS(SchurInfo<3> &sinfo, std::shared_ptr<const Vector<2>> gamma,
 	                       LocalData<3> f) override;
-	void apply(SchurInfo<3> &sinfo, const LocalData<3> u, LocalData<3> f) override;
+	void apply(const SchurInfo<3> &sinfo, const LocalData<3> u, LocalData<3> f) override;
 };
 #endif

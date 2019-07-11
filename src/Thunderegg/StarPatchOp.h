@@ -201,7 +201,7 @@ template <size_t D> class StarPatchOp : public PatchOperator<D>
 			}
 		}
 	}
-	void apply(SchurInfo<D> &sinfo, const LocalData<D> u, LocalData<D> f) override
+	void apply(const SchurInfo<D> &sinfo, const LocalData<D> u, LocalData<D> f) override
 	{
 		std::array<double, D> h2 = sinfo.pinfo->spacings;
 		for (size_t i = 0; i < D; i++) {
