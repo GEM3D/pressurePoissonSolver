@@ -24,6 +24,7 @@
 #include <Thunderegg/Domain.h>
 #include <Thunderegg/PatchSolvers/PatchSolver.h>
 #include <Thunderegg/ValVector.h>
+#include <Thunderegg/StarPatchOp.h>
 #include <bitset>
 #include <fftw3.h>
 #include <map>
@@ -186,20 +187,8 @@ void FftwPatchSolver<D>::solve(SchurInfo<D> &sinfo, std::shared_ptr<const Vector
 	nested_loop<D>(start, end,
 	               [&](std::array<int, D> coord) { f_copy_view[coord] = f_view[coord]; });
 
-	for (Side<D> s : Side<D>::getValues()) {
-		std::array<int, D - 1> start, end;
-		start.fill(0);
-		end.fill(n - 1);
-
-		if (sinfo.pinfo->hasNbr(s)) {
-			const LocalData<D - 1> gamma_view = gamma->getLocalData(sinfo.getIfaceLocalIndex(s));
-			LocalData<D - 1>       slice      = f_copy.getLocalData(0).getSliceOnSide(s);
-			double                 h2         = pow(sinfo.pinfo->spacings[s.axis()], 2);
-			nested_loop<D - 1>(start, end, [&](std::array<int, D - 1> coord) {
-				slice[coord] -= 2.0 / h2 * gamma_view[coord];
-			});
-		}
-	}
+	StarPatchOp<D> op;
+	op.addInterfaceToRHS(sinfo,gamma,f_copy.getLocalData(0));
 
 	fftw_execute(plan1[sinfo]);
 

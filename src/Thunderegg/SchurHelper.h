@@ -352,7 +352,9 @@ inline void SchurHelper<D>::applyWithInterface(std::shared_ptr<const Vector<D>> 
 	f->set(0);
 
 	for (SchurInfo<D> &sd : sinfo_vector) {
-		op->apply(sd, u, local_gamma, f);
+		int local_index = sd.pinfo->local_index;
+		op->applyWithInterface(sd, u->getLocalData(local_index), local_gamma,
+		                       f->getLocalData(local_index));
 	}
 }
 template <size_t D>
@@ -367,7 +369,9 @@ inline void SchurHelper<D>::apply(std::shared_ptr<const Vector<D>> u, std::share
 
 	f->set(0);
 	for (SchurInfo<D> &sd : sinfo_vector) {
-		op->apply(sd, u, local_gamma, f);
+		int local_index = sd.pinfo->local_index;
+		op->applyWithInterface(sd, u->getLocalData(local_index), local_gamma,
+		                       f->getLocalData(local_index));
 	}
 }
 template <size_t D> inline void SchurHelper<D>::indexDomainIfacesLocal()

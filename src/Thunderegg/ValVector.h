@@ -42,7 +42,11 @@ template <size_t D> class ValVector : public Vector<D>
 			strides[i] = size;
 			size *= lengths[i];
 		}
-		patch_stride = size;
+		if (num_patches == 1) {
+			patch_stride = 0;
+		} else {
+			patch_stride = size;
+		}
 		size *= num_patches;
 		vec.resize(size);
 	}
