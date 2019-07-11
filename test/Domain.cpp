@@ -1,14 +1,14 @@
-#include "../Domain.h"
+#include <Thunderegg/PatchInfo.h>
 #include "catch.hpp"
 using namespace std;
-TEST_CASE("NormalNbrInfo getNbrType works", "[Domain]")
+TEST_CASE("NormalNbrInfo getNbrType works", "[PatchInfo]")
 {
 	NbrInfo<3> *info = new NormalNbrInfo<3>();
 	REQUIRE(info->getNbrType() == NbrType::Normal);
 	delete info;
 }
 
-TEST_CASE("NormalNbrInfo Serialization/Deserialization", "[Domain]")
+TEST_CASE("NormalNbrInfo Serialization/Deserialization", "[PatchInfo]")
 {
 	NormalNbrInfo<3> info;
 	info.id   = 5;
@@ -22,12 +22,12 @@ TEST_CASE("NormalNbrInfo Serialization/Deserialization", "[Domain]")
 	REQUIRE(out.id == 5);
 	REQUIRE(out.rank == 1);
 }
-TEST_CASE("CoarseNbrInfo Serialization/Deserialization", "[Domain]")
+TEST_CASE("CoarseNbrInfo Serialization/Deserialization", "[PatchInfo]")
 {
 	CoarseNbrInfo<3> info;
 	info.id             = 5;
 	info.rank           = 1;
-	info.quad_on_coarse = 2;
+	info.orth_on_coarse = 2;
 	// serialize and then deserialize
 	char *buff = new char[info.serialize(nullptr)];
 	info.serialize(buff);
@@ -36,9 +36,9 @@ TEST_CASE("CoarseNbrInfo Serialization/Deserialization", "[Domain]")
 	delete[] buff;
 	REQUIRE(out.id == 5);
 	REQUIRE(out.rank == 1);
-	REQUIRE(out.quad_on_coarse == 2);
+	REQUIRE(out.orth_on_coarse == 2);
 }
-TEST_CASE("FineNbrInfo Serialization/Deserialization", "[Domain]")
+TEST_CASE("FineNbrInfo Serialization/Deserialization", "[PatchInfo]")
 {
 	FineNbrInfo<3> info;
 	info.ids[0]   = 1;
@@ -64,20 +64,20 @@ TEST_CASE("FineNbrInfo Serialization/Deserialization", "[Domain]")
 	REQUIRE(out.ranks[2] == 7);
 	REQUIRE(out.ranks[3] == 6);
 }
-TEST_CASE("Domain Serialization/Deserialization", "[Domain]")
+TEST_CASE("PatchInfo Serialization/Deserialization", "[PatchInfo]")
 {
-	Domain<3> *d_ptr                = new Domain<3>;
-	Domain<3> &d                    = *d_ptr;
+	PatchInfo<3> *d_ptr                = new PatchInfo<3>;
+	PatchInfo<3> &d                    = *d_ptr;
 	d.id                            = 0;
-	d.getNbrInfoPtr(Side<3>::north) = new NormalNbrInfo<3>(1);
-	d.getNbrInfoPtr(Side<3>::east)  = new CoarseNbrInfo<3>(2, 3);
-	d.getNbrInfoPtr(Side<3>::south) = new FineNbrInfo<3>({3, 4, 5, 6});
+	d.nbr_info[Side<3>::north].reset( new NormalNbrInfo<3>(1));
+	d.nbr_info[Side<3>::east].reset(new CoarseNbrInfo<3>(2, 3));
+	d.nbr_info[Side<3>::south].reset(new FineNbrInfo<3>({3, 4, 5, 6}));
 
 	// serialize and then deserialize
 	char *buff = new char[d.serialize(nullptr)];
 	d.serialize(buff);
 	delete d_ptr;
-	Domain<3> out;
+	PatchInfo<3> out;
 	out.deserialize(buff);
 	delete[] buff;
 
@@ -89,7 +89,7 @@ TEST_CASE("Domain Serialization/Deserialization", "[Domain]")
 	REQUIRE(out.hasNbr(Side<3>::east));
 	REQUIRE(out.getNbrType(Side<3>::east) == NbrType::Coarse);
 	REQUIRE(out.getCoarseNbrInfo(Side<3>::east).id == 2);
-	REQUIRE(out.getCoarseNbrInfo(Side<3>::east).quad_on_coarse == 3);
+	REQUIRE(out.getCoarseNbrInfo(Side<3>::east).orth_on_coarse == 3);
 
 	REQUIRE(out.hasNbr(Side<3>::south));
 	REQUIRE(out.getNbrType(Side<3>::south) == NbrType::Fine);

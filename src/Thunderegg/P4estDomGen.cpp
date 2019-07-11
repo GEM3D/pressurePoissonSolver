@@ -286,7 +286,7 @@ void P4estDomGen::extractLevel()
 		p.second->setPtrs(new_level);
 	}
 	// create Domain object
-	domain_list.push_back(shared_ptr<Domain<2>>(new Domain<2>(new_level, true)));
+	domain_list.push_back(shared_ptr<Domain<2>>(new Domain<2>(ns, new_level, true)));
 	domain_list.back()->setNeumann(inf);
 
 	curr_level--;

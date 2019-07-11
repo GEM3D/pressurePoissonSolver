@@ -212,7 +212,7 @@ template <size_t D> inline void ThundereggDomGen<D>::extractLevel()
 	} else {
 		balanceLevelWithLower(new_level, domain_list.back()->getPatchInfoMap());
 	}
-	domain_list.push_back(std::shared_ptr<Domain<D>>(new Domain<D>(new_level)));
+	domain_list.push_back(std::shared_ptr<Domain<D>>(new Domain<D>(ns, new_level)));
 	if (neumann) {
 		IsNeumannFunc<D> inf = [](Side<D>, const std::array<double, D> &,
 		                          const std::array<double, D> &) { return true; };

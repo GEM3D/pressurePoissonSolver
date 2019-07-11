@@ -113,14 +113,15 @@ template <size_t D> class Domain
 	/**
 	 * @brief Construct a new Domain object with a given PatchInfo map.
 	 *
+	 * @param ns number of cells in each direction
 	 * @param pinfo_map map that goes from patch id to the PatchInfo pointer
 	 * @param local_id_set true if local indexes are set by user
 	 * @param global_id_set true if global indexes are set by user
 	 */
-	Domain(std::map<int, std::shared_ptr<PatchInfo<D>>> pinfo_map, bool local_id_set = false,
+	Domain(std::array<int,D> ns, std::map<int, std::shared_ptr<PatchInfo<D>>> pinfo_map, bool local_id_set = false,
 	       bool global_id_set = false)
 	{
-		this->ns = pinfo_map.begin()->second->ns;
+		this->ns = ns;
 
 		num_cells_in_patch = 1;
 		for (size_t i = 0; i < D; i++) {
