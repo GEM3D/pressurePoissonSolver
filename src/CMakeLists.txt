@@ -1,120 +1,92 @@
-project(DomainDecomp)
+project(Thunderegg_Lib)
 
-find_package(Zoltan REQUIRED)
-find_package(PETSc REQUIRED)
 find_package(MPI REQUIRED)
-# If you haven't already set the C++ compiler, use the same compiler
-# that was used to build Trilinos on your machine.  You do _not_ need
-# to edit this line.
-set (CMAKE_CXX_FLAGS "-Wall --std=c++11 -O3 -march=native ${CMAKE_CXX_FLAGS}")
-if(NUM_GPU)
-    set (CMAKE_CXX_FLAGS "-DNUM_GPU=${NUM_GPU} ${CMAKE_CXX_FLAGS}")
-endif()
-set (CMAKE_CXX_FLAGS_DEBUG  "-Wall --std=c++11 -g -O3  -DDD_DEBUG")
-  MESSAGE("Setting CXX compiler.")
-  SET(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
-
+find_package(PETSc REQUIRED)
+find_package(FFTW REQUIRED)
+find_package(Zoltan REQUIRED)
 find_package(CUDA)
-find_package(AMGX)
-if(AMGX_FOUND)
-    SET(CMAKE_CXX_FLAGS "-DENABLE_AMGX ${CMAKE_CXX_FLAGS}")
-endif()
-# If you haven't already set the C compiler, use the same compiler
-# that was used to build Trilinos on your machine.  You do _not_ 
-# need to edit this line.
-  MESSAGE("Setting C compiler.")
-  SET(CMAKE_C_COMPILE ${MPI_C_COMPILER})
-
-
-find_program(CCACHE_FOUND ccache)
-if(CCACHE_FOUND)
-  MESSAGE("Using ccache.")
-   set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
-   set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
-endif(CCACHE_FOUND)
-
-find_package(FFTW REQUIRED)
-include_directories(${FFTW_INCLUDES})
-
-# 
-# EDIT HERE:
-#
-# Add to the header include path the current directory, Trilinos'
-# include directory, and the include directories of the third-party
-# libraries (TPLs) with which Trilinos was built.
-#
-find_package(FFTW REQUIRED)
-add_library(Thunderegg "")
-include_directories(".")
-include_directories(${FFTW_INCLUDES})
-include_directories(SYSTEM ${Trilinos_TPL_INCLUDE_DIRS})
-include_directories(SYSTEM ${Trilinos_INCLUDE_DIRS})
-include_directories(${MPI_CXX_INCLUDE_PATH})
-if(CUDA_FOUND)
-    include_directories(${CUDA_INCLUDE_DIRS})
-endif()
-if(AMGX_FOUND)
-    include_directories(${AMGX_INCLUDE_DIRS})
-endif()
-target_include_directories(Thunderegg PRIVATE ${PETSC_INCLUDES})
-include_directories(${Zoltan_INCLUDES})
-
-# Add to the library path Trilinos' library path, and the library
-# paths of the third-party libraries (TPLs) with which Trilinos was
-# built.  
-if(AMGX_FOUND)
-link_directories("${AMGX_DIR}/lib")
-endif()
-link_directories("${Zoltan_DIR}/lib")
-
-# 
-# EDIT HERE: Change trilinosExample to the name of the executable
-# file that you want to build.  This line tells CMake which source
-# file(s) to use to build the executable.
-#
-target_include_directories(Thunderegg PUBLIC ".")
-target_sources_local(Thunderegg PRIVATE SchurMatrixHelper.cpp SchurMatrixHelper2d.cpp)
-target_sources_local(Thunderegg PRIVATE MatrixHelper.cpp MatrixHelper2d.cpp)
-target_sources_local(Thunderegg PRIVATE TriLinInterp.cpp BilinearInterpolator.cpp)
-target_sources_local(Thunderegg PRIVATE PBMatrix.cpp)
-target_sources_local(Thunderegg PRIVATE PolyChebPrec.cpp)
-target_link_libraries(
-    Thunderegg PRIVATE
-  ${MPI_CXX_LIBRARIES} 
-  ${PETSC_LIBRARIES} 
-  ${FFTW_LIBRARIES} 
-    ${Zoltan_LIBRARIES}
-)
-#
-# EDIT HERE: Change trilinosExample to the name of the executable
-# file, as above.  This line tells the linker to link the executable 
-# with the Trilinos libraries, and with the third-party libraries 
-# (TPLs) with which Trilinos was built.
-#
-if(ENABLE_MUELU)
-    find_library(MUELU_LIB MueLuWrapper)
-    include_directories("./lib/")
-    target_link_libraries(steady
-        ${MUELU_LIB}
-    )
-    SET(CMAKE_CXX_FLAGS "-DENABLE_MUELU ${CMAKE_CXX_FLAGS}")
-endif()
-if(ENABLE_MUELU_CUDA)
-    target_link_libraries(steady
-        ${CUDA_LIBRARIES}
-        ${CUDA_CUBLAS_LIBRARIES}
-    )
-    SET(CMAKE_CXX_FLAGS "-DENABLE_MUELU_CUDA ${CMAKE_CXX_FLAGS}")
+find_package(p4est)
+find_package(BLAS)
+find_package(LAPACK)
+if(p4est_FOUND)
+    find_package(sc REQUIRED)
 endif()
 
-if(AMGX_FOUND)
-add_library(AmgxWrapper AmgxWrapper.cpp)
-target_link_libraries(steady AmgxWrapper)
-target_link_libraries(AmgxWrapper
-   ${AMGX_LIBRARIES}
-)
+#determine sources first
+list(APPEND Thunderegg_SRCS Thunderegg/SchurMatrixHelper.cpp)
+list(APPEND Thunderegg_SRCS Thunderegg/SchurMatrixHelper2d.cpp)
+list(APPEND Thunderegg_SRCS Thunderegg/MatrixHelper.cpp)
+list(APPEND Thunderegg_SRCS Thunderegg/MatrixHelper2d.cpp)
+list(APPEND Thunderegg_SRCS Thunderegg/TriLinInterp.cpp)
+list(APPEND Thunderegg_SRCS Thunderegg/BilinearInterpolator.cpp)
+list(APPEND Thunderegg_SRCS Thunderegg/PolyChebPrec.cpp)
+list(APPEND Thunderegg_SRCS Thunderegg/SchurHelper.cpp)
+list(APPEND Thunderegg_SRCS Thunderegg/Domain.cpp)
+list(APPEND Thunderegg_SRCS Thunderegg/ThundereggDomGen.cpp)
+list(APPEND Thunderegg_SRCS Thunderegg/PatchInfo.cpp)
+list(APPEND Thunderegg_HDRS Thunderegg/PatchInfo.h)
+list(APPEND Thunderegg_SRCS Thunderegg/SchurInfo.cpp)
+list(APPEND Thunderegg_SRCS Thunderegg/Vector.cpp)
+
+list(APPEND Thunderegg_SRCS Thunderegg/SevenPtPatchOperator.cpp)
+list(APPEND Thunderegg_SRCS Thunderegg/StarPatchOp.cpp)
+
+list(APPEND Thunderegg_SRCS Thunderegg/GMG/CycleFactory2d.cpp)
+list(APPEND Thunderegg_SRCS Thunderegg/GMG/CycleFactory3d.cpp)
+
+list(APPEND Thunderegg_SRCS Thunderegg/PatchSolvers/DftPatchSolver.cpp)
+list(APPEND Thunderegg_SRCS Thunderegg/PatchSolvers/FftwPatchSolver.cpp)
+
+if(p4est_FOUND)
+    list(APPEND Thunderegg_SRCS Thunderegg/P4estDomGen.cpp)
 endif()
 
+list(APPEND Thunderegg_SRCS Thunderegg/Experimental/PBMatrix.cpp)
 
-add_subdirectory(PatchSolvers)
-include(GMG/CMakeLists.txt)
+add_library(Thunderegg ${Thunderegg_SRCS} ${Thunderegg_HDRS})
+
+# set include directories
+target_include_directories(Thunderegg PUBLIC 
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+list(APPEND Thunderegg_Includes ${MPI_CXX_INCLUDE_PATH})
+list(APPEND Thunderegg_Includes ${PETSC_INCLUDES})
+list(APPEND Thunderegg_Includes ${FFTW_INCLUDES})
+list(APPEND Thunderegg_Includes ${Zoltan_INCLUDES})
+if(p4est_FOUND)
+    list(APPEND Thunderegg_Includes ${p4est_INCLUDES})
+    list(APPEND Thunderegg_Includes ${sc_INCLUDES})
+endif()
+target_include_directories(Thunderegg PUBLIC ${Thunderegg_Includes})
+
+# set link 
+#list(APPEND Thunderegg_Libs ${MPI_CXX_LIBRARIES})
+list(APPEND Thunderegg_Libs ${PETSC_LIBRARIES}) 
+list(APPEND Thunderegg_Libs ${FFTW_LIBRARIES}) 
+list(APPEND Thunderegg_Libs ${Zoltan_LIBRARIES})
+list(APPEND Thunderegg_Libs ${BLAS_LIBRARIES}) 
+list(APPEND Thunderegg_Libs ${LAPACK_LIBRARIES})
+if(p4est_FOUND)
+    list(APPEND Thunderegg_Libs ${p4est_LIBRARIES})
+    list(APPEND Thunderegg_Libs ${sc_LIBRARIES})
+endif()
+target_link_libraries(Thunderegg PUBLIC ${Thunderegg_Libs})
+target_link_libraries(Thunderegg PUBLIC ${MPI_CXX_LIBRARIES})
+
+
+install(TARGETS Thunderegg EXPORT ThundereggConfig
+    ARCHIVE  DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY  DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME  DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+
+install(DIRECTORY Thunderegg/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Thunderegg
+    FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp")
+
+install(EXPORT ThundereggConfig DESTINATION share/Thunderegg/cmake)
+
+include(PkgConfigHandler)
+configure_pc_file("Thunderegg" "Thunderegg.pc.in" "Thunderegg.pc")
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/Thunderegg.pc" 
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+

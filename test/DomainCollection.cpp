@@ -1,4 +1,4 @@
-#include "../DomainCollection.h"
+#include <Thunderegg/Domain.h>
 #include "catch.hpp"
 using namespace std;
 #if 0

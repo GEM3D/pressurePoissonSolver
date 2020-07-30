@@ -1,4 +1,4 @@
-#include "OctTree.h"
+#include <Thunderegg/OctTree.h>
 #include "catch.hpp"
 #include <set>
 using namespace std;

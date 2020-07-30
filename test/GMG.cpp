@@ -1,7 +1,7 @@
-#include "../GMG/AvgRstr.h"
-#include "../GMG/DrctIntp.h"
-#include "../GMG/InterLevelComm.h"
-#include "../GMG/TriLinIntp.h"
+#include <Thunderegg/GMG/AvgRstr.h>
+#include <Thunderegg/GMG/DrctIntp.h>
+#include <Thunderegg/GMG/InterLevelComm.h>
+#include <Thunderegg/GMG/TriLinIntp.h>
 #include "catch.hpp"
 #ifdef HAVE_VTK
 #include "../Writers/VtkWriter.h"

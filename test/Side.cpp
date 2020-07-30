@@ -1,4 +1,4 @@
-#include "Side.h"
+#include <Thunderegg/Side.h>
 #include "catch.hpp"
 using namespace std;
 TEST_CASE("Default constructor works", "[Side]")

@@ -75,3 +75,43 @@ tags
 [._]*.un~
 
 # End of https://www.gitignore.io/api/vim,c++,cuda,cmake
+.vscode/*
+
+#!.vscode/settings.json
+#
+#!.vscode/tasks.json
+#
+#!.vscode/launch.json
+#
+#!.vscode/extensions.json
+reated by https://www.gitignore.io/api/valgrind
+
+# Edit at https://www.gitignore.io/?templates=valgrind
+### Valgrind ###
+# Callgrind output files
+callgrind.out
+callgrind.out.*
+
+# Cachegrind output files
+cachegrind.out
+cachegrind.out.*
+
+# Massif output files
+massif.out
+massif.out.*
+
+# BBV output files
+bb.out
+bb.out.*
+
+# End of https://www.gitignore.io/api/valgrind
+#
+doc/*
+*.vti
+build/*
+apps/2d/*
+apps/3d/*
+!apps/2d/steady.cpp
+!apps/3d/steady.cpp
+.gitignore
+misc/*
